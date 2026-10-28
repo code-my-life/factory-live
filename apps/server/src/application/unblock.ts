@@ -15,6 +15,8 @@ export interface UnblockDeps {
   hub: Hub;
   store: HistoryPort;
   github: GitHubWritePort | null;
+  /** Faux tant que Clément n'est pas connecté à GitHub (et sans jeton de repli). */
+  canWrite?: () => boolean;
   log: LoggerPort;
   now: () => number;
 }
@@ -38,11 +40,12 @@ export async function unblockIntervention(
       'Cette intervention ne se débloque pas depuis l’app : utilise les commandes proposées',
     );
   }
-  if (!deps.github)
+  if (!deps.github || (deps.canWrite && !deps.canWrite())) {
     throw new UnblockError(
       503,
-      'Aucun jeton GitHub : dépose-le dans ~/.config/factory-live/github-token',
+      'Connecte-toi à GitHub dans factory-live (Réglages) pour débloquer depuis l’app',
     );
+  }
   const now = deps.now();
   const reserved = deps.store.reserveUnblock({
     interventionId,

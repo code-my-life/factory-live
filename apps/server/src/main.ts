@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { serve } from '@hono/node-server';
+import { GitHubAppAuth } from './adapters/github/app.ts';
 import { GitHubCache } from './adapters/github/cache.ts';
 import { GitHubClient } from './adapters/github/client.ts';
 import { CardFiles } from './adapters/hermes/files.ts';
@@ -39,12 +40,31 @@ const store = (() => {
 })();
 const profiles = new ProfileConfigReader(config.HERMES_HOME, config.FACTORY_REPO);
 const sessions = new SessionReader(config.profilesDir);
-const githubClient = config.secrets.githubToken
-  ? new GitHubClient(config.secrets.githubToken, config.GITHUB_OWNER, config.GITHUB_API)
-  : null;
-const github = githubClient
-  ? new GitHubCache(githubClient, config.GITHUB_OWNER, log.child({ component: 'github' }))
-  : null;
+// GitHub : App factory-live (lectures, quota propre) et connexion de Clément (déblocage) ; le jeton
+// fine-grained de ~/.config/factory-live/github-token sert de repli tant que l'App n'existe pas.
+const githubAuth = new GitHubAppAuth({
+  store,
+  owner: config.GITHUB_OWNER,
+  login: config.GITHUB_LOGIN,
+  origins: config.PUBLIC_ORIGINS,
+  fallbackToken: config.secrets.githubToken,
+  api: config.GITHUB_API,
+});
+const githubClient = new GitHubClient(githubAuth, config.GITHUB_OWNER, config.GITHUB_API);
+const github = new GitHubCache(
+  githubClient,
+  config.GITHUB_OWNER,
+  log.child({ component: 'github' }),
+  () => {
+    const access = githubAuth.status();
+    if (access.mode !== 'app') return 'Jeton fine-grained de repli';
+    if (access.user)
+      return `App ${access.app?.slug ?? ''}, connecté en tant que ${access.user.login}`;
+    return githubAuth.canWrite()
+      ? `App ${access.app?.slug ?? ''}, déblocage par le jeton de repli`
+      : `App ${access.app?.slug ?? ''}, connexion GitHub requise pour débloquer`;
+  },
+);
 
 const hub = new Hub(
   {
@@ -86,11 +106,18 @@ const pollKanban = () => {
 };
 pollKanban();
 
-const unblockDeps = { hub, store, github: githubClient, log, now };
+const unblockDeps = {
+  hub,
+  store,
+  github: githubClient,
+  canWrite: () => githubAuth.canWrite(),
+  log,
+  now,
+};
 let githubBusy = false;
 let lastDeliveries = 0;
 const refreshGitHub = async () => {
-  if (!github || githubBusy) return;
+  if (githubBusy) return;
   githubBusy = true;
   try {
     if (await github.refresh(hub.trackedIssues(), now())) hub.githubChanged();
@@ -136,6 +163,7 @@ const app = createApp({
   },
   unblock: unblockDeps,
   notifier,
+  githubAuth,
   hookSecret: config.secrets.hookSecret,
   origins: config.PUBLIC_ORIGINS,
   tailscaleLogins: config.TAILSCALE_LOGINS,
@@ -152,7 +180,7 @@ const server = serve({ fetch: app.fetch, port: config.PORT, hostname: config.HOS
       port: info.port,
       host: config.HOST,
       kanban: config.kanbanDb,
-      github: github ? 'jeton présent' : 'aucun jeton (lecture seule)',
+      github: githubAuth.status().mode,
       ingestion: config.secrets.hookSecret ? 'secret présent' : 'désactivée (secret absent)',
       tailscaleLogins: config.TAILSCALE_LOGINS,
     },

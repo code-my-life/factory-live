@@ -26,3 +26,22 @@ export type ClientLog = z.infer<typeof ClientLog>;
 /** Réponse d'erreur commune de l'API. */
 export const ApiError = z.object({ error: z.string(), detail: z.string().optional() });
 export type ApiError = z.infer<typeof ApiError>;
+
+/** Accès de factory-live à GitHub : GitHub App (lectures) et connexion de Clément (déblocage). */
+export const GitHubAccess = z.object({
+  mode: z.enum(['app', 'token', 'none']),
+  app: z
+    .object({
+      slug: z.string(),
+      url: z.string(),
+      installed: z.boolean().nullable(),
+      installUrl: z.url(),
+    })
+    .nullable(),
+  user: z
+    .object({ login: z.string(), avatarUrl: z.string().nullable(), expiresAt: Timestamp })
+    .nullable(),
+  setupUrl: z.string(),
+  loginUrl: z.string(),
+});
+export type GitHubAccess = z.infer<typeof GitHubAccess>;

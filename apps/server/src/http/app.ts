@@ -4,6 +4,7 @@ import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import {
   ApiError,
   ClientLog,
+  GitHubAccess,
   HermesHookBody,
   HistoryStats,
   IssueDetail,
@@ -21,6 +22,8 @@ import {
 import { bodyLimit } from 'hono/body-limit';
 import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
+import { GitHubAuthError } from '../adapters/github/app.ts';
+import type { GitHubAppAuth } from '../adapters/github/app.ts';
 import type { PushNotifier } from '../adapters/push/webpush.ts';
 import type { HistoryStore } from '../adapters/store/history.ts';
 import { toHookEvent } from '../ingest/hermes.ts';
@@ -37,7 +40,7 @@ import type { ViewDeps } from '../application/views.ts';
 import type { Logger } from '../logger.ts';
 import { UnblockError, unblockIntervention } from '../application/unblock.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
-import { writeGuard } from './guard.ts';
+import { navigationGuard, requestOrigin, writeGuard } from './guard.ts';
 import type { StreamBuffer } from './stream.ts';
 
 export interface AppDeps {
@@ -47,6 +50,7 @@ export interface AppDeps {
   views: ViewDeps;
   unblock: UnblockDeps;
   notifier: PushNotifier | null;
+  githubAuth: GitHubAppAuth | null;
   hookSecret: string | null;
   origins: readonly string[];
   tailscaleLogins: readonly string[];
@@ -119,7 +123,7 @@ export function createApp(deps: AppDeps) {
     await next();
     c.header('X-Content-Type-Options', 'nosniff');
     c.header('Referrer-Policy', 'same-origin');
-    c.header('Content-Security-Policy', CSP);
+    if (!c.res.headers.has('Content-Security-Policy')) c.header('Content-Security-Policy', CSP);
     c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   });
 
@@ -430,6 +434,132 @@ export function createApp(deps: AppDeps) {
       { component: 'client', ...parsed.data },
       parsed.data.message,
     );
+    return c.body(null, 204);
+  });
+
+  // --- GitHub : App factory-live (lectures) et connexion de Clément (déblocage) ------------------------
+
+  const navigation = navigationGuard({
+    origins: deps.origins,
+    tailscaleLogins: deps.tailscaleLogins,
+  });
+  const githubPage = (title: string, body: string, status: 200 | 400 | 403 | 409 | 502 = 200) =>
+    new Response(
+      `<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title>` +
+        `<body style="margin:0;background:#0d1117;color:#f0f6fc;font:16px/1.5 system-ui,sans-serif"><main style="max-width:36rem;margin:10vh auto;padding:0 16px">` +
+        `<h1 style="font-size:24px">${title}</h1>${body}</main></body></html>`,
+      {
+        status,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Content-Security-Policy':
+            "default-src 'none'; style-src 'unsafe-inline'; form-action https://github.com; base-uri 'none'; frame-ancestors 'none'",
+        },
+      },
+    );
+  const escapeHtml = (text: string) =>
+    text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
+  const authFailure = (error: unknown) => {
+    const status =
+      error instanceof GitHubAuthError && [400, 403, 409, 502].includes(error.status)
+        ? (error.status as 400 | 403 | 409 | 502)
+        : 502;
+    deps.log.warn({ component: 'github', error: String(error) }, 'parcours GitHub en échec');
+    return githubPage(
+      'GitHub',
+      `<p>${escapeHtml(error instanceof Error ? error.message : String(error))}</p><p><a style="color:#4493f8" href="/">Revenir à factory-live</a></p>`,
+      status,
+    );
+  };
+
+  app.openapi(
+    createRoute({
+      method: 'get',
+      path: '/api/github/status',
+      responses: { 200: json(GitHubAccess, 'Accès de factory-live à GitHub') },
+    }),
+    (c) => {
+      const status = deps.githubAuth?.status() ?? { mode: 'none' as const, app: null, user: null };
+      return c.json(
+        {
+          ...status,
+          user: status.user
+            ? { ...status.user, expiresAt: new Date(status.user.expiresAt).toISOString() }
+            : null,
+          setupUrl: '/api/github/setup',
+          loginUrl: '/api/github/login',
+        },
+        200,
+      );
+    },
+  );
+
+  app.get('/api/github/setup', navigation, (c) => {
+    if (!deps.githubAuth) return c.text('Intégration GitHub indisponible', 503);
+    const { action, manifest } = deps.githubAuth.manifestRequest(
+      requestOrigin(deps.origins, c.req.header('host')),
+    );
+    return githubPage(
+      'Créer l’App GitHub de factory-live',
+      `<p>GitHub va créer une App privée pour l’organisation, avec ces droits : issues en écriture (pour « /factory unblock »), PR, CI, contenu et webhooks des dépôts en lecture. Aucun webhook n’est activé.</p>` +
+        `<p>Sur GitHub, garde le nom proposé ou change-le, puis clique « Create GitHub App ». Tu reviendras ici pour l’installer : choisis alors « All repositories ».</p>` +
+        `<form method="post" action="${escapeHtml(action)}"><input type="hidden" name="manifest" value="${escapeHtml(JSON.stringify(manifest))}">` +
+        `<button style="font:inherit;padding:8px 16px;border-radius:6px;border:0;background:#238636;color:#fff;cursor:pointer">Continuer sur GitHub</button></form>`,
+    );
+  });
+
+  app.get('/api/github/manifest/callback', navigation, async (c) => {
+    if (!deps.githubAuth) return c.text('Intégration GitHub indisponible', 503);
+    try {
+      await deps.githubAuth.completeManifest(c.req.query('code') ?? '', c.req.query('state') ?? '');
+      deps.store.audit('github', 'app-created', null, deps.now());
+      return c.redirect(deps.githubAuth.installUrl() ?? '/', 303);
+    } catch (error) {
+      return authFailure(error);
+    }
+  });
+
+  app.get('/api/github/installed', navigation, (c) =>
+    c.redirect('/settings?github=installed', 303),
+  );
+
+  app.get('/api/github/login', navigation, (c) => {
+    if (!deps.githubAuth) return c.text('Intégration GitHub indisponible', 503);
+    try {
+      return c.redirect(
+        deps.githubAuth.authorizeUrl(requestOrigin(deps.origins, c.req.header('host'))),
+        303,
+      );
+    } catch (error) {
+      return authFailure(error);
+    }
+  });
+
+  app.get('/api/github/oauth/callback', navigation, async (c) => {
+    if (!deps.githubAuth) return c.text('Intégration GitHub indisponible', 503);
+    if (c.req.query('error'))
+      return authFailure(
+        new GitHubAuthError(
+          400,
+          `Connexion refusée sur GitHub : ${c.req.query('error_description') ?? c.req.query('error') ?? ''}`,
+        ),
+      );
+    try {
+      const user = await deps.githubAuth.completeLogin(
+        c.req.query('code') ?? '',
+        c.req.query('state') ?? '',
+      );
+      deps.store.audit(`github:${user.login}`, 'github-login', null, deps.now());
+      return c.redirect('/settings?github=connected', 303);
+    } catch (error) {
+      return authFailure(error);
+    }
+  });
+
+  app.use('/api/github/logout', guard);
+  app.post('/api/github/logout', (c) => {
+    deps.githubAuth?.logout();
+    deps.store.audit(c.get('actor'), 'github-logout', null, deps.now());
     return c.body(null, 204);
   });
 

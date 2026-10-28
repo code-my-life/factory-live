@@ -1,8 +1,9 @@
-import { mkdirSync } from 'node:fs';
+import { chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { ActivityEvent } from '@factory-live/contracts';
 import type { Board, Comment, Run, Task, TaskEvent } from '@factory-live/domain';
+import type { AppCredentials, GitHubAuthStore, UserTokens } from '../github/app.ts';
 import type {
   HistoryPort,
   KanbanDelta,
@@ -55,12 +56,15 @@ function parse<T>(value: unknown): T {
   return JSON.parse(String(value)) as T;
 }
 
-export class HistoryStore implements HistoryPort {
+export class HistoryStore implements HistoryPort, GitHubAuthStore {
   private readonly db: DatabaseSync;
 
   constructor(dataDir: string) {
     mkdirSync(dataDir, { recursive: true, mode: 0o700 });
-    this.db = new DatabaseSync(join(dataDir, 'factory-live.db'));
+    const path = join(dataDir, 'factory-live.db');
+    this.db = new DatabaseSync(path);
+    // Elle garde les clés de la GitHub App et les jetons de Clément : lisible par son seul propriétaire.
+    chmodSync(path, 0o600);
     this.db.exec(
       'PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 2000;',
     );
@@ -348,6 +352,28 @@ export class HistoryStore implements HistoryPort {
         'INSERT INTO issue_stations (issue_key, station, previous, changed_at) VALUES (?, ?, ?, ?) ON CONFLICT(issue_key) DO UPDATE SET station = excluded.station, previous = excluded.previous, changed_at = excluded.changed_at',
       )
       .run(issueKey, record.station, record.previous, record.changedAt);
+  }
+
+  githubApp(): AppCredentials | null {
+    const value = this.meta('github:app');
+    return value ? (JSON.parse(value) as AppCredentials) : null;
+  }
+
+  saveGitHubApp(app: AppCredentials): void {
+    this.setMeta('github:app', JSON.stringify(app));
+  }
+
+  githubUser(): UserTokens | null {
+    const value = this.meta('github:user');
+    return value ? (JSON.parse(value) as UserTokens) : null;
+  }
+
+  saveGitHubUser(user: UserTokens): void {
+    this.setMeta('github:user', JSON.stringify(user));
+  }
+
+  clearGitHubUser(): void {
+    this.db.prepare("DELETE FROM meta WHERE key = 'github:user'").run();
   }
 
   close(): void {

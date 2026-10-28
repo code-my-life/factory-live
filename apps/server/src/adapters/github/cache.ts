@@ -33,11 +33,18 @@ export class GitHubCache implements GitHubReadPort {
   readonly client: GitHubClient;
   private readonly owner: string;
   private readonly log: LoggerPort;
+  private readonly describe: () => string;
 
-  constructor(client: GitHubClient, owner: string, log: LoggerPort) {
+  constructor(
+    client: GitHubClient,
+    owner: string,
+    log: LoggerPort,
+    describe: () => string = () => 'Accès GitHub valide',
+  ) {
     this.client = client;
     this.owner = owner;
     this.log = log;
+    this.describe = describe;
   }
 
   issueInfo(key: string): IssueInfo | null {
@@ -73,14 +80,18 @@ export class GitHubCache implements GitHubReadPort {
           }
         }
         this.fetchedOnce.add(issue.key);
-        this.status = { ok: true, detail: 'Jeton fine-grained valide', checkedAt: now };
+        this.status = { ok: true, detail: this.describe(), checkedAt: now };
       } catch (error) {
         const status = error instanceof GitHubError ? error.status : 0;
+        // Nos propres messages (aucun accès, connexion requise) sont déjà lisibles.
+        const ours =
+          error instanceof GitHubError && /^(Aucun accès|Connecte-toi)/.test(error.message);
         this.status = {
           ok: status === 404,
-          detail:
-            status === 401
-              ? 'Jeton refusé (401) : à renouveler'
+          detail: ours
+            ? error.message
+            : status === 401
+              ? 'Accès refusé (401) : reconnecte ou réinstalle l’App GitHub'
               : status === 403
                 ? 'Accès refusé ou quota épuisé (403)'
                 : `Erreur ${status || 'réseau'} sur ${issue.key}`,

@@ -1,7 +1,8 @@
-import { IssueDetail, Snapshot, StreamEvent } from '@factory-live/contracts';
+import { GitHubAccess, IssueDetail, Snapshot, StreamEvent } from '@factory-live/contracts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { trackUnblockReactions } from '../application/unblock.ts';
 import { sign } from '../ingest/signature.ts';
-import { NOW, NOW_S, SECRET, harness } from '../test/harness.ts';
+import { NOW, NOW_S, ORIGINS, SECRET, harness } from '../test/harness.ts';
 import type { Harness } from '../test/harness.ts';
 import { insertEvent } from '../test/hermes-fixtures.ts';
 
@@ -196,6 +197,7 @@ describe('déblocage depuis l’app', () => {
         method: 'POST',
         url: 'https://api.github.com/repos/code-my-life/cv-site/issues/49/comments',
         body: { body: '/factory unblock Prends PostgreSQL' },
+        auth: 'Bearer jeton',
       },
     ]);
     expect((await snapshot()).interventions[0]?.unblock).toMatchObject({
@@ -380,6 +382,145 @@ describe('notifications', () => {
     expect(JSON.parse(h.pushes[0]?.payload ?? '{}')).toMatchObject({
       title: 'factory-live : test',
     });
+  });
+});
+
+describe('GitHub App et connexion de Clément', () => {
+  const NAV = { host: 'localhost:8446' };
+  const TAILNET_HOST = 'desktop-gja56n4.tail40220c.ts.net:8446';
+  const decode = (html: string) =>
+    html.replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)));
+  const status = async () =>
+    GitHubAccess.parse(await (await h.app.request('/api/github/status')).json());
+  const interventionId = async () => (await snapshot()).interventions[0]?.id as string;
+  const unblock = async (id: string) =>
+    h.app.request(`/api/interventions/${encodeURIComponent(id)}/unblock`, {
+      method: 'POST',
+      headers: LOCAL,
+      body: JSON.stringify({ text: 'Prends PostgreSQL' }),
+    });
+
+  /** Le parcours de Clément : page de création, retour de GitHub, connexion, retour de GitHub. */
+  async function createAndConnect() {
+    const setup = await h.app.request('/api/github/setup', { headers: NAV });
+    const page = await setup.text();
+    const state = /apps\/new\?state=([\w-]+)"/.exec(page)?.[1] ?? '';
+    const created = await h.app.request(`/api/github/manifest/callback?code=abc&state=${state}`, {
+      headers: NAV,
+    });
+    const login = await h.app.request('/api/github/login', { headers: NAV });
+    const authorize = new URL(login.headers.get('location') ?? '');
+    const back = await h.app.request(
+      `/api/github/oauth/callback?code=xyz&state=${authorize.searchParams.get('state') ?? ''}`,
+      { headers: NAV },
+    );
+    return { setup, page, state, created, login, authorize, back };
+  }
+
+  it('crée l’App depuis factory-live, puis connecte Clément', async () => {
+    expect(await status()).toEqual({
+      mode: 'token',
+      app: null,
+      user: null,
+      setupUrl: '/api/github/setup',
+      loginUrl: '/api/github/login',
+    });
+    const { setup, page, state, created, login, authorize, back } = await createAndConnect();
+    expect(setup.headers.get('content-security-policy')).toContain(
+      'form-action https://github.com',
+    );
+    const manifest = JSON.parse(
+      decode(/name="manifest" value="([^"]+)"/.exec(page)?.[1] ?? '{}'),
+    ) as Record<string, unknown>;
+    expect(manifest).toMatchObject({
+      redirect_url: 'http://localhost:8446/api/github/manifest/callback',
+      callback_urls: ORIGINS.map((origin) => `${origin}/api/github/oauth/callback`),
+      hook_attributes: { active: false },
+    });
+    expect(created.status).toBe(303);
+    expect(created.headers.get('location')).toBe(
+      'https://github.com/apps/factory-live-test/installations/new',
+    );
+    expect(login.status).toBe(303);
+    expect(authorize.searchParams.get('redirect_uri')).toBe(
+      'http://localhost:8446/api/github/oauth/callback',
+    );
+    expect(back.status).toBe(303);
+    expect(back.headers.get('location')).toBe('/settings?github=connected');
+    expect(await status()).toMatchObject({
+      mode: 'app',
+      app: { slug: 'factory-live-test', url: 'https://github.com/apps/factory-live-test' },
+      user: { login: 'cddev', expiresAt: new Date(NOW + 28_800_000).toISOString() },
+    });
+    const replay = await h.app.request(`/api/github/manifest/callback?code=abc&state=${state}`, {
+      headers: NAV,
+    });
+    expect(replay.status).toBe(400);
+    expect(await replay.text()).toContain('relance la création');
+  });
+
+  it('débloque au nom de Clément et lit avec le jeton de l’App', async () => {
+    await createAndConnect();
+    const id = await interventionId();
+    expect((await unblock(id)).status).toBe(200);
+    h.github.reactions.push({ content: '+1', user: { login: 'factory-bot' } });
+    await trackUnblockReactions(h.unblock);
+    const comment = h.github.calls.find(
+      (call) => call.method === 'POST' && call.url.endsWith('/issues/49/comments'),
+    );
+    expect(comment?.auth).toBe('Bearer ghu_test');
+    const reactions = h.github.calls.find((call) => call.url.includes('/reactions'));
+    expect(reactions?.auth).toBe('Bearer ghs_test');
+    expect(h.store.unblock(id)?.state).toBe('acknowledged');
+  });
+
+  it('sans connexion ni jeton de repli, le déblocage demande de se connecter', async () => {
+    h.close();
+    h = harness({ githubToken: null });
+    const response = await unblock(await interventionId());
+    expect(response.status).toBe(503);
+    expect(((await response.json()) as { error: string }).error).toMatch(/Connecte-toi/);
+    expect(h.github.calls.filter((call) => call.method === 'POST')).toHaveLength(0);
+  });
+
+  it('réserve ces pages à ce PC et au login Tailscale de Clément', async () => {
+    const get = (headers: Record<string, string>) =>
+      h.app.request('/api/github/setup', { headers });
+    expect((await get({})).status).toBe(403);
+    expect((await get({ host: 'evil.example' })).status).toBe(403);
+    expect((await get({ ...NAV, 'x-forwarded-for': '100.64.0.7' })).status).toBe(403);
+    expect(
+      (await get({ host: TAILNET_HOST, 'tailscale-user-login': 'intrus@github' })).status,
+    ).toBe(403);
+    const tailnet = await get({
+      host: TAILNET_HOST,
+      'tailscale-user-login': 'cddev@github',
+      'x-forwarded-for': '100.64.0.7',
+    });
+    expect(tailnet.status).toBe(200);
+    expect(decode(await tailnet.text())).toContain(
+      `"redirect_url":"https://${TAILNET_HOST}/api/github/manifest/callback"`,
+    );
+  });
+
+  it('explique un refus sur GitHub sans recopier son texte en HTML', async () => {
+    const response = await h.app.request(
+      `/api/github/oauth/callback?error=access_denied&error_description=${encodeURIComponent('<b>non</b>')}`,
+      { headers: NAV },
+    );
+    expect(response.status).toBe(400);
+    const page = await response.text();
+    expect(page).toContain('Connexion refusée sur GitHub : &#60;b&#62;non&#60;/b&#62;');
+    expect(page).not.toContain('<b>');
+  });
+
+  it('se déconnecte par une écriture protégée', async () => {
+    await createAndConnect();
+    const logout = (headers: Record<string, string>) =>
+      h.app.request('/api/github/logout', { method: 'POST', headers });
+    expect((await logout({ ...LOCAL, 'x-factory-live': '' })).status).toBe(403);
+    expect((await logout(LOCAL)).status).toBe(204);
+    expect((await status()).user).toBeNull();
   });
 });
 

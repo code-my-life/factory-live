@@ -62,3 +62,33 @@ export function writeGuard(
     return undefined;
   };
 }
+
+/**
+ * Garde des pages de navigation (création de l'App, connexion GitHub) : même identité que pour les
+ * écritures (ce PC ou le login Tailscale autorisé), sans en-tête anti-CSRF, qu'une navigation ne peut
+ * pas porter ; les retours de GitHub sont en plus liés à un état à usage unique.
+ */
+export function navigationGuard(options: GuardOptions): MiddlewareHandler {
+  return async (c, next) => {
+    const host = hostname(c.req.header('host'));
+    const login = c.req.header('tailscale-user-login') ?? null;
+    const local =
+      LOCAL_HOSTS.has(host) &&
+      !c.req.header('x-forwarded-for') &&
+      !c.req.header('x-forwarded-proto');
+    if (login ? !options.tailscaleLogins.includes(login) : !local) {
+      return c.text('Réservé à ce PC et à ton login Tailscale.', 403);
+    }
+    await next();
+    return undefined;
+  };
+}
+
+/** Origine publique de la requête (localhost ou nom tailnet), pour les adresses de retour de GitHub. */
+export function requestOrigin(origins: readonly string[], host: string | undefined): string {
+  const wanted = (host ?? '').toLowerCase();
+  return (
+    origins.find((origin) => new URL(origin).host.toLowerCase() === wanted) ??
+    (origins[0] as string)
+  );
+}

@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
+import { GitHubAppAuth } from '../adapters/github/app.ts';
 import { GitHubCache } from '../adapters/github/cache.ts';
 import { GitHubClient } from '../adapters/github/client.ts';
 import { CardFiles } from '../adapters/hermes/files.ts';
@@ -13,13 +14,16 @@ import { HistoryStore } from '../adapters/store/history.ts';
 import { createApp } from '../http/app.ts';
 import { StreamBuffer } from '../http/stream.ts';
 import { Hub } from '../application/hub.ts';
+import type { UnblockDeps } from '../application/unblock.ts';
 import { createLogger } from '../logger.ts';
+import { appPem } from './github-fixtures.ts';
 import { insertEvent, insertRun, insertTask, kanbanDb, tempDir } from './hermes-fixtures.ts';
 import type { TempDir } from './hermes-fixtures.ts';
 
 export const SECRET = 'secret-de-test';
 export const NOW = Date.parse('2026-10-28T18:00:00Z');
 export const NOW_S = Math.floor(NOW / 1000);
+export const ORIGINS = ['http://localhost:8446', 'https://desktop-gja56n4.tail40220c.ts.net:8446'];
 
 export interface Harness {
   dir: TempDir;
@@ -30,9 +34,11 @@ export interface Harness {
   buffer: StreamBuffer;
   app: ReturnType<typeof createApp>;
   github: {
-    calls: { method: string; url: string; body: unknown }[];
+    calls: { method: string; url: string; body: unknown; auth: string | null }[];
     reactions: { content: string; user: { login: string } }[];
   };
+  githubAuth: GitHubAppAuth;
+  unblock: UnblockDeps;
   pushes: { subscription: StoredSubscription; payload: string }[];
   clock: { now: number };
   syncKanban(): void;
@@ -41,9 +47,10 @@ export interface Harness {
 
 /**
  * Une factory miniature au schéma réel d'Hermès : l'issue cv-site#49, brief terminé, impl bloquée sur
- * une décision (needs_input). GitHub et Web Push sont simulés.
+ * une décision (needs_input). GitHub (API, App et connexion OAuth) et Web Push sont simulés ; sans App
+ * créée, l'accès GitHub passe par le jeton de repli (`jeton`, ou aucun avec `githubToken: null`).
  */
-export function harness(): Harness {
+export function harness(options: { githubToken?: string | null } = {}): Harness {
   const dir = tempDir();
   const hermes = join(dir.path, 'hermes');
   const factory = join(dir.path, 'factory');
@@ -124,6 +131,7 @@ export function harness(): Harness {
       method,
       url,
       body: typeof init.body === 'string' ? (JSON.parse(init.body) as unknown) : null,
+      auth: new Headers(init.headers).get('authorization'),
     });
     const respond = (body: unknown) =>
       Promise.resolve(
@@ -145,9 +153,46 @@ export function harness(): Harness {
         labels: [{ name: 'factory' }],
         state: 'open',
       });
+    if (method === 'POST' && url.includes('/app-manifests/'))
+      return respond({
+        id: 123,
+        slug: 'factory-live-test',
+        client_id: 'Iv23litest',
+        client_secret: 'secret-app',
+        pem: appPem(),
+        html_url: 'https://github.com/apps/factory-live-test',
+      });
+    if (method === 'POST' && url === 'https://github.com/login/oauth/access_token')
+      return respond({
+        access_token: 'ghu_test',
+        expires_in: 28_800,
+        refresh_token: 'ghr_test',
+        refresh_token_expires_in: 15_897_600,
+      });
+    if (url === 'https://api.github.com/user')
+      return respond({
+        login: 'cddev',
+        id: 42,
+        avatar_url: 'https://avatars.githubusercontent.com/u/42',
+      });
+    if (url.endsWith('/orgs/code-my-life/installation')) return respond({ id: 99 });
+    if (method === 'POST' && url.endsWith('/app/installations/99/access_tokens'))
+      return respond({
+        token: 'ghs_test',
+        expires_at: new Date(clock.now + 3_600_000).toISOString(),
+      });
     return Promise.resolve(new Response('{}', { status: 404 }));
   }) as typeof fetch;
-  const client = new GitHubClient('jeton', 'code-my-life', 'https://api.github.com', fakeFetch);
+  const githubAuth = new GitHubAppAuth({
+    store,
+    owner: 'code-my-life',
+    login: 'cddev',
+    origins: ORIGINS,
+    fallbackToken: options.githubToken === undefined ? 'jeton' : options.githubToken,
+    fetchImpl: fakeFetch,
+    now,
+  });
+  const client = new GitHubClient(githubAuth, 'code-my-life', 'https://api.github.com', fakeFetch);
   const cache = new GitHubCache(client, 'code-my-life', log);
   const hub = new Hub(
     {
@@ -176,7 +221,14 @@ export function harness(): Harness {
       return Promise.resolve();
     },
   );
-  const unblock = { hub, store, github: client, log, now };
+  const unblock: UnblockDeps = {
+    hub,
+    store,
+    github: client,
+    canWrite: () => githubAuth.canWrite(),
+    log,
+    now,
+  };
   const app = createApp({
     hub,
     buffer,
@@ -196,8 +248,9 @@ export function harness(): Harness {
     },
     unblock,
     notifier,
+    githubAuth,
     hookSecret: SECRET,
-    origins: ['http://localhost:8446', 'https://desktop-gja56n4.tail40220c.ts.net:8446'],
+    origins: ORIGINS,
     tailscaleLogins: ['cddev@github'],
     webDist: null,
     log,
@@ -213,6 +266,8 @@ export function harness(): Harness {
     buffer,
     app,
     github,
+    githubAuth,
+    unblock,
     pushes,
     clock,
     syncKanban,

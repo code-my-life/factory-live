@@ -1,5 +1,7 @@
 import type { ChecksState, PullRequestView } from '@factory-live/contracts';
 import type { GitHubWritePort, IssueInfo } from '../../application/ports.ts';
+import { StaticTokenSource } from './app.ts';
+import type { TokenSource } from './app.ts';
 
 export type { IssueInfo };
 
@@ -42,26 +44,27 @@ const obj = (value: unknown): Json =>
   typeof value === 'object' && value !== null ? (value as Json) : {};
 
 /**
- * Client REST de GitHub avec le jeton fine-grained de Clément (`~/.config/factory-live/github-token`).
- * Lectures conditionnelles par ETag (une réponse 304 ne compte pas dans le quota) ; la CI se lit par
- * l'API Actions, l'API Checks étant fermée aux jetons fine-grained.
+ * Client REST de GitHub. Les jetons viennent d'une source (`TokenSource`) : jeton d'installation de
+ * la GitHub App pour lire, jeton de Clément pour écrire, ou le jeton fine-grained en repli. Lectures
+ * conditionnelles par ETag (une réponse 304 ne compte pas dans le quota) ; la CI se lit par l'API
+ * Actions, ouverte à tous ces jetons.
  */
 export class GitHubClient implements GitHubWritePort {
   private readonly cache = new Map<string, { etag: string; body: unknown }>();
   rateLimit: RateLimit | null = null;
 
-  private readonly token: string;
+  private readonly tokens: TokenSource;
   private readonly owner: string;
   private readonly api: string;
   private readonly fetchImpl: Fetch;
 
   constructor(
-    token: string,
+    tokens: TokenSource | string,
     owner: string,
     api = 'https://api.github.com',
     fetchImpl: Fetch = fetch,
   ) {
-    this.token = token;
+    this.tokens = typeof tokens === 'string' ? new StaticTokenSource(tokens) : tokens;
     this.owner = owner;
     this.api = api;
     this.fetchImpl = fetchImpl;
@@ -72,13 +75,28 @@ export class GitHubClient implements GitHubWritePort {
     return `/repos/${this.owner}/${repo}${rest}`;
   }
 
-  private async request(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown> {
+  private async request(
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+    retried = false,
+  ): Promise<unknown> {
+    const kind = method === 'GET' ? 'read' : 'write';
+    const token = await this.tokens.token(kind);
+    if (!token) {
+      throw new GitHubError(
+        401,
+        kind === 'read'
+          ? 'Aucun accès GitHub : crée et installe l’App factory-live'
+          : 'Connecte-toi à GitHub dans factory-live pour écrire en ton nom',
+      );
+    }
     const cached = method === 'GET' ? this.cache.get(path) : undefined;
     const response = await this.fetchImpl(`${this.api}${path}`, {
       method,
       headers: {
         Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${this.token}`,
+        Authorization: `Bearer ${token}`,
         'X-GitHub-Api-Version': '2022-11-28',
         'User-Agent': 'factory-live',
         ...(cached ? { 'If-None-Match': cached.etag } : {}),
@@ -97,6 +115,11 @@ export class GitHubClient implements GitHubWritePort {
       };
     }
     if (response.status === 304 && cached) return cached.body;
+    if (response.status === 401 && !retried) {
+      // Jeton expiré ou révoqué : la source en fournit un neuf (installation renouvelée, rafraîchissement).
+      this.tokens.rejected(kind);
+      return this.request(method, path, body, true);
+    }
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
       throw new GitHubError(
