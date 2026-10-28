@@ -9,7 +9,7 @@ const sourceFirst = {
 
 export default defineConfig({
   test: {
-    // Le domaine reçoit ses tests en phase 3 ; d'ici là, un projet vide ne doit pas faire échouer la suite.
+    // Le serveur reçoit ses tests en phase 4 ; d'ici là, un projet vide ne doit pas faire échouer la suite.
     passWithNoTests: true,
     projects: [
       {
@@ -37,7 +37,11 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['packages/*/src/**', 'apps/*/src/**'],
-      exclude: ['**/*.test.*', 'apps/web/src/test/**'],
+      exclude: ['**/*.test.*', '**/*.test-helpers.ts', 'apps/web/src/test/**'],
+      // Règles métier : seuil vérifié à chaque `npm run verify` (plan, phase 3).
+      thresholds: {
+        'packages/domain/src/**': { lines: 95, statements: 95, functions: 90, branches: 80 },
+      },
     },
   },
 });

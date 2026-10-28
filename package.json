@@ -25,7 +25,7 @@
     "test:coverage": "vitest run --coverage",
     "dev:web": "npm run dev -w @factory-live/web",
     "dev:server": "npm run dev -w @factory-live/server",
-    "verify:fast": "npm run format:check && npm run lint && npm run typecheck && npm run check:text && npm run check:arch && npm run test",
+    "verify:fast": "npm run format:check && npm run lint && npm run typecheck && npm run check:text && npm run check:arch && npm run test:coverage",
     "verify": "npm run verify:fast && npm run build"
   },
   "devDependencies": {
