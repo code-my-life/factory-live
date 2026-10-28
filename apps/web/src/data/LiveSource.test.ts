@@ -1,6 +1,6 @@
 import type { ActivityEvent, IssueDetail, Snapshot } from '@factory-live/contracts';
 import { describe, expect, it, vi } from 'vitest';
-import { LOST_AFTER_MS, LiveSource, SILENT_AFTER_MS } from './LiveSource.ts';
+import { LOST_AFTER_MS, LiveSource, RECONNECT_DELAYS_MS, SILENT_AFTER_MS } from './LiveSource.ts';
 import type { LiveOptions, StreamLike } from './LiveSource.ts';
 
 class FakeStream implements StreamLike {
@@ -248,12 +248,28 @@ describe('LiveSource : lien et dernier état connu', () => {
     expect(SILENT_AFTER_MS).toBe(45_000);
   });
 
-  it('se dit hors ligne tout de suite quand le flux est fermé pour de bon', () => {
-    const { source, streams } = setup();
-    const stream = streams[0] as FakeStream;
-    stream.readyState = 2;
-    stream.onerror?.(new Event('error'));
+  it('se dit hors ligne tout de suite quand le flux est refusé, puis le relance de plus en plus espacé', () => {
+    const timers = manualTimers();
+    const { source, streams } = setup({}, timers);
+    const refuse = (stream: FakeStream | undefined) => {
+      if (!stream) throw new Error('flux attendu');
+      stream.readyState = 2;
+      stream.onerror?.(new Event('error'));
+    };
+    refuse(streams[0]);
     expect(source.getConnection()).toBe('lost');
+    timers.fire(RECONNECT_DELAYS_MS[0]);
+    expect(streams).toHaveLength(2);
+    refuse(streams[1]);
+    timers.fire(RECONNECT_DELAYS_MS[0]);
+    expect(streams).toHaveLength(2);
+    timers.fire(RECONNECT_DELAYS_MS[1]);
+    expect(streams).toHaveLength(3);
+    streams[2]?.onopen?.(new Event('open'));
+    expect(source.getConnection()).toBe('open');
+    refuse(streams[2]);
+    timers.fire(RECONNECT_DELAYS_MS[0]);
+    expect(streams).toHaveLength(4);
     expect(LOST_AFTER_MS).toBe(10_000);
   });
 

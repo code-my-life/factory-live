@@ -2,11 +2,11 @@ import type { Intervention, InterventionAction } from '@factory-live/contracts';
 import { CheckIcon, CopyIcon, LinkExternalIcon, PaperAirplaneIcon } from '@primer/octicons-react';
 import { Button, FormControl, Heading, Label, Textarea } from '@primer/react';
 import { useId, useState } from 'react';
-import { Link } from 'react-router';
 import { useFactorySource } from '../../data/FactoryProvider.tsx';
 import { Markdown } from '../../ui/Markdown.tsx';
 import { formatClock } from '../../ui/format.ts';
 import { INTERVENTION_LABEL } from '../../ui/vocabulary.ts';
+import { InlineLink } from '../../ui/InlineLink.tsx';
 import { issuePath } from '../../ui/paths.ts';
 import styles from './interventions.module.css';
 
@@ -173,7 +173,7 @@ export function InterventionDetail({ intervention }: { intervention: Interventio
         </Heading>
         <p className={styles.context}>
           {intervention.issueKey ? (
-            <Link to={issuePath(intervention.issueKey)}>{intervention.issueKey}</Link>
+            <InlineLink to={issuePath(intervention.issueKey)}>{intervention.issueKey}</InlineLink>
           ) : null}
           {intervention.cardId ? <span className="fl-mono"> · {intervention.cardId}</span> : null}
           {intervention.profile ? <span> · {intervention.profile}</span> : null}

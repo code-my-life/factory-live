@@ -31,6 +31,17 @@ Exposition tailnet : `tailscale serve --bg --https=8446 http://127.0.0.1:8446` (
 
 L'en-tête dit l'état du lien : « En direct », « Connexion… », « Hors ligne · dernier état il y a … » (l'app montre le dernier état reçu), « En pause » (factory en pause), « Factory muette » (factory-live ne reçoit plus rien de la factory : voir Pannes).
 
+## Tests de bout en bout
+
+`npm run e2e` lance Playwright sous Chromium : la démo (bureau et iPhone), et l'app « live » branchée sur un faux serveur d'API (`e2e/fake-api.mjs`) que les tests coupent et rétablissent. WebKit (Safari, iPhone) et les captures de référence tournent dans l'image officielle de Playwright, comme en CI (il manque à WSL des bibliothèques pour WebKit) :
+
+```sh
+docker run --rm --ipc=host --user "$(id -u):$(id -g)" -e HOME=/tmp -e E2E_WEBKIT=1 \
+  -v "$PWD":/work -w /work mcr.microsoft.com/playwright:v1.64.1-noble npx playwright test
+```
+
+Une capture qui change exprès : la même commande avec `npm run e2e:captures -- --update-snapshots` à la place de `npx playwright test`, puis relire les images de `e2e/captures.spec.ts-snapshots/` avant de les commiter.
+
 ## Ce que le conteneur voit
 
 | Montage                           | Mode               | Pourquoi                                                          |

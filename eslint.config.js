@@ -30,6 +30,9 @@ const READ_ONLY_MESSAGE =
 export default defineConfig([
   globalIgnores([
     '**/dist/**',
+    '**/dist-e2e/**',
+    'playwright-report/**',
+    'test-results/**',
     '**/coverage/**',
     '**/node_modules/**',
     'playwright-report/**',
@@ -45,9 +48,9 @@ export default defineConfig([
           allowDefaultProject: [
             '*.js',
             'vitest.config.ts',
+            'playwright.config.ts',
             'scripts/*.mjs',
             'apps/web/scripts/*.mjs',
-            'e2e/*.ts',
             'types/*.d.ts',
           ],
         },

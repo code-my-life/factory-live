@@ -41,6 +41,11 @@ export interface LiveOptions {
 export const LOST_AFTER_MS = 10_000;
 /** Un flux muet depuis ce délai (trois battements manqués) est coupé : on le relance. */
 export const SILENT_AFTER_MS = STREAM_PING_EVERY_MS * 3;
+/**
+ * Flux refusé par le serveur (502 pendant un redémarrage du conteneur) : le navigateur ne réessaie
+ * plus de lui-même ; l'app le relance après ces délais, de plus en plus espacés.
+ */
+export const RECONNECT_DELAYS_MS = [2_000, 5_000, 10_000, 30_000, 60_000] as const;
 const SAVE_EVERY_MS = 5_000;
 const STORAGE_KEY = 'factory-live:last-snapshot';
 
@@ -115,6 +120,8 @@ export class LiveSource implements FactoryDataSource {
   private lastSaved = 0;
   private lostTimer: unknown = null;
   private silenceTimer: unknown = null;
+  private reconnectTimer: unknown = null;
+  private reconnectAttempt = 0;
   private github: Cached<GitHubAccess> | null = null;
   private readonly listeners = new Set<() => void>();
   private stream: StreamLike | null = null;
@@ -192,20 +199,28 @@ export class LiveSource implements FactoryDataSource {
   }
 
   private connect(): void {
+    if (this.reconnectTimer !== null) {
+      this.clearTimer(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.stream?.close();
     const query = this.lastEventId ? `?lastEventId=${encodeURIComponent(this.lastEventId)}` : '';
     const stream = this.openStream(`${this.base}/api/stream${query}`);
     for (const type of STREAM_EVENTS) stream.addEventListener(type, (event) => this.receive(event));
     stream.addEventListener(STREAM_PING, () => this.watchSilence());
     stream.onopen = () => {
+      if (stream !== this.stream) return;
+      this.reconnectAttempt = 0;
       this.watchSilence();
       this.setConnection('open');
     };
     stream.onerror = () => {
-      // EventSource se reconnecte seul (Last-Event-ID) ; s'il abandonne, le retour au premier plan relance.
+      if (stream !== this.stream) return;
+      // EventSource se reconnecte seul (Last-Event-ID) ; s'il abandonne (réponse en erreur), l'app relance.
       // Une coupure brève (redémarrage du serveur, retour d'arrière-plan) ne fait pas crier « hors ligne ».
       if (stream.readyState === CLOSED) {
         this.setConnection('lost');
+        this.scheduleReconnect();
         return;
       }
       this.setConnection('connecting');
@@ -215,6 +230,18 @@ export class LiveSource implements FactoryDataSource {
       }, LOST_AFTER_MS);
     };
     this.stream = stream;
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer !== null) return;
+    const delay =
+      RECONNECT_DELAYS_MS[Math.min(this.reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)] ??
+      RECONNECT_DELAYS_MS[0];
+    this.reconnectAttempt += 1;
+    this.reconnectTimer = this.setTimer(() => {
+      this.reconnectTimer = null;
+      this.connect();
+    }, delay);
   }
 
   /**
@@ -239,6 +266,7 @@ export class LiveSource implements FactoryDataSource {
     this.stream?.close();
     if (this.lostTimer !== null) this.clearTimer(this.lostTimer);
     if (this.silenceTimer !== null) this.clearTimer(this.silenceTimer);
+    if (this.reconnectTimer !== null) this.clearTimer(this.reconnectTimer);
     this.doc?.removeEventListener('visibilitychange', this.onVisible);
   }
 

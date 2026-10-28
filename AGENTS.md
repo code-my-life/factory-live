@@ -8,18 +8,20 @@ factory-live montre en temps réel la factory Hermès (dépôt `code-my-life/her
 
 ## Commandes
 
-| Besoin              | Commande                                                                |
-| ------------------- | ----------------------------------------------------------------------- |
-| Installer           | `npm ci` (Node 24.15 ou plus ; l'image Docker utilise 24.22.1)          |
-| Tout vérifier, vite | `npm run verify:fast` : format, lint, types, texte, architecture, tests |
-| Tout vérifier       | `npm run verify` : la même chose plus le build                          |
-| Front sur la démo   | `npm run dev:web` puis http://127.0.0.1:5173                            |
-| Serveur (dev)       | `npm run dev:server` : lit `~/.hermes` en lecture seule, port 8446      |
-| Conteneur           | `docker compose -f docker/compose.yaml up -d --build` (voir RUNBOOK)    |
-| Tests seuls         | `npm test` ; couverture : `npm run test:coverage`                       |
-| Formater            | `npm run format`                                                        |
+| Besoin               | Commande                                                                |
+| -------------------- | ----------------------------------------------------------------------- |
+| Installer            | `npm ci` (Node 24.15 ou plus ; l'image Docker utilise 24.22.1)          |
+| Tout vérifier, vite  | `npm run verify:fast` : format, lint, types, texte, architecture, tests |
+| Tout vérifier        | `npm run verify` : la même chose plus le build                          |
+| Front sur la démo    | `npm run dev:web` puis http://127.0.0.1:5173                            |
+| Serveur (dev)        | `npm run dev:server` : lit `~/.hermes` en lecture seule, port 8446      |
+| Conteneur            | `docker compose -f docker/compose.yaml up -d --build` (voir RUNBOOK)    |
+| Tests seuls          | `npm test` ; couverture : `npm run test:coverage`                       |
+| Bout en bout         | `npm run e2e` (Chromium : démo, app « live » sur un faux serveur d'API) |
+| Bout en bout, WebKit | dans l'image de Playwright : voir RUNBOOK, « Tests de bout en bout »    |
+| Formater             | `npm run format`                                                        |
 
-La CI (GitHub Actions) lance `npm run verify` sur Node 24 et 26. Une PR n'est prête que si la CI est verte.
+La CI (GitHub Actions) lance `npm run verify` sur Node 24 et 26, puis les tests de bout en bout (Chromium, WebKit iPhone et bureau, captures de référence) dans l'image officielle de Playwright. Une PR n'est prête que si la CI est verte. Une capture qui change exprès se régénère dans cette même image (RUNBOOK), jamais sur un poste : les polices différeraient.
 
 ## Architecture (vérifiée par `npm run check:arch`)
 
