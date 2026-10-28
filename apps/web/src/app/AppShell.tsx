@@ -298,7 +298,9 @@ export function AppShell() {
               <span className={styles.tabLabel}>Plus</span>
             </button>
           </ActionMenu.Anchor>
-          <ActionMenu.Overlay align="end">
+          {/* Au-dessus du bouton : la barre est fixée en bas de l'écran, et en dessous (dans la page),
+              le menu s'ouvrait hors de l'écran tant qu'on n'avait pas défilé jusqu'en bas. */}
+          <ActionMenu.Overlay align="end" side="outside-top">
             <ActionList>
               {SECONDARY.map((destination) => {
                 const IconComponent = destination.icon;

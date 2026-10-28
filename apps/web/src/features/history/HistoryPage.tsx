@@ -113,7 +113,7 @@ export function HistoryPage() {
         </h2>
         <div className={page.tableBox}>
           <Table
-            gridTemplateColumns="minmax(0, 2fr) repeat(4, auto)"
+            gridTemplateColumns="minmax(16rem, 2fr) repeat(4, auto)"
             cellPadding="condensed"
             aria-labelledby="recent-title"
           >

@@ -35,6 +35,17 @@ html {
   overscroll-behavior: none;
 }
 
+/*
+ * App installée sur iPhone (barre d'état translucide) : une page plus courte que l'écran s'arrête à
+ * la hauteur de l'écran moins la barre d'état, et la barre d'onglets fixée en bas flotte au-dessus du
+ * bord. La page fait donc au moins toute la hauteur de l'écran.
+ */
+@media (display-mode: standalone) {
+  html {
+    min-height: calc(100% + env(safe-area-inset-top, 0px));
+  }
+}
+
 body {
   margin: 0;
   background: var(--bgColor-default);
