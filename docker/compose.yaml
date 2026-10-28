@@ -1,0 +1,46 @@
+# factory-live en service : `docker compose -f docker/compose.yaml up -d --build` depuis WSL.
+# Port lié à 127.0.0.1 : ce PC par http://localhost:8446, le tailnet par `tailscale serve --https=8446`.
+name: factory-live
+
+services:
+  factory-live:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: factory-live:local
+    container_name: factory-live
+    restart: unless-stopped
+    user: '1000:1000'
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - '127.0.0.1:8446:8446'
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      HERMES_BOARD: ${HERMES_BOARD:-factory}
+      GITHUB_OWNER: ${GITHUB_OWNER:-code-my-life}
+      TAILSCALE_LOGINS: ${TAILSCALE_LOGINS:-cddev@github}
+      PUBLIC_ORIGINS: ${PUBLIC_ORIGINS:-http://localhost:8446,https://desktop-gja56n4.tail40220c.ts.net:8446}
+      DASHBOARD_URL: ${DASHBOARD_URL:-https://desktop-gja56n4.tail40220c.ts.net:8443}
+    volumes:
+      - factory-live-data:/data
+      # Bases d'Hermès : dossiers en écriture pour le seul `-shm` de SQLite (lecteur WAL), bases ouvertes en lecture seule.
+      # Dossiers et non fichiers : Hermès réécrit ses fichiers par renommage, un fichier monté resterait figé.
+      - ${HOME}/.hermes/kanban/boards/${HERMES_BOARD:-factory}:/hermes/kanban/boards/${HERMES_BOARD:-factory}
+      - ${HOME}/.hermes/profiles:/hermes/profiles
+      - ${FACTORY_REPO:-${HOME}/perso/hermes-software-factory}:/factory:ro
+      - ${HOME}/.claude/projects:/claude-projects:ro
+      # Secrets hors dépôt : hook-secret (webhooks et sonde), github-token (déblocage, PR, CI).
+      - ${HOME}/.config/factory-live:/run/secrets/factory-live:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '5'
+
+volumes:
+  factory-live-data:

@@ -13,10 +13,14 @@ La factory Hermès en temps réel : quelle issue est à quelle étape, quel prof
 npm ci
 npm run dev:web        # front sur les données de démonstration, http://127.0.0.1:5173
 npm run verify         # format, lint, types, texte, architecture, tests, build
+docker compose -f docker/compose.yaml up -d --build   # le service, http://localhost:8446
 ```
+
+Ouvrir : `http://localhost:8446` sur ce PC, `https://desktop-gja56n4.tail40220c.ts.net:8446` depuis l'iPhone ou le Mac (tailnet seulement).
 
 ## Où regarder
 
 - [AGENTS.md](AGENTS.md) : règles et commandes du dépôt.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) : sources de données, couches, flux.
+- [docs/RUNBOOK.md](docs/RUNBOOK.md) : exploitation du service, secrets, Tailscale, pannes.
 - [docs/decisions/](docs/decisions/) : décisions d'architecture.

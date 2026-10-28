@@ -35,3 +35,17 @@ jobs:
       - run: npm run check:arch
       - run: npm run test:coverage
       - run: npm run build
+
+  docker:
+    name: Image Docker
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: docker build -f docker/Dockerfile -t factory-live:ci .
+      - name: Le conteneur démarre et répond, utilisateur 1000, racine en lecture seule
+        run: |
+          docker run -d --name fl --read-only --tmpfs /tmp --user 1000:1000 -p 127.0.0.1:8446:8446 factory-live:ci
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8446/healthz && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8446/api/openapi.json > /dev/null
+          test "$(docker inspect -f '{{.Config.User}}' fl)" = "1000:1000"
+          docker logs fl | tail -5

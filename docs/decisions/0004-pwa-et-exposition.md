@@ -16,4 +16,6 @@ Le Web Push des apps posées sur l'écran d'accueil existe sur iOS depuis 16.4, 
 ## Vérifié le 2026-10-28
 
 - Un conteneur publié sur `127.0.0.1:8446` répond depuis WSL (`curl http://127.0.0.1:8446`) et depuis Windows (`cmd.exe /c curl http://localhost:8446`).
-- Reste à vérifier avec Clément : l'adresse tailnet depuis l'iPhone et le Mac (elle ne répond pas depuis la machine elle-même), le SSE à travers `tailscale serve`, le push sur iPhone.
+- Le service tourne : image `factory-live:local` (Node 24.22.1 épinglé par digest, 363 Mo), conteneur `healthy`, utilisateur 1000:1000, racine en lecture seule, sans capacité ; `/healthz` répond depuis WSL et depuis Windows ; le kanban réel est lu à travers le montage (71 cartes) ; un webhook signé avec le vrai secret est accepté (202), une signature fausse refusée (401).
+- `tailscale serve --bg --https=8446 http://127.0.0.1:8446` actif, « tailnet only ».
+- Reste à vérifier avec Clément : l'adresse tailnet depuis l'iPhone et le Mac (elle ne répond pas depuis la machine elle-même), le SSE à travers `tailscale serve`, l'en-tête `X-Forwarded-For` posé par `tailscale serve` (hypothèse de la garde des écritures), le push sur iPhone.

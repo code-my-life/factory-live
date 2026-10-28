@@ -1,0 +1,17 @@
+# Contexte de build minimal : sources, manifestes et lockfile seulement.
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+.git
+.github
+docker/.env
+playwright-report
+test-results
+e2e
+fixtures
+**/*.test.ts
+**/*.test.tsx
+**/*.test-helpers.ts
+apps/server/src/test
+apps/web/src/test

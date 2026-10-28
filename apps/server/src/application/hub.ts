@@ -278,6 +278,16 @@ export class Hub {
 
   applyProbe(report: ProbeReport, receivedAt: number): void {
     this.probe = { report, receivedAt };
+    // Plafonds du dispatcher : la sonde les lit dans le config.yaml racine, que le conteneur ne voit pas.
+    const settings = report.kanban;
+    if (settings) {
+      this.root = {
+        maxInProgress: settings.max_in_progress ?? this.root.maxInProgress,
+        maxInProgressPerProfile:
+          settings.max_in_progress_per_profile ?? this.root.maxInProgressPerProfile,
+      };
+      this.dirty.add('agents').add('board');
+    }
     this.dirty.add('health');
   }
 

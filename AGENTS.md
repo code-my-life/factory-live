@@ -14,6 +14,8 @@ factory-live montre en temps réel la factory Hermès (dépôt `code-my-life/her
 | Tout vérifier, vite | `npm run verify:fast` : format, lint, types, texte, architecture, tests |
 | Tout vérifier       | `npm run verify` : la même chose plus le build                          |
 | Front sur la démo   | `npm run dev:web` puis http://127.0.0.1:5173                            |
+| Serveur (dev)       | `npm run dev:server` : lit `~/.hermes` en lecture seule, port 8446      |
+| Conteneur           | `docker compose -f docker/compose.yaml up -d --build` (voir RUNBOOK)    |
 | Tests seuls         | `npm test` ; couverture : `npm run test:coverage`                       |
 | Formater            | `npm run format`                                                        |
 
@@ -26,7 +28,7 @@ La CI (GitHub Actions) lance `npm run verify` sur Node 24 et 26. Une PR n'est pr
 - `apps/server` : cas d'usage (`application/`) qui ne connaissent que des ports ; adaptateurs (`adapters/`) qui les implémentent ; HTTP (`http/`).
 - `apps/web` : PWA React + Primer + React Flow. Ne connaît que `contracts`.
 
-Détails : `docs/ARCHITECTURE.md`. Décisions : `docs/decisions/`.
+Détails : `docs/ARCHITECTURE.md`. Exploitation : `docs/RUNBOOK.md`. Décisions : `docs/decisions/`.
 
 ## Règles de code
 

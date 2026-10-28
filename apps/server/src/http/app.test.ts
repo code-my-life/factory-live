@@ -144,6 +144,7 @@ describe('ingestion des webhooks d’Hermès', () => {
       probe: 'factory-live-probe',
       at: new Date(NOW).toISOString().replace('Z', '+00:00'),
       gatewayPid: 4242,
+      kanban: { max_in_progress: 3, max_in_progress_per_profile: 1 },
       checks: [
         {
           id: 'pause',
@@ -161,7 +162,12 @@ describe('ingestion des webhooks d’Hermès', () => {
     });
     expect(response.status).toBe(202);
     const data = await snapshot();
-    expect(data.factory).toMatchObject({ paused: true, pauseReason: 'maintenance', live: true });
+    expect(data.factory).toMatchObject({
+      paused: true,
+      pauseReason: 'maintenance',
+      live: true,
+      maxInProgress: 3,
+    });
     expect(data.health.find((item) => item.id === 'gateway')).toMatchObject({ status: 'ok' });
   });
 });

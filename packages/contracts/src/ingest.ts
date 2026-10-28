@@ -36,5 +36,12 @@ export const ProbeReport = z.object({
   at: z.iso.datetime({ offset: true }),
   gatewayPid: z.number().int(),
   checks: z.array(ProbeCheck).max(50),
+  /** Plafonds du dispatcher lus par le gateway (factory-live ne monte pas `~/.hermes`). */
+  kanban: z
+    .object({
+      max_in_progress: z.number().int().positive().optional(),
+      max_in_progress_per_profile: z.number().int().positive().optional(),
+    })
+    .optional(),
 });
 export type ProbeReport = z.infer<typeof ProbeReport>;
