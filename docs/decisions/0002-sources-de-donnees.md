@@ -22,3 +22,9 @@ Le sens WSL vers conteneur est déjà éprouvé (Hermès joint freellmapi sur 12
 
 - factory-live arrêté : les envois échouent sans gêner la factory, avec un avertissement par envoi perdu dans le log du worker ; factory-live se recale sur les bases au redémarrage.
 - Les dossiers des bases SQLite sont montés en lecture-écriture (SQLite y crée son `-shm`), les bases ouvertes en `readOnly`, et une règle de lint interdit toute écriture dans les adaptateurs Hermès.
+
+## Vérifié le 2026-10-28
+
+- Un conteneur `node:24.22.1-bookworm-slim` (Docker Desktop, montage d'un dossier WSL) lit une base WAL en `readOnly` pendant qu'un process WSL y écrit 200 fois en 20 s : 69 changements vus par `PRAGMA data_version`, total final juste, 0 erreur côté lecteur, 0 côté écrivain, `wal_checkpoint(TRUNCATE)` réussi.
+- Le même conteneur lit la vraie `kanban.db` du board factory (2 866 événements, 71 cartes) ; une écriture y est refusée (`attempt to write a readonly database`).
+- Le code natif d'Hermès (`agent/outbound_webhooks.py`) livre `pre_tool_call` et `post_api_request` au conteneur, signés `X-Hermes-Signature-256`. Charges de référence : `fixtures/hermes-webhooks/outbound-sample.json`. Effet de bord : un avertissement par démarrage de worker, car l'URL est en `http://` local.

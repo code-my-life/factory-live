@@ -12,3 +12,8 @@ Date : 2026-10-28. Statut : accepté.
 ## Pourquoi
 
 Le Web Push des apps posées sur l'écran d'accueil existe sur iOS depuis 16.4, sans compte développeur Apple, à condition que le manifeste déclare `display: standalone` et que la permission soit demandée sur un geste. Le badge de l'icône est disponible.
+
+## Vérifié le 2026-10-28
+
+- Un conteneur publié sur `127.0.0.1:8446` répond depuis WSL (`curl http://127.0.0.1:8446`) et depuis Windows (`cmd.exe /c curl http://localhost:8446`).
+- Reste à vérifier avec Clément : l'adresse tailnet depuis l'iPhone et le Mac (elle ne répond pas depuis la machine elle-même), le SSE à travers `tailscale serve`, le push sur iPhone.
