@@ -1,0 +1,9 @@
+# Le graphe ne couvre que le code source : la factory lance Graphify avec --no-gitignore.
+node_modules/
+dist/
+dist-e2e/
+coverage/
+playwright-report/
+test-results/
+.hermes/
+graphify-out/
