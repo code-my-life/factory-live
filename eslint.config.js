@@ -33,6 +33,8 @@ export default defineConfig([
     '**/dist-e2e/**',
     'playwright-report/**',
     'test-results/**',
+    'graphify-out/**',
+    '.hermes/**',
     '**/coverage/**',
     '**/node_modules/**',
     'playwright-report/**',
