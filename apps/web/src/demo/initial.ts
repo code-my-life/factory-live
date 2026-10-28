@@ -1,0 +1,1330 @@
+import type {
+  AgentActivity,
+  CardView,
+  Intervention,
+  IssueDetail,
+  IssueSummary,
+  PullRequestView,
+  RunView,
+  TimelineEntry,
+  TranscriptEntry,
+  TranscriptView,
+} from '@factory-live/contracts';
+import {
+  NEMOTRON_SUPER,
+  QWEN_LOCAL,
+  buildHealth,
+  buildHistory,
+  buildProfiles,
+  buildUsage,
+  model,
+} from './catalog.ts';
+import { iso, nextId } from './state.ts';
+import type { DemoState } from './state.ts';
+
+/** Identifiants stables, partagés avec le script du scénario. */
+export const KEYS = {
+  team: 'claude-cockpit#71',
+  contact: 'cv-site#47',
+  shortcut: 'claude-cockpit#73',
+  projects: 'cv-site#49',
+  tags: 'claude-cockpit#68',
+  footer: 'cv-site#44',
+  e2e: 'claude-cockpit#42',
+  overlap: 'claude-cockpit#52',
+  codeowners: 'cv-site#46',
+} as const;
+
+export const CARDS = {
+  teamBrief: 't_5e21a7c4',
+  teamImpl: 't_5e21c0d9',
+  teamRelease: 't_5e21d4f2',
+  contactBrief: 't_83b0e611',
+  contactImpl: 't_83b1f2a0',
+  contactRelease: 't_83b20c7e',
+  shortcutBrief: 't_a90c3d18',
+  shortcutImpl: 't_a90c5e02',
+  shortcutRelease: 't_a90c6b9f',
+  projectsBrief: 't_c41e8a07',
+  tagsBrief: 't_2f6d0b31',
+  tagsImpl: 't_2f6d1c84',
+  tagsRelease: 't_2f6d2e15',
+  footerBrief: 't_9c04d2a6',
+  footerImpl: 't_9c04e18b',
+  footerRelease: 't_9c04f35c',
+  e2eBrief: 't_dc67e1d8',
+  e2eImpl: 't_93914cb4',
+  e2eRelease: 't_4c7f58b3',
+  overlapImpl: 't_d6702099',
+  overlapRelease: 't_b7c03d7b',
+  codeownersImpl: 't_70e1b2c9',
+} as const;
+
+export const RUNS = { teamBrief: 181, contactImpl: 179, contactGate: 183, teamImpl: 184 } as const;
+
+const REPOS: Record<string, string> = {
+  'claude-cockpit': 'https://github.com/code-my-life/claude-cockpit',
+  'cv-site': 'https://github.com/code-my-life/cv-site',
+};
+
+function issueUrl(key: string): string {
+  const [repo, number] = key.split('#');
+  return `${REPOS[repo ?? ''] ?? 'https://github.com/code-my-life'}/issues/${number ?? ''}`;
+}
+
+export function prUrl(repo: string, number: number): string {
+  return `${REPOS[repo] ?? 'https://github.com/code-my-life'}/pull/${number}`;
+}
+
+function pr(
+  repo: string,
+  number: number,
+  patch: Partial<PullRequestView> & { title: string },
+): PullRequestView {
+  return {
+    number,
+    url: prUrl(repo, number),
+    state: 'draft',
+    checks: 'pending',
+    reviewDecision: null,
+    autoMerge: false,
+    additions: 0,
+    deletions: 0,
+    changedFiles: 0,
+    ...patch,
+  };
+}
+
+function card(
+  id: string,
+  title: string,
+  patch: Partial<CardView> & Pick<CardView, 'kind' | 'status' | 'assignee' | 'station'>,
+): CardView {
+  return {
+    id,
+    title,
+    blockKind: null,
+    blockReason: null,
+    parents: [],
+    skills: [],
+    runs: [],
+    changedFiles: [],
+    testsPassed: null,
+    testsTotal: null,
+    ...patch,
+  };
+}
+
+function run(
+  id: number,
+  profile: string,
+  patch: Partial<RunView> & Pick<RunView, 'role' | 'status' | 'startedAt'>,
+): RunView {
+  return {
+    id,
+    profile,
+    outcome: null,
+    endedAt: null,
+    model: null,
+    laneModel: null,
+    summary: null,
+    tokens: null,
+    costUsd: null,
+    ...patch,
+  };
+}
+
+function timeline(
+  at: string,
+  label: string,
+  patch: Partial<Omit<TimelineEntry, 'id' | 'at' | 'label'>> = {},
+): TimelineEntry {
+  return {
+    id: nextId('tl'),
+    at,
+    label,
+    source: 'kanban',
+    profile: null,
+    cardId: null,
+    detail: null,
+    tone: 'neutral',
+    ...patch,
+  };
+}
+
+function entry(
+  at: string,
+  role: TranscriptEntry['role'],
+  text: string | null,
+  patch: Partial<Omit<TranscriptEntry, 'id' | 'at' | 'role' | 'text'>> = {},
+): TranscriptEntry {
+  return { id: nextId('tr'), at, role, text, toolName: null, model: null, status: null, ...patch };
+}
+
+function idle(
+  profile: string,
+  station: AgentActivity['station'],
+  configModel: AgentActivity['model'],
+): AgentActivity {
+  return {
+    profile,
+    station,
+    state: 'idle',
+    cardId: null,
+    issueKey: null,
+    model: configModel,
+    laneModel: null,
+    action: null,
+    runStartedAt: null,
+    lastHeartbeatAt: null,
+  };
+}
+
+/** L'état de la factory au lancement du scénario : deux cartes en cours, trois interventions. */
+export function createInitialState(now: number): DemoState {
+  const ago = (seconds: number) => iso(now - seconds * 1000);
+  const min = 60;
+
+  const summaries: IssueSummary[] = [
+    {
+      key: KEYS.team,
+      repo: 'claude-cockpit',
+      number: 71,
+      title: 'Vue ÉQUIPE : regrouper les cartes par projet',
+      url: issueUrl(KEYS.team),
+      labels: ['factory', 'claude:opus'],
+      station: 'implementation',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'active',
+      claudeModel: 'claude-opus-5-5',
+      harness: 'coder-claude',
+      pr: null,
+      activeProfiles: ['coder-claude'],
+      interventionIds: [],
+      startedAt: ago(38 * min),
+      updatedAt: ago(6),
+    },
+    {
+      key: KEYS.contact,
+      repo: 'cv-site',
+      number: 47,
+      title: 'Formulaire de contact : validation côté serveur',
+      url: issueUrl(KEYS.contact),
+      labels: ['factory'],
+      station: 'gate',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'active',
+      claudeModel: null,
+      harness: 'coder',
+      pr: pr('cv-site', 52, {
+        title: 'feat(contact): validation côté serveur du formulaire (#47)',
+        additions: 214,
+        deletions: 18,
+        changedFiles: 5,
+      }),
+      activeProfiles: ['gate'],
+      interventionIds: [],
+      startedAt: ago(82 * min),
+      updatedAt: ago(12),
+    },
+    {
+      key: KEYS.shortcut,
+      repo: 'claude-cockpit',
+      number: 73,
+      title: 'Raccourci clavier pour répondre à la dernière question',
+      url: issueUrl(KEYS.shortcut),
+      labels: ['factory'],
+      station: 'brief',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'queued',
+      claudeModel: null,
+      harness: null,
+      pr: null,
+      activeProfiles: [],
+      interventionIds: [],
+      startedAt: ago(4 * min),
+      updatedAt: ago(4 * min),
+    },
+    {
+      key: KEYS.projects,
+      repo: 'cv-site',
+      number: 49,
+      title: 'Page Projets : filtres par techno',
+      url: issueUrl(KEYS.projects),
+      labels: ['factory'],
+      station: 'brief',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'waiting_human',
+      claudeModel: null,
+      harness: null,
+      pr: null,
+      activeProfiles: [],
+      interventionIds: [],
+      startedAt: ago(26 * min),
+      updatedAt: ago(14 * min),
+    },
+    {
+      key: KEYS.tags,
+      repo: 'claude-cockpit',
+      number: 68,
+      title: 'Tag automatique des versions sur main',
+      url: issueUrl(KEYS.tags),
+      labels: ['factory'],
+      station: 'release',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'waiting_human',
+      claudeModel: null,
+      harness: 'coder',
+      pr: pr('claude-cockpit', 74, {
+        title: 'ci: tag automatique à chaque changement de version (#68)',
+        state: 'open',
+        checks: 'success',
+        reviewDecision: 'review_required',
+        autoMerge: true,
+        additions: 96,
+        deletions: 4,
+        changedFiles: 3,
+      }),
+      activeProfiles: [],
+      interventionIds: [],
+      startedAt: ago(3 * 60 * min),
+      updatedAt: ago(22 * min),
+    },
+    {
+      key: KEYS.footer,
+      repo: 'cv-site',
+      number: 44,
+      title: 'Pied de page : liens vers GitHub et LinkedIn',
+      url: issueUrl(KEYS.footer),
+      labels: ['factory'],
+      station: 'implementation',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'blocked',
+      claudeModel: null,
+      harness: 'coder',
+      pr: pr('cv-site', 50, {
+        title: 'feat(footer): liens sociaux (#44)',
+        additions: 41,
+        deletions: 2,
+        changedFiles: 2,
+      }),
+      activeProfiles: [],
+      interventionIds: [],
+      startedAt: ago(2 * 60 * min),
+      updatedAt: ago(42 * min),
+    },
+    {
+      key: KEYS.e2e,
+      repo: 'claude-cockpit',
+      number: 42,
+      title: 'E2E PR 2 : actions des cartes et lanceur',
+      url: issueUrl(KEYS.e2e),
+      labels: ['factory'],
+      station: 'done',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'done',
+      claudeModel: null,
+      harness: 'coder',
+      pr: pr('claude-cockpit', 69, {
+        title: 'test(e2e): PR 2a, scénarios des cartes et outillage (#42)',
+        state: 'merged',
+        checks: 'success',
+        reviewDecision: 'approved',
+        additions: 458,
+        deletions: 9,
+        changedFiles: 6,
+      }),
+      activeProfiles: [],
+      interventionIds: [],
+      startedAt: ago(9 * 24 * 60 * min),
+      updatedAt: ago(8 * 24 * 60 * min),
+    },
+    {
+      key: KEYS.overlap,
+      repo: 'claude-cockpit',
+      number: 52,
+      title: "Île : le bouton Détails chevauche l'encart d'autorisation",
+      url: issueUrl(KEYS.overlap),
+      labels: ['factory', 'claude'],
+      station: 'done',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'done',
+      claudeModel: 'claude-sonnet-5-5',
+      harness: 'coder-claude',
+      pr: pr('claude-cockpit', 70, {
+        title: "fix(island): le bouton Détails ne chevauche plus l'encart (#52)",
+        state: 'merged',
+        checks: 'success',
+        reviewDecision: 'approved',
+        additions: 37,
+        deletions: 12,
+        changedFiles: 2,
+      }),
+      activeProfiles: [],
+      interventionIds: [],
+      startedAt: ago(8 * 24 * 60 * min + 3 * 60 * min),
+      updatedAt: ago(8 * 24 * 60 * min),
+    },
+    {
+      key: KEYS.codeowners,
+      repo: 'cv-site',
+      number: 46,
+      title: 'CODEOWNERS sur main',
+      url: issueUrl(KEYS.codeowners),
+      labels: ['factory'],
+      station: 'done',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'done',
+      claudeModel: null,
+      harness: 'scribe',
+      pr: pr('cv-site', 46, {
+        title: 'chore: CODEOWNERS (* @cddev)',
+        state: 'merged',
+        checks: 'success',
+        reviewDecision: 'approved',
+        additions: 1,
+        deletions: 0,
+        changedFiles: 1,
+      }),
+      activeProfiles: [],
+      interventionIds: [],
+      startedAt: ago(11 * 24 * 60 * min + 96 * min),
+      updatedAt: ago(11 * 24 * 60 * min),
+    },
+  ];
+
+  const opus = model('anthropic', 'claude-opus-5-5', 'live');
+  const qwenLive = model('llamacpp', QWEN_LOCAL, 'live');
+
+  const details: Record<string, IssueDetail> = {};
+  const find = (key: string) => {
+    const summary = summaries.find((candidate) => candidate.key === key);
+    if (!summary) throw new Error(key);
+    return summary;
+  };
+
+  details[KEYS.team] = {
+    issue: find(KEYS.team),
+    tokens: 412_000,
+    costUsd: 3.12,
+    cards: [
+      card(CARDS.teamBrief, `${KEYS.team} : Vue ÉQUIPE : regrouper les cartes par projet`, {
+        kind: 'brief',
+        status: 'done',
+        assignee: 'coordinator-claude',
+        station: 'brief',
+        skills: ['factory-brief', 'factory-cli-lane'],
+        runs: [
+          run(RUNS.teamBrief, 'coordinator-claude', {
+            role: 'coordinator',
+            status: 'done',
+            outcome: 'completed',
+            startedAt: ago(38 * min),
+            endedAt: ago(31 * min),
+            model: model('freellmapi', 'agnes-2.5-flash', 'session'),
+            laneModel: model('anthropic', 'claude-opus-5-5', 'session'),
+            summary:
+              'Brief rédigé : base 3f9c2e1, test fail-first desktop/test/team.test.js, 2 cartes créées',
+            tokens: 48_200,
+            costUsd: 0.31,
+          }),
+        ],
+      }),
+      card(CARDS.teamImpl, `impl ${KEYS.team} : regrouper les cartes par projet`, {
+        kind: 'impl',
+        status: 'running',
+        assignee: 'coder-claude',
+        station: 'implementation',
+        parents: [CARDS.teamBrief],
+        skills: ['factory-author-proof', 'factory-cli-lane'],
+        changedFiles: [
+          { path: 'desktop/src/team/TeamView.tsx', edits: 3 },
+          { path: 'desktop/src/team/groupByProject.ts', edits: 2 },
+          { path: 'desktop/test/team.test.js', edits: 1 },
+        ],
+        testsPassed: 11,
+        testsTotal: 13,
+        runs: [
+          run(RUNS.teamImpl, 'coder-claude', {
+            role: 'implementer',
+            status: 'running',
+            startedAt: ago(11 * min),
+            model: qwenLive,
+            laneModel: opus,
+            tokens: 318_000,
+            costUsd: 2.81,
+          }),
+        ],
+      }),
+      card(CARDS.teamRelease, `release ${KEYS.team}`, {
+        kind: 'release',
+        status: 'todo',
+        assignee: 'coordinator-claude',
+        station: 'release',
+        parents: [CARDS.teamImpl],
+        skills: ['factory-release'],
+      }),
+    ],
+    timeline: [
+      timeline(ago(39 * min), 'Label factory posé par cddev', { source: 'github' }),
+      timeline(ago(39 * min), "Carte brief créée par l'intake", {
+        cardId: CARDS.teamBrief,
+        detail: 'Label claude:opus : modèle claude-opus-5-5 pour tout le parcours',
+      }),
+      timeline(ago(38 * min), 'coordinator-claude prend le brief', {
+        profile: 'coordinator-claude',
+        cardId: CARDS.teamBrief,
+      }),
+      timeline(ago(31 * min), 'Brief rédigé, 2 cartes créées', {
+        profile: 'coordinator-claude',
+        cardId: CARDS.teamBrief,
+        tone: 'success',
+        detail: 'impl → coder-claude, release → coordinator-claude',
+      }),
+      timeline(ago(11 * min), "coder-claude prend l'implémentation", {
+        profile: 'coder-claude',
+        cardId: CARDS.teamImpl,
+      }),
+      timeline(ago(8 * min), 'Échec prouvé sur la base : 2 tests rouges', {
+        source: 'hermes',
+        profile: 'coder-claude',
+        cardId: CARDS.teamImpl,
+        tone: 'attention',
+        detail: 'npm test -- team sur 3f9c2e1',
+      }),
+      timeline(ago(7 * min), 'claude -p lancé (claude-opus-5-5, 40 tours au plus)', {
+        source: 'hermes',
+        profile: 'coder-claude',
+        cardId: CARDS.teamImpl,
+      }),
+    ],
+  };
+
+  details[KEYS.contact] = {
+    issue: find(KEYS.contact),
+    tokens: 286_000,
+    costUsd: 0,
+    cards: [
+      card(
+        CARDS.contactBrief,
+        `${KEYS.contact} : Formulaire de contact : validation côté serveur`,
+        {
+          kind: 'brief',
+          status: 'done',
+          assignee: 'coordinator',
+          station: 'brief',
+          skills: ['factory-brief'],
+          runs: [
+            run(176, 'coordinator', {
+              role: 'coordinator',
+              status: 'done',
+              outcome: 'completed',
+              startedAt: ago(82 * min),
+              endedAt: ago(74 * min),
+              model: model('moa', 'mix', 'session'),
+              summary: 'Brief rédigé : base 8d41c07, test fail-first api/test/contact.test.ts',
+              tokens: 61_000,
+            }),
+          ],
+        },
+      ),
+      card(CARDS.contactImpl, `impl ${KEYS.contact} : validation côté serveur`, {
+        kind: 'impl',
+        status: 'running',
+        assignee: 'gate',
+        station: 'gate',
+        parents: [CARDS.contactBrief],
+        skills: ['factory-author-proof'],
+        changedFiles: [
+          { path: 'api/src/routes/contact.ts', edits: 4 },
+          { path: 'api/src/validation/contact.ts', edits: 2 },
+          { path: 'api/test/contact.test.ts', edits: 3 },
+        ],
+        testsPassed: 34,
+        testsTotal: 34,
+        runs: [
+          run(RUNS.contactImpl, 'coder', {
+            role: 'implementer',
+            status: 'done',
+            outcome: 'review_requested',
+            startedAt: ago(70 * min),
+            endedAt: ago(9 * min),
+            model: model('freellmapi', 'dots3-note-preview', 'session'),
+            summary: 'Validation zod côté serveur, 3 tests ajoutés, PR #52 en brouillon',
+            tokens: 171_000,
+          }),
+          run(RUNS.contactGate, 'gate', {
+            role: 'reviewer',
+            status: 'running',
+            startedAt: ago(6 * min),
+            model: model('nvidia', NEMOTRON_SUPER, 'live'),
+            tokens: 54_000,
+          }),
+        ],
+      }),
+      card(CARDS.contactRelease, `release ${KEYS.contact}`, {
+        kind: 'release',
+        status: 'todo',
+        assignee: 'coordinator',
+        station: 'release',
+        parents: [CARDS.contactImpl],
+        skills: ['factory-release'],
+      }),
+    ],
+    timeline: [
+      timeline(ago(83 * min), 'Label factory posé par cddev', { source: 'github' }),
+      timeline(ago(82 * min), 'coordinator prend le brief', {
+        profile: 'coordinator',
+        cardId: CARDS.contactBrief,
+      }),
+      timeline(ago(74 * min), 'Brief rédigé, 2 cartes créées', {
+        profile: 'coordinator',
+        cardId: CARDS.contactBrief,
+        tone: 'success',
+      }),
+      timeline(ago(70 * min), "coder prend l'implémentation", {
+        profile: 'coder',
+        cardId: CARDS.contactImpl,
+      }),
+      timeline(ago(52 * min), '429 sur agnes-2.5-flash, fallback vers dots3-note-preview', {
+        source: 'hermes',
+        profile: 'coder',
+        cardId: CARDS.contactImpl,
+        tone: 'attention',
+      }),
+      timeline(ago(12 * min), 'PR #52 ouverte en brouillon par la GitHub App', {
+        source: 'github',
+        cardId: CARDS.contactImpl,
+      }),
+      timeline(ago(9 * min), 'Revue demandée à gate', {
+        profile: 'coder',
+        cardId: CARDS.contactImpl,
+        detail: 'coder-guard : branche poussée au même commit, PR citée dans le handoff',
+      }),
+      timeline(ago(6 * min), 'gate prend la revue', { profile: 'gate', cardId: CARDS.contactImpl }),
+    ],
+  };
+
+  details[KEYS.shortcut] = {
+    issue: find(KEYS.shortcut),
+    tokens: 0,
+    costUsd: 0,
+    cards: [
+      card(
+        CARDS.shortcutBrief,
+        `${KEYS.shortcut} : Raccourci clavier pour répondre à la dernière question`,
+        {
+          kind: 'brief',
+          status: 'ready',
+          assignee: 'coordinator',
+          station: 'brief',
+          skills: ['factory-brief'],
+        },
+      ),
+    ],
+    timeline: [
+      timeline(ago(4 * min), 'Label factory posé par cddev', { source: 'github' }),
+      timeline(ago(4 * min), 'Carte brief créée, en file : 2 cartes en cours sur 2 autorisées', {
+        cardId: CARDS.shortcutBrief,
+      }),
+    ],
+  };
+
+  details[KEYS.projects] = {
+    issue: find(KEYS.projects),
+    tokens: 23_000,
+    costUsd: 0,
+    cards: [
+      card(CARDS.projectsBrief, `${KEYS.projects} : Page Projets : filtres par techno`, {
+        kind: 'brief',
+        status: 'blocked',
+        assignee: 'coordinator',
+        station: 'brief',
+        blockKind: 'needs_input',
+        blockReason: 'Carte UI sans maquette jointe',
+        skills: ['factory-brief'],
+        runs: [
+          run(182, 'coordinator', {
+            role: 'coordinator',
+            status: 'blocked',
+            outcome: 'blocked',
+            startedAt: ago(25 * min),
+            endedAt: ago(14 * min),
+            model: model('moa', 'mix', 'session'),
+            summary: 'Bloqué : carte UI sans maquette jointe',
+            tokens: 23_000,
+          }),
+        ],
+      }),
+    ],
+    timeline: [
+      timeline(ago(26 * min), 'Label factory posé par cddev', { source: 'github' }),
+      timeline(ago(25 * min), 'coordinator prend le brief', {
+        profile: 'coordinator',
+        cardId: CARDS.projectsBrief,
+      }),
+      timeline(ago(14 * min), 'Bloqué : décision attendue', {
+        profile: 'coordinator',
+        cardId: CARDS.projectsBrief,
+        tone: 'attention',
+        detail: 'Carte UI sans maquette jointe',
+      }),
+      timeline(ago(14 * min), 'Question publiée sur l’issue et envoyée sur Telegram', {
+        source: 'comment',
+        cardId: CARDS.projectsBrief,
+      }),
+    ],
+  };
+
+  details[KEYS.tags] = {
+    issue: find(KEYS.tags),
+    tokens: 198_000,
+    costUsd: 0,
+    cards: [
+      card(CARDS.tagsBrief, `${KEYS.tags} : Tag automatique des versions sur main`, {
+        kind: 'brief',
+        status: 'done',
+        assignee: 'coordinator',
+        station: 'brief',
+      }),
+      card(CARDS.tagsImpl, `impl ${KEYS.tags} : workflow Tag on version`, {
+        kind: 'impl',
+        status: 'done',
+        assignee: 'gate',
+        station: 'gate',
+        parents: [CARDS.tagsBrief],
+        testsPassed: 52,
+        testsTotal: 52,
+        changedFiles: [
+          { path: '.github/workflows/tag-on-version.yml', edits: 2 },
+          { path: 'docs/RELEASE.md', edits: 1 },
+        ],
+      }),
+      card(CARDS.tagsRelease, `release ${KEYS.tags}`, {
+        kind: 'release',
+        status: 'blocked',
+        assignee: 'coordinator',
+        station: 'release',
+        parents: [CARDS.tagsImpl],
+        blockKind: 'needs_input',
+        blockReason: 'Prêt à merger claude-cockpit#74',
+      }),
+    ],
+    timeline: [
+      timeline(ago(180 * min), 'Label factory posé par cddev', { source: 'github' }),
+      timeline(ago(31 * min), 'Gate : approuvé', {
+        profile: 'gate',
+        cardId: CARDS.tagsImpl,
+        tone: 'success',
+      }),
+      timeline(ago(30 * min), 'PR #74 prête, revue demandée à @cddev, auto-merge armé', {
+        source: 'github',
+      }),
+      timeline(ago(22 * min), 'Release : prêt à merger, en attente de ton approbation', {
+        profile: 'coordinator',
+        cardId: CARDS.tagsRelease,
+        tone: 'attention',
+      }),
+    ],
+  };
+
+  details[KEYS.footer] = {
+    issue: find(KEYS.footer),
+    tokens: 94_000,
+    costUsd: 0,
+    cards: [
+      card(CARDS.footerBrief, `${KEYS.footer} : Pied de page : liens vers GitHub et LinkedIn`, {
+        kind: 'brief',
+        status: 'done',
+        assignee: 'coordinator',
+        station: 'brief',
+      }),
+      card(CARDS.footerImpl, `impl ${KEYS.footer} : liens sociaux`, {
+        kind: 'impl',
+        status: 'ready',
+        assignee: 'coder',
+        station: 'implementation',
+        parents: [CARDS.footerBrief],
+      }),
+      card(CARDS.footerRelease, `release ${KEYS.footer}`, {
+        kind: 'release',
+        status: 'todo',
+        assignee: 'coordinator',
+        station: 'release',
+        parents: [CARDS.footerImpl],
+      }),
+    ],
+    timeline: [
+      timeline(ago(120 * min), 'Label factory posé par cddev', { source: 'github' }),
+      timeline(ago(61 * min), 'Gate : changements demandés', {
+        profile: 'gate',
+        cardId: CARDS.footerImpl,
+        tone: 'attention',
+        detail: 'Lien LinkedIn sans rel="noopener"',
+      }),
+      timeline(ago(42 * min), 'Carte prête mais retenue par la garde active_pr', {
+        cardId: CARDS.footerImpl,
+        tone: 'danger',
+        detail: 'Un commentaire de moins de 24 h cite la PR #50, sans relais depuis',
+      }),
+    ],
+  };
+
+  const doneDetail = (key: string, cards: CardView[], tokens: number, costUsd: number) => {
+    details[key] = {
+      issue: find(key),
+      tokens,
+      costUsd,
+      cards,
+      timeline: [
+        timeline(find(key).startedAt, 'Label factory posé par cddev', { source: 'github' }),
+        timeline(find(key).updatedAt, 'Fusionné dans main, workflows verts', {
+          source: 'github',
+          tone: 'done',
+        }),
+      ],
+    };
+  };
+  doneDetail(
+    KEYS.e2e,
+    [
+      card(CARDS.e2eBrief, `${KEYS.e2e} : E2E PR 2 : actions des cartes et lanceur`, {
+        kind: 'brief',
+        status: 'done',
+        assignee: 'coordinator',
+        station: 'brief',
+      }),
+      card(CARDS.e2eImpl, `impl ${KEYS.e2e} : E2E PR 2b, île et lanceur`, {
+        kind: 'impl',
+        status: 'done',
+        assignee: 'gate',
+        station: 'gate',
+        parents: [CARDS.e2eBrief],
+        testsPassed: 13,
+        testsTotal: 13,
+      }),
+      card(CARDS.e2eRelease, `release ${KEYS.e2e} : E2E PR 2b, île et lanceur`, {
+        kind: 'release',
+        status: 'done',
+        assignee: 'coordinator',
+        station: 'release',
+        parents: [CARDS.e2eImpl],
+      }),
+    ],
+    1_840_000,
+    6.4,
+  );
+  doneDetail(
+    KEYS.overlap,
+    [
+      card(CARDS.overlapImpl, `impl ${KEYS.overlap}`, {
+        kind: 'impl',
+        status: 'done',
+        assignee: 'gate-claude',
+        station: 'gate',
+      }),
+      card(CARDS.overlapRelease, `release ${KEYS.overlap}`, {
+        kind: 'release',
+        status: 'done',
+        assignee: 'coordinator-claude',
+        station: 'release',
+        parents: [CARDS.overlapImpl],
+      }),
+    ],
+    233_000,
+    1.94,
+  );
+  doneDetail(
+    KEYS.codeowners,
+    [
+      card(CARDS.codeownersImpl, `impl ${KEYS.codeowners}`, {
+        kind: 'impl',
+        status: 'done',
+        assignee: 'gate',
+        station: 'gate',
+      }),
+    ],
+    31_000,
+    0,
+  );
+
+  const agents: AgentActivity[] = [
+    idle('coordinator', 'brief', model('moa', 'mix')),
+    idle('coordinator-claude', 'brief', model('freellmapi', 'auto')),
+    {
+      profile: 'coder-claude',
+      station: 'implementation',
+      state: 'cli',
+      cardId: CARDS.teamImpl,
+      issueKey: KEYS.team,
+      model: qwenLive,
+      laneModel: opus,
+      action: {
+        kind: 'cli',
+        label: 'claude -p · Edit',
+        detail: 'desktop/src/team/TeamView.tsx',
+        startedAt: ago(6),
+      },
+      runStartedAt: ago(11 * min),
+      lastHeartbeatAt: ago(40),
+    },
+    idle('coder', 'implementation', model('freellmapi', 'auto')),
+    idle('coder-opencode', 'implementation', model('nvidia', 'nvidia/nemotron-3-ultra-550b-a55b')),
+    idle('scribe', 'implementation', model('freellmapi', 'auto')),
+    {
+      profile: 'gate',
+      station: 'gate',
+      state: 'tool',
+      cardId: CARDS.contactImpl,
+      issueKey: KEYS.contact,
+      model: model('nvidia', NEMOTRON_SUPER, 'live'),
+      laneModel: null,
+      action: { kind: 'tool', label: 'terminal', detail: 'pnpm -r test', startedAt: ago(12) },
+      runStartedAt: ago(6 * min),
+      lastHeartbeatAt: ago(25),
+    },
+    idle('gate-claude', 'gate', model('freellmapi', 'auto')),
+    idle('release', 'release', model('freellmapi', 'auto')),
+    idle('tool-setup', 'side', model('freellmapi', 'auto')),
+  ];
+  const coordinator = agents[0];
+  if (coordinator) {
+    coordinator.state = 'queued';
+    coordinator.issueKey = KEYS.shortcut;
+    coordinator.cardId = CARDS.shortcutBrief;
+  }
+
+  const interventions: Intervention[] = [
+    {
+      id: 'iv-projects',
+      kind: 'needs_input',
+      severity: 'critical',
+      title: 'Carte UI sans maquette jointe',
+      issueKey: KEYS.projects,
+      cardId: CARDS.projectsBrief,
+      profile: 'coordinator',
+      question: [
+        "La carte touche l'interface (page Projets) et aucune maquette n'est jointe à l'issue. Les règles du brief exigent une maquette pour une carte UI.",
+        '',
+        'Deux options :',
+        '',
+        "1. Joindre une maquette (capture ou lien) à l'issue.",
+        '2. Valider une mise en page simple : filtres en pastilles au-dessus de la grille, sélection multiple, état vide « Aucun projet pour ces technos ».',
+        '',
+        'Quelle option retiens-tu ?',
+      ].join('\n'),
+      openedAt: ago(14 * min),
+      push: true,
+      actions: [
+        { kind: 'unblock' },
+        { kind: 'link', label: "Ouvrir l'issue cv-site#49", url: issueUrl(KEYS.projects) },
+      ],
+      unblock: null,
+    },
+    {
+      id: 'iv-footer',
+      kind: 'held_active_pr',
+      severity: 'warning',
+      title: 'Carte prête mais retenue depuis 42 min',
+      issueKey: KEYS.footer,
+      cardId: CARDS.footerImpl,
+      profile: 'coder',
+      question:
+        "La carte impl est prête, mais le dispatcher la retient : un commentaire de moins de 24 h cite la PR #50, sans relais depuis. C'est la garde `active_pr` d'Hermès contre les PR en double. `/factory unblock` ne s'applique pas (la carte n'est pas bloquée) : il faut relayer la carte.",
+      openedAt: ago(42 * min),
+      push: true,
+      actions: [
+        {
+          kind: 'copy',
+          label: 'Relancer par relais (scribe puis coder)',
+          command: `hermes kanban --board factory reassign ${CARDS.footerImpl} scribe --reason "relais active_pr" && hermes kanban --board factory reassign ${CARDS.footerImpl} coder --reason "reprise sur la PR"`,
+        },
+        { kind: 'link', label: 'Voir la PR #50', url: prUrl('cv-site', 50) },
+      ],
+      unblock: null,
+    },
+    {
+      id: 'iv-tags',
+      kind: 'pr_approval',
+      severity: 'info',
+      title: 'PR #74 prête à approuver',
+      issueKey: KEYS.tags,
+      cardId: CARDS.tagsRelease,
+      profile: 'coordinator',
+      question:
+        'La gate a approuvé la PR #74 et la CI est verte (Tests, E2E, GitHub Pages). Revue demandée à @cddev, auto-merge armé : ton approbation déclenche le merge, le tag puis la release.',
+      openedAt: ago(22 * min),
+      push: false,
+      actions: [
+        { kind: 'link', label: 'Approuver la PR #74 sur GitHub', url: prUrl('claude-cockpit', 74) },
+      ],
+      unblock: null,
+    },
+  ];
+  for (const intervention of interventions) {
+    const summary = summaries.find((candidate) => candidate.key === intervention.issueKey);
+    if (summary) summary.interventionIds.push(intervention.id);
+  }
+  for (const [key, detail] of Object.entries(details)) {
+    const summary = summaries.find((candidate) => candidate.key === key);
+    if (summary) detail.issue = { ...summary };
+  }
+
+  const transcripts: Record<number, TranscriptView[]> = {
+    [RUNS.teamImpl]: [
+      {
+        runId: RUNS.teamImpl,
+        source: 'hermes',
+        title: 'Session Hermès · coder-claude',
+        entries: [
+          entry(ago(11 * min), 'user', `work kanban task ${CARDS.teamImpl}`),
+          entry(
+            ago(11 * min - 5),
+            'assistant',
+            'Je lis la carte et le brief, puis je prépare le worktree.',
+            {
+              model: QWEN_LOCAL,
+            },
+          ),
+          entry(ago(11 * min - 8), 'tool_call', `{"task_id": "${CARDS.teamImpl}"}`, {
+            toolName: 'kanban_show',
+          }),
+          entry(
+            ago(11 * min - 9),
+            'tool_result',
+            `Carte impl ${KEYS.team} · base 3f9c2e1 · contrat local-only · skills factory-author-proof, factory-cli-lane · claude_model: claude-opus-5-5`,
+            { toolName: 'kanban_show', status: 'ok' },
+          ),
+          entry(ago(10 * min), 'tool_call', '{"name": "factory-cli-lane"}', {
+            toolName: 'skill_view',
+          }),
+          entry(
+            ago(10 * min - 4),
+            'reasoning',
+            "Le label claude:opus impose claude-opus-5-5 pour la lane. Je dois d'abord prouver l'échec sur la base, puis déléguer à Claude Code et relancer les tests moi-même.",
+          ),
+          entry(ago(9 * min), 'tool_call', 'npm test -- team', { toolName: 'terminal' }),
+          entry(
+            ago(8 * min),
+            'tool_result',
+            '  team view\n    ✓ renders one card per conversation\n    ✗ groups cards by project\n    ✗ sorts groups by project name\n\n  11 passing, 2 failing',
+            { toolName: 'terminal', status: 'error' },
+          ),
+          entry(
+            ago(8 * min + 20),
+            'assistant',
+            'Échec prouvé sur la base 3f9c2e1 : 2 tests rouges. Je délègue l’implémentation à Claude Code.',
+            { model: QWEN_LOCAL },
+          ),
+          entry(
+            ago(7 * min),
+            'tool_call',
+            'claude -p "$(cat evidence/brief.md)" --model claude-opus-5-5 --allowedTools "Read,Edit,Write,Bash(npm *),Bash(git diff*),Bash(git status*)" --max-turns 40 --output-format json > evidence/10-claude-run.json',
+            { toolName: 'terminal' },
+          ),
+        ],
+        terminal: [
+          `\u001b[2m${new Date(now - 11 * 60_000).toLocaleTimeString('fr-FR')}\u001b[0m Query: work kanban task ${CARDS.teamImpl}`,
+          `\u001b[2m${new Date(now - 11 * 60_000 + 1000).toLocaleTimeString('fr-FR')}\u001b[0m Initializing agent... profile=coder-claude provider=llamacpp`,
+          `  model=${QWEN_LOCAL}`,
+          '\u001b[36m  kanban_show\u001b[0m t_5e21c0d9 \u001b[2m(0,2 s)\u001b[0m',
+          '\u001b[36m  skill_view\u001b[0m factory-cli-lane \u001b[2m(0,1 s)\u001b[0m',
+          '\u001b[35m  [thinking]\u001b[0m preuve de l’échec sur la base avant la lane',
+          '\u001b[36m  terminal\u001b[0m npm test -- team \u001b[2m(8,4 s)\u001b[0m',
+          '\u001b[32m    11 passing\u001b[0m',
+          '\u001b[31m    2 failing\u001b[0m',
+          '\u001b[36m  terminal\u001b[0m claude -p "$(cat evidence/brief.md)" --model claude-opus-5-5 --max-turns 40 \u001b[33m(en cours)\u001b[0m',
+        ],
+      },
+      {
+        runId: RUNS.teamImpl,
+        source: 'claude-code',
+        title: 'Claude Code · claude-opus-5-5',
+        entries: [
+          entry(
+            ago(7 * min),
+            'system',
+            `Session 4cd140d2 · ~/perso/claude-cockpit/.worktrees/${CARDS.teamImpl} · claude-opus-5-5`,
+          ),
+          entry(
+            ago(7 * min),
+            'user',
+            'Implémente le regroupement des cartes par projet dans la vue ÉQUIPE. Les tests desktop/test/team.test.js décrivent le comportement attendu. Interdits : affaiblir une assertion, allonger un timeout, git push --force.',
+          ),
+          entry(
+            ago(7 * min - 6),
+            'reasoning',
+            'Les tests attendent groupByProject(cards) qui renvoie des groupes triés par nom de projet, cartes sans projet à la fin. Je lis la vue avant de toucher quoi que ce soit.',
+            { model: 'claude-opus-5-5' },
+          ),
+          entry(ago(7 * min - 10), 'tool_call', 'desktop/src/team/TeamView.tsx', {
+            toolName: 'Read',
+          }),
+          entry(ago(7 * min - 11), 'tool_result', '212 lignes', { toolName: 'Read', status: 'ok' }),
+          entry(ago(6 * min), 'tool_call', 'desktop/src/team/groupByProject.ts (nouveau fichier)', {
+            toolName: 'Write',
+          }),
+          entry(ago(5 * min), 'tool_call', 'desktop/src/team/TeamView.tsx', { toolName: 'Edit' }),
+          entry(ago(4 * min), 'tool_call', 'npm test -- team', { toolName: 'Bash' }),
+          entry(
+            ago(4 * min - 9),
+            'tool_result',
+            '12 passing, 1 failing (sorts groups by project name)',
+            {
+              toolName: 'Bash',
+              status: 'error',
+            },
+          ),
+          entry(
+            ago(3 * min),
+            'assistant',
+            "Il reste l'ordre des groupes : je trie avec localeCompare en français pour que « Élan » passe avant « Zéphyr ».",
+            { model: 'claude-opus-5-5' },
+          ),
+        ],
+        terminal: [],
+      },
+    ],
+    [RUNS.contactGate]: [
+      {
+        runId: RUNS.contactGate,
+        source: 'hermes',
+        title: 'Session Hermès · gate',
+        entries: [
+          entry(ago(6 * min), 'user', `work kanban task ${CARDS.contactImpl}`),
+          entry(ago(6 * min - 4), 'tool_call', '{"name": "factory-gate"}', {
+            toolName: 'skill_view',
+          }),
+          entry(ago(5 * min), 'tool_call', 'pnpm install --frozen-lockfile', {
+            toolName: 'terminal',
+          }),
+          entry(ago(4 * min), 'tool_result', 'Done in 41,2s', {
+            toolName: 'terminal',
+            status: 'ok',
+          }),
+          entry(ago(3 * min), 'tool_call', 'pnpm -r typecheck', { toolName: 'terminal' }),
+          entry(ago(2 * min), 'tool_result', '3 projets, aucune erreur', {
+            toolName: 'terminal',
+            status: 'ok',
+          }),
+          entry(ago(12), 'tool_call', 'pnpm -r test', { toolName: 'terminal' }),
+        ],
+        terminal: [
+          `\u001b[2m${new Date(now - 6 * 60_000).toLocaleTimeString('fr-FR')}\u001b[0m Query: work kanban task ${CARDS.contactImpl}`,
+          `  model=${NEMOTRON_SUPER} provider=nvidia reasoning=high`,
+          '\u001b[36m  terminal\u001b[0m pnpm install --frozen-lockfile \u001b[2m(41,2 s)\u001b[0m',
+          '\u001b[36m  terminal\u001b[0m pnpm -r typecheck \u001b[2m(27,9 s)\u001b[0m',
+          '\u001b[36m  terminal\u001b[0m pnpm -r test \u001b[33m(en cours)\u001b[0m',
+        ],
+      },
+    ],
+    [RUNS.teamBrief]: [
+      {
+        runId: RUNS.teamBrief,
+        source: 'hermes',
+        title: 'Session Hermès · coordinator-claude',
+        entries: [
+          entry(ago(38 * min), 'user', `work kanban task ${CARDS.teamBrief}`),
+          entry(ago(37 * min), 'tool_call', 'desktop/src/team', {
+            toolName: 'mcp_graphify_get_neighbors',
+          }),
+          entry(
+            ago(36 * min),
+            'tool_call',
+            'claude -p "$(cat evidence/brief-input.md)" --model claude-opus-5-5 --max-turns 15',
+            {
+              toolName: 'terminal',
+            },
+          ),
+          entry(
+            ago(32 * min),
+            'tool_result',
+            'Brief rendu (evidence/brief-claude.json, 15 tours, 0,31 $US)',
+            {
+              toolName: 'terminal',
+              status: 'ok',
+            },
+          ),
+          entry(ago(31 * min), 'tool_call', 'impl claude-cockpit#71 → coder-claude', {
+            toolName: 'kanban_create',
+          }),
+          entry(ago(31 * min), 'tool_call', 'release claude-cockpit#71 → coordinator-claude', {
+            toolName: 'kanban_create',
+          }),
+          entry(ago(31 * min), 'assistant', 'Brief rédigé, 2 cartes créées. Je termine la carte.', {
+            model: 'agnes-2.5-flash',
+          }),
+        ],
+        terminal: [],
+      },
+    ],
+  };
+
+  return {
+    snapshot: {
+      generatedAt: iso(now),
+      factory: { live: true, paused: false, pauseReason: null, maxInProgress: 2, running: 2 },
+      stations: [
+        { id: 'intake', label: 'Intake', profiles: [] },
+        { id: 'brief', label: 'Brief', profiles: ['coordinator', 'coordinator-claude'] },
+        {
+          id: 'implementation',
+          label: 'Implémentation',
+          profiles: ['coder', 'coder-claude', 'coder-opencode', 'scribe'],
+        },
+        { id: 'gate', label: 'Gate', profiles: ['gate', 'gate-claude'] },
+        { id: 'release', label: 'Release', profiles: ['release'] },
+        { id: 'done', label: 'Terminé', profiles: [] },
+      ],
+      agents,
+      issues: summaries,
+      sideCards: [
+        {
+          id: 't_7d2e90a1',
+          title:
+            'watch 2026-10-28 : 2 PR ouvertes sur code-my-life/claude-cockpit (merge en attente ?)',
+          kind: 'watch',
+          status: 'triage',
+          assignee: 'coordinator',
+          openedAt: ago(21 * min),
+          note: 'Anomalie relevée par factory-watch (toutes les 30 min)',
+        },
+      ],
+      interventions,
+      activity: [
+        {
+          id: nextId('ev'),
+          at: ago(6),
+          kind: 'tool',
+          profile: 'coder-claude',
+          issueKey: KEYS.team,
+          cardId: CARDS.teamImpl,
+          label: 'Edit',
+          detail: 'desktop/src/team/TeamView.tsx',
+          status: 'running',
+          durationMs: null,
+          model: 'claude-opus-5-5',
+        },
+        {
+          id: nextId('ev'),
+          at: ago(12),
+          kind: 'tool',
+          profile: 'gate',
+          issueKey: KEYS.contact,
+          cardId: CARDS.contactImpl,
+          label: 'terminal',
+          detail: 'pnpm -r test',
+          status: 'running',
+          durationMs: null,
+          model: NEMOTRON_SUPER,
+        },
+        {
+          id: nextId('ev'),
+          at: ago(40),
+          kind: 'kanban',
+          profile: 'coder-claude',
+          issueKey: KEYS.team,
+          cardId: CARDS.teamImpl,
+          label: 'heartbeat',
+          detail: null,
+          status: 'ok',
+          durationMs: null,
+          model: null,
+        },
+        {
+          id: nextId('ev'),
+          at: ago(2 * 60),
+          kind: 'tool',
+          profile: 'gate',
+          issueKey: KEYS.contact,
+          cardId: CARDS.contactImpl,
+          label: 'terminal',
+          detail: 'pnpm -r typecheck',
+          status: 'ok',
+          durationMs: 27_900,
+          model: NEMOTRON_SUPER,
+        },
+        {
+          id: nextId('ev'),
+          at: ago(4 * 60),
+          kind: 'tool',
+          profile: 'coder-claude',
+          issueKey: KEYS.team,
+          cardId: CARDS.teamImpl,
+          label: 'Bash',
+          detail: 'npm test -- team : 12 passing, 1 failing',
+          status: 'error',
+          durationMs: 8_900,
+          model: 'claude-opus-5-5',
+        },
+        {
+          id: nextId('ev'),
+          at: ago(4 * 60 + 30),
+          kind: 'kanban',
+          profile: null,
+          issueKey: KEYS.shortcut,
+          cardId: CARDS.shortcutBrief,
+          label: 'Carte créée par l’intake',
+          detail: 'En file : 2 cartes en cours sur 2 autorisées',
+          status: null,
+          durationMs: null,
+          model: null,
+        },
+        {
+          id: nextId('ev'),
+          at: ago(9 * 60),
+          kind: 'kanban',
+          profile: 'coder',
+          issueKey: KEYS.contact,
+          cardId: CARDS.contactImpl,
+          label: 'Revue demandée à gate',
+          detail: 'coder-guard : branche poussée, PR #52 citée',
+          status: 'ok',
+          durationMs: null,
+          model: null,
+        },
+        {
+          id: nextId('ev'),
+          at: ago(14 * 60),
+          kind: 'kanban',
+          profile: 'coordinator',
+          issueKey: KEYS.projects,
+          cardId: CARDS.projectsBrief,
+          label: 'Bloqué : décision attendue',
+          detail: 'Carte UI sans maquette jointe',
+          status: 'blocked',
+          durationMs: null,
+          model: null,
+        },
+        {
+          id: nextId('ev'),
+          at: ago(22 * 60),
+          kind: 'github',
+          profile: null,
+          issueKey: KEYS.tags,
+          cardId: null,
+          label: 'PR #74 : revue demandée à @cddev',
+          detail: 'CI verte, auto-merge armé',
+          status: null,
+          durationMs: null,
+          model: null,
+        },
+      ],
+      health: buildHealth(now),
+    },
+    details,
+    transcripts,
+    profiles: buildProfiles(),
+    usage: buildUsage(now),
+    history: buildHistory(now),
+  };
+}

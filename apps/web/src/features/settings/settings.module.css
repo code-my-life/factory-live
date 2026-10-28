@@ -1,0 +1,74 @@
+.block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--base-size-12);
+}
+
+.state {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  margin: 0;
+  font-size: var(--text-body-size-small);
+}
+
+.ok {
+  color: var(--fgColor-success);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8);
+}
+
+.notification {
+  width: min(100%, 360px);
+  padding: var(--base-size-12);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-large);
+  background: var(--bgColor-muted);
+  box-shadow: var(--shadow-floating-small);
+}
+
+.notificationApp {
+  margin: 0;
+  color: var(--fgColor-muted);
+  font-size: 11px;
+}
+
+.notificationTitle {
+  margin: 2px 0 0;
+  font-weight: var(--base-text-weight-semibold);
+  font-size: var(--text-body-size-small);
+}
+
+.notificationBody {
+  margin: 2px 0 0;
+  font-size: var(--text-body-size-small);
+}
+
+.install,
+.sources {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-body-size-small);
+}
+
+.install li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--base-size-8);
+  overflow-wrap: anywhere;
+}
+
+.install svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--fgColor-muted);
+}

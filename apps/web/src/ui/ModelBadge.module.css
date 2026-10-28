@@ -1,0 +1,54 @@
+.badge {
+  display: inline-flex;
+  overflow: hidden;
+  align-items: center;
+  gap: var(--base-size-6);
+  max-width: 100%;
+  min-width: 0;
+  padding: 1px var(--base-size-6);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-full);
+  background: var(--bgColor-muted);
+  color: var(--fgColor-default);
+  font-size: var(--text-body-size-small);
+  line-height: var(--text-body-lineHeight-small);
+  white-space: nowrap;
+}
+
+.badge[data-live='true'] {
+  border-color: var(--borderColor-accent-muted);
+  background: var(--bgColor-accent-muted);
+}
+
+.badge[data-emphasis='true'] {
+  border-color: var(--borderColor-done-muted, var(--borderColor-accent-muted));
+  background: var(--bgColor-done-muted, var(--bgColor-accent-muted));
+}
+
+.prefix {
+  flex: none;
+  color: var(--fgColor-muted);
+}
+
+.model {
+  flex: 0 1 auto;
+  min-width: 4ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--fontStack-monospace);
+  font-size: 12px;
+}
+
+/* Le fournisseur cède la place au modèle quand la largeur manque. */
+.provider {
+  flex: 0 100 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fgColor-muted);
+  text-overflow: ellipsis;
+}
+
+.provider::before {
+  content: '·';
+  margin-right: var(--base-size-6);
+}

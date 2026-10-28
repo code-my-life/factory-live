@@ -1,0 +1,162 @@
+.graph {
+  min-width: 0;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  background-color: var(--bgColor-inset);
+  background-image: radial-gradient(var(--borderColor-muted) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.graph :global(.react-flow) {
+  --xy-edge-stroke: var(--borderColor-emphasis);
+  --xy-edge-stroke-width: 1.5;
+  --xy-background-color: transparent;
+}
+
+.graph :global(.react-flow__node) {
+  cursor: pointer;
+}
+
+.graph :global(.react-flow__node:focus-visible) {
+  outline: none;
+}
+
+.graph :global(.react-flow__node:focus-visible) .node {
+  outline: 2px solid var(--fgColor-accent);
+  outline-offset: 2px;
+}
+
+.edge :global(.react-flow__edge-path) {
+  stroke: var(--borderColor-emphasis);
+}
+
+.edge:global(.animated) :global(.react-flow__edge-path) {
+  stroke: var(--fgColor-accent);
+}
+
+.handle {
+  width: 6px;
+  height: 6px;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: var(--borderColor-emphasis);
+  opacity: 0;
+}
+
+.node {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-6);
+  box-sizing: border-box;
+  width: 264px;
+  height: 168px;
+  padding: var(--base-size-8) var(--base-size-12);
+  overflow: hidden;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  background: var(--bgColor-default);
+  color: var(--fgColor-default);
+  font-family: var(--fontStack-system);
+  transition: border-color 160ms var(--fl-ease-out);
+}
+
+.node[data-status='running'] {
+  border-color: var(--borderColor-accent-emphasis);
+}
+.node[data-status='review'] {
+  border-color: var(--borderColor-done-muted);
+}
+.node[data-status='blocked'] {
+  border-color: var(--borderColor-danger-emphasis);
+}
+.node[data-status='done'] {
+  border-color: var(--borderColor-success-muted);
+}
+.node[data-selected='true'] {
+  box-shadow: 0 0 0 2px var(--borderColor-accent-emphasis);
+}
+
+.nodeTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--base-size-8);
+}
+
+.nodeKind {
+  color: var(--fgColor-muted);
+  font-family: var(--fontStack-monospace);
+  font-size: 11px;
+}
+
+.nodeStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-6);
+  font-size: 12px;
+  color: var(--fgColor-muted);
+}
+
+.nodeTitle {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin: 0;
+  font-size: var(--text-body-size-small);
+  font-weight: var(--base-text-weight-semibold);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.nodeWho {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-6);
+  min-width: 0;
+  color: var(--fgColor-muted);
+  font-size: 12px;
+}
+
+.nodeProfile {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodeModels {
+  display: flex;
+  min-width: 0;
+}
+
+.nodeAction,
+.nodeBlock {
+  overflow: hidden;
+  margin: 0;
+  font-family: var(--fontStack-monospace);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodeAction {
+  color: var(--fgColor-accent);
+}
+
+.nodeBlock {
+  color: var(--fgColor-danger);
+}
+
+.nodeProgress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4);
+  margin-top: auto;
+}
+
+.nodeMeta {
+  color: var(--fgColor-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}

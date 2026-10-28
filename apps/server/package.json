@@ -1,0 +1,23 @@
+{
+  "name": "@factory-live/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --conditions=source --watch src/main.ts",
+    "start": "node dist/main.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.5",
+    "@hono/zod-openapi": "1.6.3",
+    "hono": "4.13.14",
+    "pino": "10.4.0",
+    "web-push": "3.6.7",
+    "yaml": "2.9.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/web-push": "3.6.4"
+  }
+}

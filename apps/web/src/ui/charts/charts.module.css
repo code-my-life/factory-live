@@ -1,0 +1,219 @@
+/*
+ * Graphiques maison (skill dataviz) : marques fines, extrémité arrondie de 4 px, 2 px d'air
+ * entre colonnes, grille d'un trait recessif, texte toujours en jetons de texte.
+ */
+.figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+  margin: 0;
+  --fl-mark: var(--bgColor-accent-emphasis);
+}
+
+.caption {
+  font-size: var(--text-body-size-medium);
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.plotArea {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--base-size-8);
+  height: 168px;
+}
+
+.yAxis {
+  position: relative;
+  width: 40px;
+}
+
+.tick {
+  position: absolute;
+  right: 0;
+  transform: translateY(50%);
+  color: var(--fgColor-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.plot {
+  position: relative;
+  min-width: 0;
+}
+
+.gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--borderColor-muted);
+}
+
+.columns {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.column {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.columnHit {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.columnHit:focus-visible {
+  outline: 2px solid var(--fgColor-accent);
+  outline-offset: 1px;
+}
+
+.columnBar {
+  position: relative;
+  width: min(24px, 100%);
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: var(--fl-mark);
+  transition: filter 120ms var(--fl-ease-out);
+}
+
+.columnBar[data-active='true'] {
+  filter: brightness(1.25);
+}
+
+.peakLabel {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translate(-50%, -4px);
+  color: var(--fgColor-default);
+  font-size: 11px;
+  font-weight: var(--base-text-weight-semibold);
+  white-space: nowrap;
+}
+
+.tooltip {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--base-size-4) var(--base-size-8);
+  transform: translateX(-50%);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  background: var(--bgColor-default);
+  box-shadow: var(--shadow-floating-small);
+  color: var(--fgColor-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.tooltip strong {
+  color: var(--fgColor-default);
+  font-variant-numeric: tabular-nums;
+}
+
+.xAxis {
+  display: flex;
+  justify-content: space-between;
+  padding-left: 48px;
+  color: var(--fgColor-muted);
+  font-size: 11px;
+}
+
+.tableToggle summary {
+  color: var(--fgColor-accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.table {
+  margin-top: var(--base-size-8);
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.table th,
+.table td {
+  padding: 2px var(--base-size-12) 2px 0;
+  text-align: left;
+}
+
+.table th {
+  color: var(--fgColor-muted);
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.barList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.barRow {
+  display: grid;
+  grid-template-columns: minmax(96px, 140px) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--base-size-12);
+  font-size: var(--text-body-size-small);
+}
+
+.barLabel {
+  overflow-wrap: anywhere;
+}
+
+/* L'échelle garde 72 px à droite pour que la valeur, posée au bout de la barre, ne déborde jamais. */
+.barScale {
+  position: relative;
+  min-width: 0;
+  height: 18px;
+  margin-right: 72px;
+}
+
+.barFill {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: var(--fl-pct);
+  min-width: 2px;
+  height: 14px;
+  border-radius: 0 4px 4px 0;
+  background: var(--fl-mark);
+}
+
+.barValue {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--fl-pct) + 8px);
+  transform: translateY(-50%);
+  color: var(--fgColor-default);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

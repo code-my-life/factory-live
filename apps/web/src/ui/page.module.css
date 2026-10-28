@@ -1,0 +1,119 @@
+/* Mise en page commune des écrans secondaires. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-16);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--base-size-8) var(--base-size-16);
+}
+
+.intro {
+  margin: var(--base-size-4) 0 0;
+  max-width: 68ch;
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+}
+
+.muted {
+  margin: 0;
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--text-title-size-small);
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.panel {
+  min-width: 0;
+  padding: var(--base-size-12) var(--base-size-16);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  background: var(--bgColor-default);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: var(--base-size-12);
+}
+
+.figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8) var(--base-size-24);
+  margin: 0;
+}
+
+.figure dt {
+  color: var(--fgColor-muted);
+  font-size: 12px;
+}
+
+.figure dd {
+  margin: 2px 0 0;
+  font-size: var(--text-title-size-medium);
+  font-weight: var(--base-text-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.tableBox {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+}
+
+.table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: var(--text-body-size-small);
+}
+
+.table th,
+.table td {
+  padding: var(--base-size-8) var(--base-size-12);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  border-top: 0;
+  background: var(--bgColor-muted);
+  color: var(--fgColor-muted);
+  font-size: 12px;
+  font-weight: var(--base-text-weight-semibold);
+  white-space: nowrap;
+}
+
+.table td.num,
+.table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.demoNote {
+  margin: 0;
+  color: var(--fgColor-attention);
+  font-size: 12px;
+}

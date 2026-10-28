@@ -1,0 +1,49 @@
+.markdown {
+  min-width: 0;
+  font-size: var(--text-body-size-medium);
+  line-height: var(--text-body-lineHeight-medium);
+  overflow-wrap: anywhere;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown p,
+.markdown ul,
+.markdown ol {
+  margin-block: var(--base-size-8);
+}
+
+.markdown ul,
+.markdown ol {
+  padding-left: var(--base-size-24);
+}
+
+.markdown code {
+  padding: 0.1em 0.35em;
+  border-radius: var(--borderRadius-small);
+  background: var(--bgColor-neutral-muted);
+  font-family: var(--fontStack-monospace);
+  font-size: 0.9em;
+}
+
+.markdown pre {
+  overflow-x: auto;
+  padding: var(--base-size-12);
+  border-radius: var(--borderRadius-medium);
+  background: var(--bgColor-inset);
+}
+
+.markdown pre code {
+  padding: 0;
+  background: none;
+}
+
+.markdown a {
+  color: var(--fgColor-accent);
+}

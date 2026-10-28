@@ -1,0 +1,137 @@
+.feed {
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--base-size-8);
+  margin-bottom: var(--base-size-8);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-title-size-small);
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.empty {
+  margin: 0;
+  color: var(--fgColor-muted);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+}
+
+.item {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: var(--base-size-8) var(--base-size-12);
+  align-items: start;
+  padding: var(--base-size-8) var(--base-size-12);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+  font-size: var(--text-body-size-small);
+  line-height: var(--text-body-lineHeight-small);
+}
+
+.item:first-child {
+  border-top: 0;
+}
+
+.time {
+  color: var(--fgColor-muted);
+  font-family: var(--fontStack-monospace);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kind {
+  display: inline-flex;
+  padding-top: 2px;
+  color: var(--fgColor-muted);
+}
+
+.item[data-status='error'] .kind,
+.item[data-status='blocked'] .kind {
+  color: var(--fgColor-danger);
+}
+
+.item[data-status='running'] .kind {
+  color: var(--fgColor-accent);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--base-size-4) var(--base-size-8);
+}
+
+.profile {
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.label {
+  font-family: var(--fontStack-monospace);
+  font-size: 12px;
+}
+
+.duration {
+  color: var(--fgColor-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.running {
+  color: var(--fgColor-accent);
+}
+
+.detail {
+  color: var(--fgColor-muted);
+  font-family: var(--fontStack-monospace);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-4) var(--base-size-12);
+}
+
+.meta:empty {
+  display: none;
+}
+
+.issue {
+  color: var(--fgColor-accent);
+  font-family: var(--fontStack-monospace);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.model {
+  color: var(--fgColor-muted);
+  font-family: var(--fontStack-monospace);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .issue:hover {
+    text-decoration: underline;
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"],
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": [
+    "vitest.config.ts",
+    "eslint.config.js",
+    "scripts/*.mjs",
+    "apps/web/scripts/*.mjs",
+    "e2e/**/*.ts"
+  ]
+}
