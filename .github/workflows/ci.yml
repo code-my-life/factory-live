@@ -44,8 +44,9 @@ jobs:
       - run: docker build -f docker/Dockerfile -t factory-live:ci .
       - name: Le conteneur démarre et répond, utilisateur 1000, racine en lecture seule
         run: |
-          docker run -d --name fl --read-only --tmpfs /tmp --user 1000:1000 -p 127.0.0.1:8446:8446 factory-live:ci
-          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8446/healthz && break; sleep 1; done
+          docker run -d --name fl --read-only --tmpfs /tmp -v fl-data:/data --user 1000:1000 -p 127.0.0.1:8446:8446 factory-live:ci
+          ok=0; for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8446/healthz && { ok=1; break; }; sleep 1; done
+          if [ "$ok" != 1 ]; then docker logs fl; exit 1; fi
           curl -fsS http://127.0.0.1:8446/api/openapi.json > /dev/null
           test "$(docker inspect -f '{{.Config.User}}' fl)" = "1000:1000"
           docker logs fl | tail -5

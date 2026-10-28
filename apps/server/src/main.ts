@@ -26,7 +26,17 @@ const version = (
 ).version;
 const now = () => Date.now();
 
-const store = new HistoryStore(config.DATA_DIR);
+const store = (() => {
+  try {
+    return new HistoryStore(config.DATA_DIR);
+  } catch (error) {
+    log.fatal(
+      { component: 'server', dataDir: config.DATA_DIR, error: String(error) },
+      'Base de factory-live impossible à ouvrir : DATA_DIR doit être un volume inscriptible (docker/compose.yaml)',
+    );
+    process.exit(1);
+  }
+})();
 const profiles = new ProfileConfigReader(config.HERMES_HOME, config.FACTORY_REPO);
 const sessions = new SessionReader(config.profilesDir);
 const githubClient = config.secrets.githubToken
