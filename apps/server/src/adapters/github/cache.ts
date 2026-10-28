@@ -23,10 +23,14 @@ export function parsePrUrl(
  * Cache des données GitHub affichées (titres, labels, PR, CI). Rafraîchi par le hub : les issues actives
  * toutes les 30 s, les autres une fois. Sans jeton, tout reste vide et l'interface se rabat sur le kanban.
  */
+const MISSING_RETRY_MS = 3_600_000;
+
 export class GitHubCache implements GitHubReadPort {
   private readonly issues = new Map<string, IssueInfo>();
   private readonly prs = new Map<string, PullRequestView>();
   private readonly fetchedOnce = new Set<string>();
+  /** Issues introuvables sur GitHub (cartes de test, dépôt supprimé) : relues une fois l'heure. */
+  private readonly missing = new Map<string, number>();
   status: GitHubStatus = { ok: false, detail: 'Pas encore interrogée', checkedAt: null };
   lastDelivery: { at: number; status: number } | null = null;
 
@@ -64,6 +68,8 @@ export class GitHubCache implements GitHubReadPort {
     let changed = false;
     for (const issue of tracked) {
       if (!issue.active && this.fetchedOnce.has(issue.key)) continue;
+      const missingSince = this.missing.get(issue.key);
+      if (missingSince !== undefined && now - missingSince < MISSING_RETRY_MS) continue;
       const [repo = '', number = '0'] = issue.key.split('#');
       try {
         const info = await this.client.issue(repo, Number(number));
@@ -80,14 +86,25 @@ export class GitHubCache implements GitHubReadPort {
           }
         }
         this.fetchedOnce.add(issue.key);
+        this.missing.delete(issue.key);
         this.status = { ok: true, detail: this.describe(), checkedAt: now };
       } catch (error) {
         const status = error instanceof GitHubError ? error.status : 0;
+        if (status === 404) {
+          // L'issue n'existe pas (carte de test au numéro inventé) : rien à voir avec l'accès à GitHub.
+          if (!this.missing.has(issue.key))
+            this.log.info(
+              { issue: issue.key },
+              'issue introuvable sur GitHub, relue dans une heure',
+            );
+          this.missing.set(issue.key, now);
+          continue;
+        }
         // Nos propres messages (aucun accès, connexion requise) sont déjà lisibles.
         const ours =
           error instanceof GitHubError && /^(Aucun accès|Connecte-toi)/.test(error.message);
         this.status = {
-          ok: status === 404,
+          ok: false,
           detail: ours
             ? error.message
             : status === 401

@@ -24,4 +24,23 @@ describe('reportClientErrors', () => {
     fail('après');
     expect(send).toHaveBeenCalledTimes(6);
   });
+
+  it('donne le fichier et la ligne quand l’erreur arrive sans pile', () => {
+    const target = new EventTarget();
+    const send = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })));
+    reportClientErrors(target, send, () => 0);
+    target.dispatchEvent(
+      new ErrorEvent('error', {
+        message: 'Script error.',
+        filename: 'https://desktop-gja56n4.tail40220c.ts.net:8446/assets/index-abc.js',
+        lineno: 12,
+        colno: 345,
+      }),
+    );
+    const [, init] = send.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      message: 'Script error. (index-abc.js:12:345)',
+      stack: null,
+    });
+  });
 });

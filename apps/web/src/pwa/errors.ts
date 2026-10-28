@@ -36,8 +36,12 @@ export function reportClientErrors(
   };
   const onError = (event: Event) => {
     const error = event as ErrorEvent;
+    // Sans pile (« Script error. » de Safari), le fichier et la ligne restent souvent la seule piste.
+    const where = error.filename
+      ? ` (${error.filename.split('/').pop() ?? error.filename}:${error.lineno}:${error.colno})`
+      : '';
     report(
-      error.message || String(error.error),
+      `${error.message || String(error.error)}${where}`,
       error.error instanceof Error ? (error.error.stack ?? null) : null,
     );
   };
