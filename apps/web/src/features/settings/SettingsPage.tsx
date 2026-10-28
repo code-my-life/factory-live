@@ -6,12 +6,14 @@ import {
 } from '@primer/octicons-react';
 import { Button, Heading, SegmentedControl } from '@primer/react';
 import { useState } from 'react';
+import type { GitHubAccess } from '@factory-live/contracts';
 import type { ColorPreference } from '../../app/colorMode.tsx';
 import { useColorMode } from '../../app/colorMode.tsx';
 import { useFactorySource, useSnapshot } from '../../data/FactoryProvider.tsx';
 import { LiveDot } from '../../ui/LiveDot.tsx';
 import { INTERVENTION_LABEL } from '../../ui/vocabulary.ts';
 import page from '../../ui/page.module.css';
+import { GitHubAccessPanel } from './GitHubAccessPanel.tsx';
 import styles from './settings.module.css';
 
 const THEMES: { value: ColorPreference; label: string }[] = [
@@ -31,12 +33,47 @@ const PUSHED = [
 
 type PushState = 'off' | 'on';
 
+const APP_SLUG = 'factory-live-code-my-life';
+const APP_URL = `https://github.com/apps/${APP_SLUG}`;
+
+/**
+ * Le parcours GitHub de la démo, une étape par clic : rien, App créée, App installée, Clément
+ * connecté. En direct, l'état vient de `/api/github/status` et chaque étape mène à la page du serveur.
+ */
+function demoGitHubAccess(step: number, connectedAt: number): GitHubAccess {
+  const app =
+    step >= 1
+      ? {
+          slug: APP_SLUG,
+          url: APP_URL,
+          installed: step >= 2,
+          installUrl: `${APP_URL}/installations/new`,
+        }
+      : null;
+  return {
+    mode: app ? 'app' : 'none',
+    app,
+    user:
+      step >= 3
+        ? {
+            login: 'cddev',
+            avatarUrl: null,
+            expiresAt: new Date(connectedAt + 8 * 3_600_000).toISOString(),
+          }
+        : null,
+    setupUrl: '/api/github/setup',
+    loginUrl: '/api/github/login',
+  };
+}
+
 export function SettingsPage() {
   const { preference, setPreference } = useColorMode();
   const source = useFactorySource();
   const snapshot = useSnapshot();
   const [push, setPush] = useState<PushState>('off');
   const [preview, setPreview] = useState(false);
+  const [githubStep, setGitHubStep] = useState(0);
+  const [connectedAt, setConnectedAt] = useState(0);
   const sources = snapshot.health.filter((service) => service.group === 'factory-live');
 
   return (
@@ -96,6 +133,22 @@ export function SettingsPage() {
           ) : null}
         </div>
       </section>
+
+      <GitHubAccessPanel
+        access={demoGitHubAccess(githubStep, connectedAt)}
+        demo={source.kind === 'demo'}
+        actions={{
+          create: { onClick: () => setGitHubStep(1) },
+          install: { onClick: () => setGitHubStep(2) },
+          login: {
+            onClick: () => {
+              setConnectedAt(Date.now());
+              setGitHubStep(3);
+            },
+          },
+          logout: { onClick: () => setGitHubStep(2) },
+        }}
+      />
 
       <section className={page.panel} aria-labelledby="theme-title">
         <div className={styles.block}>
