@@ -12,6 +12,9 @@ updates:
       # Le runtime est Node 24 LTS (image node:24.22.1) : des types de Node 26 décriraient des API absentes.
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+      # TypeScript 7 refusé par typescript-eslint 8.72 (peer < 6.1.0) : gel en 6.0.x (ADR 0006), à relever quand il le prendra.
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:
