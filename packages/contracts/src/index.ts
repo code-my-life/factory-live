@@ -6,3 +6,6 @@ export * from './activity.ts';
 export * from './health.ts';
 export * from './usage.ts';
 export * from './snapshot.ts';
+export * from './stream.ts';
+export * from './ingest.ts';
+export * from './api.ts';

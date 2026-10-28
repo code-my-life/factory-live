@@ -24,16 +24,16 @@ iPhone, Mac : https://desktop-gja56n4.tail40220c.ts.net:8446
 
 ## Couches
 
-| Couche                        | Rôle                                                                         | Dépend de            |
-| ----------------------------- | ---------------------------------------------------------------------------- | -------------------- |
-| `packages/domain`             | Règles pures : stations, interventions, modèle effectif, stats               | rien                 |
-| `packages/contracts`          | Schémas zod de l'API, de l'ingestion, du SSE ; OpenAPI 3.1                   | zod                  |
-| `apps/server/src/application` | Cas d'usage et ports                                                         | domain, contracts    |
-| `apps/server/src/adapters`    | Hermès (SQLite en lecture), webhooks, transcriptions, GitHub, push, stockage | ports, bibliothèques |
-| `apps/server/src/http`        | Hono : REST, SSE, ingestion                                                  | application          |
-| `apps/web`                    | PWA                                                                          | contracts            |
+| Couche                        | Rôle                                                                             | Dépend de            |
+| ----------------------------- | -------------------------------------------------------------------------------- | -------------------- |
+| `packages/domain`             | Règles pures : stations, interventions, modèle effectif, stats                   | rien                 |
+| `packages/contracts`          | Schémas zod de l'API, de l'ingestion, du SSE ; OpenAPI 3.1                       | zod                  |
+| `apps/server/src/application` | Hub temps réel, projections, cas d'usage, ports (`ports.ts`), sans entrée-sortie | domain, contracts    |
+| `apps/server/src/adapters`    | Hermès (SQLite en lecture), webhooks, transcriptions, GitHub, push, stockage     | ports, bibliothèques |
+| `apps/server/src/http`        | Hono : REST, SSE, ingestion                                                      | application          |
+| `apps/web`                    | PWA                                                                              | contracts            |
 
-Les règles sont vérifiées en CI par dependency-cruiser (`.dependency-cruiser.cjs`).
+Les règles sont vérifiées en CI par dependency-cruiser (`.dependency-cruiser.cjs`) : l'application n'importe ni adaptateur, ni `http`, ni module Node (fichiers, réseau, SQLite) ; tout passe par ses ports. Sabotage vérifié : un import d'adaptateur ou de `node:fs` dans `application/` fait échouer `npm run check:arch`.
 
 ## Sources et corrélation
 
@@ -43,7 +43,8 @@ Les règles sont vérifiées en CI par dependency-cruiser (`.dependency-cruiser.
 | Cartes, runs, transitions | `kanban.db`                                       | `PRAGMA data_version` toutes les 300 ms, `task_events` au-delà du curseur |
 | Transcription Hermès      | `state.db` du profil                              | à la demande et pour le rattrapage                                        |
 | Terminal brut             | `logs/<task_id>.log` du board                     | à la demande, rendu ANSI                                                  |
-| Lanes CLI                 | `~/.claude/projects`, `opencode.db`               | dossier tiré du `cwd`, fenêtre du run                                     |
+| Lane Claude Code          | `~/.claude/projects`                              | dossier tiré du workspace de la carte, fenêtre du run, coût `cost-state`  |
+| Lane OpenCode             | session Hermès et log de la carte                 | sortie de `opencode run` ; `opencode.db` n'est pas lu (jetons OAuth)      |
 | Santé                     | sonde du gateway + signaux passifs                | « sonde muette » après 90 s sans rapport                                  |
 | PR, CI, réactions         | API REST GitHub                                   | ETag, API Actions pour la CI                                              |
 

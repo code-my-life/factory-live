@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupByIssue, issueStationOf } from './issues.ts';
+import { groupByIssue, issueStationOf, issueStatusOf, profileStation } from './issues.ts';
 import { aLink, aRun, aTask, anEvent } from './fixtures.test-helpers.ts';
 import type { Board, Task } from './hermes.ts';
 
@@ -104,5 +104,42 @@ describe('issueStationOf', () => {
     expect(at([brief({ status: 'done' }), impl({ status: 'review' }), second, release()])).toBe(
       'implementation',
     );
+  });
+});
+
+describe('issueStatusOf', () => {
+  const card = (status: Task['status']) => aTask({ status });
+
+  it('reprend la station pour une issue finie ou arrêtée', () => {
+    expect(issueStatusOf([card('archived')], 'done', 0)).toBe('done');
+    expect(issueStatusOf([card('archived')], 'stopped', 2)).toBe('stopped');
+  });
+
+  it('une intervention ouverte prime : l’issue attend Clément', () => {
+    expect(issueStatusOf([card('running'), card('blocked')], 'implementation', 1)).toBe(
+      'waiting_human',
+    );
+  });
+
+  it('sinon bloquée, puis active, puis en attente de son tour', () => {
+    expect(issueStatusOf([card('running'), card('blocked')], 'implementation', 0)).toBe('blocked');
+    expect(issueStatusOf([card('done'), card('running')], 'gate', 0)).toBe('active');
+    expect(issueStatusOf([card('ready'), card('done')], 'implementation', 0)).toBe('queued');
+  });
+});
+
+describe('profileStation', () => {
+  it.each([
+    ['coordinator', 'brief'],
+    ['coordinator-claude', 'brief'],
+    ['coder', 'implementation'],
+    ['coder-opencode', 'implementation'],
+    ['scribe', 'implementation'],
+    ['gate-claude', 'gate'],
+    ['release', 'release'],
+    ['tool-setup', 'side'],
+    ['default', 'side'],
+  ])('%s est à la station %s', (profile, station) => {
+    expect(profileStation(profile)).toBe(station);
   });
 });

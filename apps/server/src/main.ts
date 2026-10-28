@@ -1,0 +1,165 @@
+import { readFileSync } from 'node:fs';
+import { serve } from '@hono/node-server';
+import { GitHubCache } from './adapters/github/cache.ts';
+import { GitHubClient } from './adapters/github/client.ts';
+import { CardFiles } from './adapters/hermes/files.ts';
+import { KanbanReader } from './adapters/hermes/kanban.ts';
+import { ProfileConfigReader } from './adapters/hermes/profiles.ts';
+import { SessionReader } from './adapters/hermes/sessions.ts';
+import { PushNotifier, vapidKeys } from './adapters/push/webpush.ts';
+import { HistoryStore } from './adapters/store/history.ts';
+import { loadConfig } from './config.ts';
+import { createApp } from './http/app.ts';
+import { StreamBuffer } from './http/stream.ts';
+import { Hub } from './application/hub.ts';
+import { createLogger } from './logger.ts';
+import { notifyOpened } from './application/notify.ts';
+import { trackUnblockReactions } from './application/unblock.ts';
+
+/** Racine de composition : configuration, adaptateurs, hub, minuteries, serveur HTTP. */
+const config = loadConfig();
+const log = createLogger(config.LOG_LEVEL);
+const version = (
+  JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+    version: string;
+  }
+).version;
+const now = () => Date.now();
+
+const store = new HistoryStore(config.DATA_DIR);
+const profiles = new ProfileConfigReader(config.HERMES_HOME, config.FACTORY_REPO);
+const sessions = new SessionReader(config.profilesDir);
+const githubClient = config.secrets.githubToken
+  ? new GitHubClient(config.secrets.githubToken, config.GITHUB_OWNER, config.GITHUB_API)
+  : null;
+const github = githubClient
+  ? new GitHubCache(githubClient, config.GITHUB_OWNER, log.child({ component: 'github' }))
+  : null;
+
+const hub = new Hub(
+  {
+    owner: config.GITHUB_OWNER,
+    boardName: config.HERMES_BOARD,
+    dashboardUrl: config.DASHBOARD_URL,
+    heldAfterSeconds: config.HELD_AFTER_MINUTES * 60,
+    keepFinishedMs: 24 * 3600_000,
+  },
+  { store, profiles, github, log: log.child({ component: 'hub' }), now },
+);
+const buffer = new StreamBuffer();
+hub.subscribe((event) => buffer.push(event));
+
+const notifier = new PushNotifier(store, vapidKeys(store), config.VAPID_SUBJECT);
+hub.interventionListeners.add((opened, all) => {
+  notifyOpened({ store, notifier, log, now }, opened, all).catch((error: unknown) =>
+    log.error({ component: 'push', error: String(error) }, 'notification en échec'),
+  );
+});
+
+// Kanban : data_version toutes les 300 ms, comme le dashboard d'Hermès ; réouverture si la base disparaît.
+let kanban: KanbanReader | null = null;
+const pollKanban = () => {
+  try {
+    kanban ??= new KanbanReader(config.kanbanDb);
+    if (kanban.changed()) hub.applyKanban(kanban.read(), now());
+  } catch (error) {
+    hub.kanbanFailed(
+      `kanban.db illisible : ${String(error instanceof Error ? error.message : error)}`,
+    );
+    log.error(
+      { component: 'kanban', path: config.kanbanDb, error: String(error) },
+      'lecture du kanban en échec',
+    );
+    kanban?.close();
+    kanban = null;
+  }
+};
+pollKanban();
+
+const unblockDeps = { hub, store, github: githubClient, log, now };
+let githubBusy = false;
+let lastDeliveries = 0;
+const refreshGitHub = async () => {
+  if (!github || githubBusy) return;
+  githubBusy = true;
+  try {
+    if (await github.refresh(hub.trackedIssues(), now())) hub.githubChanged();
+    await trackUnblockReactions(unblockDeps);
+    if (now() - lastDeliveries > 5 * 60_000) {
+      lastDeliveries = now();
+      await github.refreshDeliveries(Object.keys(profiles.manifest().projects));
+      hub.githubChanged();
+    }
+  } catch (error) {
+    log.warn({ component: 'github', error: String(error) }, 'rafraîchissement GitHub en échec');
+  } finally {
+    githubBusy = false;
+  }
+};
+
+const timers = [
+  setInterval(pollKanban, 300),
+  setInterval(() => hub.flush(), 250),
+  setInterval(() => hub.tick(), 15_000),
+  setInterval(() => hub.reloadConfig(), 5 * 60_000),
+  setInterval(() => void refreshGitHub(), 30_000),
+  setInterval(() => store.purgeActivity(now() - 30 * 86_400_000), 6 * 3600_000),
+];
+void refreshGitHub();
+
+const app = createApp({
+  hub,
+  buffer,
+  store,
+  views: {
+    hub,
+    store,
+    sessions,
+    profiles,
+    github,
+    files: new CardFiles(config.boardDir, config.CLAUDE_PROJECTS),
+    owner: config.GITHUB_OWNER,
+    boardName: config.HERMES_BOARD,
+    dashboardUrl: config.DASHBOARD_URL,
+    heldAfterSeconds: config.HELD_AFTER_MINUTES * 60,
+    now,
+  },
+  unblock: unblockDeps,
+  notifier,
+  hookSecret: config.secrets.hookSecret,
+  origins: config.PUBLIC_ORIGINS,
+  tailscaleLogins: config.TAILSCALE_LOGINS,
+  webDist: config.WEB_DIST,
+  log,
+  now,
+  version,
+});
+
+const server = serve({ fetch: app.fetch, port: config.PORT, hostname: config.HOST }, (info) => {
+  log.info(
+    {
+      component: 'server',
+      port: info.port,
+      host: config.HOST,
+      kanban: config.kanbanDb,
+      github: github ? 'jeton présent' : 'aucun jeton (lecture seule)',
+      ingestion: config.secrets.hookSecret ? 'secret présent' : 'désactivée (secret absent)',
+      tailscaleLogins: config.TAILSCALE_LOGINS,
+    },
+    'factory-live démarré',
+  );
+});
+
+const stop = (signal: string) => {
+  log.info({ component: 'server', signal }, 'arrêt demandé');
+  for (const timer of timers) clearInterval(timer);
+  server.close(() => {
+    kanban?.close();
+    sessions.close();
+    store.close();
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(0), 5_000).unref();
+};
+process.on('SIGTERM', () => stop('SIGTERM'));
+process.on('SIGINT', () => stop('SIGINT'));

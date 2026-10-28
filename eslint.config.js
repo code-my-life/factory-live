@@ -54,7 +54,10 @@ export default defineConfig([
     },
     rules: {
       '@typescript-eslint/consistent-type-imports': 'error',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', ignoreRestSiblings: true },
+      ],
     },
   },
   {
@@ -69,6 +72,8 @@ export default defineConfig([
   },
   {
     files: ['apps/server/src/adapters/hermes/**/*.ts'],
+    // Les tests préparent leurs bases dans un dossier temporaire, jamais dans ~/.hermes.
+    ignores: ['apps/server/src/adapters/hermes/**/*.test.ts'],
     rules: {
       'no-restricted-imports': [
         'error',

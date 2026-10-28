@@ -79,3 +79,33 @@ export function issueStationOf(tasks: readonly Task[], board: Board): Station {
   if (ofKind('release').some((task) => task.status !== 'done')) return 'release';
   return 'done';
 }
+
+export type IssueStatus = 'active' | 'queued' | 'waiting_human' | 'blocked' | 'done' | 'stopped';
+
+/**
+ * État d'une issue pour la ligne : finie ou arrêtée selon sa station ; sinon une intervention ouverte
+ * prime (elle attend Clément), puis une carte bloquée (dépendance), puis un worker en cours ; le reste attend son tour.
+ */
+export function issueStatusOf(
+  tasks: readonly Task[],
+  station: Station,
+  openInterventions: number,
+): IssueStatus {
+  if (station === 'done' || station === 'stopped') return station;
+  if (openInterventions > 0) return 'waiting_human';
+  const live = tasks.filter((task) => task.status !== 'archived' && task.status !== 'done');
+  if (live.some((task) => task.status === 'blocked')) return 'blocked';
+  if (live.some((task) => task.status === 'running')) return 'active';
+  return 'queued';
+}
+
+export type ProfileStation = 'brief' | 'implementation' | 'gate' | 'release' | 'side';
+
+/** Station d'un profil de la factory, d'après son nom (coordinator-claude est un coordinator, etc.). */
+export function profileStation(profile: string): ProfileStation {
+  if (profile.startsWith('coordinator')) return 'brief';
+  if (profile.startsWith('coder') || profile === 'scribe') return 'implementation';
+  if (profile.startsWith('gate')) return 'gate';
+  if (profile === 'release') return 'release';
+  return 'side';
+}

@@ -41,10 +41,19 @@ module.exports = {
       from: { path: '^apps/server/src/application' },
       to: {
         path: [
-          '^apps/server/src/(adapters|http|infrastructure)',
-          'node_modules/(hono|@hono|pino|web-push)',
+          '^apps/server/src/(adapters|http|infrastructure|test)',
+          '^apps/server/src/(main|config|logger)\\.ts$',
+          'node_modules/(hono|@hono|pino|web-push|yaml)',
         ],
       },
+    },
+    {
+      name: 'application-has-no-io',
+      severity: 'error',
+      comment:
+        'L’application ne touche ni aux fichiers, ni au réseau, ni à SQLite : tout passe par ses ports.',
+      from: { path: '^apps/server/src/application' },
+      to: { dependencyTypes: ['core'] },
     },
     {
       name: 'no-test-code-in-production',
