@@ -273,7 +273,8 @@ export function buildProfiles(): ProfileView[] {
       skills: ['factory-onboard'],
       plugins: [{ name: 'factory-notify', refusals: 0 }],
       mcp: [],
-      drift: [{ field: 'profil', live: 'déployé', repo: 'absent du dépôt' }],
+      // tool-setup est volontairement hors distribution (install.sh le configure) : pas de dérive à montrer.
+      drift: [],
       stats: { runs: 6, gatePassRate: null, medianRunMinutes: 11, costUsd: null },
     },
   ];
