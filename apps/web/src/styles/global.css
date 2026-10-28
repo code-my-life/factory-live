@@ -27,8 +27,11 @@
 }
 
 html {
+  /* stylelint-disable plugin/browser-compat, property-no-vendor-prefix -- propriétés des navigateurs mobiles (iOS Safari ne lit que la forme préfixée) ; ailleurs, sans effet */
   -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* stylelint-enable plugin/browser-compat, property-no-vendor-prefix */
   overscroll-behavior: none;
 }
 
@@ -50,7 +53,8 @@ a,
 button,
 [role='button'],
 [role='tab'] {
-  user-select: none;
+  /* stylelint-disable-next-line property-no-vendor-prefix -- Safari exige encore la forme préfixée */
+  -webkit-user-select: none;
   user-select: none;
 }
 

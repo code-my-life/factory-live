@@ -14,7 +14,7 @@ import {
 import type { Icon } from '@primer/octicons-react';
 import { CounterLabel, Token } from '@primer/react';
 import type { Node, NodeProps } from '@xyflow/react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import { FlowNode } from '../../ui/flow/FlowNode.tsx';
 import type { FlowTone } from '../../ui/flow/FlowNode.tsx';
@@ -60,12 +60,15 @@ const AGENT_ORDER: Record<AgentActivity['state'], number> = {
 };
 const WORKING = new Set<AgentActivity['state']>(['thinking', 'tool', 'cli']);
 const ISSUES_SHOWN = 3;
+/** Sur la voie, la place ne manque pas en hauteur : on montre plus d'issues, titres compris. */
+const ISSUES_ON_RAIL = 4;
+/** États qu'on lit sous le titre de l'issue ; « en cours » se voit à l'agent qui y travaille. */
+const FLAGGED = new Set<IssueSummary['status']>(['waiting_human', 'blocked', 'queued']);
 
 export interface StationNodeData extends Record<string, unknown> {
   station: StationView;
   agents: readonly AgentActivity[];
   issues: readonly IssueSummary[];
-  vertical: boolean;
   /** Une issue vient d'arriver : le compteur le signale une fois. */
   arrived: boolean;
 }
@@ -84,21 +87,138 @@ export function stationTone(
   return 'muted';
 }
 
-/** Une station de la ligne : qui y travaille (avatars), combien d'issues, lesquelles. Le détail est sous le graphe. */
-export function StationNode({ data }: NodeProps<StationFlowNode>) {
-  const { station, agents, issues, vertical, arrived } = data;
-  const navigate = useNavigate();
-  const tone = stationTone(station.id, agents, issues);
-  const crew = station.profiles.map(
-    (profile) =>
-      agents.find((agent) => agent.profile === profile) ?? { profile, state: 'idle' as const },
-  );
-  crew.sort((left, right) => AGENT_ORDER[left.state] - AGENT_ORDER[right.state]);
-  const sorted = [...issues].sort(
+function sortedIssues(issues: readonly IssueSummary[]): IssueSummary[] {
+  return [...issues].sort(
     (left, right) =>
       ISSUE_ORDER[left.status] - ISSUE_ORDER[right.status] ||
       right.updatedAt.localeCompare(left.updatedAt),
   );
+}
+
+/** Le compteur d'issues posé sur l'arrêt ; il bat une fois quand une issue arrive. */
+export function StationCounter({ count, arrived }: { count: number; arrived: boolean }) {
+  return (
+    <span className={styles.counter} data-arrived={arrived ? '' : undefined}>
+      <CounterLabel aria-label={`${count} issue${count > 1 ? 's' : ''}`}>{count}</CounterLabel>
+    </span>
+  );
+}
+
+/** L'équipe d'une station : un avatar par agent, en gris au repos, les plus occupés d'abord. */
+export function StationCrew({
+  station,
+  agents,
+  size,
+}: {
+  station: StationView;
+  agents: readonly AgentActivity[];
+  size: 20 | 24;
+}) {
+  const crew = station.profiles.map(
+    (profile) =>
+      agents.find((agent) => agent.profile === profile) ?? { profile, state: 'idle' as const },
+  );
+  if (crew.length === 0) return null;
+  crew.sort((left, right) => AGENT_ORDER[left.state] - AGENT_ORDER[right.state]);
+  return (
+    <ul className={styles.crew} aria-label={`Agents de l’étape ${STATION_LABEL[station.id]}`}>
+      {crew.map((member) => (
+        <li
+          key={member.profile}
+          className={styles.crewMember}
+          data-idle={member.state === 'idle' ? '' : undefined}
+          title={`${member.profile} : ${AGENT_STATE_LABEL[member.state].toLowerCase()}`}
+        >
+          <AgentAvatar profile={member.profile} size={size} state={member.state} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function doing(agent: AgentActivity): string {
+  const issue = agent.issueKey ? `#${agent.issueKey.split('#')[1] ?? ''} · ` : '';
+  if (agent.action)
+    return `${issue}${agent.action.label}${agent.action.detail ? ` ${agent.action.detail}` : ''}`;
+  return `${issue}${AGENT_STATE_LABEL[agent.state].toLowerCase()}`;
+}
+
+/**
+ * Le contenu d'une station sur la voie verticale (téléphone) : qui y travaille et à quoi, puis ses
+ * issues avec leur titre, chacune une ligne qui se touche et mène à l'issue.
+ */
+export function StationRailDetails({
+  station,
+  agents,
+  issues,
+}: {
+  station: StationId;
+  agents: readonly AgentActivity[];
+  issues: readonly IssueSummary[];
+}) {
+  const label = STATION_LABEL[station];
+  const working = agents
+    .filter((agent) => agent.state !== 'idle')
+    .sort((left, right) => AGENT_ORDER[left.state] - AGENT_ORDER[right.state]);
+  const sorted = sortedIssues(issues);
+  const shown = sorted.slice(0, ISSUES_ON_RAIL);
+  if (working.length === 0 && shown.length === 0) return null;
+  return (
+    <>
+      {working.length > 0 ? (
+        <ul className={styles.railAgents} aria-label={`Au travail à l’étape ${label}`}>
+          {working.map((agent) => (
+            <li key={agent.profile} className={styles.railAgent} data-state={agent.state}>
+              <AgentAvatar profile={agent.profile} size={20} state={agent.state} named />
+              <span className={styles.railAgentName}>{agent.profile}</span>
+              <span className={styles.railAgentDoing}>{doing(agent)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {shown.length > 0 ? (
+        <ul className={styles.railIssues} aria-label={`Issues à l’étape ${label}`}>
+          {shown.map((issue) => {
+            const IssueIcon = ISSUE_ICON[issue.status];
+            return (
+              <li key={issue.key}>
+                <Link
+                  to={issuePath(issue.key)}
+                  className={styles.railIssue}
+                  data-status={issue.status}
+                >
+                  <IssueIcon size={16} className={styles.issueIcon} />
+                  <span className={styles.railIssueTitle}>{issue.title}</span>
+                  <span className={styles.railIssueMeta}>
+                    <span className={styles.railIssueKey}>{issue.key}</span>
+                    {FLAGGED.has(issue.status) ? (
+                      <span className={styles.railIssueStatus}>
+                        {' · '}
+                        {ISSUE_STATUS_LABEL[issue.status]}
+                      </span>
+                    ) : null}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+      {sorted.length > shown.length ? (
+        <Link to="/issues" className={styles.railMore}>
+          Voir les {sorted.length} issues
+        </Link>
+      ) : null}
+    </>
+  );
+}
+
+/** Une station de la ligne en largeur : qui y travaille (avatars), combien d'issues, lesquelles. Le détail est sous le graphe. */
+export function StationNode({ data }: NodeProps<StationFlowNode>) {
+  const { station, agents, issues, arrived } = data;
+  const navigate = useNavigate();
+  const tone = stationTone(station.id, agents, issues);
+  const sorted = sortedIssues(issues);
   const shown = sorted.slice(0, ISSUES_SHOWN);
   const label = STATION_LABEL[station.id];
   return (
@@ -107,29 +227,9 @@ export function StationNode({ data }: NodeProps<StationFlowNode>) {
       title={label}
       tone={tone}
       active={tone === 'accent'}
-      vertical={vertical}
-      aside={
-        <span className={styles.counter} data-arrived={arrived ? '' : undefined}>
-          <CounterLabel aria-label={`${issues.length} issue${issues.length > 1 ? 's' : ''}`}>
-            {issues.length}
-          </CounterLabel>
-        </span>
-      }
+      aside={<StationCounter count={issues.length} arrived={arrived} />}
     >
-      {crew.length > 0 ? (
-        <ul className={styles.crew} aria-label={`Agents de l’étape ${label}`}>
-          {crew.map((member) => (
-            <li
-              key={member.profile}
-              className={styles.crewMember}
-              data-idle={member.state === 'idle' ? '' : undefined}
-              title={`${member.profile} : ${AGENT_STATE_LABEL[member.state].toLowerCase()}`}
-            >
-              <AgentAvatar profile={member.profile} size={24} state={member.state} />
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <StationCrew station={station} agents={agents} size={24} />
       {shown.length > 0 ? (
         <ul className={styles.issues} aria-label={`Issues à l’étape ${label}`}>
           {shown.map((issue) => {

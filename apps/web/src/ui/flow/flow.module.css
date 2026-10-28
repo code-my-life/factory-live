@@ -9,8 +9,18 @@
   --xy-background-color: transparent;
 }
 
+/* Graphe statique : son fond ne garde pas le doigt (React Flow y pose `touch-action: none`). */
+.flowRoot :global(.react-flow__pane) {
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+/*
+ * React Flow rend un nœud sans action propre (ni sélection ni clic) transparent au pointeur : le
+ * contenu reprend la main pour que ses boutons (issues d'une station) se cliquent et se touchent.
+ */
 .node {
   display: flex;
+  pointer-events: auto;
   flex-direction: column;
   align-items: center;
   gap: var(--base-size-6);
@@ -94,8 +104,10 @@
   outline-offset: var(--base-size-4);
 }
 
+/* Au-dessus de l'anneau qui respire, qui sinon le coupe. */
 .stopAside {
   position: absolute;
+  z-index: 1;
   top: calc(var(--base-size-6) * -1);
   left: calc(100% - var(--base-size-12));
   display: inline-flex;
@@ -171,4 +183,184 @@
 .packetLabel {
   fill: var(--fgColor-onEmphasis);
   font: var(--text-caption-shorthand);
+}
+
+/*
+ * Voie verticale (téléphone, fenêtre étroite) : les arrêts et les liaisons du graphe, posés dans le
+ * flux de la page. Rien n'y retient le doigt : la page défile, chaque ligne se touche.
+ */
+.rail {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.railStep {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--base-size-48) minmax(0, 1fr);
+  column-gap: var(--base-size-12);
+  border-radius: var(--borderRadius-large);
+}
+
+.railStep[data-selectable] {
+  padding-inline-end: var(--base-size-8);
+}
+
+.railStep[data-selected] {
+  background-color: var(--bgColor-accent-muted);
+}
+
+.railStep[data-selected] .stop {
+  outline: var(--borderWidth-thick) solid var(--borderColor-accent-emphasis);
+  outline-offset: var(--base-size-4);
+}
+
+.railTrack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.railLink {
+  position: relative;
+  flex: 1 0 auto;
+  width: 0;
+  min-height: var(--base-size-16);
+  border-inline-start: var(--borderWidth-thicker) solid var(--borderColor-default);
+  transition: border-color var(--motion-transition-stateChange);
+}
+
+.railLink[data-active] {
+  border-inline-start-color: var(--borderColor-accent-muted);
+}
+
+/* L'étape suivante est menée en même temps : rien ne passe de l'une à l'autre, la liaison est pointillée. */
+.railLink[data-parallel] {
+  border-inline-start-style: dashed;
+}
+
+/* Le flux du graphe : des tirets qui descendent vers l'étape au travail (boucle coupée par la pause). */
+.railFlow {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: calc(var(--borderWidth-thicker) * -1);
+  width: var(--borderWidth-thicker);
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--bgColor-accent-emphasis) 0 var(--base-size-4),
+    transparent var(--base-size-4) var(--base-size-16)
+  );
+  animation: railFlow var(--base-duration-1000) var(--motion-easing-linear) infinite;
+}
+
+@keyframes railFlow {
+  to {
+    background-position-y: var(--base-size-16);
+  }
+}
+
+.railPacket {
+  position: absolute;
+  top: 0;
+  left: calc(var(--base-size-2) * -1);
+  z-index: 1;
+  display: inline-flex;
+  padding: var(--base-size-2);
+  border-radius: var(--borderRadius-full);
+  background-color: var(--bgColor-default);
+  transform: translate(-50%, 0);
+  pointer-events: none;
+}
+
+.railPacketBody {
+  display: inline-flex;
+  align-items: center;
+  height: var(--base-size-20);
+  padding-inline: var(--base-size-6);
+  border-radius: var(--borderRadius-full);
+  background-color: var(--bgColor-accent-emphasis);
+  color: var(--fgColor-onEmphasis);
+  font: var(--text-caption-shorthand);
+  white-space: nowrap;
+}
+
+.railBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+  padding-block-end: var(--base-size-20);
+}
+
+.railStep:last-child .railBody {
+  padding-block-end: var(--base-size-8);
+}
+
+.railHead {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  min-width: 0;
+  min-height: var(--base-size-48);
+}
+
+.railTitle,
+.railSelect {
+  display: -webkit-box;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font: var(--text-title-shorthand-small);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.railSelect {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+/* Toute l'étape se touche : la zone du bouton s'étend à la ligne entière, retour immédiat à l'appui. */
+.railSelect::after {
+  position: absolute;
+  border-radius: var(--borderRadius-large);
+  content: '';
+  inset: 0;
+  transition: background-color var(--motion-transition-stateChange);
+}
+
+.railSelect:active::after {
+  background-color: var(--control-transparent-bgColor-active);
+}
+
+.railSelect:focus-visible {
+  outline: none;
+}
+
+.railSelect:focus-visible::after {
+  outline: var(--focus-outline);
+  outline-offset: calc(var(--focus-outline-width) * -1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .railSelect:hover::after {
+    background-color: var(--control-transparent-bgColor-hover);
+  }
+}
+
+.railMeta {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--base-size-4);
+  color: var(--fgColor-muted);
+  font: var(--text-body-shorthand-small);
 }

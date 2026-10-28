@@ -10,12 +10,13 @@ import {
   UnderlineNav,
 } from '@primer/react';
 import { Table } from '@primer/react/experimental';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useIssueDetail, useSnapshot } from '../../data/FactoryProvider.tsx';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
+import { useMotion } from '../../ui/motion.tsx';
 import { ActivityTimeline } from '../../ui/timeline/ActivityTimeline.tsx';
 import { fromTimelineEntry } from '../../ui/timeline/rows.ts';
 import { formatCompact, formatDuration, formatUsd } from '../../ui/format.ts';
@@ -59,68 +60,106 @@ function RunsTable({
   if (card.runs.length === 0) {
     return <p className={styles.muted}>Cette carte n’a pas encore tourné.</p>;
   }
+  const runs = [...card.runs].reverse();
+  const duration = (run: RunView) =>
+    run.endedAt ? (
+      formatDuration(Date.parse(run.endedAt) - Date.parse(run.startedAt))
+    ) : (
+      <Elapsed since={run.startedAt} />
+    );
   return (
-    <div className={styles.tableBox}>
-      <Table
-        gridTemplateColumns="auto auto minmax(0, 2fr) minmax(0, 2fr) auto auto"
-        cellPadding="condensed"
-        aria-label={`Runs de la carte ${card.id}`}
-      >
-        <Table.Head>
-          <Table.Row>
-            <Table.Header>Run</Table.Header>
-            <Table.Header>Agent</Table.Header>
-            <Table.Header>Modèle</Table.Header>
-            <Table.Header>Résultat</Table.Header>
-            <Table.Header>Durée</Table.Header>
-            <Table.Header>
-              <span className="fl-visually-hidden">Transcription</span>
-            </Table.Header>
-          </Table.Row>
-        </Table.Head>
-        <Table.Body>
-          {[...card.runs].reverse().map((run: RunView) => (
-            <Table.Row
-              key={run.id}
-              className={run.id === selectedRunId ? styles.selectedRow : undefined}
-            >
-              <Table.Cell className="fl-mono">#{run.id}</Table.Cell>
-              <Table.Cell>
-                <span className={styles.cellStack}>
-                  <span className={styles.agentCell}>
-                    <AgentAvatar profile={run.profile} size={16} named />
-                    {run.profile}
-                  </span>
-                  <span className={styles.cellNote}>{RUN_ROLE_LABEL[run.role]}</span>
-                </span>
-              </Table.Cell>
-              <Table.Cell className={styles.modelCell}>
-                {run.model ? <ModelBadge model={run.model} /> : '?'}
+    <>
+      {/* Téléphone : une fiche par run, lisible sans défilement de côté ; le tableau prend le relais au-delà. */}
+      <ul className={styles.runList} aria-label={`Runs de la carte ${card.id}`}>
+        {runs.map((run) => (
+          <li
+            key={run.id}
+            className={styles.runItem}
+            data-selected={run.id === selectedRunId ? '' : undefined}
+          >
+            <p className={styles.runHead}>
+              <span className="fl-mono">#{run.id}</span>
+              <span className={styles.agentCell}>
+                <AgentAvatar profile={run.profile} size={16} named />
+                {run.profile}
+              </span>
+              <span className={styles.cellNote}>{RUN_ROLE_LABEL[run.role]}</span>
+              <span className={`${styles.runDuration} fl-tabular`}>{duration(run)}</span>
+            </p>
+            {run.model || run.laneModel ? (
+              <p className={styles.runModels}>
+                {run.model ? <ModelBadge model={run.model} /> : null}
                 {run.laneModel ? <ModelBadge model={run.laneModel} prefix="lane" emphasis /> : null}
-              </Table.Cell>
-              <Table.Cell>
-                <span className={styles.cellStack}>
-                  {run.outcome ?? 'en cours'}
-                  {run.summary ? <span className={styles.cellNote}>{run.summary}</span> : null}
-                </span>
-              </Table.Cell>
-              <Table.Cell className="fl-tabular">
-                {run.endedAt ? (
-                  formatDuration(Date.parse(run.endedAt) - Date.parse(run.startedAt))
-                ) : (
-                  <Elapsed since={run.startedAt} />
-                )}
-              </Table.Cell>
-              <Table.Cell>
-                <Button size="small" onClick={() => onSelectRun(run.id)}>
-                  Transcription
-                </Button>
-              </Table.Cell>
+              </p>
+            ) : null}
+            <p className={styles.runOutcome}>
+              {run.outcome ?? 'en cours'}
+              {run.summary ? <span className={styles.cellNote}>{run.summary}</span> : null}
+            </p>
+            <Button size="small" onClick={() => onSelectRun(run.id)}>
+              Transcription du run #{run.id}
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <div className={styles.tableBox}>
+        <Table
+          gridTemplateColumns="auto auto minmax(0, 2fr) minmax(0, 2fr) auto auto"
+          cellPadding="condensed"
+          aria-label={`Runs de la carte ${card.id}`}
+        >
+          <Table.Head>
+            <Table.Row>
+              <Table.Header>Run</Table.Header>
+              <Table.Header>Agent</Table.Header>
+              <Table.Header>Modèle</Table.Header>
+              <Table.Header>Résultat</Table.Header>
+              <Table.Header>Durée</Table.Header>
+              <Table.Header>
+                <span className="fl-visually-hidden">Transcription</span>
+              </Table.Header>
             </Table.Row>
-          ))}
-        </Table.Body>
-      </Table>
-    </div>
+          </Table.Head>
+          <Table.Body>
+            {runs.map((run) => (
+              <Table.Row
+                key={run.id}
+                className={run.id === selectedRunId ? styles.selectedRow : undefined}
+              >
+                <Table.Cell className="fl-mono">#{run.id}</Table.Cell>
+                <Table.Cell>
+                  <span className={styles.cellStack}>
+                    <span className={styles.agentCell}>
+                      <AgentAvatar profile={run.profile} size={16} named />
+                      {run.profile}
+                    </span>
+                    <span className={styles.cellNote}>{RUN_ROLE_LABEL[run.role]}</span>
+                  </span>
+                </Table.Cell>
+                <Table.Cell className={styles.modelCell}>
+                  {run.model ? <ModelBadge model={run.model} /> : '?'}
+                  {run.laneModel ? (
+                    <ModelBadge model={run.laneModel} prefix="lane" emphasis />
+                  ) : null}
+                </Table.Cell>
+                <Table.Cell>
+                  <span className={styles.cellStack}>
+                    {run.outcome ?? 'en cours'}
+                    {run.summary ? <span className={styles.cellNote}>{run.summary}</span> : null}
+                  </span>
+                </Table.Cell>
+                <Table.Cell className="fl-tabular">{duration(run)}</Table.Cell>
+                <Table.Cell>
+                  <Button size="small" onClick={() => onSelectRun(run.id)}>
+                    Transcription
+                  </Button>
+                </Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table>
+      </div>
+    </>
   );
 }
 
@@ -146,6 +185,8 @@ export function IssuePage() {
   const [tab, setTab] = useState<Tab>('activity');
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
+  const cardPanel = useRef<HTMLDivElement | null>(null);
+  const motion = useMotion();
 
   if (!key || !detail) {
     return (
@@ -279,7 +320,7 @@ export function IssuePage() {
           <h2 id="graph-title" className={styles.sectionTitle}>
             Cartes de l’issue
           </h2>
-          <span className={styles.muted}>Clique une carte pour voir ses runs.</span>
+          <span className={styles.muted}>Choisis une carte pour voir ses runs.</span>
         </div>
         <IssueGraph
           cards={detail.cards}
@@ -288,10 +329,19 @@ export function IssuePage() {
           onSelectCard={(cardId) => {
             setSelectedCardId(cardId);
             setSelectedRunId(null);
+            // Sur téléphone, les runs s'affichent sous la voie, hors de l'écran : on les y amène.
+            requestAnimationFrame(() => {
+              const panel = cardPanel.current;
+              if (panel && panel.getBoundingClientRect().top > window.innerHeight * 0.7)
+                panel.scrollIntoView({
+                  block: 'start',
+                  behavior: motion.enabled && !motion.reduced ? 'smooth' : 'auto',
+                });
+            });
           }}
         />
         {selectedCard ? (
-          <div className={styles.cardPanel}>
+          <div ref={cardPanel} className={styles.cardPanel}>
             <h3 className={styles.cardPanelTitle}>
               <span className="fl-mono">#{selectedCard.kind}</span> {shortCardTitle(selectedCard)}
               <span className={styles.muted}>
@@ -316,21 +366,24 @@ export function IssuePage() {
       </section>
 
       <section className={styles.section}>
-        <UnderlineNav aria-label="Détails de l’issue">
-          {TABS.map((entry) => (
-            <UnderlineNav.Item
-              key={entry.id}
-              href={`#${entry.id}`}
-              aria-current={tab === entry.id ? 'page' : undefined}
-              onSelect={(event) => {
-                event.preventDefault();
-                setTab(entry.id);
-              }}
-            >
-              {entry.label}
-            </UnderlineNav.Item>
-          ))}
-        </UnderlineNav>
+        {/* Sur téléphone, les onglets défilent de côté plutôt que de se replier dans « More », que Primer n'écrit qu'en anglais. */}
+        <div className={styles.tabsScroller}>
+          <UnderlineNav aria-label="Détails de l’issue" className={styles.tabs}>
+            {TABS.map((entry) => (
+              <UnderlineNav.Item
+                key={entry.id}
+                href={`#${entry.id}`}
+                aria-current={tab === entry.id ? 'page' : undefined}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setTab(entry.id);
+                }}
+              >
+                {entry.label}
+              </UnderlineNav.Item>
+            ))}
+          </UnderlineNav>
+        </div>
         <div className={styles.tabPanel}>
           {tab === 'activity' ? (
             <ActivityTimeline

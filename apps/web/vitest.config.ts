@@ -10,5 +10,7 @@ export default defineProject({
     include: ['src/**/*.test.{ts,tsx}'],
     environment: 'jsdom',
     setupFiles: ['src/test/setup.ts'],
+    // Primer importe ses feuilles de style depuis son JavaScript : Vite doit le transformer lui-même.
+    server: { deps: { inline: [/@primer\/react/] } },
   },
 });

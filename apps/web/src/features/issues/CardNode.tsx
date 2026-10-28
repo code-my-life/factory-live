@@ -21,13 +21,12 @@ import styles from './IssueGraph.module.css';
 export interface CardNodeData extends Record<string, unknown> {
   card: CardView;
   agent: AgentActivity | null;
-  vertical: boolean;
   selected: boolean;
 }
 
 export type CardFlowNode = Node<CardNodeData, 'card'>;
 
-const KIND_ICON: Record<CardView['kind'], Icon> = {
+export const KIND_ICON: Record<CardView['kind'], Icon> = {
   brief: WorkflowIcon,
   impl: CodeIcon,
   release: RocketIcon,
@@ -37,7 +36,7 @@ const KIND_ICON: Record<CardView['kind'], Icon> = {
   other: ToolsIcon,
 };
 
-const STATUS_TONE: Record<CardView['status'], FlowTone> = {
+export const STATUS_TONE: Record<CardView['status'], FlowTone> = {
   triage: 'attention',
   todo: 'muted',
   scheduled: 'muted',
@@ -52,25 +51,25 @@ const STATUS_TONE: Record<CardView['status'], FlowTone> = {
 export const NODE_WIDTH = 232;
 export const NODE_HEIGHT = 224;
 
-/** Une carte de l'issue, dans le même cadre qu'une station de la ligne d'usine : qui, quel modèle, quoi. */
-export function CardNode({ data }: NodeProps<CardFlowNode>) {
-  const { card, agent, vertical, selected } = data;
+/**
+ * Ce que montre une carte, dans le graphe comme sur la voie verticale : qui la tient, avec quel
+ * modèle (celui de la lane CLI s'il délègue), et ce qu'il fait, ce qui la bloque ou où en sont ses tests.
+ */
+export function CardSummary({
+  card,
+  agent,
+  align = 'center',
+}: {
+  card: CardView;
+  agent: AgentActivity | null;
+  align?: 'center' | 'start';
+}) {
   const run = card.runs.at(-1) ?? null;
   const running = card.status === 'running';
   const model = agent?.model ?? run?.model ?? null;
   const laneModel = agent?.laneModel ?? (running ? run?.laneModel : null) ?? null;
-  const tone = STATUS_TONE[card.status];
   return (
-    <FlowNode
-      icon={KIND_ICON[card.kind]}
-      title={shortCardTitle(card)}
-      tone={tone}
-      active={running}
-      selected={selected}
-      vertical={vertical}
-      titleLines={2}
-    >
-      <span className={styles.status}>{CARD_STATUS_LABEL[card.status]}</span>
+    <div className={styles.summary} data-align={align}>
       <p className={styles.who}>
         <AgentAvatar
           {...(running && agent ? { state: agent.state } : {})}
@@ -108,6 +107,24 @@ export function CardNode({ data }: NodeProps<CardFlowNode>) {
           </span>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** Une carte de l'issue dans le graphe en largeur, dans le même cadre qu'une station de la ligne d'usine. */
+export function CardNode({ data }: NodeProps<CardFlowNode>) {
+  const { card, agent, selected } = data;
+  return (
+    <FlowNode
+      icon={KIND_ICON[card.kind]}
+      title={shortCardTitle(card)}
+      tone={STATUS_TONE[card.status]}
+      active={card.status === 'running'}
+      selected={selected}
+      titleLines={2}
+    >
+      <span className={styles.status}>{CARD_STATUS_LABEL[card.status]}</span>
+      <CardSummary card={card} agent={agent} />
     </FlowNode>
   );
 }
