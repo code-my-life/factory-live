@@ -36,6 +36,10 @@ Détails : `docs/ARCHITECTURE.md`. Exploitation : `docs/RUNBOOK.md`. Décisions 
 - Aucun tiret cadratin, nulle part (`npm run check:text`).
 - Test d'abord : chaque règle ou correctif commence par un test qui échoue. Un adaptateur se teste sur des données réelles anonymisées (`fixtures/`).
 - Les adaptateurs Hermès lisent seulement : bases SQLite ouvertes en `readOnly`, aucune écriture dans `~/.hermes` (règle de lint dédiée).
+- Primer : avant d'écrire un composant ou un CSS, interroger le MCP Primer (`.mcp.json` ; lancer Claude Code depuis la racine du dépôt pour qu'il soit chargé). `npm run lint` applique `eslint-plugin-primer-react`, `npm run lint:css` la config stylelint de Primer, la même vérification que l'outil `lint_css` du MCP.
+- Mouvement : jetons `--motion-*` de Primer, 500 ms au plus ; toute animation en boucle porte `data-loop` (coupée par le bouton de pause et par `prefers-reduced-motion`) ; jamais d'information portée par le seul mouvement.
+- Vocabulaire de l'interface, un concept, un mot : agent (jamais « profil »), carte, issue, station, intervention, lane (le CLI délégué). Vérifié par `npm run check:text`.
+- Visualisations : un seul dessin de graphe (`ui/flow`, stations rondes reliées par une voie) et une seule timeline (`Timeline` de Primer, `ui/timeline`), partout ; les agents ont chacun leur avatar (`ui/agents`).
 - Interface : composants Primer d'abord ; styles en CSS modules avec les jetons Primer (`var(--bgColor-default)`…), jamais de couleur en dur ; aucun flou ni transparence ; tout texte qui peut déborder est tronqué ou coupé (`min-width: 0`) ; survols seulement sous `@media (hover: hover) and (pointer: fine)` ; cibles tactiles d'au moins 44 px.
 - Une nouvelle dépendance : version exacte, peerDependencies compatibles (React 19, Vite 8, TypeScript 6.0), maintenue, sans module natif. Le dire dans la PR.
 

@@ -1,0 +1,19 @@
+/*
+ * Variables de mise en page de factory-live (zones sûres, hauteurs de barres). Tout le reste vient
+ * des jetons Primer ; ce fichier est aussi lu par stylelint pour connaître ces variables.
+ */
+:root {
+  /* App installée : l'en-tête colle en haut et absorbe lui-même l'encoche. */
+  --fl-sticky-top: 0px;
+  --fl-header-pad-top: env(safe-area-inset-top, 0px);
+  --fl-gutter-left: max(var(--base-size-16), env(safe-area-inset-left, 0px));
+  --fl-gutter-right: max(var(--base-size-16), env(safe-area-inset-right, 0px));
+  --fl-tabbar-height: calc(var(--base-size-48) + var(--base-size-8));
+  --fl-header-height: calc(var(--base-size-48) + var(--base-size-8));
+}
+
+/* Publiée en artifact : l'hôte pose déjà les marges d'encoche sur :root ; l'en-tête colle sous la bande. */
+:root[data-host='artifact'] {
+  --fl-sticky-top: env(safe-area-inset-top, 0px);
+  --fl-header-pad-top: 0px;
+}

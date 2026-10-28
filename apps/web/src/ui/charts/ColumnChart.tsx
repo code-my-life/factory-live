@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { Table } from '@primer/react/experimental';
 import styles from './charts.module.css';
 
 export interface ColumnDatum {
@@ -96,7 +97,7 @@ export function ColumnChart({
               style={{ left: `${((active + 0.5) / data.length) * 100}%` }}
               role="status"
             >
-              <strong>{formatValue(activeDatum.value)}</strong>
+              <strong className={styles.tooltipValue}>{formatValue(activeDatum.value)}</strong>
               <span>{activeDatum.label}</span>
             </div>
           ) : null}
@@ -108,25 +109,27 @@ export function ColumnChart({
         <span>{data.at(-1)?.label}</span>
       </div>
       <details className={styles.tableToggle}>
-        <summary>Voir le tableau</summary>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th scope="col">Jour</th>
-              <th scope="col" className={styles.num}>
-                Valeur
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+        <summary className={styles.tableSummary}>Voir le tableau</summary>
+        <Table
+          gridTemplateColumns="auto auto"
+          cellPadding="condensed"
+          aria-label={`${title}, en tableau`}
+        >
+          <Table.Head>
+            <Table.Row>
+              <Table.Header>Jour</Table.Header>
+              <Table.Header align="end">Valeur</Table.Header>
+            </Table.Row>
+          </Table.Head>
+          <Table.Body>
             {data.map((datum) => (
-              <tr key={datum.key}>
-                <td>{datum.label}</td>
-                <td className={styles.num}>{formatValue(datum.value)}</td>
-              </tr>
+              <Table.Row key={datum.key}>
+                <Table.Cell>{datum.label}</Table.Cell>
+                <Table.Cell align="end">{formatValue(datum.value)}</Table.Cell>
+              </Table.Row>
             ))}
-          </tbody>
-        </table>
+          </Table.Body>
+        </Table>
       </details>
     </figure>
   );

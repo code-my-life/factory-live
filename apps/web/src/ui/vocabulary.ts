@@ -1,4 +1,11 @@
-import type { AgentState, InterventionKind, IssueStatus, StationId } from '@factory-live/contracts';
+import type {
+  AgentState,
+  InterventionKind,
+  IssueStatus,
+  KanbanStatus,
+  RunRole,
+  StationId,
+} from '@factory-live/contracts';
 
 /** Le vocabulaire de la factory, tel qu'il apparaît dans ses docs et sur les issues. */
 export const STATION_LABEL: Record<StationId, string> = {
@@ -74,3 +81,23 @@ export const PROVIDER_LABEL: Record<string, string> = {
 export function providerLabel(provider: string): string {
   return PROVIDER_LABEL[provider] ?? provider;
 }
+
+export const CARD_STATUS_LABEL: Record<KanbanStatus, string> = {
+  triage: 'Triage',
+  todo: 'En attente',
+  scheduled: 'Planifiée',
+  ready: 'Prête',
+  running: 'En cours',
+  blocked: 'Bloquée',
+  review: 'En revue',
+  done: 'Terminée',
+  archived: 'Archivée',
+};
+
+export const RUN_ROLE_LABEL: Record<RunRole, string> = {
+  coordinator: 'coordination',
+  implementer: 'implémentation',
+  reviewer: 'revue',
+  release: 'release',
+  other: 'autre',
+};

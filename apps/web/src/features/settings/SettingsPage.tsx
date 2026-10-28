@@ -121,22 +121,22 @@ export function SettingsPage() {
             Installer l’app
           </h2>
           <ul className={styles.install}>
-            <li>
-              <DeviceMobileIcon size={16} aria-hidden="true" />
+            <li className={styles.installItem}>
+              <DeviceMobileIcon size={16} aria-hidden="true" className={styles.installIcon} />
               <span>
                 <strong>iPhone</strong> : Safari sur https://desktop-gja56n4.tail40220c.ts.net:8446,
                 Partager, Sur l’écran d’accueil, puis ouvre l’app et active les notifications.
               </span>
             </li>
-            <li>
-              <DeviceDesktopIcon size={16} aria-hidden="true" />
+            <li className={styles.installItem}>
+              <DeviceDesktopIcon size={16} aria-hidden="true" className={styles.installIcon} />
               <span>
                 <strong>Ce PC</strong> : http://localhost:8446 dans Edge ou Chrome, puis Installer
                 l’application.
               </span>
             </li>
-            <li>
-              <DeviceDesktopIcon size={16} aria-hidden="true" />
+            <li className={styles.installItem}>
+              <DeviceDesktopIcon size={16} aria-hidden="true" className={styles.installIcon} />
               <span>
                 <strong>Mac ou autre PC du tailnet</strong> : la même adresse que l’iPhone, dans
                 Chrome, Edge ou Safari.

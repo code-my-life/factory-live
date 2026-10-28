@@ -2,38 +2,48 @@
   position: relative;
   display: inline-block;
   flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--fl-dot-color);
+  width: var(--base-size-8);
+  height: var(--base-size-8);
+  border-radius: var(--borderRadius-full);
+  background-color: var(--bgColor-neutral-emphasis);
 }
 
-.dot[data-tone='success'] {
-  --fl-dot-color: var(--fgColor-success);
+.dot[data-tone='success'],
+.dot[data-tone='success']::after {
+  background-color: var(--bgColor-success-emphasis);
 }
-.dot[data-tone='accent'] {
-  --fl-dot-color: var(--fgColor-accent);
+
+.dot[data-tone='accent'],
+.dot[data-tone='accent']::after {
+  background-color: var(--bgColor-accent-emphasis);
 }
-.dot[data-tone='attention'] {
-  --fl-dot-color: var(--fgColor-attention);
+
+.dot[data-tone='attention'],
+.dot[data-tone='attention']::after {
+  background-color: var(--bgColor-attention-emphasis);
 }
-.dot[data-tone='danger'] {
-  --fl-dot-color: var(--fgColor-danger);
+
+.dot[data-tone='danger'],
+.dot[data-tone='danger']::after {
+  background-color: var(--bgColor-danger-emphasis);
 }
-.dot[data-tone='done'] {
-  --fl-dot-color: var(--fgColor-done);
+
+.dot[data-tone='done'],
+.dot[data-tone='done']::after {
+  background-color: var(--bgColor-done-emphasis);
 }
-.dot[data-tone='muted'] {
-  --fl-dot-color: var(--fgColor-muted);
+
+.dot[data-tone='muted'],
+.dot[data-tone='muted']::after {
+  background-color: var(--bgColor-neutral-emphasis);
 }
 
 .dot[data-pulse='true']::after {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 50%;
-  background: var(--fl-dot-color);
-  animation: pulse 1.6s var(--fl-ease-out) infinite;
+  border-radius: var(--borderRadius-full);
+  animation: pulse var(--base-duration-1000) var(--motion-easing-enter) infinite;
 }
 
 @keyframes pulse {
@@ -41,6 +51,7 @@
     transform: scale(1);
     opacity: 0.55;
   }
+
   to {
     transform: scale(2.6);
     opacity: 0;

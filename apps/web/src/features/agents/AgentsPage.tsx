@@ -3,17 +3,17 @@ import { AlertIcon, ArrowRightIcon } from '@primer/octicons-react';
 import { Heading, Label, Token } from '@primer/react';
 import { Link } from 'react-router';
 import { useProfiles, useSnapshot } from '../../data/FactoryProvider.tsx';
+import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { LiveDot } from '../../ui/LiveDot.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
-import { ProfileIcon } from '../../ui/ProfileIcon.tsx';
 import { formatPercent, formatUsd } from '../../ui/format.ts';
 import { AGENT_STATE_LABEL, STATION_LABEL } from '../../ui/vocabulary.ts';
-import { issuePath } from '../issues/paths.ts';
+import { issuePath } from '../../ui/paths.ts';
 import page from '../../ui/page.module.css';
 import styles from './agents.module.css';
 
-function ProfileCard({
+function AgentProfileCard({
   profile,
   activity,
 }: {
@@ -25,11 +25,11 @@ function ProfileCard({
     <article
       className={styles.card}
       data-working={working ? 'true' : undefined}
-      aria-labelledby={`profil-${profile.name}`}
+      aria-labelledby={`agent-${profile.name}`}
     >
       <header className={styles.head}>
-        <ProfileIcon profile={profile.name} />
-        <h2 id={`profil-${profile.name}`} className={styles.name}>
+        <AgentAvatar profile={profile.name} size={40} state={activity?.state ?? 'idle'} named />
+        <h2 id={`agent-${profile.name}`} className={styles.name}>
           {profile.name}
         </h2>
         <Label variant="secondary">{STATION_LABEL[profile.station]}</Label>
@@ -132,28 +132,30 @@ function ProfileCard({
 
       <dl className={styles.stats}>
         <div>
-          <dt>Runs</dt>
-          <dd>{profile.stats.runs}</dd>
+          <dt className={styles.statTerm}>Runs</dt>
+          <dd className={styles.statValue}>{profile.stats.runs}</dd>
         </div>
         <div>
-          <dt>Passage en gate</dt>
-          <dd>
+          <dt className={styles.statTerm}>Passage en gate</dt>
+          <dd className={styles.statValue}>
             {profile.stats.gatePassRate !== null
               ? formatPercent(profile.stats.gatePassRate)
               : 'sans objet'}
           </dd>
         </div>
         <div>
-          <dt>Durée médiane</dt>
-          <dd>
+          <dt className={styles.statTerm}>Durée médiane</dt>
+          <dd className={styles.statValue}>
             {profile.stats.medianRunMinutes !== null
               ? `${profile.stats.medianRunMinutes} min`
               : '?'}
           </dd>
         </div>
         <div>
-          <dt>Coût estimé</dt>
-          <dd>{profile.stats.costUsd !== null ? formatUsd(profile.stats.costUsd) : 'gratuit'}</dd>
+          <dt className={styles.statTerm}>Coût estimé</dt>
+          <dd className={styles.statValue}>
+            {profile.stats.costUsd !== null ? formatUsd(profile.stats.costUsd) : 'gratuit'}
+          </dd>
         </div>
       </dl>
     </article>
@@ -172,15 +174,16 @@ export function AgentsPage() {
             Agents
           </Heading>
           <p className={page.intro}>
-            Les {profiles.length} profils de la factory, avec la configuration réellement en
-            service.
-            {drifting > 0 ? ` ${drifting} profils diffèrent du dépôt hermes-software-factory.` : ''}
+            Les {profiles.length} agents de la factory, avec la configuration réellement en service.
+            {drifting > 0
+              ? ` ${drifting} agent${drifting > 1 ? 's' : ''} diffère${drifting > 1 ? 'nt' : ''} du dépôt hermes-software-factory.`
+              : ''}
           </p>
         </div>
       </header>
       <div className={styles.grid}>
         {profiles.map((profile) => (
-          <ProfileCard
+          <AgentProfileCard
             key={profile.name}
             profile={profile}
             activity={snapshot.agents.find((agent) => agent.profile === profile.name)}

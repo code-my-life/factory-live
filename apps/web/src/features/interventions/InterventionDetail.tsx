@@ -7,7 +7,7 @@ import { useFactorySource } from '../../data/FactoryProvider.tsx';
 import { Markdown } from '../../ui/Markdown.tsx';
 import { formatClock } from '../../ui/format.ts';
 import { INTERVENTION_LABEL } from '../../ui/vocabulary.ts';
-import { issuePath } from '../issues/paths.ts';
+import { issuePath } from '../../ui/paths.ts';
 import styles from './interventions.module.css';
 
 const SEVERITY_LABEL = { critical: 'Bloquant', warning: 'À traiter', info: 'Pour info' } as const;
@@ -126,16 +126,16 @@ function UnblockForm({ intervention }: { intervention: Intervention }) {
 
   return (
     <form className={styles.form} onSubmit={(event) => void submit(event)}>
-      <FormControl id={fieldId}>
+      <FormControl id={fieldId} className={styles.field}>
         <FormControl.Label>Ta réponse</FormControl.Label>
         <Textarea
+          {...(error ? { validationStatus: 'error' as const } : {})}
           value={text}
           onChange={(event) => setText(event.target.value)}
           rows={4}
           block
           resize="vertical"
           placeholder="Par exemple : option 2, filtres en pastilles au-dessus de la grille."
-          {...(error ? { validationStatus: 'error' as const } : {})}
         />
         {error ? (
           <FormControl.Validation variant="error">{error}</FormControl.Validation>

@@ -50,7 +50,7 @@
 .muted {
   margin: 0;
   color: var(--fgColor-muted);
-  font-size: 12px;
+  font-size: var(--base-text-size-xs);
 }
 
 .action {
@@ -58,7 +58,7 @@
   overflow: hidden;
   color: var(--fgColor-accent);
   font-family: var(--fontStack-monospace);
-  font-size: 12px;
+  font-size: var(--base-text-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -73,7 +73,7 @@
 .blockTitle {
   margin: 0;
   color: var(--fgColor-muted);
-  font-size: 12px;
+  font-size: var(--base-text-size-xs);
   font-weight: var(--base-text-weight-semibold);
 }
 
@@ -108,7 +108,7 @@
   border: var(--borderWidth-thin) solid var(--borderColor-attention-muted);
   border-radius: var(--borderRadius-medium);
   background: var(--bgColor-attention-muted);
-  font-size: 12px;
+  font-size: var(--base-text-size-xs);
 }
 
 .driftTitle {
@@ -140,7 +140,7 @@
   margin: 0;
   color: var(--fgColor-default);
   font-family: var(--fontStack-monospace);
-  font-size: 12px;
+  font-size: var(--base-text-size-xs);
   overflow-wrap: anywhere;
 }
 
@@ -153,14 +153,14 @@
   border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
 }
 
-.stats dt {
+.statTerm {
   color: var(--fgColor-muted);
-  font-size: 11px;
+  font: var(--text-caption-shorthand);
 }
 
-.stats dd {
-  margin: 2px 0 0;
-  font-size: var(--text-body-size-small);
+.statValue {
+  margin: var(--base-size-2) 0 0;
+  font: var(--text-body-shorthand-small);
   font-weight: var(--base-text-weight-semibold);
   font-variant-numeric: tabular-nums;
 }

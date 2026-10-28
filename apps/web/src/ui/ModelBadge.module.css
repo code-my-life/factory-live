@@ -5,7 +5,7 @@
   gap: var(--base-size-6);
   max-width: 100%;
   min-width: 0;
-  padding: 1px var(--base-size-6);
+  padding: var(--base-size-2) var(--base-size-6);
   border: var(--borderWidth-thin) solid var(--borderColor-default);
   border-radius: var(--borderRadius-full);
   background: var(--bgColor-muted);
@@ -36,7 +36,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: var(--fontStack-monospace);
-  font-size: 12px;
+  font-size: var(--base-text-size-xs);
 }
 
 /* Le fournisseur cède la place au modèle quand la largeur manque. */

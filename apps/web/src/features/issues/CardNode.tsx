@@ -1,12 +1,21 @@
 import type { AgentActivity, CardView } from '@factory-live/contracts';
-import { Handle, Position } from '@xyflow/react';
-import type { Node, NodeProps } from '@xyflow/react';
+import {
+  BugIcon,
+  CodeIcon,
+  EyeIcon,
+  RocketIcon,
+  ToolsIcon,
+  WorkflowIcon,
+} from '@primer/octicons-react';
+import type { Icon } from '@primer/octicons-react';
 import { ProgressBar } from '@primer/react';
-import { LiveDot } from '../../ui/LiveDot.tsx';
-import type { DotTone } from '../../ui/LiveDot.tsx';
+import type { Node, NodeProps } from '@xyflow/react';
+import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
+import { FlowNode } from '../../ui/flow/FlowNode.tsx';
+import type { FlowTone } from '../../ui/flow/FlowNode.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
-import { ProfileIcon } from '../../ui/ProfileIcon.tsx';
-import { CARD_STATUS_LABEL, shortCardTitle } from './cardText.ts';
+import { CARD_STATUS_LABEL } from '../../ui/vocabulary.ts';
+import { shortCardTitle } from './cardText.ts';
 import styles from './IssueGraph.module.css';
 
 export interface CardNodeData extends Record<string, unknown> {
@@ -18,82 +27,87 @@ export interface CardNodeData extends Record<string, unknown> {
 
 export type CardFlowNode = Node<CardNodeData, 'card'>;
 
-const STATUS_TONE: Partial<Record<CardView['status'], DotTone>> = {
-  running: 'accent',
-  review: 'done',
-  blocked: 'danger',
-  done: 'success',
-  ready: 'attention',
+const KIND_ICON: Record<CardView['kind'], Icon> = {
+  brief: WorkflowIcon,
+  impl: CodeIcon,
+  release: RocketIcon,
+  diagnostic: BugIcon,
+  watch: EyeIcon,
+  onboarding: ToolsIcon,
+  other: ToolsIcon,
 };
 
-export const NODE_WIDTH = 264;
-export const NODE_HEIGHT = 168;
+const STATUS_TONE: Record<CardView['status'], FlowTone> = {
+  triage: 'attention',
+  todo: 'muted',
+  scheduled: 'muted',
+  ready: 'muted',
+  running: 'accent',
+  blocked: 'danger',
+  review: 'done',
+  done: 'success',
+  archived: 'muted',
+};
 
-/** Un nœud du graphe d'une issue, dans l'esprit d'agenttrail : type, état, qui, quel modèle, quoi. */
+export const NODE_WIDTH = 232;
+export const NODE_HEIGHT = 224;
+
+/** Une carte de l'issue, dans le même cadre qu'une station de la ligne d'usine : qui, quel modèle, quoi. */
 export function CardNode({ data }: NodeProps<CardFlowNode>) {
   const { card, agent, vertical, selected } = data;
   const run = card.runs.at(-1) ?? null;
   const running = card.status === 'running';
   const model = agent?.model ?? run?.model ?? null;
   const laneModel = agent?.laneModel ?? (running ? run?.laneModel : null) ?? null;
-  const topFile = [...card.changedFiles].sort((left, right) => right.edits - left.edits)[0];
+  const tone = STATUS_TONE[card.status];
   return (
-    <div
-      className={styles.node}
-      data-status={card.status}
-      data-selected={selected ? 'true' : undefined}
+    <FlowNode
+      icon={KIND_ICON[card.kind]}
+      title={shortCardTitle(card)}
+      tone={tone}
+      active={running}
+      selected={selected}
+      vertical={vertical}
+      titleLines={2}
     >
-      <Handle
-        type="target"
-        position={vertical ? Position.Top : Position.Left}
-        className={styles.handle}
-      />
-      <div className={styles.nodeTop}>
-        <span className={styles.nodeKind}>#{card.kind}</span>
-        <span className={styles.nodeStatus}>
-          <LiveDot tone={STATUS_TONE[card.status] ?? 'muted'} pulse={running} />
-          {CARD_STATUS_LABEL[card.status]}
-        </span>
-      </div>
-      <p className={styles.nodeTitle}>{shortCardTitle(card)}</p>
-      <div className={styles.nodeWho}>
-        <ProfileIcon profile={card.assignee} size={14} />
-        <span className={styles.nodeProfile}>{card.assignee}</span>
-      </div>
+      <span className={styles.status}>{CARD_STATUS_LABEL[card.status]}</span>
+      <p className={styles.who}>
+        <AgentAvatar
+          {...(running && agent ? { state: agent.state } : {})}
+          profile={card.assignee}
+          size={20}
+          named
+        />
+        <span className={styles.agentName}>{card.assignee}</span>
+      </p>
       {model ? (
-        <div className={styles.nodeModels}>
+        <p className={styles.models}>
           <ModelBadge
-            model={laneModel ?? model}
             {...(laneModel ? { prefix: 'lane', emphasis: true } : {})}
+            model={laneModel ?? model}
           />
-        </div>
+        </p>
       ) : null}
       {agent?.action ? (
-        <p className={styles.nodeAction}>
+        <p className={styles.action}>
           {agent.action.label}
           {agent.action.detail ? ` · ${agent.action.detail}` : ''}
         </p>
       ) : card.blockReason ? (
-        <p className={styles.nodeBlock}>{card.blockReason}</p>
-      ) : null}
-      {card.testsTotal ? (
-        <div className={styles.nodeProgress}>
+        <p className={styles.block}>{card.blockReason}</p>
+      ) : card.testsTotal ? (
+        <div className={styles.progress}>
           <ProgressBar
-            progress={Math.round(((card.testsPassed ?? 0) / card.testsTotal) * 100)}
+            progress={Math.round(((card.testsPassed ?? card.testsTotal) / card.testsTotal) * 100)}
             barSize="small"
-            aria-label={`${card.testsPassed ?? 0} tests réussis sur ${card.testsTotal}`}
+            aria-label={`${card.testsPassed ?? card.testsTotal} tests réussis sur ${card.testsTotal}`}
           />
-          <span className={styles.nodeMeta}>
-            {card.testsPassed}/{card.testsTotal} tests
-            {topFile ? ` · ${card.changedFiles.length} fichiers` : ''}
+          <span className={styles.meta}>
+            {card.testsPassed ?? card.testsTotal}/{card.testsTotal} tests
+            {card.changedFiles.length > 0 ? ` · ${card.changedFiles.length} fichiers` : ''}
           </span>
         </div>
       ) : null}
-      <Handle
-        type="source"
-        position={vertical ? Position.Bottom : Position.Right}
-        className={styles.handle}
-      />
-    </div>
+    </FlowNode>
   );
 }

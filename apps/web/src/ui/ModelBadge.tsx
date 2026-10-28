@@ -6,7 +6,7 @@ const SOURCE_LABEL: Record<ModelRef['source'], string> = {
   live: 'observé sur le dernier appel',
   session: 'enregistré dans la session',
   override: 'forcé sur la carte',
-  config: 'configuration du profil',
+  config: 'configuration de l’agent',
 };
 
 /**

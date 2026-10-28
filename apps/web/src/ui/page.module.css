@@ -61,59 +61,26 @@
   margin: 0;
 }
 
-.figure dt {
+.figureTerm {
   color: var(--fgColor-muted);
-  font-size: 12px;
+  font: var(--text-caption-shorthand);
 }
 
-.figure dd {
-  margin: 2px 0 0;
-  font-size: var(--text-title-size-medium);
-  font-weight: var(--base-text-weight-semibold);
+.figureValue {
+  margin: var(--base-size-2) 0 0;
+  font: var(--text-title-shorthand-medium);
   font-variant-numeric: tabular-nums;
 }
 
+/* Les tableaux sont des composants Table de Primer ; ce cadre ne fait que défiler en largeur sur iPhone. */
 .tableBox {
   max-width: 100%;
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  border: var(--borderWidth-thin) solid var(--borderColor-default);
-  border-radius: var(--borderRadius-medium);
-}
-
-.table {
-  width: 100%;
-  min-width: 560px;
-  border-collapse: collapse;
-  font-size: var(--text-body-size-small);
-}
-
-.table th,
-.table td {
-  padding: var(--base-size-8) var(--base-size-12);
-  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
-  text-align: left;
-  vertical-align: top;
-}
-
-.table th {
-  border-top: 0;
-  background: var(--bgColor-muted);
-  color: var(--fgColor-muted);
-  font-size: 12px;
-  font-weight: var(--base-text-weight-semibold);
-  white-space: nowrap;
-}
-
-.table td.num,
-.table th.num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 .demoNote {
   margin: 0;
   color: var(--fgColor-attention);
-  font-size: 12px;
+  font-size: var(--base-text-size-xs);
 }

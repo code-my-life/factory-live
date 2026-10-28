@@ -24,7 +24,8 @@
 }
 
 .notification {
-  width: min(100%, 360px);
+  width: 100%;
+  max-width: var(--overlay-width-small);
   padding: var(--base-size-12);
   border: var(--borderWidth-thin) solid var(--borderColor-default);
   border-radius: var(--borderRadius-large);
@@ -35,17 +36,17 @@
 .notificationApp {
   margin: 0;
   color: var(--fgColor-muted);
-  font-size: 11px;
+  font: var(--text-caption-shorthand);
 }
 
 .notificationTitle {
-  margin: 2px 0 0;
+  margin: var(--base-size-2) 0 0;
   font-weight: var(--base-text-weight-semibold);
   font-size: var(--text-body-size-small);
 }
 
 .notificationBody {
-  margin: 2px 0 0;
+  margin: var(--base-size-2) 0 0;
   font-size: var(--text-body-size-small);
 }
 
@@ -60,15 +61,15 @@
   font-size: var(--text-body-size-small);
 }
 
-.install li {
+.installItem {
   display: flex;
   align-items: flex-start;
   gap: var(--base-size-8);
   overflow-wrap: anywhere;
 }
 
-.install svg {
+.installIcon {
   flex: none;
-  margin-top: 2px;
+  margin-top: var(--base-size-2);
   color: var(--fgColor-muted);
 }

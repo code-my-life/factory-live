@@ -311,7 +311,7 @@ export function buildScript(): ScenarioStep[] {
           cardId: null,
           label: 'PR #52 prête, revue demandée à @cddev',
           detail:
-            "Dépôt privé : pas d'auto-merge, le profil release fusionnera après ton approbation",
+            "Dépôt privé : pas d'auto-merge, l’agent release fusionnera après ton approbation",
           tone: 'neutral',
         });
         openIntervention(state, {
@@ -323,7 +323,7 @@ export function buildScript(): ScenarioStep[] {
           cardId: CARDS.contactRelease,
           profile: 'coordinator',
           question:
-            "La gate a approuvé la PR #52 : 34 tests, build hors ligne vert, checks verts. cv-site est privé, donc pas d'auto-merge : après ton approbation, le profil release fusionne puis surveille main.",
+            "La gate a approuvé la PR #52 : 34 tests, build hors ligne vert, checks verts. cv-site est privé, donc pas d'auto-merge : après ton approbation, l’agent release fusionne puis surveille main.",
           openedAt: iso(now),
           push: false,
           actions: [

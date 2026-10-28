@@ -1,0 +1,174 @@
+/* Graphe de factory-live : ligne d'usine et issue partagent ce dessin. */
+.canvas {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Nœud : un arrêt rond, son nom, son contenu, centrés. Pas de boîte : le graphe se lit comme une voie. */
+.flowRoot {
+  --xy-background-color: transparent;
+}
+
+.node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--base-size-6);
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  color: var(--fgColor-default);
+  text-align: center;
+}
+
+.stop {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--base-size-48);
+  height: var(--base-size-48);
+  border: var(--borderWidth-thick) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-full);
+  background-color: var(--bgColor-muted);
+  color: var(--fgColor-muted);
+  transition:
+    background-color var(--motion-transition-stateChange),
+    border-color var(--motion-transition-stateChange);
+}
+
+.stop[data-tone='accent'] {
+  border-color: var(--borderColor-accent-emphasis);
+  background-color: var(--bgColor-accent-emphasis);
+  color: var(--fgColor-onEmphasis);
+}
+
+.stop[data-tone='success'] {
+  border-color: var(--borderColor-success-emphasis);
+  background-color: var(--bgColor-success-emphasis);
+  color: var(--fgColor-onEmphasis);
+}
+
+.stop[data-tone='attention'] {
+  border-color: var(--borderColor-attention-emphasis);
+  background-color: var(--bgColor-attention-emphasis);
+  color: var(--fgColor-onEmphasis);
+}
+
+.stop[data-tone='danger'] {
+  border-color: var(--borderColor-danger-emphasis);
+  background-color: var(--bgColor-danger-emphasis);
+  color: var(--fgColor-onEmphasis);
+}
+
+.stop[data-tone='done'] {
+  border-color: var(--borderColor-done-emphasis);
+  background-color: var(--bgColor-done-emphasis);
+  color: var(--fgColor-onEmphasis);
+}
+
+/* On y travaille : un anneau respire autour de l'arrêt (boucle coupée par la pause ou par le système). */
+.stop[data-active]::after {
+  position: absolute;
+  border-radius: var(--borderRadius-full);
+  content: '';
+  inset: 0;
+  outline: var(--borderWidth-thick) solid var(--borderColor-accent-emphasis);
+  outline-offset: var(--borderWidth-thick);
+  pointer-events: none;
+}
+
+.stop[data-loop]::after {
+  animation: breathe var(--base-duration-1000) var(--motion-easing-move) infinite alternate;
+}
+
+@keyframes breathe {
+  to {
+    outline-offset: var(--base-size-6);
+  }
+}
+
+.node[data-selected] .stop {
+  outline: var(--borderWidth-thick) solid var(--borderColor-accent-emphasis);
+  outline-offset: var(--base-size-4);
+}
+
+.stopAside {
+  position: absolute;
+  top: calc(var(--base-size-6) * -1);
+  left: calc(100% - var(--base-size-12));
+  display: inline-flex;
+  white-space: nowrap;
+}
+
+.nodeTitle {
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  font: var(--text-title-shorthand-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodeTitle[data-lines='2'] {
+  display: -webkit-box;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.nodeBody {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--base-size-6);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.handle {
+  visibility: hidden;
+}
+
+/* Liaisons : trait discret au repos, accent quand la liaison sert, flux qui la parcourt. */
+.edge {
+  stroke: var(--borderColor-default);
+  stroke-width: var(--borderWidth-thicker);
+  transition: stroke var(--motion-transition-stateChange);
+}
+
+.edge[data-active] {
+  stroke: var(--borderColor-accent-muted);
+}
+
+.flow {
+  fill: none;
+  stroke: var(--borderColor-accent-emphasis);
+  stroke-dasharray: var(--base-size-4) var(--base-size-12);
+  stroke-linecap: round;
+  stroke-width: var(--borderWidth-thicker);
+  pointer-events: none;
+  animation: flow var(--base-duration-1000) var(--motion-easing-linear) infinite;
+}
+
+@keyframes flow {
+  to {
+    stroke-dashoffset: calc(var(--base-size-16) * -1);
+  }
+}
+
+.packet {
+  pointer-events: none;
+}
+
+.packetBody {
+  fill: var(--bgColor-accent-emphasis);
+  stroke: var(--bgColor-default);
+  stroke-width: var(--borderWidth-thick);
+}
+
+.packetLabel {
+  fill: var(--fgColor-onEmphasis);
+  font: var(--text-caption-shorthand);
+}

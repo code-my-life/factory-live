@@ -1,0 +1,53 @@
+/* Cadre de l'avatar : l'anneau d'état se dessine autour, sans décaler la mise en page. */
+.frame {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  border-radius: var(--borderRadius-medium);
+}
+
+.avatar {
+  display: block;
+}
+
+.frame[data-state]::after {
+  position: absolute;
+  border-radius: var(--borderRadius-medium);
+  content: '';
+  inset: 0;
+  outline: var(--borderWidth-thick) solid var(--borderColor-default);
+  outline-offset: var(--borderWidth-thin);
+  pointer-events: none;
+}
+
+.frame[data-state='thinking']::after,
+.frame[data-state='tool']::after {
+  outline-color: var(--borderColor-accent-emphasis);
+}
+
+.frame[data-state='cli']::after {
+  outline-color: var(--borderColor-done-emphasis);
+}
+
+.frame[data-state='queued']::after {
+  outline-color: var(--borderColor-attention-emphasis);
+}
+
+.frame[data-state='blocked']::after {
+  outline-color: var(--borderColor-danger-emphasis);
+}
+
+.frame[data-state='idle']::after {
+  display: none;
+}
+
+/* Au travail : l'anneau respire (boucle coupée par la préférence d'animation ou par le système). */
+.frame[data-loop]::after {
+  animation: ring var(--base-duration-1000) var(--motion-easing-move) infinite alternate;
+}
+
+@keyframes ring {
+  to {
+    outline-offset: var(--borderWidth-thick);
+  }
+}

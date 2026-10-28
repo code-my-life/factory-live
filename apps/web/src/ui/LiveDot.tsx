@@ -17,6 +17,7 @@ export function LiveDot({
       className={styles.dot}
       data-tone={tone}
       data-pulse={pulse ? 'true' : undefined}
+      data-loop={pulse ? '' : undefined}
       role={label ? 'img' : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}

@@ -460,7 +460,7 @@ export function buildHealth(now: number): ServiceHealth[] {
       checkedAt: ago(12),
       metrics: [
         { label: 'En cours', value: '2 sur 2' },
-        { label: 'Par profil', value: '1 au plus' },
+        { label: 'Par agent', value: '1 au plus' },
       ],
     },
     {

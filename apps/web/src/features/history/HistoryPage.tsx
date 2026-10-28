@@ -1,9 +1,10 @@
 import { Heading, Label } from '@primer/react';
+import { Table } from '@primer/react/experimental';
 import { Link } from 'react-router';
 import { useFactorySource, useHistory } from '../../data/FactoryProvider.tsx';
 import { BarList } from '../../ui/charts/BarList.tsx';
 import { formatDayMonth, formatMinutes, formatPercent } from '../../ui/format.ts';
-import { issuePath } from '../issues/paths.ts';
+import { issuePath } from '../../ui/paths.ts';
 import page from '../../ui/page.module.css';
 
 const OUTCOME = {
@@ -34,24 +35,24 @@ export function HistoryPage() {
 
       <dl className={page.figures}>
         <div className={page.figure}>
-          <dt>Issues terminées</dt>
-          <dd>{history.issuesDone}</dd>
+          <dt className={page.figureTerm}>Issues terminées</dt>
+          <dd className={page.figureValue}>{history.issuesDone}</dd>
         </div>
         <div className={page.figure}>
-          <dt>Délai médian, label → merge</dt>
-          <dd>
+          <dt className={page.figureTerm}>Délai médian, label → merge</dt>
+          <dd className={page.figureValue}>
             {history.medianLeadTimeMinutes !== null
               ? formatMinutes(history.medianLeadTimeMinutes)
               : '?'}
           </dd>
         </div>
         <div className={page.figure}>
-          <dt>Blocages</dt>
-          <dd>{history.blocks}</dd>
+          <dt className={page.figureTerm}>Blocages</dt>
+          <dd className={page.figureValue}>{history.blocks}</dd>
         </div>
         <div className={page.figure}>
-          <dt>Ton temps de réponse médian</dt>
-          <dd>
+          <dt className={page.figureTerm}>Ton temps de réponse médian</dt>
+          <dd className={page.figureValue}>
             {history.medianHumanResponseMinutes !== null
               ? formatMinutes(history.medianHumanResponseMinutes)
               : '?'}
@@ -76,32 +77,32 @@ export function HistoryPage() {
             Passage en gate du premier coup
           </h2>
           <div className={page.tableBox}>
-            <table className={page.table} style={{ minWidth: 0 }}>
-              <thead>
-                <tr>
-                  <th scope="col">Harnais</th>
-                  <th scope="col">Modèle</th>
-                  <th scope="col" className={page.num}>
-                    Runs
-                  </th>
-                  <th scope="col" className={page.num}>
-                    Taux
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table
+              gridTemplateColumns="auto minmax(0, 1fr) auto auto"
+              cellPadding="condensed"
+              aria-labelledby="gate-title"
+            >
+              <Table.Head>
+                <Table.Row>
+                  <Table.Header>Harnais</Table.Header>
+                  <Table.Header>Modèle</Table.Header>
+                  <Table.Header align="end">Runs</Table.Header>
+                  <Table.Header align="end">Taux</Table.Header>
+                </Table.Row>
+              </Table.Head>
+              <Table.Body>
                 {history.gatePassRate.map((row) => (
-                  <tr key={`${row.harness}-${row.model}`}>
-                    <td>{row.harness}</td>
-                    <td className="fl-mono">{row.model}</td>
-                    <td className={page.num}>{row.runs}</td>
-                    <td className={page.num}>
+                  <Table.Row key={`${row.harness}-${row.model}`}>
+                    <Table.Cell>{row.harness}</Table.Cell>
+                    <Table.Cell className="fl-mono">{row.model}</Table.Cell>
+                    <Table.Cell align="end">{row.runs}</Table.Cell>
+                    <Table.Cell align="end">
                       {row.runs >= 3 ? formatPercent(row.rate) : 'trop peu'}
-                    </td>
-                  </tr>
+                    </Table.Cell>
+                  </Table.Row>
                 ))}
-              </tbody>
-            </table>
+              </Table.Body>
+            </Table>
           </div>
         </section>
       </div>
@@ -111,39 +112,41 @@ export function HistoryPage() {
           Dernières issues terminées
         </h2>
         <div className={page.tableBox}>
-          <table className={page.table}>
-            <thead>
-              <tr>
-                <th scope="col">Issue</th>
-                <th scope="col">Résultat</th>
-                <th scope="col" className={page.num}>
-                  Délai
-                </th>
-                <th scope="col">Version</th>
-                <th scope="col">Terminée le</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table
+            gridTemplateColumns="minmax(0, 2fr) repeat(4, auto)"
+            cellPadding="condensed"
+            aria-labelledby="recent-title"
+          >
+            <Table.Head>
+              <Table.Row>
+                <Table.Header>Issue</Table.Header>
+                <Table.Header>Résultat</Table.Header>
+                <Table.Header align="end">Délai</Table.Header>
+                <Table.Header>Version</Table.Header>
+                <Table.Header>Terminée le</Table.Header>
+              </Table.Row>
+            </Table.Head>
+            <Table.Body>
               {history.recent.map((row) => (
-                <tr key={row.key}>
-                  <td>
+                <Table.Row key={row.key}>
+                  <Table.Cell>
                     <Link to={issuePath(row.key)} className="fl-mono">
                       {row.key}
                     </Link>{' '}
                     {row.title}
-                  </td>
-                  <td>
+                  </Table.Cell>
+                  <Table.Cell>
                     <Label variant={OUTCOME[row.outcome].variant}>
                       {OUTCOME[row.outcome].label}
                     </Label>
-                  </td>
-                  <td className={page.num}>{formatMinutes(row.leadTimeMinutes)}</td>
-                  <td className="fl-mono">{row.version ?? 'sans tag'}</td>
-                  <td>{formatDayMonth(row.finishedAt)}</td>
-                </tr>
+                  </Table.Cell>
+                  <Table.Cell align="end">{formatMinutes(row.leadTimeMinutes)}</Table.Cell>
+                  <Table.Cell className="fl-mono">{row.version ?? 'sans tag'}</Table.Cell>
+                  <Table.Cell>{formatDayMonth(row.finishedAt)}</Table.Cell>
+                </Table.Row>
               ))}
-            </tbody>
-          </table>
+            </Table.Body>
+          </Table>
         </div>
       </section>
     </section>

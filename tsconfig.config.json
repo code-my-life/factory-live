@@ -16,6 +16,7 @@
     "eslint.config.js",
     "scripts/*.mjs",
     "apps/web/scripts/*.mjs",
-    "e2e/**/*.ts"
+    "e2e/**/*.ts",
+    "types/*.d.ts"
   ]
 }

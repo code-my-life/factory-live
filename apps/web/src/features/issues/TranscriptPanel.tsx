@@ -79,7 +79,9 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
         </p>
         {long ? (
           <details className={styles.entryDetails}>
-            <summary>Afficher en entier ({entry.text?.length ?? 0} caractères)</summary>
+            <summary className={styles.entrySummary}>
+              Afficher en entier ({entry.text?.length ?? 0} caractères)
+            </summary>
             {body}
           </details>
         ) : (

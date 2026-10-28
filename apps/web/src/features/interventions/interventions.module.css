@@ -112,7 +112,7 @@
   align-items: center;
   gap: var(--base-size-4);
   color: var(--fgColor-muted);
-  font-size: 12px;
+  font-size: var(--base-text-size-xs);
 }
 
 .item[data-severity='critical'] .itemKind {
@@ -127,12 +127,12 @@
 
 .itemMeta {
   color: var(--fgColor-muted);
-  font-size: 12px;
+  font-size: var(--base-text-size-xs);
 }
 
 .itemProgress {
   color: var(--fgColor-accent);
-  font-size: 12px;
+  font-size: var(--base-text-size-xs);
 }
 
 .detail {
@@ -165,7 +165,7 @@
 
 .kind {
   color: var(--fgColor-muted);
-  font-size: 12px;
+  font-size: var(--base-text-size-xs);
 }
 
 .context {
@@ -190,7 +190,7 @@
   width: 100%;
 }
 
-.form > div {
+.field {
   width: 100%;
 }
 
@@ -216,9 +216,7 @@
   border: var(--borderWidth-thin) solid var(--borderColor-default);
   border-radius: var(--borderRadius-medium);
   background: var(--bgColor-inset);
-  font-family: var(--fontStack-monospace);
-  font-size: 12px;
-  line-height: 1.6;
+  font: var(--text-codeBlock-shorthand);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   user-select: all;
@@ -240,7 +238,7 @@
 .answer {
   margin: 0;
   padding: var(--base-size-8) var(--base-size-12);
-  border-left: 2px solid var(--borderColor-default);
+  border-left: var(--borderWidth-thick) solid var(--borderColor-default);
   color: var(--fgColor-muted);
   overflow-wrap: anywhere;
 }
@@ -271,24 +269,24 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: var(--base-size-20);
+  height: var(--base-size-20);
   border: var(--borderWidth-thin) solid var(--borderColor-default);
-  border-radius: 50%;
-  font-size: 11px;
+  border-radius: var(--borderRadius-full);
+  font: var(--text-caption-shorthand);
 }
 
 .step[data-done='true'] .stepMark {
   border-color: var(--borderColor-success-emphasis);
   background: var(--bgColor-success-emphasis);
   color: var(--fgColor-onEmphasis);
-  transition: background 200ms var(--fl-ease-out);
+  transition: background-color var(--motion-transition-stateChange);
 }
 
 .stepHint {
   display: block;
   color: var(--fgColor-muted);
-  font-size: 12px;
+  font-size: var(--base-text-size-xs);
 }
 
 .inlineLink {

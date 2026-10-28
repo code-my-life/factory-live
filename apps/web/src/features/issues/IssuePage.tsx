@@ -1,15 +1,5 @@
-import type { CardView, IssueDetail, RunView, TimelineEntry } from '@factory-live/contracts';
-import {
-  ArrowLeftIcon,
-  BellIcon,
-  CheckCircleIcon,
-  CommentIcon,
-  GitPullRequestIcon,
-  InfoIcon,
-  LinkExternalIcon,
-  WorkflowIcon,
-  XCircleIcon,
-} from '@primer/octicons-react';
+import type { CardView, IssueDetail, RunView } from '@factory-live/contracts';
+import { ArrowLeftIcon, LinkExternalIcon } from '@primer/octicons-react';
 import {
   Banner,
   Button,
@@ -19,16 +9,21 @@ import {
   Link as PrimerLink,
   UnderlineNav,
 } from '@primer/react';
+import { Table } from '@primer/react/experimental';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useIssueDetail, useSnapshot } from '../../data/FactoryProvider.tsx';
+import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
-import { formatClock, formatCompact, formatDuration, formatUsd } from '../../ui/format.ts';
+import { ActivityTimeline } from '../../ui/timeline/ActivityTimeline.tsx';
+import { fromTimelineEntry } from '../../ui/timeline/rows.ts';
+import { formatCompact, formatDuration, formatUsd } from '../../ui/format.ts';
 import { INTERVENTION_LABEL, ISSUE_STATUS_LABEL, STATION_LABEL } from '../../ui/vocabulary.ts';
-import { CARD_STATUS_LABEL, RUN_ROLE_LABEL, shortCardTitle } from './cardText.ts';
+import { CARD_STATUS_LABEL, RUN_ROLE_LABEL } from '../../ui/vocabulary.ts';
+import { shortCardTitle } from './cardText.ts';
 import { IssueGraph } from './IssueGraph.tsx';
-import { issueKeyFromParams } from './paths.ts';
+import { issueKeyFromParams } from '../../ui/paths.ts';
 import { PullRequestPanel } from './PullRequestPanel.tsx';
 import { TranscriptPanel } from './TranscriptPanel.tsx';
 import styles from './issues.module.css';
@@ -43,55 +38,12 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'evidence', label: 'Preuves' },
 ];
 
-const TONE_ICON = {
-  neutral: InfoIcon,
-  success: CheckCircleIcon,
-  attention: BellIcon,
-  danger: XCircleIcon,
-  done: CheckCircleIcon,
-} as const;
-
-const SOURCE_ICON = {
-  kanban: WorkflowIcon,
-  hermes: InfoIcon,
-  github: GitPullRequestIcon,
-  comment: CommentIcon,
-  'factory-live': BellIcon,
-} as const;
-
 function defaultCard(detail: IssueDetail): CardView | null {
   return (
     detail.cards.find((card) => card.status === 'running' || card.status === 'review') ??
     detail.cards.find((card) => card.status === 'blocked') ??
     detail.cards.at(-1) ??
     null
-  );
-}
-
-function Timeline({ entries }: { entries: readonly TimelineEntry[] }) {
-  const ordered = [...entries].sort((left, right) => right.at.localeCompare(left.at));
-  return (
-    <ol className={styles.timeline}>
-      {ordered.map((entry) => {
-        const Icon = entry.tone === 'neutral' ? SOURCE_ICON[entry.source] : TONE_ICON[entry.tone];
-        return (
-          <li key={entry.id} className={styles.timelineItem} data-tone={entry.tone}>
-            <span className={styles.timelineBadge}>
-              <Icon size={14} aria-hidden="true" />
-            </span>
-            <div className={styles.timelineBody}>
-              <p className={styles.timelineLabel}>
-                {entry.profile ? <strong>{entry.profile}</strong> : null} {entry.label}
-              </p>
-              {entry.detail ? <p className={styles.timelineDetail}>{entry.detail}</p> : null}
-            </div>
-            <time className={styles.timelineTime} dateTime={entry.at}>
-              {formatClock(entry.at)}
-            </time>
-          </li>
-        );
-      })}
-    </ol>
   );
 }
 
@@ -109,52 +61,65 @@ function RunsTable({
   }
   return (
     <div className={styles.tableBox}>
-      <table className={styles.table}>
-        <caption className="fl-visually-hidden">Runs de la carte {card.id}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Run</th>
-            <th scope="col">Profil</th>
-            <th scope="col">Modèle</th>
-            <th scope="col">Résultat</th>
-            <th scope="col">Durée</th>
-            <th scope="col">
+      <Table
+        gridTemplateColumns="auto auto minmax(0, 2fr) minmax(0, 2fr) auto auto"
+        cellPadding="condensed"
+        aria-label={`Runs de la carte ${card.id}`}
+      >
+        <Table.Head>
+          <Table.Row>
+            <Table.Header>Run</Table.Header>
+            <Table.Header>Agent</Table.Header>
+            <Table.Header>Modèle</Table.Header>
+            <Table.Header>Résultat</Table.Header>
+            <Table.Header>Durée</Table.Header>
+            <Table.Header>
               <span className="fl-visually-hidden">Transcription</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
+            </Table.Header>
+          </Table.Row>
+        </Table.Head>
+        <Table.Body>
           {[...card.runs].reverse().map((run: RunView) => (
-            <tr key={run.id} data-selected={run.id === selectedRunId ? 'true' : undefined}>
-              <td className="fl-mono">#{run.id}</td>
-              <td>
-                {run.profile}
-                <span className={styles.cellNote}>{RUN_ROLE_LABEL[run.role]}</span>
-              </td>
-              <td className={styles.modelCell}>
+            <Table.Row
+              key={run.id}
+              className={run.id === selectedRunId ? styles.selectedRow : undefined}
+            >
+              <Table.Cell className="fl-mono">#{run.id}</Table.Cell>
+              <Table.Cell>
+                <span className={styles.cellStack}>
+                  <span className={styles.agentCell}>
+                    <AgentAvatar profile={run.profile} size={16} named />
+                    {run.profile}
+                  </span>
+                  <span className={styles.cellNote}>{RUN_ROLE_LABEL[run.role]}</span>
+                </span>
+              </Table.Cell>
+              <Table.Cell className={styles.modelCell}>
                 {run.model ? <ModelBadge model={run.model} /> : '?'}
                 {run.laneModel ? <ModelBadge model={run.laneModel} prefix="lane" emphasis /> : null}
-              </td>
-              <td>
-                {run.outcome ?? 'en cours'}
-                {run.summary ? <span className={styles.cellNote}>{run.summary}</span> : null}
-              </td>
-              <td className="fl-tabular">
+              </Table.Cell>
+              <Table.Cell>
+                <span className={styles.cellStack}>
+                  {run.outcome ?? 'en cours'}
+                  {run.summary ? <span className={styles.cellNote}>{run.summary}</span> : null}
+                </span>
+              </Table.Cell>
+              <Table.Cell className="fl-tabular">
                 {run.endedAt ? (
                   formatDuration(Date.parse(run.endedAt) - Date.parse(run.startedAt))
                 ) : (
                   <Elapsed since={run.startedAt} />
                 )}
-              </td>
-              <td>
+              </Table.Cell>
+              <Table.Cell>
                 <Button size="small" onClick={() => onSelectRun(run.id)}>
                   Transcription
                 </Button>
-              </td>
-            </tr>
+              </Table.Cell>
+            </Table.Row>
           ))}
-        </tbody>
-      </table>
+        </Table.Body>
+      </Table>
     </div>
   );
 }
@@ -250,16 +215,18 @@ export function IssuePage() {
 
       <dl className={styles.facts}>
         <div>
-          <dt>Harnais</dt>
-          <dd>{issue.harness ?? 'choisi au brief'}</dd>
+          <dt className={styles.factTerm}>Harnais</dt>
+          <dd className={styles.factValue}>{issue.harness ?? 'choisi au brief'}</dd>
         </div>
         <div>
-          <dt>Modèle Claude</dt>
-          <dd className="fl-mono">{issue.claudeModel ?? 'aucun (pas de label claude)'}</dd>
+          <dt className={styles.factTerm}>Modèle Claude</dt>
+          <dd className={`${styles.factValue} fl-mono`}>
+            {issue.claudeModel ?? 'aucun (pas de label claude)'}
+          </dd>
         </div>
         <div>
-          <dt>PR</dt>
-          <dd>
+          <dt className={styles.factTerm}>PR</dt>
+          <dd className={styles.factValue}>
             {issue.pr ? (
               <PrimerLink href={issue.pr.url} target="_blank" rel="noreferrer">
                 #{issue.pr.number} · {issue.pr.state} · CI {issue.pr.checks}
@@ -270,8 +237,8 @@ export function IssuePage() {
           </dd>
         </div>
         <div>
-          <dt>Durée</dt>
-          <dd className="fl-tabular">
+          <dt className={styles.factTerm}>Durée</dt>
+          <dd className={`${styles.factValue} fl-tabular`}>
             {elapsedEnd !== null ? (
               formatDuration(elapsedEnd - Date.parse(issue.startedAt))
             ) : (
@@ -280,12 +247,12 @@ export function IssuePage() {
           </dd>
         </div>
         <div>
-          <dt>Jetons</dt>
-          <dd className="fl-tabular">{formatCompact(detail.tokens)}</dd>
+          <dt className={styles.factTerm}>Jetons</dt>
+          <dd className={`${styles.factValue} fl-tabular`}>{formatCompact(detail.tokens)}</dd>
         </div>
         <div>
-          <dt>Coût estimé</dt>
-          <dd className="fl-tabular">
+          <dt className={styles.factTerm}>Coût estimé</dt>
+          <dd className={`${styles.factValue} fl-tabular`}>
             {detail.costUsd > 0 ? formatUsd(detail.costUsd) : 'nul (modèles gratuits)'}
           </dd>
         </div>
@@ -365,7 +332,14 @@ export function IssuePage() {
           ))}
         </UnderlineNav>
         <div className={styles.tabPanel}>
-          {tab === 'activity' ? <Timeline entries={detail.timeline} /> : null}
+          {tab === 'activity' ? (
+            <ActivityTimeline
+              rows={[...detail.timeline]
+                .sort((left, right) => right.at.localeCompare(left.at))
+                .map(fromTimelineEntry)}
+              label={`Activité de ${issue.key}`}
+            />
+          ) : null}
           {tab === 'transcript' ? (
             runForTranscript !== null ? (
               <TranscriptPanel key={runForTranscript} runId={runForTranscript} />
@@ -376,37 +350,45 @@ export function IssuePage() {
           {tab === 'pr' ? <PullRequestPanel issue={issue} /> : null}
           {tab === 'costs' ? (
             <div className={styles.tableBox}>
-              <table className={styles.table}>
-                <caption className="fl-visually-hidden">Consommation par run</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Run</th>
-                    <th scope="col">Profil</th>
-                    <th scope="col">Modèle</th>
-                    <th scope="col">Jetons</th>
-                    <th scope="col">Coût</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table
+                gridTemplateColumns="auto auto minmax(0, 1fr) auto auto"
+                cellPadding="condensed"
+                aria-label="Consommation par run"
+              >
+                <Table.Head>
+                  <Table.Row>
+                    <Table.Header>Run</Table.Header>
+                    <Table.Header>Agent</Table.Header>
+                    <Table.Header>Modèle</Table.Header>
+                    <Table.Header>Jetons</Table.Header>
+                    <Table.Header>Coût</Table.Header>
+                  </Table.Row>
+                </Table.Head>
+                <Table.Body>
                   {detail.cards
                     .flatMap((card) => card.runs)
                     .map((run) => (
-                      <tr key={run.id}>
-                        <td className="fl-mono">#{run.id}</td>
-                        <td>{run.profile}</td>
-                        <td className="fl-mono">
+                      <Table.Row key={run.id}>
+                        <Table.Cell className="fl-mono">#{run.id}</Table.Cell>
+                        <Table.Cell>
+                          <span className={styles.agentCell}>
+                            <AgentAvatar profile={run.profile} size={16} named />
+                            {run.profile}
+                          </span>
+                        </Table.Cell>
+                        <Table.Cell className="fl-mono">
                           {run.laneModel?.model ?? run.model?.model ?? '?'}
-                        </td>
-                        <td className="fl-tabular">
+                        </Table.Cell>
+                        <Table.Cell className="fl-tabular">
                           {run.tokens !== null ? formatCompact(run.tokens) : '?'}
-                        </td>
-                        <td className="fl-tabular">
+                        </Table.Cell>
+                        <Table.Cell className="fl-tabular">
                           {run.costUsd !== null ? formatUsd(run.costUsd) : 'gratuit'}
-                        </td>
-                      </tr>
+                        </Table.Cell>
+                      </Table.Row>
                     ))}
-                </tbody>
-              </table>
+                </Table.Body>
+              </Table>
             </div>
           ) : null}
           {tab === 'evidence' ? (

@@ -1,6 +1,7 @@
 // @ts-check
 import js from '@eslint/js';
 import { defineConfig, globalIgnores } from 'eslint/config';
+import primerReact from 'eslint-plugin-primer-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
@@ -47,6 +48,7 @@ export default defineConfig([
             'scripts/*.mjs',
             'apps/web/scripts/*.mjs',
             'e2e/*.ts',
+            'types/*.d.ts',
           ],
         },
         tsconfigRootDir: import.meta.dirname,
@@ -69,6 +71,16 @@ export default defineConfig([
     files: ['apps/web/src/**/*.{ts,tsx}'],
     extends: [reactHooks.configs.flat.recommended],
     languageOptions: { globals: globals.browser },
+    // Règles officielles de Primer React : composants, accessibilité, CSS modules, jetons de couleur.
+    plugins: { 'primer-react': primerReact },
+    rules: {
+      ...primerReact.configs.recommended.rules,
+      'primer-react/no-wildcard-imports': 'error',
+      'primer-react/no-deprecated-octicon': 'error',
+      'primer-react/spread-props-first': 'error',
+      'primer-react/enforce-css-module-default-import': 'error',
+      'primer-react/a11y-link-in-text-block': 'error',
+    },
   },
   {
     files: ['apps/server/src/adapters/hermes/**/*.ts'],

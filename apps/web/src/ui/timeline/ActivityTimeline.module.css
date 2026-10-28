@@ -1,0 +1,90 @@
+.timeline {
+  min-width: 0;
+}
+
+/* Une ligne qui arrive glisse en place (entrée : jeton de mouvement de Primer). */
+.item {
+  transition:
+    opacity var(--motion-transition-enter),
+    transform var(--motion-transition-enter);
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(calc(var(--base-size-8) * -1));
+  }
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-2);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--stack-gap-condensed);
+  min-width: 0;
+  color: var(--fgColor-default);
+  font: var(--text-body-shorthand-small);
+}
+
+.agent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-4);
+  min-width: 0;
+}
+
+.agentName {
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.time {
+  margin-left: auto;
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--fgColor-muted);
+  font: var(--text-body-shorthand-small);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--stack-gap-condensed);
+  margin: 0;
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+}
+
+.issue {
+  color: var(--fgColor-accent);
+  font-family: var(--fontStack-monospace);
+}
+
+.model {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--fontStack-monospace);
+}
+
+.duration {
+  font-variant-numeric: tabular-nums;
+}

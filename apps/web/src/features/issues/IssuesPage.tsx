@@ -6,7 +6,7 @@ import { Link } from 'react-router';
 import { useSnapshot } from '../../data/FactoryProvider.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { ISSUE_STATUS_LABEL, STATION_LABEL } from '../../ui/vocabulary.ts';
-import { issuePath } from './paths.ts';
+import { issuePath } from '../../ui/paths.ts';
 import styles from './issues.module.css';
 
 const FILTERS: { label: string; keep: (issue: IssueSummary) => boolean }[] = [
@@ -52,7 +52,7 @@ export function IssuesPage() {
       </header>
       <ul className={styles.issueList}>
         {issues.map((issue) => (
-          <li key={issue.key}>
+          <li key={issue.key} className={styles.issueListItem}>
             <Link to={issuePath(issue.key)} className={styles.issueRow}>
               <span className={styles.issueRowMain}>
                 <span className={styles.issueRowKey}>{issue.key}</span>

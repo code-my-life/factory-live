@@ -5,8 +5,10 @@
  */
 .header {
   position: sticky;
+  /* stylelint-disable-next-line primer/spacing -- zones sûres de l'iPhone (env), sans équivalent Primer */
   top: var(--fl-sticky-top);
   z-index: 20;
+  /* stylelint-disable-next-line primer/spacing -- zones sûres de l'iPhone (env), sans équivalent Primer */
   padding-top: var(--fl-header-pad-top);
   border-bottom: var(--borderWidth-thin) solid var(--borderColor-default);
   background: var(--bgColor-default);
@@ -17,7 +19,9 @@
   align-items: center;
   gap: var(--base-size-12);
   min-height: var(--fl-header-height);
+  /* stylelint-disable-next-line primer/spacing -- zones sûres de l'iPhone (env), sans équivalent Primer */
   padding-left: var(--fl-gutter-left);
+  /* stylelint-disable-next-line primer/spacing -- zones sûres de l'iPhone (env), sans équivalent Primer */
   padding-right: var(--fl-gutter-right);
 }
 
@@ -93,10 +97,14 @@
   max-width: 1480px;
   margin-inline: auto;
   padding-top: var(--base-size-16);
+  /* stylelint-disable primer/spacing -- zones sûres de l'iPhone (env), sans équivalent Primer */
   padding-bottom: calc(
     var(--fl-tabbar-height) + env(safe-area-inset-bottom, 0px) + var(--base-size-32)
   );
+  /* stylelint-enable primer/spacing */
+  /* stylelint-disable-next-line primer/spacing -- zones sûres de l'iPhone (env), sans équivalent Primer */
   padding-left: var(--fl-gutter-left);
+  /* stylelint-disable-next-line primer/spacing -- zones sûres de l'iPhone (env), sans équivalent Primer */
   padding-right: var(--fl-gutter-right);
 }
 
@@ -108,9 +116,12 @@
   z-index: 20;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
+  /* stylelint-disable-next-line primer/spacing -- zones sûres de l'iPhone (env), sans équivalent Primer */
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  /* stylelint-disable-next-line primer/spacing -- zones sûres de l'iPhone (env), sans équivalent Primer */
+  padding-left: env(safe-area-inset-left, 0);
+  /* stylelint-disable-next-line primer/spacing -- zones sûres de l'iPhone (env), sans équivalent Primer */
+  padding-right: env(safe-area-inset-right, 0);
   border-top: var(--borderWidth-thin) solid var(--borderColor-default);
   background: var(--bgColor-default);
 }
@@ -120,31 +131,30 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: var(--base-size-2);
   min-height: var(--fl-tabbar-height);
   padding: var(--base-size-4) 0;
   border: 0;
   background: none;
   color: var(--fgColor-muted);
-  font: inherit;
-  font-size: 11px;
+  font: var(--text-caption-shorthand);
   text-decoration: none;
   cursor: pointer;
-  transition: color 120ms var(--fl-ease-out);
+  transition: color var(--motion-transition-hover);
 }
 
 .tab:active {
   color: var(--fgColor-default);
 }
 
-.tab[aria-current='page'],
-.tab:global(.active) {
+/* NavLink pose aria-current="page" sur l'onglet actif. */
+.tab[aria-current='page'] {
   color: var(--fgColor-accent);
 }
 
 .tab:focus-visible {
-  outline: 2px solid var(--fgColor-accent);
-  outline-offset: -4px;
+  outline: var(--focus-outline);
+  outline-offset: calc(var(--base-size-4) * -1);
 }
 
 .tabIcon {
@@ -154,28 +164,27 @@
 
 .tabBadge {
   position: absolute;
-  top: -6px;
-  left: 12px;
-  min-width: 16px;
-  height: 16px;
-  padding-inline: 4px;
+  top: calc(var(--base-size-6) * -1);
+  left: var(--base-size-12);
+  min-width: var(--base-size-16);
+  height: var(--base-size-16);
+  padding-inline: var(--base-size-4);
   border-radius: var(--borderRadius-full);
   background: var(--bgColor-danger-emphasis);
   color: var(--fgColor-onEmphasis);
-  font-size: 10px;
+  font: var(--text-caption-shorthand);
   font-weight: var(--base-text-weight-semibold);
-  line-height: 16px;
   text-align: center;
 }
 
 .tabDot {
   position: absolute;
-  top: -2px;
-  right: -4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--fgColor-attention);
+  top: calc(var(--base-size-2) * -1);
+  right: calc(var(--base-size-4) * -1);
+  width: var(--base-size-8);
+  height: var(--base-size-8);
+  border-radius: var(--borderRadius-full);
+  background: var(--bgColor-attention-emphasis);
 }
 
 .tabLabel {
@@ -188,7 +197,7 @@
 .sidebarFoot {
   margin: var(--base-size-16) var(--base-size-12) 0;
   color: var(--fgColor-muted);
-  font-size: var(--text-body-size-small);
+  font: var(--text-body-shorthand-small);
 }
 
 .hideNarrow {
@@ -213,7 +222,7 @@
     width: 1px;
     height: 1px;
     overflow: hidden;
-    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
   }
 }
 
@@ -230,6 +239,7 @@
 
   .sidebarInner {
     position: sticky;
+    /* stylelint-disable-next-line primer/spacing -- zones sûres de l'iPhone (env), sans équivalent Primer */
     top: calc(var(--fl-sticky-top) + var(--fl-header-pad-top) + var(--fl-header-height));
     max-height: calc(100dvh - var(--fl-header-height));
     overflow-y: auto;

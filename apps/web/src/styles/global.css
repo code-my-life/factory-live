@@ -5,20 +5,6 @@
  */
 :root {
   color-scheme: dark;
-  /* App installée : l'en-tête colle en haut et absorbe lui-même l'encoche. */
-  --fl-sticky-top: 0px;
-  --fl-header-pad-top: env(safe-area-inset-top, 0px);
-  --fl-gutter-left: max(16px, env(safe-area-inset-left, 0px));
-  --fl-gutter-right: max(16px, env(safe-area-inset-right, 0px));
-  --fl-tabbar-height: 56px;
-  --fl-header-height: 56px;
-  --fl-ease-out: cubic-bezier(0.215, 0.61, 0.355, 1);
-}
-
-/* Publiée en artifact : l'hôte pose déjà les marges d'encoche sur :root ; l'en-tête colle sous la bande. */
-:root[data-host='artifact'] {
-  --fl-sticky-top: env(safe-area-inset-top, 0px);
-  --fl-header-pad-top: 0px;
 }
 
 :root[data-host='artifact'] body::before {
@@ -26,8 +12,8 @@
   position: fixed;
   inset: 0 0 auto;
   z-index: 30;
-  height: env(safe-area-inset-top, 0px);
-  background: var(--bgColor-default, #0d1117);
+  height: env(safe-area-inset-top, 0);
+  background: var(--bgColor-default);
 }
 
 :root[data-color-mode='light'] {
@@ -42,15 +28,15 @@
 
 html {
   -webkit-tap-highlight-color: transparent;
-  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   overscroll-behavior: none;
 }
 
 body {
   margin: 0;
-  background: var(--bgColor-default, #0d1117);
-  color: var(--fgColor-default, #f0f6fc);
-  font-family: var(--fontStack-system, system-ui, sans-serif);
+  background: var(--bgColor-default);
+  color: var(--fgColor-default);
+  font-family: var(--fontStack-system);
   overscroll-behavior: none;
 }
 
@@ -65,7 +51,7 @@ button,
 [role='button'],
 [role='tab'] {
   user-select: none;
-  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* iOS zoome la page sur un champ en dessous de 16 px et ne dézoome pas ensuite. */
@@ -73,8 +59,15 @@ button,
   input,
   textarea,
   select {
-    font-size: 16px !important;
+    font-size: var(--base-text-size-md) !important;
   }
+}
+
+/* Animations en boucle (flux, anneau des agents) : coupées quand l'utilisateur les met en pause. */
+:root[data-motion='paused'] [data-loop],
+:root[data-motion='paused'] [data-loop]::before,
+:root[data-motion='paused'] [data-loop]::after {
+  animation: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -92,16 +85,13 @@ button,
   position: absolute;
   width: 1px;
   height: 1px;
-  padding: 0;
-  margin: -1px;
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
   white-space: nowrap;
-  border: 0;
 }
 
 .fl-mono {
-  font-family: var(--fontStack-monospace, ui-monospace, monospace);
+  font-family: var(--fontStack-monospace);
 }
 
 .fl-tabular {

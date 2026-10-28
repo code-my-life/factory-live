@@ -8,6 +8,7 @@
   gap: var(--base-size-8);
   min-width: 0;
   margin: 0;
+
   --fl-mark: var(--bgColor-accent-emphasis);
 }
 
@@ -33,7 +34,7 @@
   right: 0;
   transform: translateY(50%);
   color: var(--fgColor-muted);
-  font-size: 11px;
+  font: var(--text-caption-shorthand);
   font-variant-numeric: tabular-nums;
 }
 
@@ -46,8 +47,8 @@
   position: absolute;
   left: 0;
   right: 0;
-  height: 1px;
-  background: var(--borderColor-muted);
+  height: 0;
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
 }
 
 .columns {
@@ -88,9 +89,9 @@
   position: relative;
   width: min(24px, 100%);
   min-height: 2px;
-  border-radius: 4px 4px 0 0;
+  border-radius: var(--borderRadius-small) var(--borderRadius-small) 0 0;
   background: var(--fl-mark);
-  transition: filter 120ms var(--fl-ease-out);
+  transition: filter var(--motion-transition-hover);
 }
 
 .columnBar[data-active='true'] {
@@ -101,9 +102,9 @@
   position: absolute;
   bottom: 100%;
   left: 50%;
-  transform: translate(-50%, -4px);
+  transform: translate(-50%, calc(var(--base-size-4) * -1));
   color: var(--fgColor-default);
-  font-size: 11px;
+  font: var(--text-caption-shorthand);
   font-weight: var(--base-text-weight-semibold);
   white-space: nowrap;
 }
@@ -121,12 +122,12 @@
   background: var(--bgColor-default);
   box-shadow: var(--shadow-floating-small);
   color: var(--fgColor-muted);
-  font-size: 12px;
+  font-size: var(--base-text-size-xs);
   white-space: nowrap;
   pointer-events: none;
 }
 
-.tooltip strong {
+.tooltipValue {
   color: var(--fgColor-default);
   font-variant-numeric: tabular-nums;
 }
@@ -134,32 +135,15 @@
 .xAxis {
   display: flex;
   justify-content: space-between;
-  padding-left: 48px;
+  padding-left: var(--base-size-48);
   color: var(--fgColor-muted);
-  font-size: 11px;
+  font: var(--text-caption-shorthand);
 }
 
-.tableToggle summary {
+.tableSummary {
   color: var(--fgColor-accent);
-  font-size: 12px;
+  font: var(--text-caption-shorthand);
   cursor: pointer;
-}
-
-.table {
-  margin-top: var(--base-size-8);
-  border-collapse: collapse;
-  font-size: 12px;
-}
-
-.table th,
-.table td {
-  padding: 2px var(--base-size-12) 2px 0;
-  text-align: left;
-}
-
-.table th {
-  color: var(--fgColor-muted);
-  font-weight: var(--base-text-weight-semibold);
 }
 
 .num {
@@ -188,32 +172,29 @@
   overflow-wrap: anywhere;
 }
 
-/* L'échelle garde 72 px à droite pour que la valeur, posée au bout de la barre, ne déborde jamais. */
+/* La barre et sa valeur se suivent ; la barre la plus longue laisse toujours la place de la valeur. */
 .barScale {
-  position: relative;
+  --fl-pct: 0%;
+
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
   min-width: 0;
-  height: 18px;
-  margin-right: 72px;
 }
 
 .barFill {
-  position: absolute;
-  top: 2px;
-  left: 0;
-  width: var(--fl-pct);
-  min-width: 2px;
-  height: 14px;
-  border-radius: 0 4px 4px 0;
+  flex: none;
+  width: calc(var(--fl-pct) * 0.8);
+  min-width: var(--base-size-2);
+  height: var(--base-size-12);
+  border-radius: 0 var(--borderRadius-small) var(--borderRadius-small) 0;
   background: var(--fl-mark);
 }
 
 .barValue {
-  position: absolute;
-  top: 50%;
-  left: calc(var(--fl-pct) + 8px);
-  transform: translateY(-50%);
+  flex: none;
   color: var(--fgColor-default);
-  font-size: 12px;
+  font: var(--text-caption-shorthand);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

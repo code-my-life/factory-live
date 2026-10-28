@@ -9,7 +9,7 @@ import styles from './health.module.css';
 
 const GROUPS: { id: ServiceHealth['group']; label: string; hint: string }[] = [
   { id: 'hermes', label: 'Hermès', hint: 'Gateway, dispatcher, pause, dashboard' },
-  { id: 'models', label: 'Modèles', hint: 'Fournisseurs appelés par les profils' },
+  { id: 'models', label: 'Modèles', hint: 'Fournisseurs appelés par les agents' },
   { id: 'tools', label: 'Outils', hint: 'MCP et API utilisés par les agents' },
   { id: 'intake', label: 'Intake', hint: 'Ce qui fait entrer les issues dans la factory' },
   { id: 'factory-live', label: 'factory-live', hint: 'Les sources de cet outil' },
@@ -62,8 +62,8 @@ export function HealthPage() {
                     <dl className={styles.metrics}>
                       {service.metrics.map((metric) => (
                         <div key={metric.label}>
-                          <dt>{metric.label}</dt>
-                          <dd>{metric.value}</dd>
+                          <dt className={styles.metricTerm}>{metric.label}</dt>
+                          <dd className={styles.metricValue}>{metric.value}</dd>
                         </div>
                       ))}
                     </dl>

@@ -46,7 +46,7 @@ function requireIssue(state: DemoState, key: IssueKey): IssueDetail {
 
 export function patchAgent(state: DemoState, profile: string, patch: Partial<AgentActivity>): void {
   const agent = state.snapshot.agents.find((candidate) => candidate.profile === profile);
-  if (!agent) throw new Error(`Profil de démo inconnu : ${profile}`);
+  if (!agent) throw new Error(`Agent de démo inconnu : ${profile}`);
   Object.assign(agent, patch);
 }
 

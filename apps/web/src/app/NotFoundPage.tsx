@@ -9,7 +9,7 @@ export function NotFoundPage() {
       </Heading>
       <Text as="p">
         Cette adresse ne correspond à aucune vue.{' '}
-        <Link as={RouterLink} to="/">
+        <Link as={RouterLink} to="/" inline>
           Revenir à la ligne d’usine
         </Link>
       </Text>

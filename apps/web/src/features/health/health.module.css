@@ -50,7 +50,7 @@
 .tileStatus {
   margin-left: auto;
   color: var(--fgColor-muted);
-  font-size: 12px;
+  font-size: var(--base-text-size-xs);
 }
 
 .tileDetail {
@@ -66,19 +66,19 @@
   margin: 0;
 }
 
-.metrics dt {
+.metricTerm {
   color: var(--fgColor-muted);
-  font-size: 11px;
+  font: var(--text-caption-shorthand);
 }
 
-.metrics dd {
+.metricValue {
   margin: 0;
-  font-size: 12px;
+  font: var(--text-caption-shorthand);
   font-variant-numeric: tabular-nums;
 }
 
 .checked {
   margin: 0;
   color: var(--fgColor-muted);
-  font-size: 11px;
+  font: var(--text-caption-shorthand);
 }

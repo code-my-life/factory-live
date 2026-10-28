@@ -56,14 +56,14 @@ export function PullRequestPanel({ issue }: { issue: IssueSummary }) {
       </div>
       <dl className={styles.facts}>
         <div>
-          <dt>Changements</dt>
-          <dd className="fl-tabular">
+          <dt className={styles.factTerm}>Changements</dt>
+          <dd className={`${styles.factValue} fl-tabular`}>
             +{pr.additions} −{pr.deletions} · {pr.changedFiles} fichiers
           </dd>
         </div>
         <div>
-          <dt>Revue</dt>
-          <dd>
+          <dt className={styles.factTerm}>Revue</dt>
+          <dd className={styles.factValue}>
             {pr.reviewDecision === 'approved'
               ? 'Approuvée'
               : pr.reviewDecision === 'changes_requested'
@@ -74,8 +74,8 @@ export function PullRequestPanel({ issue }: { issue: IssueSummary }) {
           </dd>
         </div>
         <div>
-          <dt>Auto-merge</dt>
-          <dd>
+          <dt className={styles.factTerm}>Auto-merge</dt>
+          <dd className={styles.factValue}>
             {pr.autoMerge
               ? 'Armé : le merge part dès ton approbation'
               : 'Non (dépôt privé ou PR en brouillon)'}
@@ -85,7 +85,7 @@ export function PullRequestPanel({ issue }: { issue: IssueSummary }) {
       <ul className={styles.checks} aria-label="Workflows de la PR">
         {CHECKS.map((check) => (
           <li key={check.name} className={styles.check} data-state={pr.checks}>
-            <CheckIcon size={16} aria-hidden="true" />
+            <CheckIcon size={16} aria-hidden="true" className={styles.checkIcon} />
             <span>
               <strong>{check.name}</strong> <span className={styles.muted}>{check.detail}</span>
             </span>

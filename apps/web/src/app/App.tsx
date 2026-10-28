@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { RouterProvider } from 'react-router/dom';
 import { FactoryProvider } from '../data/FactoryProvider.tsx';
 import { createDataSource } from '../data/createDataSource.ts';
+import { MotionProvider } from '../ui/motion.tsx';
 import { ColorModeProvider, primerColorMode, useColorMode } from './colorMode.tsx';
 import { createAppRouter } from './router.tsx';
 
@@ -28,9 +29,11 @@ export function App() {
   return (
     <ColorModeProvider>
       <PrimerTheme>
-        <FactoryProvider source={source}>
-          <RouterProvider router={router} />
-        </FactoryProvider>
+        <MotionProvider>
+          <FactoryProvider source={source}>
+            <RouterProvider router={router} />
+          </FactoryProvider>
+        </MotionProvider>
       </PrimerTheme>
     </ColorModeProvider>
   );

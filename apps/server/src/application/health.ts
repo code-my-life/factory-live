@@ -106,14 +106,14 @@ export function buildHealth(signals: HealthSignals): {
     status: tickStatus,
     detail:
       signals.lastTickAt === null
-        ? 'Aucun tick reçu (webhooks du profil default non branchés ?)'
+        ? 'Aucun tick reçu (webhooks du gateway non branchés ?)'
         : paused
           ? `En pause, dernier tick ${ago(now, signals.lastTickAt)}`
           : `Dernier tick ${ago(now, signals.lastTickAt)}`,
     checkedAt: signals.lastTickAt === null ? null : iso(signals.lastTickAt),
     metrics: [
       { label: 'En cours', value: `${signals.running} sur ${signals.maxInProgress}` },
-      { label: 'Par profil', value: `${signals.maxInProgressPerProfile} au plus` },
+      { label: 'Par agent', value: `${signals.maxInProgressPerProfile} au plus` },
     ],
   });
 

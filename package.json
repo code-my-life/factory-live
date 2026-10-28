@@ -25,22 +25,31 @@
     "test:coverage": "vitest run --coverage",
     "dev:web": "npm run dev -w @factory-live/web",
     "dev:server": "npm run dev -w @factory-live/server",
-    "verify:fast": "npm run format:check && npm run lint && npm run typecheck && npm run check:text && npm run check:arch && npm run test:coverage",
-    "verify": "npm run verify:fast && npm run build"
+    "verify:fast": "npm run format:check && npm run lint && npm run lint:css && npm run typecheck && npm run check:text && npm run check:arch && npm run test:coverage",
+    "verify": "npm run verify:fast && npm run build",
+    "lint:css": "stylelint \"apps/web/src/**/*.css\""
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.64.1",
+    "@primer/stylelint-config": "13.6.0",
     "@types/node": "24.19.2",
     "@vitest/coverage-v8": "5.0.5",
     "dependency-cruiser": "18.7.0",
     "eslint": "10.13.0",
+    "eslint-plugin-primer-react": "9.3.1",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.13.0",
     "prettier": "3.9.10",
+    "stylelint": "16.26.1",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",
     "vitest": "5.0.5"
+  },
+  "overrides": {
+    "stylelint-browser-compat": {
+      "zod": "4.6.7"
+    }
   }
 }

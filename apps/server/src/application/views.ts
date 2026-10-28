@@ -278,7 +278,7 @@ export function profileViews(deps: ViewDeps, periodDays = 30): ProfileView[] {
     const chain = live ? [...(live.model ? [live.model] : []), ...live.fallbacks] : [];
     return {
       name,
-      role: (manifest.profiles[name]?.skills ?? []).join(', ') || 'profil Hermès',
+      role: (manifest.profiles[name]?.skills ?? []).join(', ') || 'agent Hermès',
       station: profileStation(name),
       modelChain: chain.map((link) => ({ ...link, source: 'config' as const })),
       effort: live?.effort ?? null,
@@ -409,7 +409,7 @@ export function historyStats(deps: ViewDeps, periodDays: number): HistoryStats {
     { harness: string; model: string; runs: number; passed: number }
   >();
   for (const verdict of verdicts) {
-    const model = verdict.claudeModel ?? 'modèle du profil';
+    const model = verdict.claudeModel ?? 'modèle de l’agent';
     const key = `${verdict.harness}|${model}`;
     const group = groups.get(key) ?? { harness: verdict.harness, model, runs: 0, passed: 0 };
     group.runs += 1;

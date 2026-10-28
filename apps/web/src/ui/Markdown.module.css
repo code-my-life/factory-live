@@ -25,11 +25,10 @@
 }
 
 .markdown code {
-  padding: 0.1em 0.35em;
+  padding: var(--base-size-2) var(--base-size-4);
   border-radius: var(--borderRadius-small);
   background: var(--bgColor-neutral-muted);
-  font-family: var(--fontStack-monospace);
-  font-size: 0.9em;
+  font: var(--text-codeInline-shorthand);
 }
 
 .markdown pre {

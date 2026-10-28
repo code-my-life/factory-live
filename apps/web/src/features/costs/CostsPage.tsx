@@ -1,4 +1,5 @@
 import { Heading, SegmentedControl } from '@primer/react';
+import { Table } from '@primer/react/experimental';
 import { useState } from 'react';
 import { useFactorySource, useUsage } from '../../data/FactoryProvider.tsx';
 import type { UsagePeriod } from '../../data/source.ts';
@@ -67,20 +68,20 @@ export function CostsPage() {
 
       <dl className={page.figures}>
         <div className={page.figure}>
-          <dt>Jetons</dt>
-          <dd>{formatCompact(totalTokens)}</dd>
+          <dt className={page.figureTerm}>Jetons</dt>
+          <dd className={page.figureValue}>{formatCompact(totalTokens)}</dd>
         </div>
         <div className={page.figure}>
-          <dt>Appels aux modèles</dt>
-          <dd>{formatInteger(totalCalls)}</dd>
+          <dt className={page.figureTerm}>Appels aux modèles</dt>
+          <dd className={page.figureValue}>{formatInteger(totalCalls)}</dd>
         </div>
         <div className={page.figure}>
-          <dt>Réponses 429</dt>
-          <dd>{formatInteger(totalRateLimited)}</dd>
+          <dt className={page.figureTerm}>Réponses 429</dt>
+          <dd className={page.figureValue}>{formatInteger(totalRateLimited)}</dd>
         </div>
         <div className={page.figure}>
-          <dt>Coût estimé (abonnement Claude)</dt>
-          <dd>{formatUsd(totalCost)}</dd>
+          <dt className={page.figureTerm}>Coût estimé (abonnement Claude)</dt>
+          <dd className={page.figureValue}>{formatUsd(totalCost)}</dd>
         </div>
       </dl>
 
@@ -110,50 +111,42 @@ export function CostsPage() {
           Par modèle
         </h2>
         <div className={page.tableBox}>
-          <table className={page.table}>
-            <thead>
-              <tr>
-                <th scope="col">Modèle</th>
-                <th scope="col">Fournisseur</th>
-                <th scope="col" className={page.num}>
-                  Appels
-                </th>
-                <th scope="col" className={page.num}>
-                  Entrée
-                </th>
-                <th scope="col" className={page.num}>
-                  Sortie
-                </th>
-                <th scope="col" className={page.num}>
-                  429
-                </th>
-                <th scope="col" className={page.num}>
-                  Erreurs
-                </th>
-                <th scope="col" className={page.num}>
-                  Coût
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table
+            gridTemplateColumns="minmax(0, 2fr) repeat(7, auto)"
+            cellPadding="condensed"
+            aria-labelledby="models-title"
+          >
+            <Table.Head>
+              <Table.Row>
+                <Table.Header>Modèle</Table.Header>
+                <Table.Header>Fournisseur</Table.Header>
+                <Table.Header align="end">Appels</Table.Header>
+                <Table.Header align="end">Entrée</Table.Header>
+                <Table.Header align="end">Sortie</Table.Header>
+                <Table.Header align="end">429</Table.Header>
+                <Table.Header align="end">Erreurs</Table.Header>
+                <Table.Header align="end">Coût</Table.Header>
+              </Table.Row>
+            </Table.Head>
+            <Table.Body>
               {usage.models.map((row) => (
-                <tr key={`${row.provider}-${row.model}`}>
-                  <td className="fl-mono" style={{ overflowWrap: 'anywhere' }}>
+                <Table.Row key={`${row.provider}-${row.model}`}>
+                  <Table.Cell className="fl-mono" style={{ overflowWrap: 'anywhere' }}>
                     {row.model}
-                  </td>
-                  <td>{providerLabel(row.provider)}</td>
-                  <td className={page.num}>{formatInteger(row.calls)}</td>
-                  <td className={page.num}>{formatCompact(row.inputTokens)}</td>
-                  <td className={page.num}>{formatCompact(row.outputTokens)}</td>
-                  <td className={page.num}>{formatInteger(row.rateLimited)}</td>
-                  <td className={page.num}>{formatInteger(row.errors)}</td>
-                  <td className={page.num}>
+                  </Table.Cell>
+                  <Table.Cell>{providerLabel(row.provider)}</Table.Cell>
+                  <Table.Cell align="end">{formatInteger(row.calls)}</Table.Cell>
+                  <Table.Cell align="end">{formatCompact(row.inputTokens)}</Table.Cell>
+                  <Table.Cell align="end">{formatCompact(row.outputTokens)}</Table.Cell>
+                  <Table.Cell align="end">{formatInteger(row.rateLimited)}</Table.Cell>
+                  <Table.Cell align="end">{formatInteger(row.errors)}</Table.Cell>
+                  <Table.Cell align="end">
                     {row.costUsd !== null ? formatUsd(row.costUsd) : 'gratuit'}
-                  </td>
-                </tr>
+                  </Table.Cell>
+                </Table.Row>
               ))}
-            </tbody>
-          </table>
+            </Table.Body>
+          </Table>
         </div>
         <p className={page.muted}>{usage.claudeSubscriptionNote}</p>
       </section>
@@ -161,7 +154,7 @@ export function CostsPage() {
       <section className={page.section}>
         <div className={page.panel}>
           <BarList
-            title="Jetons par profil"
+            title="Jetons par agent"
             data={usage.byProfile.map((row) => ({
               key: row.profile,
               label: row.profile,
