@@ -26,3 +26,11 @@ export const StreamEvent = z.discriminatedUnion('type', [
 ]);
 export type StreamEvent = z.infer<typeof StreamEvent>;
 export type StreamEventType = StreamEvent['type'];
+
+/**
+ * Battement du flux : un événement SSE `ping` (données `{}`, sans `id`, donc sans effet sur la reprise),
+ * envoyé quand rien d'autre n'est parti depuis `STREAM_PING_EVERY_MS`. Un flux muet plus longtemps est
+ * un flux coupé (réseau perdu sans erreur, sortie du tailnet) : le client le relance.
+ */
+export const STREAM_PING = 'ping';
+export const STREAM_PING_EVERY_MS = 15_000;

@@ -45,6 +45,8 @@ export const IssueSummary = z.object({
   claudeModel: z.string().nullable(),
   harness: z.string().nullable(),
   pr: PullRequestView.nullable(),
+  /** Lien de la PR relevé dans les runs d'Hermès : connu même quand GitHub n'est pas relié. */
+  prUrl: z.url().nullable(),
   activeProfiles: z.array(z.string()),
   interventionIds: z.array(z.string()),
   startedAt: Timestamp,

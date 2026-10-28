@@ -21,6 +21,16 @@ Le conteneur tourne en `restart: unless-stopped`, utilisateur 1000:1000, racine 
 
 Exposition tailnet : `tailscale serve --bg --https=8446 http://127.0.0.1:8446` (depuis WSL). Jamais Funnel. L'adresse tailnet ne répond pas depuis ce PC lui-même : la tester depuis un autre appareil. Ports déjà pris sur le nœud : 443 Funnel vers 8644 (webhook GitHub), 8443 dashboard Hermès, 8444 graphes, 8445 freellmapi, 8446 factory-live.
 
+## Installer l'app et activer les notifications
+
+| Appareil     | Installer                                                                                                            | Notifications                                                                    |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| iPhone, iPad | Safari sur l'adresse tailnet, Partager, « Sur l'écran d'accueil », puis ouvrir factory-live depuis l'écran d'accueil | Réglages de l'app, « Activer les notifications », accepter ; « Envoyer un test » |
+| Ce PC        | `http://localhost:8446` dans Edge ou Chrome, icône d'installation dans la barre d'adresse                            | idem ; Windows doit autoriser les notifications d'Edge ou de Chrome              |
+| Mac          | adresse tailnet dans Safari (Fichier, « Ajouter au Dock ») ou Chrome                                                 | idem                                                                             |
+
+L'en-tête dit l'état du lien : « En direct », « Connexion… », « Hors ligne · dernier état il y a … » (l'app montre le dernier état reçu), « En pause » (factory en pause), « Factory muette » (factory-live ne reçoit plus rien de la factory : voir Pannes).
+
 ## Ce que le conteneur voit
 
 | Montage                           | Mode               | Pourquoi                                                          |
@@ -46,14 +56,18 @@ Jamais monté : `~/.hermes` en entier (son `.env` porte toutes les clés), `open
 
 ## Pannes
 
-| Symptôme                                              | Cause probable                                         | Action                                                                       |
-| ----------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| Santé : « Sonde muette »                              | gateway arrêté, ou factory-live injoignable depuis WSL | `hermes gateway status` ; `curl -s localhost:8446/healthz`                   |
-| Santé : « Aucun tick reçu »                           | webhooks du profil default absents                     | `hermes config get hooks.outbound` ; relancer `./install.sh` de la factory   |
-| Sources : `kanban.db illisible`, schéma inattendu     | mise à jour d'Hermès qui a changé une table            | lire le détail (colonne citée), adapter `apps/server/src/adapters/hermes/`   |
-| Workers : « outbound webhook … failed » dans leur log | factory-live arrêté                                    | `docker compose -f docker/compose.yaml up -d` ; la factory n'est pas gênée   |
-| Déblocage : 503                                       | ni connexion GitHub ni jeton de repli                  | Réglages, « Se connecter à GitHub » (`/api/github/login`)                    |
-| GitHub : « Installation de l'App illisible » ou repli | App créée mais pas installée                           | `/api/github/status` donne `installUrl` : installer sur « All repositories » |
-| Connexion GitHub : « Seul le compte cddev … »         | autre compte GitHub ouvert dans ce navigateur          | se déconnecter de GitHub, puis relancer la connexion                         |
-| Déblocage : 😕 sur le commentaire                     | plus aucune carte bloquée sur l'issue                  | rien à faire, la carte est déjà repartie                                     |
-| Écriture refusée (403) depuis l'iPhone                | login Tailscale différent de `cddev@github`            | `TAILSCALE_LOGINS` dans `docker/.env`, puis `up -d`                          |
+| Symptôme                                              | Cause probable                                            | Action                                                                                 |
+| ----------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Santé : « Sonde muette »                              | gateway arrêté, ou factory-live injoignable depuis WSL    | `hermes gateway status` ; `curl -s localhost:8446/healthz`                             |
+| Santé : « Aucun tick reçu »                           | webhooks du profil default absents                        | `hermes config get hooks.outbound` ; relancer `./install.sh` de la factory             |
+| Sources : `kanban.db illisible`, schéma inattendu     | mise à jour d'Hermès qui a changé une table               | lire le détail (colonne citée), adapter `apps/server/src/adapters/hermes/`             |
+| Workers : « outbound webhook … failed » dans leur log | factory-live arrêté                                       | `docker compose -f docker/compose.yaml up -d` ; la factory n'est pas gênée             |
+| Déblocage : 503                                       | ni connexion GitHub ni jeton de repli                     | Réglages, « Se connecter à GitHub » (`/api/github/login`)                              |
+| GitHub : « Installation de l'App illisible » ou repli | App créée mais pas installée                              | `/api/github/status` donne `installUrl` : installer sur « All repositories »           |
+| Connexion GitHub : « Seul le compte cddev … »         | autre compte GitHub ouvert dans ce navigateur             | se déconnecter de GitHub, puis relancer la connexion                                   |
+| Déblocage : 😕 sur le commentaire                     | plus aucune carte bloquée sur l'issue                     | rien à faire, la carte est déjà repartie                                               |
+| En-tête « Factory muette »                            | ni sonde ni webhook depuis 10 min (gateway arrêté)        | `hermes gateway status` ; voir « Sonde muette »                                        |
+| En-tête « Hors ligne » sur l'iPhone                   | hors du tailnet, ou conteneur arrêté                      | Tailscale actif sur l'iPhone ; `docker ps --filter name=factory-live`                  |
+| Aucun push sur l'iPhone                               | app pas installée, permission refusée, mode Concentration | Réglages de l'app (elle dit ce qui manque) ; Réglages iOS, Notifications, factory-live |
+| Erreur du front sur un appareil                       | remontée au journal du serveur                            | `docker logs factory-live \| grep '"component":"client"'`                              |
+| Écriture refusée (403) depuis l'iPhone                | login Tailscale différent de `cddev@github`               | `TAILSCALE_LOGINS` dans `docker/.env`, puis `up -d`                                    |

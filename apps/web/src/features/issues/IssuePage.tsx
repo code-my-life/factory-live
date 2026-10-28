@@ -272,6 +272,13 @@ export function IssuePage() {
               <PrimerLink href={issue.pr.url} target="_blank" rel="noreferrer">
                 #{issue.pr.number} · {issue.pr.state} · CI {issue.pr.checks}
               </PrimerLink>
+            ) : issue.prUrl ? (
+              <>
+                <PrimerLink href={issue.prUrl} target="_blank" rel="noreferrer">
+                  #{issue.prUrl.split('/').at(-1)}
+                </PrimerLink>{' '}
+                <span className={styles.muted}>(état inconnu : GitHub pas encore relié)</span>
+              </>
             ) : (
               'pas encore ouverte'
             )}

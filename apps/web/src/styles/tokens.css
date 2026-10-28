@@ -10,6 +10,19 @@
   --fl-gutter-right: max(var(--base-size-16), env(safe-area-inset-right, 0px));
   --fl-tabbar-height: calc(var(--base-size-48) + var(--base-size-8));
   --fl-header-height: calc(var(--base-size-48) + var(--base-size-8));
+  /* Bande de l'encoche, sous la barre d'état translucide d'iOS (texte blanc) : la couleur de l'en-tête. */
+  --fl-statusbar-bg: var(--bgColor-default);
+}
+
+/* Thème clair : la bande reste sombre pour que l'heure et la batterie, toujours blanches, se lisent. */
+:root[data-color-mode='light'] {
+  --fl-statusbar-bg: var(--bgColor-emphasis);
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-color-mode='auto'] {
+    --fl-statusbar-bg: var(--bgColor-emphasis);
+  }
 }
 
 /* Publiée en artifact : l'hôte pose déjà les marges d'encoche sur :root ; l'en-tête colle sous la bande. */

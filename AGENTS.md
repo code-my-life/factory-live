@@ -54,3 +54,5 @@ Détails : `docs/ARCHITECTURE.md`. Exploitation : `docs/RUNBOOK.md`. Décisions 
 ## Données de démonstration
 
 `apps/web/src/demo/` rejoue un scénario réaliste de la factory sans serveur. Il sert à la maquette publiée en artifact et aux tests de bout en bout. Le test `DemoSource.test.ts` vérifie qu'il respecte les contrats.
+
+Builds du front : `VITE_DATA_SOURCE=live` pour l'app servie par le conteneur (vraies données, service worker, notifications), `demo` par défaut pour la maquette et les e2e ; la maquette en artifact se construit avec `VITE_ARTIFACT=1 VITE_ROUTER=memory FACTORY_LIVE_BASE=./` (sans service worker, que l'hôte n'autorise pas). Le service worker (`src/sw/sw.ts`) a son propre projet TypeScript (`tsconfig.sw.json`, types WebWorker).

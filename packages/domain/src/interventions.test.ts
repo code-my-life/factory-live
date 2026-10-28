@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { interventionsOf } from './interventions.ts';
+import { interventionsOf, pullRequestUrl } from './interventions.ts';
 import type { InterventionContext } from './interventions.ts';
 import { aRun, aTask, anEvent } from './fixtures.test-helpers.ts';
 import type { Board, Task, TaskEvent } from './hermes.ts';
@@ -212,5 +212,28 @@ describe('interventionsOf', () => {
     const events = [blockedEvent('Question', 'needs_input', 42)];
     expect(run(tasks, events)[0]?.id).toBe(run(tasks, events)[0]?.id);
     expect(run(tasks, events)[0]?.id).toBe('needs_input:t_b:42');
+  });
+});
+
+describe('pullRequestUrl', () => {
+  it('prend le lien de PR du dernier run des cartes, publié ou relevé, et rien d’autre', () => {
+    const tasks = [aTask({ id: 't_impl' }), aTask({ id: 't_release' })];
+    const board: Board = {
+      tasks,
+      events: [],
+      links: [],
+      runs: [
+        aRun({ id: 1, taskId: 't_impl', metadata: { pr_url: 'https://github.com/o/r/pull/1' } }),
+        aRun({
+          id: 3,
+          taskId: 't_release',
+          metadata: { published_pr: 'https://github.com/o/r/pull/2' },
+        }),
+        aRun({ id: 2, taskId: 't_impl', metadata: { pr_url: 'pas un lien' } }),
+        aRun({ id: 4, taskId: 't_autre', metadata: { pr_url: 'https://github.com/o/r/pull/9' } }),
+      ],
+    };
+    expect(pullRequestUrl(tasks, board)).toBe('https://github.com/o/r/pull/2');
+    expect(pullRequestUrl([aTask({ id: 't_seule' })], board)).toBeNull();
   });
 });

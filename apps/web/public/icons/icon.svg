@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>factory-live</title>
+  <rect width="512" height="512" rx="112" fill="#0d1117"/>
+  <g transform="translate(96 96) scale(13.333)" fill="#4493f8" stroke="#4493f8">
+    <circle cx="4" cy="12" r="2.5" stroke="none"/>
+    <circle cx="12" cy="6" r="2.5" stroke="none"/>
+    <circle cx="12" cy="18" r="2.5" stroke="none"/>
+    <circle cx="20" cy="12" r="2.5" stroke="none"/>
+    <path d="M6.2 11 9.8 7.2M6.2 13l3.6 3.8M14.2 7.2l3.6 3.8M14.2 16.8l3.6-3.8" fill="none" stroke-width="1.6" stroke-linecap="round"/>
+  </g>
+</svg>

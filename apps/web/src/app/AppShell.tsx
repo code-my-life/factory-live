@@ -20,7 +20,7 @@ import {
   Label,
   NavList,
 } from '@primer/react';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import {
   Link,
@@ -31,7 +31,14 @@ import {
   useNavigate,
   useResolvedPath,
 } from 'react-router';
-import { useFactorySource, useSnapshot } from '../data/FactoryProvider.tsx';
+import {
+  useConnection,
+  useFactorySource,
+  useLastUpdate,
+  useSnapshot,
+} from '../data/FactoryProvider.tsx';
+import { setAppBadge } from '../pwa/badge.ts';
+import { Elapsed } from '../ui/Elapsed.tsx';
 import { LiveDot } from '../ui/LiveDot.tsx';
 import styles from './AppShell.module.css';
 
@@ -99,12 +106,22 @@ function FactoryLogo() {
 export function AppShell() {
   const snapshot = useSnapshot();
   const source = useFactorySource();
+  const connection = useConnection();
+  const lastUpdate = useLastUpdate();
   const navigate = useNavigate();
   const location = useLocation();
   const moreRef = useRef<HTMLButtonElement>(null);
 
   const openInterventions = snapshot.interventions.length;
   const pushable = snapshot.interventions.filter((intervention) => intervention.push).length;
+  // Pastille de l'icône de l'app installée : les blocages qui t'attendent, comme le serveur la pose
+  // à chaque push (notify.ts) ; la démo n'y touche pas.
+  const waiting = snapshot.interventions.filter(
+    (intervention) => intervention.kind !== 'pr_approval' && intervention.kind !== 'main_red',
+  ).length;
+  useEffect(() => {
+    if (source.kind === 'live' && connection === 'open') setAppBadge(waiting);
+  }, [source.kind, connection, waiting]);
   const unhealthy = snapshot.health.filter((service) => service.status !== 'ok').length;
   const activeIssues = snapshot.issues.filter(
     (issue) => !['done', 'stopped'].includes(issue.status),
@@ -126,25 +143,52 @@ export function AppShell() {
             <span className={styles.brandName}>factory-live</span>
           </Link>
           <p className={styles.status} aria-live="polite">
-            {snapshot.factory.paused ? (
+            {connection === 'lost' ? (
               <>
-                <LiveDot tone="attention" />
-                <span className={styles.statusText}>
-                  En pause{snapshot.factory.pauseReason ? ` : ${snapshot.factory.pauseReason}` : ''}
+                <LiveDot tone="danger" />
+                <span className={styles.statusText}>Hors ligne</span>
+                <span className={styles.statusDetail}>
+                  {lastUpdate !== null ? (
+                    <>
+                      dernier état <Elapsed since={new Date(lastUpdate).toISOString()} mode="age" />
+                    </>
+                  ) : (
+                    'factory-live injoignable'
+                  )}
                 </span>
+              </>
+            ) : connection === 'connecting' ? (
+              <>
+                <LiveDot tone="muted" />
+                <span className={styles.statusText}>Connexion…</span>
               </>
             ) : (
               <>
-                <LiveDot tone="success" pulse={snapshot.factory.live} />
-                <span className={styles.statusText}>
-                  {snapshot.factory.live ? 'En direct' : 'Hors ligne'}
+                {snapshot.factory.paused ? (
+                  <>
+                    <LiveDot tone="attention" />
+                    <span className={styles.statusText}>
+                      En pause
+                      {snapshot.factory.pauseReason ? ` : ${snapshot.factory.pauseReason}` : ''}
+                    </span>
+                  </>
+                ) : snapshot.factory.live ? (
+                  <>
+                    <LiveDot tone="success" pulse />
+                    <span className={styles.statusText}>En direct</span>
+                  </>
+                ) : (
+                  <>
+                    <LiveDot tone="attention" />
+                    <span className={styles.statusText}>Factory muette</span>
+                  </>
+                )}
+                <span className={styles.statusDetail}>
+                  {snapshot.factory.running} carte{snapshot.factory.running > 1 ? 's' : ''} en cours
+                  sur {snapshot.factory.maxInProgress}
                 </span>
               </>
             )}
-            <span className={styles.statusDetail}>
-              {snapshot.factory.running} carte{snapshot.factory.running > 1 ? 's' : ''} en cours sur{' '}
-              {snapshot.factory.maxInProgress}
-            </span>
           </p>
           <div className={styles.headerActions}>
             {source.kind === 'demo' ? (

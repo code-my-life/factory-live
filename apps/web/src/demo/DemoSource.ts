@@ -7,7 +7,7 @@ import type {
   TranscriptView,
   UsageReport,
 } from '@factory-live/contracts';
-import type { FactoryDataSource, UsagePeriod } from '../data/source.ts';
+import type { Connection, FactoryDataSource, UsagePeriod } from '../data/source.ts';
 import { CARDS, KEYS } from './initial.ts';
 import { createInitialState } from './initial.ts';
 import { buildScript } from './script.ts';
@@ -42,6 +42,15 @@ export class DemoSource implements FactoryDataSource {
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  /** La démo ne perd jamais le lien : elle se joue sur l'appareil. */
+  getConnection(): Connection {
+    return 'open';
+  }
+
+  getLastUpdate(): number | null {
+    return null;
   }
 
   getSnapshot(): Snapshot {

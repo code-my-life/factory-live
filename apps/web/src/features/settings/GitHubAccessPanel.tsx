@@ -1,6 +1,6 @@
 import type { GitHubAccess } from '@factory-live/contracts';
 import { CheckCircleIcon, LinkExternalIcon, MarkGithubIcon } from '@primer/octicons-react';
-import { Avatar, Button, Link } from '@primer/react';
+import { Avatar, Button, Flash, Link } from '@primer/react';
 import { LiveDot } from '../../ui/LiveDot.tsx';
 import { formatDuration } from '../../ui/format.ts';
 import { useNow } from '../../ui/useNow.ts';
@@ -48,10 +48,13 @@ export function GitHubAccessPanel({
   access,
   actions,
   demo,
+  error = null,
 }: {
   access: GitHubAccess;
   actions: GitHubActions;
   demo: boolean;
+  /** Échec de la dernière action (déconnexion). */
+  error?: string | null;
 }) {
   const now = useNow();
   const { app, user } = access;
@@ -160,6 +163,11 @@ export function GitHubAccessPanel({
             </div>
           ) : null}
         </dl>
+        {error ? (
+          <Flash variant="danger" className={styles.flash}>
+            {error}
+          </Flash>
+        ) : null}
       </div>
     </section>
   );

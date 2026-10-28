@@ -180,12 +180,17 @@ function idle(
   };
 }
 
+/** Le lien de PR que la factory relève dans ses runs : en démo, celui de la PR quand il y en a une. */
+function withPrUrl(summaries: Omit<IssueSummary, 'prUrl'>[]): IssueSummary[] {
+  return summaries.map((summary) => ({ ...summary, prUrl: summary.pr?.url ?? null }));
+}
+
 /** L'état de la factory au lancement du scénario : deux cartes en cours, trois interventions. */
 export function createInitialState(now: number): DemoState {
   const ago = (seconds: number) => iso(now - seconds * 1000);
   const min = 60;
 
-  const summaries: IssueSummary[] = [
+  const summaries: IssueSummary[] = withPrUrl([
     {
       key: KEYS.team,
       repo: 'claude-cockpit',
@@ -400,7 +405,7 @@ export function createInitialState(now: number): DemoState {
       startedAt: ago(11 * 24 * 60 * min + 96 * min),
       updatedAt: ago(11 * 24 * 60 * min),
     },
-  ];
+  ]);
 
   const opus = model('anthropic', 'claude-opus-5-5', 'live');
   const qwenLive = model('llamacpp', QWEN_LOCAL, 'live');

@@ -4,7 +4,7 @@ import { trackUnblockReactions } from '../application/unblock.ts';
 import { sign } from '../ingest/signature.ts';
 import { NOW, NOW_S, ORIGINS, SECRET, harness } from '../test/harness.ts';
 import type { Harness } from '../test/harness.ts';
-import { insertEvent } from '../test/hermes-fixtures.ts';
+import { insertEvent, insertRun } from '../test/hermes-fixtures.ts';
 
 let h: Harness;
 
@@ -278,8 +278,29 @@ describe('détail d’une issue', () => {
     expect(detail.timeline.map((entry) => entry.label)).toContain(
       'Carte bloquée : décision attendue',
     );
+    expect(detail.issue.prUrl).toBeNull();
     expect((await h.app.request('/api/issues/cv-site/50')).status).toBe(404);
     expect((await h.app.request('/api/issues/..%2Fetc/1')).status).toBe(400);
+  });
+});
+
+describe('PR relevée par la factory', () => {
+  it('donne le lien de la PR noté dans les runs, même sans GitHub relié', async () => {
+    insertRun(h.writer, {
+      taskId: 't_1a9f0049',
+      profile: 'coder',
+      status: 'done',
+      outcome: 'completed',
+      startedAt: NOW_S - 300,
+      endedAt: NOW_S - 200,
+      metadata: { pr_url: 'https://github.com/code-my-life/cv-site/pull/52' },
+    });
+    h.syncKanban();
+    const detail = IssueDetail.parse(await (await h.app.request('/api/issues/cv-site/49')).json());
+    expect(detail.issue).toMatchObject({
+      pr: null,
+      prUrl: 'https://github.com/code-my-life/cv-site/pull/52',
+    });
   });
 });
 
@@ -333,6 +354,14 @@ describe('flux SSE', () => {
     expect(events[0]?.event).toBe('snapshot');
     for (const event of events) StreamEvent.parse(event.data);
     expect(events.map((event) => event.event)).toContain('activity');
+  });
+
+  it('bat quand rien ne part, sans id pour ne pas fausser la reprise', async () => {
+    h.close();
+    h = harness({ streamPingMs: 30 });
+    const events = await read(await h.app.request('/api/stream'), 2);
+    expect(events[0]?.event).toBe('snapshot');
+    expect(events[1]).toEqual({ id: null, event: 'ping', data: {} });
   });
 
   it('reprend après une coupure sans renvoyer d’instantané', async () => {

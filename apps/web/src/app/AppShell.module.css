@@ -14,6 +14,15 @@
   background: var(--bgColor-default);
 }
 
+/* App installée sur iPhone : la bande de l'encoche, au-dessus du contenu de l'en-tête. */
+.header::before {
+  position: absolute;
+  height: var(--fl-header-pad-top);
+  background: var(--fl-statusbar-bg);
+  content: '';
+  inset: 0 0 auto;
+}
+
 .headerInner {
   display: flex;
   align-items: center;

@@ -5,7 +5,7 @@ import {
   LinkExternalIcon,
   XCircleFillIcon,
 } from '@primer/octicons-react';
-import { Button, StateLabel } from '@primer/react';
+import { Button, Link as PrimerLink, StateLabel } from '@primer/react';
 import styles from './issues.module.css';
 
 const CHECKS = [
@@ -17,6 +17,18 @@ const CHECKS = [
 /** État de la PR de l'issue, tel que GitHub le donne (API Actions pour la CI). */
 export function PullRequestPanel({ issue }: { issue: IssueSummary }) {
   const pr = issue.pr;
+  if (!pr && issue.prUrl) {
+    return (
+      <p className={styles.muted}>
+        PR{' '}
+        <PrimerLink href={issue.prUrl} target="_blank" rel="noreferrer">
+          #{issue.prUrl.split('/').at(-1)}
+        </PrimerLink>{' '}
+        relevée par la factory ; son état, ses revues et sa CI s’afficheront une fois GitHub relié
+        (Réglages, GitHub).
+      </p>
+    );
+  }
   if (!pr) {
     return (
       <p className={styles.muted}>

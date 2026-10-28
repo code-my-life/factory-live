@@ -1,5 +1,6 @@
 import type {
   ActivityEvent,
+  GitHubAccess,
   HistoryStats,
   IssueDetail,
   IssueKey,
@@ -9,12 +10,14 @@ import type {
   TranscriptView,
   UsageReport,
 } from '@factory-live/contracts';
-import type { FactoryDataSource, UsagePeriod } from './source.ts';
+import { STREAM_PING, STREAM_PING_EVERY_MS } from '@factory-live/contracts';
+import type { Connection, FactoryDataSource, UsagePeriod } from './source.ts';
 
 type Fetch = typeof fetch;
 
 export interface StreamLike {
   onmessage: ((event: MessageEvent<string>) => void) | null;
+  onopen: ((event: Event) => void) | null;
   onerror: ((event: Event) => void) | null;
   addEventListener(type: string, listener: (event: MessageEvent<string>) => void): void;
   close(): void;
@@ -28,6 +31,30 @@ export interface LiveOptions {
   now?: () => number;
   /** Document observé pour se reconnecter au retour au premier plan (iOS coupe le flux en arrière-plan). */
   document?: Pick<Document, 'visibilityState' | 'addEventListener' | 'removeEventListener'>;
+  /** Où garder le dernier état connu, montré hors ligne (`localStorage` par défaut). */
+  storage?: Pick<Storage, 'getItem' | 'setItem'> | null;
+  setTimer?: (callback: () => void, ms: number) => unknown;
+  clearTimer?: (handle: unknown) => void;
+}
+
+/** Un flux en erreur depuis ce délai sans s'être rétabli : la PWA se dit hors ligne. */
+export const LOST_AFTER_MS = 10_000;
+/** Un flux muet depuis ce délai (trois battements manqués) est coupé : on le relance. */
+export const SILENT_AFTER_MS = STREAM_PING_EVERY_MS * 3;
+const SAVE_EVERY_MS = 5_000;
+const STORAGE_KEY = 'factory-live:last-snapshot';
+
+interface Saved {
+  receivedAt: number;
+  snapshot: Snapshot;
+}
+
+function defaultStorage(): Pick<Storage, 'getItem' | 'setItem'> | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    return null;
+  }
 }
 
 interface Cached<T> {
@@ -83,6 +110,12 @@ const EMPTY_PROFILES: readonly ProfileView[] = [];
 export class LiveSource implements FactoryDataSource {
   readonly kind = 'live' as const;
   private snapshot: Snapshot = EMPTY_SNAPSHOT;
+  private connection: Connection = 'connecting';
+  private lastUpdate: number | null = null;
+  private lastSaved = 0;
+  private lostTimer: unknown = null;
+  private silenceTimer: unknown = null;
+  private github: Cached<GitHubAccess> | null = null;
   private readonly listeners = new Set<() => void>();
   private stream: StreamLike | null = null;
   private lastEventId: string | null = null;
@@ -97,6 +130,9 @@ export class LiveSource implements FactoryDataSource {
   private readonly openStream: (url: string) => StreamLike;
   private readonly now: () => number;
   private readonly doc: LiveOptions['document'];
+  private readonly storage: LiveOptions['storage'];
+  private readonly setTimer: (callback: () => void, ms: number) => unknown;
+  private readonly clearTimer: (handle: unknown) => void;
   private readonly onVisible = () => {
     if (
       this.doc?.visibilityState === 'visible' &&
@@ -111,8 +147,48 @@ export class LiveSource implements FactoryDataSource {
     this.openStream = options.openStream ?? ((url) => new EventSource(url));
     this.now = options.now ?? Date.now;
     this.doc = options.document ?? (typeof document === 'undefined' ? undefined : document);
+    this.storage = options.storage === undefined ? defaultStorage() : options.storage;
+    this.setTimer = options.setTimer ?? ((callback, ms) => setTimeout(callback, ms));
+    this.clearTimer =
+      options.clearTimer ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
+    this.restore();
     this.doc?.addEventListener('visibilitychange', this.onVisible);
     this.connect();
+  }
+
+  /** Le dernier état connu, gardé sur l'appareil : la PWA s'ouvre dessus, même hors ligne. */
+  private restore(): void {
+    try {
+      const raw = this.storage?.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Saved;
+      if (!saved.snapshot?.stations) return;
+      this.snapshot = saved.snapshot;
+      this.lastUpdate = saved.receivedAt;
+    } catch {
+      // Sauvegarde illisible : on attend simplement le flux.
+    }
+  }
+
+  private save(): void {
+    if (!this.storage || this.now() - this.lastSaved < SAVE_EVERY_MS) return;
+    this.lastSaved = this.now();
+    try {
+      const saved: Saved = { receivedAt: this.lastUpdate ?? this.now(), snapshot: this.snapshot };
+      this.storage.setItem(STORAGE_KEY, JSON.stringify(saved));
+    } catch {
+      // Stockage plein ou refusé : l'état ne sera simplement pas gardé.
+    }
+  }
+
+  private setConnection(connection: Connection): void {
+    if (connection !== 'connecting' && this.lostTimer !== null) {
+      this.clearTimer(this.lostTimer);
+      this.lostTimer = null;
+    }
+    if (this.connection === connection) return;
+    this.connection = connection;
+    this.notify();
   }
 
   private connect(): void {
@@ -120,14 +196,49 @@ export class LiveSource implements FactoryDataSource {
     const query = this.lastEventId ? `?lastEventId=${encodeURIComponent(this.lastEventId)}` : '';
     const stream = this.openStream(`${this.base}/api/stream${query}`);
     for (const type of STREAM_EVENTS) stream.addEventListener(type, (event) => this.receive(event));
+    stream.addEventListener(STREAM_PING, () => this.watchSilence());
+    stream.onopen = () => {
+      this.watchSilence();
+      this.setConnection('open');
+    };
     stream.onerror = () => {
       // EventSource se reconnecte seul (Last-Event-ID) ; s'il abandonne, le retour au premier plan relance.
+      // Une coupure brève (redémarrage du serveur, retour d'arrière-plan) ne fait pas crier « hors ligne ».
+      if (stream.readyState === CLOSED) {
+        this.setConnection('lost');
+        return;
+      }
+      this.setConnection('connecting');
+      this.lostTimer ??= this.setTimer(() => {
+        this.lostTimer = null;
+        if (this.connection === 'connecting') this.setConnection('lost');
+      }, LOST_AFTER_MS);
     };
     this.stream = stream;
   }
 
+  /**
+   * Un réseau perdu ne coupe pas toujours la connexion (sortie du tailnet, iPhone en veille) : le
+   * serveur bat toutes les 15 s, et un flux muet trois fois plus longtemps est relancé ; s'il ne
+   * revient pas, l'app se dit hors ligne après le délai de grâce.
+   */
+  private watchSilence(): void {
+    if (this.silenceTimer !== null) this.clearTimer(this.silenceTimer);
+    this.silenceTimer = this.setTimer(() => {
+      this.silenceTimer = null;
+      this.connect();
+      this.setConnection('connecting');
+      this.lostTimer ??= this.setTimer(() => {
+        this.lostTimer = null;
+        if (this.connection === 'connecting') this.setConnection('lost');
+      }, LOST_AFTER_MS);
+    }, SILENT_AFTER_MS);
+  }
+
   close(): void {
     this.stream?.close();
+    if (this.lostTimer !== null) this.clearTimer(this.lostTimer);
+    if (this.silenceTimer !== null) this.clearTimer(this.silenceTimer);
     this.doc?.removeEventListener('visibilitychange', this.onVisible);
   }
 
@@ -141,6 +252,15 @@ export class LiveSource implements FactoryDataSource {
       return;
     }
     if (!STREAM_EVENTS.includes(event.type)) return;
+    this.lastUpdate = this.now();
+    this.watchSilence();
+    // Un message prouve que le lien est rétabli ; l'avis aux abonnés part avec la mise à jour.
+    const reopened = this.connection !== 'open';
+    if (reopened) {
+      if (this.lostTimer !== null) this.clearTimer(this.lostTimer);
+      this.lostTimer = null;
+      this.connection = 'open';
+    }
     switch (event.type) {
       case 'snapshot':
         this.snapshot = event.snapshot;
@@ -160,7 +280,10 @@ export class LiveSource implements FactoryDataSource {
       case 'activity': {
         const known = new Set(this.snapshot.activity.map((item) => item.id));
         const fresh = event.events.filter((item: ActivityEvent) => !known.has(item.id));
-        if (fresh.length === 0) return;
+        if (fresh.length === 0) {
+          if (reopened) this.notify();
+          return;
+        }
         this.snapshot = {
           ...this.snapshot,
           activity: [...this.snapshot.activity, ...fresh].slice(-ACTIVITY_KEPT),
@@ -174,6 +297,7 @@ export class LiveSource implements FactoryDataSource {
       }
     }
     this.notify();
+    this.save();
   }
 
   private notify(): void {
@@ -187,6 +311,33 @@ export class LiveSource implements FactoryDataSource {
 
   getSnapshot(): Snapshot {
     return this.snapshot;
+  }
+
+  getConnection(): Connection {
+    return this.connection;
+  }
+
+  getLastUpdate(): number | null {
+    return this.lastUpdate;
+  }
+
+  getGitHubAccess(): GitHubAccess | null {
+    if (!this.fresh(this.github, 60_000)) {
+      this.load<GitHubAccess>('github', '/api/github/status', (value) => {
+        this.github = { value, fetchedAt: this.now(), stale: false };
+      });
+    }
+    return this.github?.value ?? null;
+  }
+
+  async logoutGitHub(): Promise<void> {
+    const response = await this.fetchImpl(`${this.base}/api/github/logout`, {
+      method: 'POST',
+      headers: { 'X-Factory-Live': '1' },
+    });
+    if (!response.ok) throw new Error(`Déconnexion refusée (HTTP ${response.status})`);
+    if (this.github) this.github.stale = true;
+    this.getGitHubAccess();
   }
 
   /** Lecture en arrière-plan, une seule à la fois par clé ; prévient les abonnés à l'arrivée. */

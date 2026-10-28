@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import type {
+  GitHubAccess,
   HistoryStats,
   IssueDetail,
   IssueKey,
@@ -9,7 +10,7 @@ import type {
   TranscriptView,
   UsageReport,
 } from '@factory-live/contracts';
-import type { FactoryDataSource, UsagePeriod } from './source.ts';
+import type { Connection, FactoryDataSource, UsagePeriod } from './source.ts';
 
 const FactorySourceContext = createContext<FactoryDataSource | null>(null);
 
@@ -57,4 +58,19 @@ export function useUsage(periodDays: UsagePeriod): UsageReport {
 
 export function useHistory(): HistoryStats {
   return useSourceValue((source) => source.getHistory());
+}
+
+/** Le lien avec factory-live (la démo est toujours reliée). */
+export function useConnection(): Connection {
+  return useSourceValue((source) => source.getConnection());
+}
+
+/** Quand l'état affiché a été reçu, pour dire son âge hors ligne. */
+export function useLastUpdate(): number | null {
+  return useSourceValue((source) => source.getLastUpdate());
+}
+
+/** Accès de factory-live à GitHub, lu sur le serveur (en direct) ; `null` en démo ou pendant la lecture. */
+export function useGitHubAccess(): GitHubAccess | null {
+  return useSourceValue((source) => source.getGitHubAccess?.() ?? null);
 }

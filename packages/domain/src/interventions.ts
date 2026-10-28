@@ -67,7 +67,8 @@ function firstLine(value: string, fallback: string): string {
   return value.split('\n')[0]?.trim() || fallback;
 }
 
-function prUrlOf(tasks: readonly Task[], board: Board): string | null {
+/** Le lien de la PR d'un ensemble de cartes, relevé dans les runs d'Hermès (`pr_url`, `published_pr`). */
+export function pullRequestUrl(tasks: readonly Task[], board: Board): string | null {
   const ids = new Set(tasks.map((task) => task.id));
   const urls = board.runs
     .filter((run) => ids.has(run.taskId))
@@ -134,7 +135,7 @@ function blockedIntervention(
   };
 
   if (cardKindOf(task) === 'release') {
-    const pr = prUrlOf(issueTasks, board);
+    const pr = pullRequestUrl(issueTasks, board);
     if (task.blockKind === 'needs_input') {
       return build('pr_approval', task, issueKey, blocked, blocked?.createdAt ?? task.createdAt, {
         severity: 'info',

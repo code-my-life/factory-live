@@ -9,10 +9,16 @@ import './styles/global.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App.tsx';
+import { reportClientErrors } from './pwa/errors.ts';
+import { registerServiceWorker } from './pwa/register.ts';
 
 if (import.meta.env.VITE_ARTIFACT === '1') {
   // Dans un artifact, l'hôte pose déjà les marges des zones sûres sur :root.
   document.documentElement.dataset.host = 'artifact';
+} else if (import.meta.env.PROD && import.meta.env.VITE_DATA_SOURCE === 'live') {
+  // L'app servie par factory-live : installable, notifications, erreurs du front remontées au serveur.
+  registerServiceWorker();
+  reportClientErrors();
 }
 
 const container = document.getElementById('root');

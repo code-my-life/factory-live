@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "tsBuildInfoFile": "../../node_modules/.tmp/web-sw.tsbuildinfo",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2024", "WebWorker"],
+    "types": []
+  },
+  "include": ["src/sw/sw.ts", "src/sw/notification.ts"]
+}

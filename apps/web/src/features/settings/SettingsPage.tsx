@@ -1,19 +1,13 @@
-import {
-  BellIcon,
-  CheckCircleIcon,
-  DeviceDesktopIcon,
-  DeviceMobileIcon,
-} from '@primer/octicons-react';
-import { Button, Heading, SegmentedControl } from '@primer/react';
-import { useState } from 'react';
-import type { GitHubAccess } from '@factory-live/contracts';
+import { DeviceDesktopIcon, DeviceMobileIcon } from '@primer/octicons-react';
+import { Flash, Heading, SegmentedControl } from '@primer/react';
+import { useSearchParams } from 'react-router';
 import type { ColorPreference } from '../../app/colorMode.tsx';
 import { useColorMode } from '../../app/colorMode.tsx';
 import { useFactorySource, useSnapshot } from '../../data/FactoryProvider.tsx';
 import { LiveDot } from '../../ui/LiveDot.tsx';
-import { INTERVENTION_LABEL } from '../../ui/vocabulary.ts';
 import page from '../../ui/page.module.css';
-import { GitHubAccessPanel } from './GitHubAccessPanel.tsx';
+import { DemoGitHubSection, LiveGitHubSection } from './GitHubSection.tsx';
+import { DemoPushSection, LivePushSection } from './PushSection.tsx';
 import styles from './settings.module.css';
 
 const THEMES: { value: ColorPreference; label: string }[] = [
@@ -22,59 +16,20 @@ const THEMES: { value: ColorPreference; label: string }[] = [
   { value: 'system', label: 'Système' },
 ];
 
-const PUSHED = [
-  'needs_input',
-  'capability',
-  'transient',
-  'triage_loop',
-  'held_active_pr',
-  'gave_up',
-] as const;
-
-type PushState = 'off' | 'on';
-
-const APP_SLUG = 'factory-live-code-my-life';
-const APP_URL = `https://github.com/apps/${APP_SLUG}`;
-
-/**
- * Le parcours GitHub de la démo, une étape par clic : rien, App créée, App installée, Clément
- * connecté. En direct, l'état vient de `/api/github/status` et chaque étape mène à la page du serveur.
- */
-function demoGitHubAccess(step: number, connectedAt: number): GitHubAccess {
-  const app =
-    step >= 1
-      ? {
-          slug: APP_SLUG,
-          url: APP_URL,
-          installed: step >= 2,
-          installUrl: `${APP_URL}/installations/new`,
-        }
-      : null;
-  return {
-    mode: app ? 'app' : 'none',
-    app,
-    user:
-      step >= 3
-        ? {
-            login: 'cddev',
-            avatarUrl: null,
-            expiresAt: new Date(connectedAt + 8 * 3_600_000).toISOString(),
-          }
-        : null,
-    setupUrl: '/api/github/setup',
-    loginUrl: '/api/github/login',
-  };
-}
+/** Retours de GitHub après une étape faite chez lui (`/api/github/installed`, `/api/github/oauth/callback`). */
+const GITHUB_RETURN: Record<string, string> = {
+  installed: 'App GitHub installée : factory-live lit désormais tes dépôts avec elle.',
+  connected: 'Connecté à GitHub : tes réponses partiront à ton nom.',
+};
 
 export function SettingsPage() {
   const { preference, setPreference } = useColorMode();
   const source = useFactorySource();
   const snapshot = useSnapshot();
-  const [push, setPush] = useState<PushState>('off');
-  const [preview, setPreview] = useState(false);
-  const [githubStep, setGitHubStep] = useState(0);
-  const [connectedAt, setConnectedAt] = useState(0);
+  const [params] = useSearchParams();
+  const githubReturn = GITHUB_RETURN[params.get('github') ?? ''];
   const sources = snapshot.health.filter((service) => service.group === 'factory-live');
+  const demo = source.kind === 'demo';
 
   return (
     <section className={page.page} aria-labelledby="settings-title">
@@ -84,71 +39,15 @@ export function SettingsPage() {
         </Heading>
       </header>
 
-      <section className={page.panel} aria-labelledby="push-title">
-        <div className={styles.block}>
-          <h2 id="push-title" className={page.sectionTitle}>
-            Notifications de cet appareil
-          </h2>
-          <p className={page.muted}>
-            Un push part seulement quand un blocage t’attend :{' '}
-            {PUSHED.map((kind) => INTERVENTION_LABEL[kind].toLowerCase()).join(', ')}. Les PR à
-            approuver et la santé restent visibles ici sans notification. Telegram continue en
-            parallèle.
-          </p>
-          <p className={styles.state}>
-            {push === 'on' ? (
-              <>
-                <CheckCircleIcon size={16} className={styles.ok} aria-hidden="true" /> Activées sur
-                cet appareil
-                {source.kind === 'demo' ? ' (démo : rien n’est envoyé)' : ''}
-              </>
-            ) : (
-              <>
-                <LiveDot tone="muted" /> Pas encore activées sur cet appareil
-              </>
-            )}
-          </p>
-          <div className={styles.actions}>
-            {push === 'off' ? (
-              <Button variant="primary" leadingVisual={BellIcon} onClick={() => setPush('on')}>
-                Activer les notifications
-              </Button>
-            ) : (
-              <>
-                <Button onClick={() => setPreview(true)}>Envoyer un test</Button>
-                <Button variant="invisible" onClick={() => setPush('off')}>
-                  Désactiver
-                </Button>
-              </>
-            )}
-          </div>
-          {preview && push === 'on' ? (
-            <div className={styles.notification} role="status">
-              <p className={styles.notificationApp}>factory-live · maintenant</p>
-              <p className={styles.notificationTitle}>Décision attendue · cv-site#49</p>
-              <p className={styles.notificationBody}>
-                Carte UI sans maquette jointe. Touche pour répondre.
-              </p>
-            </div>
-          ) : null}
-        </div>
-      </section>
+      {githubReturn ? (
+        <Flash variant="success" className={styles.flash}>
+          {githubReturn}
+        </Flash>
+      ) : null}
 
-      <GitHubAccessPanel
-        access={demoGitHubAccess(githubStep, connectedAt)}
-        demo={source.kind === 'demo'}
-        actions={{
-          create: { onClick: () => setGitHubStep(1) },
-          install: { onClick: () => setGitHubStep(2) },
-          login: {
-            onClick: () => {
-              setConnectedAt(Date.now());
-              setGitHubStep(3);
-            },
-          },
-          logout: { onClick: () => setGitHubStep(2) },
-        }}
-      />
+      {demo ? <DemoPushSection /> : <LivePushSection />}
+
+      {demo ? <DemoGitHubSection /> : <LiveGitHubSection />}
 
       <section className={page.panel} aria-labelledby="theme-title">
         <div className={styles.block}>
@@ -213,8 +112,7 @@ export function SettingsPage() {
             ))}
           </ul>
           <p className={page.muted}>
-            Version 0.1.0 ·{' '}
-            {source.kind === 'demo' ? 'données de démonstration' : 'données en direct'} · Hermès
+            Version 0.1.0 · {demo ? 'données de démonstration' : 'données en direct'} · Hermès
             0.22.2
           </p>
         </div>

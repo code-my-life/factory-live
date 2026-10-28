@@ -13,6 +13,8 @@ import {
   PushKey,
   PushSubscriptionInput,
   ServiceHealth,
+  STREAM_PING,
+  STREAM_PING_EVERY_MS,
   Snapshot,
   TranscriptView,
   UnblockProgress,
@@ -55,6 +57,8 @@ export interface AppDeps {
   origins: readonly string[];
   tailscaleLogins: readonly string[];
   webDist: string | null;
+  /** Battement du flux quand rien d'autre ne part (15 s ; plus court dans les tests). */
+  streamPingMs?: number;
   log: Logger;
   now: () => number;
   version: string;
@@ -306,14 +310,18 @@ export function createApp(deps: AppDeps) {
           });
         }
         const waited = await new Promise<'event' | 'timeout'>((resolve) => {
-          const timer = setTimeout(() => resolve('timeout'), 15_000);
+          const timer = setTimeout(
+            () => resolve('timeout'),
+            deps.streamPingMs ?? STREAM_PING_EVERY_MS,
+          );
           wake = () => {
             clearTimeout(timer);
             resolve('event');
           };
         });
         wake = null;
-        if (waited === 'timeout' && !closed) await stream.write(': battement\n\n');
+        if (waited === 'timeout' && !closed)
+          await stream.writeSSE({ event: STREAM_PING, data: '{}' });
       }
     });
   });

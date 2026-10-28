@@ -17,6 +17,7 @@ import {
   issueStationOf,
   issueStatusOf,
   profileStation,
+  pullRequestUrl,
   runRoleOf,
 } from '@factory-live/domain';
 import type { ActivityLine, Board, Comment, LiveAgent, Run, Task } from '@factory-live/domain';
@@ -182,6 +183,7 @@ export function projectIssues(
       harness:
         text(implementer?.metadata['harness'])?.split(' (')[0] ?? implementer?.profile ?? null,
       pr: input.pullRequest(key),
+      prUrl: pullRequestUrl(tasks, input.board),
       activeProfiles: [
         ...new Set(
           tasks

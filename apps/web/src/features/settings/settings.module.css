@@ -121,3 +121,7 @@
 .nowrap {
   white-space: nowrap;
 }
+
+.flash {
+  width: 100%;
+}

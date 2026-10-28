@@ -15,7 +15,7 @@ COPY tsconfig.base.json tsconfig.json ./
 COPY packages packages
 COPY apps apps
 RUN npx tsc -b packages/domain packages/contracts apps/server \
- && VITE_DATA_SOURCE=demo npm run build -w @factory-live/web
+ && VITE_DATA_SOURCE=live npm run build -w @factory-live/web
 
 # Dépendances d'exécution du seul serveur (le front est déjà construit).
 FROM ${NODE_IMAGE} AS deps

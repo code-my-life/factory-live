@@ -50,7 +50,9 @@ export interface Harness {
  * une décision (needs_input). GitHub (API, App et connexion OAuth) et Web Push sont simulés ; sans App
  * créée, l'accès GitHub passe par le jeton de repli (`jeton`, ou aucun avec `githubToken: null`).
  */
-export function harness(options: { githubToken?: string | null } = {}): Harness {
+export function harness(
+  options: { githubToken?: string | null; streamPingMs?: number } = {},
+): Harness {
   const dir = tempDir();
   const hermes = join(dir.path, 'hermes');
   const factory = join(dir.path, 'factory');
@@ -253,6 +255,7 @@ export function harness(options: { githubToken?: string | null } = {}): Harness 
     origins: ORIGINS,
     tailscaleLogins: ['cddev@github'],
     webDist: null,
+    ...(options.streamPingMs ? { streamPingMs: options.streamPingMs } : {}),
     log,
     now,
     version: 'test',

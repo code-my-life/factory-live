@@ -64,6 +64,7 @@ export function patchIssue(state: DemoState, key: IssueKey, patch: Partial<Issue
     summary.stationChangedAt = patch.updatedAt ?? new Date().toISOString();
   }
   Object.assign(summary, patch);
+  if (patch.pr) summary.prUrl = patch.pr.url;
   const detail = requireIssue(state, key);
   detail.issue = { ...summary };
 }

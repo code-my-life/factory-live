@@ -1,10 +1,11 @@
 import type { ActivityEvent, IssueDetail, Snapshot } from '@factory-live/contracts';
 import { describe, expect, it, vi } from 'vitest';
-import { LiveSource } from './LiveSource.ts';
-import type { StreamLike } from './LiveSource.ts';
+import { LOST_AFTER_MS, LiveSource, SILENT_AFTER_MS } from './LiveSource.ts';
+import type { LiveOptions, StreamLike } from './LiveSource.ts';
 
 class FakeStream implements StreamLike {
   onmessage: StreamLike['onmessage'] = null;
+  onopen: StreamLike['onopen'] = null;
   onerror: StreamLike['onerror'] = null;
   readyState = 1;
   private readonly handlers = new Map<string, ((event: MessageEvent<string>) => void)[]>();
@@ -56,7 +57,7 @@ function activity(id: string, cardId = 't_1a9f0049'): ActivityEvent {
   };
 }
 
-function setup(routes: Record<string, unknown> = {}) {
+function setup(routes: Record<string, unknown> = {}, options: Partial<LiveOptions> = {}) {
   const streams: FakeStream[] = [];
   const calls: { url: string; init: RequestInit | undefined }[] = [];
   const fetchImpl = vi.fn((input: string | URL | Request, init?: RequestInit) => {
@@ -86,6 +87,8 @@ function setup(routes: Record<string, unknown> = {}) {
       return stream;
     },
     document: doc,
+    storage: null,
+    ...options,
   });
   return {
     source,
@@ -183,5 +186,116 @@ describe('LiveSource', () => {
     expect(source.getUsage(7)).toBe(source.getUsage(7));
     expect(source.getHistory()).toBe(source.getHistory());
     expect(source.getProfiles()).toBe(source.getProfiles());
+  });
+});
+
+describe('LiveSource : lien et dernier état connu', () => {
+  function manualTimers() {
+    let next = 0;
+    const pending = new Map<number, { callback: () => void; ms: number }>();
+    return {
+      setTimer: (callback: () => void, ms: number) => {
+        next += 1;
+        pending.set(next, { callback, ms });
+        return next;
+      },
+      clearTimer: (handle: unknown) => void pending.delete(handle as number),
+      /** Déclenche les minuteries de cette durée, comme si elle s'était écoulée. */
+      fire: (ms: number) => {
+        for (const [id, timer] of [...pending])
+          if (timer.ms === ms) {
+            pending.delete(id);
+            timer.callback();
+          }
+      },
+    };
+  }
+
+  it('se dit en direct à l’ouverture du flux, et hors ligne seulement après une coupure qui dure', () => {
+    const timers = manualTimers();
+    const { source, streams } = setup({}, timers);
+    expect(source.getConnection()).toBe('connecting');
+    const stream = streams[0] as FakeStream;
+    stream.onopen?.(new Event('open'));
+    expect(source.getConnection()).toBe('open');
+    stream.readyState = 0;
+    stream.onerror?.(new Event('error'));
+    expect(source.getConnection()).toBe('connecting');
+    stream.onopen?.(new Event('open'));
+    expect(source.getConnection()).toBe('open');
+    stream.onerror?.(new Event('error'));
+    timers.fire(LOST_AFTER_MS);
+    expect(source.getConnection()).toBe('lost');
+    stream.emit('snapshot', { type: 'snapshot', snapshot: SNAPSHOT }, '9');
+    expect(source.getConnection()).toBe('open');
+  });
+
+  it('relance un flux resté muet (réseau perdu sans erreur), puis se dit hors ligne s’il ne revient pas', () => {
+    const timers = manualTimers();
+    const { source, streams } = setup({}, timers);
+    const first = streams[0] as FakeStream;
+    first.onopen?.(new Event('open'));
+    first.emit('ping', {}, '');
+    expect(source.getConnection()).toBe('open');
+    timers.fire(SILENT_AFTER_MS);
+    expect(streams).toHaveLength(2);
+    expect(first.readyState).toBe(2);
+    expect(source.getConnection()).toBe('connecting');
+    timers.fire(LOST_AFTER_MS);
+    expect(source.getConnection()).toBe('lost');
+    streams[1]?.onopen?.(new Event('open'));
+    expect(source.getConnection()).toBe('open');
+    expect(SILENT_AFTER_MS).toBe(45_000);
+  });
+
+  it('se dit hors ligne tout de suite quand le flux est fermé pour de bon', () => {
+    const { source, streams } = setup();
+    const stream = streams[0] as FakeStream;
+    stream.readyState = 2;
+    stream.onerror?.(new Event('error'));
+    expect(source.getConnection()).toBe('lost');
+    expect(LOST_AFTER_MS).toBe(10_000);
+  });
+
+  it('garde le dernier état sur l’appareil et s’ouvre dessus au lancement suivant', () => {
+    const stored = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => void stored.set(key, value),
+    };
+    const first = setup({}, { storage, now: () => 1_000_000 });
+    first.streams[0]?.emit('snapshot', { type: 'snapshot', snapshot: SNAPSHOT }, '1');
+    expect(stored.size).toBe(1);
+    const next = setup({}, { storage, now: () => 2_000_000 });
+    expect(next.source.getSnapshot()).toEqual(SNAPSHOT);
+    expect(next.source.getLastUpdate()).toBe(1_000_000);
+    expect(next.source.getConnection()).toBe('connecting');
+  });
+});
+
+describe('LiveSource : accès GitHub', () => {
+  const ACCESS = {
+    mode: 'app',
+    app: {
+      slug: 'factory-live-code-my-life',
+      url: 'https://github.com/apps/x',
+      installed: true,
+      installUrl: 'https://github.com/apps/x/installations/new',
+    },
+    user: { login: 'cddev', avatarUrl: null, expiresAt: '2026-10-29T02:00:00.000Z' },
+    setupUrl: '/api/github/setup',
+    loginUrl: '/api/github/login',
+  };
+
+  it('lit l’accès GitHub du serveur, puis déconnecte avec l’en-tête anti-CSRF', async () => {
+    const { source, calls } = setup({ '/api/github/status': ACCESS, '/api/github/logout': {} });
+    expect(source.getGitHubAccess()).toBeNull();
+    await settle();
+    expect(source.getGitHubAccess()).toEqual(ACCESS);
+    await source.logoutGitHub();
+    const logout = calls.find((call) => call.url.endsWith('/api/github/logout'));
+    expect(logout?.init?.method).toBe('POST');
+    expect(new Headers(logout?.init?.headers).get('x-factory-live')).toBe('1');
+    expect(calls.filter((call) => call.url.endsWith('/api/github/status'))).toHaveLength(2);
   });
 });
