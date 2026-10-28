@@ -5,6 +5,8 @@
  * (post_tool_call), `agent/turn_response_intake.py` (post_api_request), `agent/api_request_hooks.py`
  * (api_request_error), `hermes_cli/kanban_db.py` et `kanban_db_dispatch.py` (événements kanban).
  */
+import type { Task } from './hermes.ts';
+
 export interface HookEvent {
   event: string;
   profile: string;
@@ -89,6 +91,45 @@ export function taskIdFromCwd(cwd: string): string | null {
   return WORKSPACE.exec(cwd)?.[1] ?? null;
 }
 
+/** Une carte en cours, telle que le kanban la décrit : de quoi la retrouver par le dossier de son worker. */
+export type RunningCard = Pick<Task, 'id' | 'assignee' | 'workspacePath'>;
+
+function rootOf(path: string): string {
+  return path.replace(/\/+$/, '');
+}
+
+function contains(workspace: string, cwd: string): boolean {
+  const root = rootOf(workspace);
+  return root !== '' && (cwd === root || cwd.startsWith(`${root}/`));
+}
+
+/**
+ * La carte d'un worker d'après son dossier courant. D'abord la carte en cours de son profil dont le
+ * workspace contient ce dossier, la plus précise l'emportant : c'est la seule voie pour un workspace
+ * `dir:`, le clone du dépôt pour un onboarding ou le worktree de la carte impl pour une reprise de la
+ * gate. Sinon l'id lu dans le chemin, quand la carte n'est pas encore en cours dans le kanban lu.
+ * Deux cartes à égalité : celle que nomme le chemin, sinon aucune plutôt qu'une au hasard.
+ */
+export function cardOfCwd(
+  cwd: string,
+  profile: string,
+  running: readonly RunningCard[] = [],
+): string | null {
+  const named = taskIdFromCwd(cwd);
+  let best: RunningCard[] = [];
+  let depth = -1;
+  for (const card of running) {
+    if (card.assignee !== profile || !card.workspacePath || !contains(card.workspacePath, cwd))
+      continue;
+    const length = rootOf(card.workspacePath).length;
+    if (length > depth) [best, depth] = [[card], length];
+    else if (length === depth) best.push(card);
+  }
+  if (best.length === 0) return named;
+  if (best.length === 1) return best[0]?.id ?? null;
+  return best.some((card) => card.id === named) ? named : null;
+}
+
 export function agentKey(profile: string, cardId: string | null, sessionId: string | null): string {
   return cardId ? `${profile}@${cardId}` : `${profile}#${sessionId ?? ''}`;
 }
@@ -165,16 +206,20 @@ function line(
   };
 }
 
-/** Applique un webhook : rend un nouvel état (l'ancien n'est jamais modifié) et les lignes du fil à ajouter. */
+/**
+ * Applique un webhook : rend un nouvel état (l'ancien n'est jamais modifié) et les lignes du fil à
+ * ajouter. `running` (les cartes en cours) relie à sa carte un worker dont le dossier ne la nomme pas.
+ */
 export function applyHook(
   agents: ReadonlyMap<string, LiveAgent>,
   event: HookEvent,
+  running: readonly RunningCard[] = [],
 ): { agents: Map<string, LiveAgent>; lines: ActivityLine[] } {
   const next = new Map(agents);
   const extra = event.extra;
   const kanban = KANBAN_EVENTS.has(event.event);
   const profile = kanban ? (str(extra['assignee']) ?? event.profile) : event.profile;
-  const cardId = kanban ? str(extra['task_id']) : taskIdFromCwd(event.cwd);
+  const cardId = kanban ? str(extra['task_id']) : cardOfCwd(event.cwd, profile, running);
   const sessionId = kanban ? null : str(event.sessionId);
   const key = agentKey(profile, cardId, sessionId);
   const current = next.get(key);

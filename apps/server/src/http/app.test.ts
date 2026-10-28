@@ -4,7 +4,7 @@ import { trackUnblockReactions } from '../application/unblock.ts';
 import { sign } from '../ingest/signature.ts';
 import { NOW, NOW_S, ORIGINS, SECRET, harness } from '../test/harness.ts';
 import type { Harness } from '../test/harness.ts';
-import { insertEvent, insertRun } from '../test/hermes-fixtures.ts';
+import { insertEvent, insertRun, insertTask } from '../test/hermes-fixtures.ts';
 
 let h: Harness;
 
@@ -114,6 +114,38 @@ describe('ingestion des webhooks d’Hermès', () => {
       status: 'running',
       issueKey: 'cv-site#49',
     });
+  });
+
+  it('rattache la reprise de la gate à sa carte, pas à la carte impl dont elle occupe le worktree', async () => {
+    const worktree = '/home/cleme/perso/cv-site/.worktrees/t_1a9f0049';
+    insertTask(h.writer, {
+      id: 't_9a7e0049',
+      title: 'rework cv-site#49 : tests manquants (revue gate)',
+      status: 'running',
+      assignee: 'gate',
+      createdAt: NOW_S - 60,
+    });
+    h.writer
+      .prepare(
+        "UPDATE tasks SET workspace_kind = 'dir', workspace_path = ? WHERE id = 't_9a7e0049'",
+      )
+      .run(worktree);
+    h.syncKanban();
+    await postHook(
+      hook('pre_tool_call', {
+        profile: 'gate',
+        cwd: worktree,
+        tool_name: 'terminal',
+        tool_input: { command: 'npm test' },
+      }),
+    );
+    const data = await snapshot();
+    expect(data.agents.find((agent) => agent.profile === 'gate')).toMatchObject({
+      cardId: 't_9a7e0049',
+      state: 'tool',
+      action: { label: 'terminal', detail: 'npm test' },
+    });
+    expect(data.activity.at(-1)).toMatchObject({ profile: 'gate', cardId: 't_9a7e0049' });
   });
 
   it('refuse une signature fausse, n’applique pas deux fois un nouvel essai, refuse un envoi périmé', async () => {

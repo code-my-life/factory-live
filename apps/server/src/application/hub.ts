@@ -208,7 +208,8 @@ export class Hub {
       return;
     }
     this.account(event);
-    const result = applyHook(this.live, event);
+    const running = this.board.tasks.filter((task) => task.status === 'running');
+    const result = applyHook(this.live, event, running);
     this.live = result.agents;
     const lines = result.lines
       .map((line) => toActivityEvent(line, this.seq++, this.issueOfCard))

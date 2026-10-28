@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { agentKey, applyHook, describeToolCall, taskIdFromCwd } from './activity.ts';
-import type { ActivityLine, HookEvent, LiveAgent } from './activity.ts';
+import { agentKey, applyHook, cardOfCwd, describeToolCall, taskIdFromCwd } from './activity.ts';
+import type { ActivityLine, HookEvent, LiveAgent, RunningCard } from './activity.ts';
 
 const CARD = 't_5e21c0d9';
 const KEY = agentKey('coder-claude', CARD, 's1');
@@ -19,11 +19,15 @@ function hook(event: string, patch: Partial<HookEvent> = {}): HookEvent {
   };
 }
 
-function run(events: HookEvent[], start: ReadonlyMap<string, LiveAgent> = new Map()) {
+function run(
+  events: HookEvent[],
+  start: ReadonlyMap<string, LiveAgent> = new Map(),
+  running: readonly RunningCard[] = [],
+) {
   let agents = new Map(start);
   const lines: ActivityLine[] = [];
   for (const event of events) {
-    const result = applyHook(agents, event);
+    const result = applyHook(agents, event, running);
     agents = result.agents;
     lines.push(...result.lines);
   }
@@ -43,6 +47,73 @@ describe('taskIdFromCwd', () => {
     );
     expect(taskIdFromCwd('/home/cleme/.hermes/hermes-agent')).toBeNull();
     expect(taskIdFromCwd('/home/cleme/workspaces/t_83b0e611x')).toBeNull();
+  });
+});
+
+const CLONE = '/home/cleme/perso/factory-live';
+const IMPL_WORKTREE = '/home/cleme/perso/claude-cockpit/.worktrees/t_2fe761e4';
+
+describe('cardOfCwd', () => {
+  it('relie un worker lancé dans le clone (workspace dir:) à la carte en cours de son profil', () => {
+    const running: RunningCard[] = [
+      { id: 't_8c92404a', assignee: 'tool-setup', workspacePath: CLONE },
+    ];
+    expect(cardOfCwd(CLONE, 'tool-setup', running)).toBe('t_8c92404a');
+    expect(cardOfCwd(`${CLONE}/apps/web`, 'tool-setup', running)).toBe('t_8c92404a');
+  });
+
+  it('attribue la reprise de la gate à sa carte, pas à la carte impl dont elle occupe le worktree', () => {
+    const running: RunningCard[] = [
+      { id: 't_1ab0b0db', assignee: 'gate', workspacePath: IMPL_WORKTREE },
+      { id: 't_2fe761e4', assignee: 'coder', workspacePath: IMPL_WORKTREE },
+    ];
+    expect(cardOfCwd(IMPL_WORKTREE, 'gate', running)).toBe('t_1ab0b0db');
+    expect(cardOfCwd(IMPL_WORKTREE, 'coder', running)).toBe('t_2fe761e4');
+  });
+
+  it('retient le workspace le plus précis qui contient le dossier', () => {
+    const running: RunningCard[] = [
+      { id: 't_00000001', assignee: 'coder', workspacePath: CLONE },
+      { id: 't_00000002', assignee: 'coder', workspacePath: `${CLONE}/packages/domain/` },
+    ];
+    expect(cardOfCwd(`${CLONE}/packages/domain/src`, 'coder', running)).toBe('t_00000002');
+    expect(cardOfCwd(`${CLONE}/apps`, 'coder', running)).toBe('t_00000001');
+  });
+
+  it('ne devine pas : ni carte d’un autre profil, ni dossier voisin, ni égalité entre deux cartes', () => {
+    expect(
+      cardOfCwd(CLONE, 'coder', [
+        { id: 't_8c92404a', assignee: 'tool-setup', workspacePath: CLONE },
+      ]),
+    ).toBeNull();
+    expect(
+      cardOfCwd(`${CLONE}-2`, 'tool-setup', [
+        { id: 't_8c92404a', assignee: 'tool-setup', workspacePath: CLONE },
+      ]),
+    ).toBeNull();
+    expect(
+      cardOfCwd(CLONE, 'coder', [
+        { id: 't_00000001', assignee: 'coder', workspacePath: CLONE },
+        { id: 't_00000002', assignee: 'coder', workspacePath: CLONE },
+      ]),
+    ).toBeNull();
+    expect(
+      cardOfCwd('/', 'coder', [{ id: 't_00000001', assignee: 'coder', workspacePath: '/' }]),
+    ).toBeNull();
+  });
+
+  it('à égalité, garde la carte que nomme le chemin', () => {
+    expect(
+      cardOfCwd(IMPL_WORKTREE, 'coder', [
+        { id: 't_00000003', assignee: 'coder', workspacePath: IMPL_WORKTREE },
+        { id: 't_2fe761e4', assignee: 'coder', workspacePath: IMPL_WORKTREE },
+      ]),
+    ).toBe('t_2fe761e4');
+  });
+
+  it('sans carte en cours connue, lit l’id dans le workspace ou le worktree', () => {
+    expect(cardOfCwd(`${IMPL_WORKTREE}/src`, 'coder')).toBe('t_2fe761e4');
+    expect(cardOfCwd(CLONE, 'tool-setup')).toBeNull();
   });
 });
 
@@ -255,6 +326,34 @@ describe('applyHook', () => {
       runStartedAt: 1_000_000,
       state: 'tool',
     });
+  });
+
+  it('l’onboarding lancé dans le clone et ses événements kanban forment un seul agent', () => {
+    const { agents, lines } = run(
+      [
+        hook('kanban_task_claimed', {
+          profile: 'default',
+          cwd: '/',
+          sessionId: '',
+          extra: { task_id: 't_8c92404a', assignee: 'tool-setup' },
+        }),
+        hook('pre_tool_call', {
+          profile: 'tool-setup',
+          cwd: CLONE,
+          toolName: 'terminal',
+          toolInput: { command: 'npm ci' },
+          at: 1_003_000,
+        }),
+      ],
+      new Map(),
+      [{ id: 't_8c92404a', assignee: 'tool-setup', workspacePath: CLONE }],
+    );
+    expect([...agents.keys()]).toEqual([agentKey('tool-setup', 't_8c92404a', null)]);
+    expect(agents.get(agentKey('tool-setup', 't_8c92404a', null))).toMatchObject({
+      sessionId: 's1',
+      state: 'tool',
+    });
+    expect(lines.map((item) => item.cardId)).toEqual(['t_8c92404a', 't_8c92404a']);
   });
 
   it('deux cartes du même profil restent deux agents', () => {
