@@ -1,10 +1,11 @@
 import { DemoSource } from '../demo/DemoSource.ts';
+import { LiveSource } from './LiveSource.ts';
 import type { FactoryDataSource } from './source.ts';
 
 /**
- * Choisit la source de données. La maquette et les tests de bout en bout tournent sur la démo ;
- * la source branchée sur l'API de factory-live (REST + SSE) s'ajoute avec le serveur.
+ * Choisit la source de données au build : `VITE_DATA_SOURCE=live` branche la PWA sur l'API de
+ * factory-live (SSE + REST) ; sinon la démo, qui sert à la maquette et aux tests de bout en bout.
  */
 export function createDataSource(): FactoryDataSource {
-  return new DemoSource();
+  return import.meta.env.VITE_DATA_SOURCE === 'live' ? new LiveSource() : new DemoSource();
 }
