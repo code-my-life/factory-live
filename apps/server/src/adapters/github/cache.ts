@@ -97,7 +97,7 @@ export class GitHubCache implements GitHubReadPort {
                 : `Erreur ${status || 'réseau'} sur ${issue.key}`,
           checkedAt: now,
         };
-        this.log.warn({ component: 'github', issue: issue.key, status }, 'lecture GitHub en échec');
+        this.log.warn({ issue: issue.key, status }, 'lecture GitHub en échec');
         if (status === 401 || status === 403) break;
       }
     }
@@ -112,10 +112,7 @@ export class GitHubCache implements GitHubReadPort {
         if (latest && (!this.lastDelivery || latest.at > this.lastDelivery.at))
           this.lastDelivery = { at: latest.at, status: latest.status };
       } catch (error) {
-        this.log.debug(
-          { component: 'github', repo, error: String(error) },
-          'livraisons des webhooks illisibles',
-        );
+        this.log.debug({ repo, error: String(error) }, 'livraisons des webhooks illisibles');
       }
     }
   }
