@@ -1,85 +1,18 @@
-/* Contenu d'une carte ; le cadre (FlowNode, FlowRail) est celui de la ligne d'usine. */
-.summary {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--base-size-6);
-  max-width: 100%;
-  min-width: 0;
-}
-
-/* Sur la voie verticale, le contenu s'aligne sous le titre, à gauche. */
-.summary[data-align='start'] {
-  align-items: stretch;
-}
-
-.summary[data-align='start'] .who,
-.summary[data-align='start'] .models {
-  justify-content: flex-start;
-}
-
-.summary[data-align='start'] .progress {
-  align-items: flex-start;
-}
-
-.status {
-  color: var(--fgColor-muted);
-  font: var(--text-caption-shorthand);
-  white-space: nowrap;
-}
-
-.who {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--base-size-6);
-  min-width: 0;
-  margin: 0;
-  font: var(--text-body-shorthand-small);
-}
-
-.agentName {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+/* Contenu d'une carte dans sa boîte de job (ui/work) : modèles, progression des tests. */
 .models {
   display: flex;
-  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--base-size-4);
   min-width: 0;
-  margin: 0;
-}
-
-.action,
-.block {
-  display: -webkit-box;
-  margin: 0;
-  overflow: hidden;
-  font: var(--text-caption-shorthand);
-  overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.action {
-  color: var(--fgColor-default);
-}
-
-.block {
-  color: var(--fgColor-danger);
 }
 
 .progress {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  width: 100%;
   gap: var(--base-size-4);
+  min-width: 0;
 }
 
-.meta {
-  color: var(--fgColor-muted);
-  font: var(--text-caption-shorthand);
+.progressBar {
+  width: 100%;
 }

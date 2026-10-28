@@ -8,7 +8,7 @@ Clément veut une stack que la factory sache faire évoluer, qui reste ouverte �
 
 ## Décision
 
-- Monorepo npm workspaces : `packages/domain` (règles pures), `packages/contracts` (zod), `apps/server` (Hono sur Node 24 LTS), `apps/web` (React 19, Vite 8, Primer React, React Flow).
+- Monorepo npm workspaces : `packages/domain` (règles pures), `packages/contracts` (zod), `apps/server` (Hono sur Node 24 LTS), `apps/web` (React 19, Vite 8, Primer React, Motion ; React Flow d'abord, retiré ensuite, voir ADR 0005).
 - TypeScript 6.0.3 strict. TypeScript 7.0.2 existe, mais typescript-eslint 8.72.1 exige `typescript <6.1.0`.
 - Node 24.22.1 dans l'image ; la CI teste aussi Node 26, celui des agents de la factory.
 - `node:sqlite` intégré (release candidate depuis Node 24.15, option `readOnly`) plutôt qu'un module natif.

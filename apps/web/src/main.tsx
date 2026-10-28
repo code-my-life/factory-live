@@ -3,7 +3,6 @@ import '@primer/primitives/dist/css/functional/themes/dark.css';
 import '@primer/primitives/dist/css/functional/themes/light.css';
 import '@primer/primitives/dist/css/functional/motion/motion.css';
 import '@primer/primitives/dist/css/base/motion/motion.css';
-import '@xyflow/react/dist/base.css';
 import './styles/tokens.css';
 import './styles/global.css';
 

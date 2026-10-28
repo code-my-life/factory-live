@@ -24,6 +24,16 @@ export function formatDuration(ms: number): string {
   return `${hours} h ${String(minutes % 60).padStart(2, '0')}`;
 }
 
+/** Depuis combien de temps, à la minute : « moins d'une minute », « 11 min », « 2 h 05 », « 9 j ». */
+export function formatStay(ms: number): string {
+  if (ms < 60_000) return "moins d'une minute";
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h ${String(minutes % 60).padStart(2, '0')}`;
+  return `${Math.floor(hours / 24)} j`;
+}
+
 export function formatMinutes(minutes: number): string {
   return formatDuration(minutes * 60_000);
 }

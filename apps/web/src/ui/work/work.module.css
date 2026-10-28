@@ -1,0 +1,217 @@
+/* Icône d'état d'un job (issue de la ligne, carte d'une issue) : la couleur dit l'état, le badge le nomme. */
+.icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--fgColor-muted);
+}
+
+.icon[data-tone='accent'] {
+  color: var(--fgColor-accent);
+}
+
+.icon[data-tone='attention'] {
+  color: var(--fgColor-attention);
+}
+
+.icon[data-tone='danger'] {
+  color: var(--fgColor-danger);
+}
+
+.icon[data-tone='done'] {
+  color: var(--fgColor-done);
+}
+
+.icon[data-tone='success'] {
+  color: var(--fgColor-success);
+}
+
+.spinner {
+  flex: none;
+  color: var(--fgColor-accent);
+}
+
+/* Jobs d'une étape : des boîtes séparées, comme les jobs d'un workflow GitHub Actions. */
+.jobs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--base-size-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Étape large (voie verticale sur iPad ou fenêtre moyenne) : les jobs se mettent côte à côte. */
+@container (min-width: 36rem) {
+  .jobs {
+    grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  }
+}
+
+.job {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-6);
+  min-width: 0;
+  padding: var(--base-size-8) var(--base-size-12);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  background-color: var(--bgColor-default);
+  box-shadow: var(--shadow-resting-small);
+  transition:
+    border-color var(--motion-transition-hover),
+    background-color var(--motion-transition-hover);
+}
+
+/* Ce qui attend Clément ou ce qui bloque se repère de loin : le cadre prend la couleur de l'état. */
+.job[data-tone='attention'] {
+  border-color: var(--borderColor-attention-emphasis);
+}
+
+.job[data-tone='danger'] {
+  border-color: var(--borderColor-danger-emphasis);
+}
+
+.job[data-selected] {
+  border-color: var(--borderColor-accent-emphasis);
+  background-color: var(--bgColor-accent-muted);
+}
+
+.job[data-compact] {
+  gap: var(--base-size-4);
+  padding: var(--base-size-6) var(--base-size-8);
+}
+
+.job:has(.jobTitle:active) {
+  background-color: var(--bgColor-muted);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .job:has(.jobTitle:hover) {
+    border-color: var(--borderColor-emphasis);
+  }
+}
+
+.jobHead {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-6);
+  min-width: 0;
+}
+
+.jobBadge {
+  flex: none;
+  font-family: var(--fontStack-monospace);
+}
+
+.jobContext {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jobSince {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+  font-variant-numeric: tabular-nums;
+}
+
+.jobTitle {
+  display: -webkit-box;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: none;
+  color: var(--fgColor-default);
+  font: var(--text-body-shorthand-medium);
+  font-weight: var(--base-text-weight-semibold);
+  text-align: start;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.job[data-compact] .jobTitle {
+  font: var(--text-body-shorthand-small);
+  -webkit-line-clamp: 1;
+}
+
+/* Toute la boîte se touche : la zone du lien (ou du bouton) s'étend au job entier. */
+.jobTitle::after {
+  position: absolute;
+  border-radius: inherit;
+  content: '';
+  inset: 0;
+}
+
+.jobTitle:focus-visible {
+  outline: none;
+}
+
+.jobTitle:focus-visible::after {
+  outline: var(--focus-outline);
+  outline-offset: calc(var(--focus-outline-width) * -1);
+}
+
+.jobWho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-4) var(--base-size-8);
+  min-width: 0;
+}
+
+.jobAgent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-4);
+  min-width: 0;
+  font: var(--text-body-shorthand-small);
+}
+
+.jobAgentName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jobDetail {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.jobDetail[data-code] {
+  font-family: var(--fontStack-monospace);
+}
+
+.jobDetail[data-tone='attention'] {
+  color: var(--fgColor-attention);
+}
+
+.jobDetail[data-tone='danger'] {
+  color: var(--fgColor-danger);
+}
+
+/* Au-dessus du lien de la boîte, pour rester touchable. */
+.jobAction {
+  position: relative;
+  z-index: 1;
+  align-self: flex-start;
+  color: var(--fgColor-accent);
+  font: var(--text-body-shorthand-small);
+  font-weight: var(--base-text-weight-semibold);
+}

@@ -1,5 +1,6 @@
 import { PauseIcon, PlayIcon } from '@primer/octicons-react';
 import { IconButton } from '@primer/react';
+import { MotionConfig } from 'motion/react';
 import {
   createContext,
   useCallback,
@@ -23,6 +24,12 @@ interface MotionState {
   paused: boolean;
   setPaused: (paused: boolean) => void;
 }
+
+/**
+ * Un déplacement dans la page, une issue qui passe à la station suivante par exemple :
+ * `--motion-duration-long` (500 ms, « large-scale layout shifts ») et `--motion-easing-move` de Primer.
+ */
+export const MOVE_TRANSITION = { duration: 0.5, ease: [0.6, 0, 0.2, 1] } as const;
 
 const MotionContext = createContext<MotionState>({
   enabled: true,
@@ -73,7 +80,14 @@ export function MotionProvider({ children }: { children: ReactNode }) {
     () => ({ enabled, reduced, paused, setPaused }),
     [enabled, reduced, paused, setPaused],
   );
-  return <MotionContext.Provider value={value}>{children}</MotionContext.Provider>;
+  // Motion (bibliothèque) suit la même préférence : coupée, une boîte change de place sans glisser.
+  return (
+    <MotionContext.Provider value={value}>
+      <MotionConfig reducedMotion={enabled ? 'never' : 'always'} transition={MOVE_TRANSITION}>
+        {children}
+      </MotionConfig>
+    </MotionContext.Provider>
+  );
 }
 
 export function useMotion(): MotionState {

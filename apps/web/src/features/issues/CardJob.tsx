@@ -1,0 +1,97 @@
+import type { AgentActivity, CardView } from '@factory-live/contracts';
+import {
+  BugIcon,
+  CodeIcon,
+  EyeIcon,
+  RocketIcon,
+  ToolsIcon,
+  WorkflowIcon,
+} from '@primer/octicons-react';
+import type { Icon } from '@primer/octicons-react';
+import { ProgressBar } from '@primer/react';
+import { formatStay } from '../../ui/format.ts';
+import { ModelBadge } from '../../ui/ModelBadge.tsx';
+import { JobBox, JobDetail } from '../../ui/work/JobBox.tsx';
+import { cardWorkState } from '../../ui/work/workState.tsx';
+import { shortCardTitle } from './cardText.ts';
+import styles from './IssueGraph.module.css';
+
+export const KIND_ICON: Record<CardView['kind'], Icon> = {
+  brief: WorkflowIcon,
+  impl: CodeIcon,
+  release: RocketIcon,
+  diagnostic: BugIcon,
+  watch: EyeIcon,
+  onboarding: ToolsIcon,
+  other: ToolsIcon,
+};
+
+/**
+ * Une carte de l'issue, dans la même boîte qu'une issue de la ligne d'usine : son état, l'agent qui
+ * la tient, avec quel modèle (celui de la lane CLI s'il délègue), et ce qu'il fait, ce qui la bloque
+ * ou où en sont ses tests. Toute la boîte se choisit, pour voir les runs de la carte.
+ */
+export function CardJob({
+  card,
+  agent,
+  selected,
+  onSelect,
+  now,
+}: {
+  card: CardView;
+  agent: AgentActivity | null;
+  selected: boolean;
+  onSelect: () => void;
+  now: number;
+}) {
+  const run = card.runs.at(-1) ?? null;
+  const running = card.status === 'running';
+  const model = agent?.model ?? run?.model ?? null;
+  const laneModel = agent?.laneModel ?? (running ? run?.laneModel : null) ?? null;
+  const since = run
+    ? formatStay((run.endedAt ? Date.parse(run.endedAt) : now) - Date.parse(run.startedAt))
+    : undefined;
+  return (
+    <JobBox
+      {...(since ? { since } : {})}
+      id={card.id}
+      state={cardWorkState(card, agent)}
+      badge={card.kind}
+      context={card.id}
+      title={shortCardTitle(card)}
+      onSelect={onSelect}
+      selected={selected}
+      agent={card.assignee}
+    >
+      {model ? (
+        <span className={styles.models}>
+          <ModelBadge
+            {...(laneModel ? { prefix: 'lane', emphasis: true } : {})}
+            model={laneModel ?? model}
+          />
+        </span>
+      ) : null}
+      {agent?.action ? (
+        <JobDetail code>
+          {agent.action.label}
+          {agent.action.detail ? ` · ${agent.action.detail}` : ''}
+        </JobDetail>
+      ) : card.blockReason ? (
+        <JobDetail tone="danger">{card.blockReason}</JobDetail>
+      ) : card.testsTotal ? (
+        <span className={styles.progress}>
+          <ProgressBar
+            className={styles.progressBar}
+            progress={Math.round(((card.testsPassed ?? card.testsTotal) / card.testsTotal) * 100)}
+            barSize="small"
+            aria-label={`${card.testsPassed ?? card.testsTotal} tests réussis sur ${card.testsTotal}`}
+          />
+          <JobDetail>
+            {card.testsPassed ?? card.testsTotal}/{card.testsTotal} tests
+            {card.changedFiles.length > 0 ? ` · ${card.changedFiles.length} fichiers` : ''}
+          </JobDetail>
+        </span>
+      ) : null}
+    </JobBox>
+  );
+}

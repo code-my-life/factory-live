@@ -30,7 +30,7 @@
   gap: var(--stack-gap-condensed);
 }
 
-/* Nœud de station : les agents (avatars) puis les issues (jetons). */
+/* Tête de station : son compteur (posé sur l'arrêt), qui bat quand une issue arrive, et son équipe. */
 .counter {
   display: inline-flex;
 }
@@ -48,8 +48,7 @@
 .crew {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--base-size-6);
+  gap: var(--base-size-4);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -62,146 +61,6 @@
 /* Agent au repos : l'avatar passe en gris, son nom et son état restent dans le texte alternatif. */
 .crewMember[data-idle] {
   filter: grayscale(1);
-}
-
-.issues {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: var(--base-size-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.issueItem {
-  display: inline-flex;
-}
-
-.issueItem[data-status='waiting_human'] .issueIcon,
-.railIssue[data-status='waiting_human'] .issueIcon {
-  color: var(--fgColor-attention);
-}
-
-.issueItem[data-status='blocked'] .issueIcon,
-.railIssue[data-status='blocked'] .issueIcon {
-  color: var(--fgColor-danger);
-}
-
-.issueItem[data-status='active'] .issueIcon,
-.railIssue[data-status='active'] .issueIcon {
-  color: var(--fgColor-accent);
-}
-
-.issueItem[data-status='done'] .issueIcon,
-.railIssue[data-status='done'] .issueIcon {
-  color: var(--fgColor-done);
-}
-
-.issueIcon {
-  color: var(--fgColor-muted);
-}
-
-.more {
-  color: var(--fgColor-muted);
-  font: var(--text-caption-shorthand);
-}
-
-/* Station sur la voie verticale : qui y travaille et à quoi, puis ses issues, chacune une ligne à toucher. */
-.railAgents,
-.railIssues {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.railAgent {
-  display: flex;
-  align-items: center;
-  gap: var(--base-size-8);
-  min-width: 0;
-  min-height: var(--base-size-28);
-  font: var(--text-body-shorthand-small);
-}
-
-.railAgentName {
-  flex: none;
-  font-weight: var(--base-text-weight-semibold);
-}
-
-.railAgentDoing {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--fgColor-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.railAgent[data-state='blocked'] .railAgentDoing {
-  color: var(--fgColor-danger);
-}
-
-.railIssue {
-  display: grid;
-  grid-template-columns: var(--base-size-16) minmax(0, 1fr);
-  align-items: center;
-  column-gap: var(--base-size-8);
-  min-height: var(--base-size-44);
-  margin-inline: calc(var(--base-size-8) * -1);
-  padding: var(--base-size-4) var(--base-size-8);
-  border-radius: var(--borderRadius-medium);
-  color: var(--fgColor-default);
-  text-decoration: none;
-  transition: background-color var(--motion-transition-stateChange);
-}
-
-.railIssue:active {
-  background-color: var(--control-transparent-bgColor-active);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .railIssue:hover {
-    background-color: var(--control-transparent-bgColor-hover);
-  }
-}
-
-.railIssueTitle {
-  min-width: 0;
-  overflow: hidden;
-  font: var(--text-body-shorthand-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.railIssueMeta {
-  grid-column: 2;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--fgColor-muted);
-  font: var(--text-caption-shorthand);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.railIssueKey {
-  font-family: var(--fontStack-monospace);
-}
-
-.railIssue[data-status='waiting_human'] .railIssueStatus {
-  color: var(--fgColor-attention);
-}
-
-.railIssue[data-status='blocked'] .railIssueStatus {
-  color: var(--fgColor-danger);
-}
-
-.railMore {
-  align-self: flex-start;
-  color: var(--fgColor-accent);
-  font: var(--text-body-shorthand-small);
 }
 
 /* Sous le graphe : deux panneaux côte à côte sur grand écran, l'un sous l'autre sur iPhone. */

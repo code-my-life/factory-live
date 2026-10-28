@@ -26,7 +26,7 @@ La CI (GitHub Actions) lance `npm run verify` sur Node 24 et 26. Une PR n'est pr
 - `packages/domain` : règles pures (stations, interventions, modèle effectif). Ne dépend de rien.
 - `packages/contracts` : schémas zod de l'API, de l'ingestion et du flux SSE. Ne dépend que de zod.
 - `apps/server` : cas d'usage (`application/`) qui ne connaissent que des ports ; adaptateurs (`adapters/`) qui les implémentent ; HTTP (`http/`).
-- `apps/web` : PWA React + Primer + React Flow. Ne connaît que `contracts`.
+- `apps/web` : PWA React + Primer + Motion. Ne connaît que `contracts`.
 
 Détails : `docs/ARCHITECTURE.md`. Exploitation : `docs/RUNBOOK.md`. Décisions : `docs/decisions/`.
 
@@ -40,7 +40,7 @@ Détails : `docs/ARCHITECTURE.md`. Exploitation : `docs/RUNBOOK.md`. Décisions 
 - Mouvement : jetons `--motion-*` de Primer, 500 ms au plus ; toute animation en boucle porte `data-loop` (coupée par le bouton de pause et par `prefers-reduced-motion`) ; jamais d'information portée par le seul mouvement.
 - Vocabulaire de l'interface, un concept, un mot : agent (jamais « profil »), carte, issue, station, intervention, lane (le CLI délégué). Vérifié par `npm run check:text`.
 - Visualisations : un seul dessin de graphe (`ui/flow`, stations rondes reliées par une voie) et une seule timeline (`Timeline` de Primer, `ui/timeline`), partout ; les agents ont chacun leur avatar (`ui/agents`).
-- Graphe : toujours par `FlowView`, qui choisit le graphe en largeur ou la voie verticale (`FlowRail`) selon la place ; une page fournit les deux (nœuds et liaisons, étapes). Rien ne doit capturer le doigt : vérifier au geste tactile (CDP `Input.dispatchTouchEvent`) que la page défile depuis le graphe et que ses lignes se touchent.
+- Graphe : toujours par `FlowLine` (`ui/flow`), une étape par station ou par rang de cartes, et sous chaque étape ses jobs (`JobBox`, `ui/work`, une boîte par issue ou par carte, avec son état en `Label` et l'agent qui la tient). Rien ne doit capturer le doigt : vérifier au geste tactile (CDP `Input.dispatchTouchEvent`) que la page défile depuis la voie et que les boîtes se touchent.
 - Interface : composants Primer d'abord ; styles en CSS modules avec les jetons Primer (`var(--bgColor-default)`…), jamais de couleur en dur ; aucun flou ni transparence ; tout texte qui peut déborder est tronqué ou coupé (`min-width: 0`) ; survols seulement sous `@media (hover: hover) and (pointer: fine)` ; cibles tactiles d'au moins 44 px.
 - Une nouvelle dépendance : version exacte, peerDependencies compatibles (React 19, Vite 8, TypeScript 6.0), maintenue, sans module natif. Le dire dans la PR.
 

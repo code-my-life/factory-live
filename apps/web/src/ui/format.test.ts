@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatAge, formatDuration } from './format.ts';
+import { formatAge, formatDuration, formatStay } from './format.ts';
 
 describe('formatDuration', () => {
   it.each([
@@ -26,5 +26,14 @@ describe('formatAge', () => {
 
   it('dit « il y a » au-delà', () => {
     expect(formatAge('2026-10-28T15:56:00Z', now)).toBe('il y a 4 min');
+  });
+});
+
+describe('formatStay', () => {
+  it('compte à la minute, puis en heures, puis en jours', () => {
+    expect(formatStay(20_000)).toBe("moins d'une minute");
+    expect(formatStay(11 * 60_000 + 59_000)).toBe('11 min');
+    expect(formatStay(2 * 3_600_000 + 5 * 60_000)).toBe('2 h 05');
+    expect(formatStay(216 * 3_600_000)).toBe('9 j');
   });
 });

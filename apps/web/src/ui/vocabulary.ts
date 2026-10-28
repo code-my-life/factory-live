@@ -1,5 +1,6 @@
 import type {
   AgentState,
+  CardKind,
   InterventionKind,
   IssueStatus,
   KanbanStatus,
@@ -69,6 +70,19 @@ export const INTERVENTION_LABEL: Record<InterventionKind, string> = {
   service_down: 'Service en panne',
 };
 
+/** Ce qu'on fait d'une intervention, depuis la boîte de l'issue sur la ligne d'usine. */
+export const INTERVENTION_ACTION_LABEL: Record<InterventionKind, string> = {
+  needs_input: 'Répondre',
+  capability: 'Répondre',
+  transient: 'Débloquer',
+  gave_up: 'Débloquer',
+  triage_loop: 'Voir la procédure',
+  held_active_pr: 'Voir les commandes',
+  pr_approval: 'Approuver la PR',
+  main_red: 'Voir les runs',
+  service_down: 'Voir la santé',
+};
+
 export const PROVIDER_LABEL: Record<string, string> = {
   freellmapi: 'freellmapi',
   nvidia: 'NVIDIA',
@@ -81,6 +95,16 @@ export const PROVIDER_LABEL: Record<string, string> = {
 export function providerLabel(provider: string): string {
   return PROVIDER_LABEL[provider] ?? provider;
 }
+
+export const CARD_KIND_LABEL: Record<CardKind, string> = {
+  brief: 'Brief',
+  impl: 'Implémentation',
+  release: 'Release',
+  diagnostic: 'Diagnostic',
+  watch: 'Surveillance',
+  onboarding: 'Onboarding',
+  other: 'Autre',
+};
 
 export const CARD_STATUS_LABEL: Record<KanbanStatus, string> = {
   triage: 'Triage',

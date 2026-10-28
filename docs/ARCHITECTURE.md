@@ -11,7 +11,7 @@ WSL (hôte)                                            Conteneur factory-live (D
 |   hooks.outbound natifs                 |---------->|   modèle effectif, stats             |
 |   factory-live-probe (santé, 30 s)      |---------->| serveur Hono : REST + SSE, push,     |
 +-----------------------------------------+           |   historique (SQLite), client GitHub |
-| kanban.db, state.db, logs de cartes,    | lecture   | PWA React + Primer + React Flow      |
+| kanban.db, state.db, logs de cartes,    | lecture   | PWA React + Primer + Motion          |
 | ~/.claude/projects, opencode.db         |---------->|                                      |
 +-----------------------------------------+ seule     +--------------------------------------+
 tailscale serve https:8446 -> 127.0.0.1:8446          sortant : api.github.com, Web Push,
@@ -51,4 +51,4 @@ Les règles sont vérifiées en CI par dependency-cruiser (`.dependency-cruiser.
 ## Front
 
 - Une seule interface de données (`apps/web/src/data/source.ts`) : la démo (`DemoSource`) et l'API (REST + SSE) la réalisent.
-- Primer React pour les composants, jetons Primer pour les styles, React Flow pour le graphe d'une issue, Motion pour le glissement des issues entre stations.
+- Primer React pour les composants, jetons Primer pour les styles, une voie en CSS (`FlowLine`) pour la ligne d'usine comme pour le graphe d'une issue, Motion pour le glissement des issues entre stations.
