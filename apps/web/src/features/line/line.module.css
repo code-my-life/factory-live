@@ -158,11 +158,6 @@
   color: var(--fgColor-muted);
 }
 
-.liveIssue {
-  color: var(--fgColor-accent);
-  font-family: var(--fontStack-monospace);
-}
-
 .liveElapsed {
   margin-left: auto;
   color: var(--fgColor-muted);
@@ -239,4 +234,11 @@
 .sideNote {
   color: var(--fgColor-muted);
   font: var(--text-caption-shorthand);
+}
+
+.sideMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-4) var(--base-size-8);
 }

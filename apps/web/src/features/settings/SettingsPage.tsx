@@ -7,6 +7,7 @@ import { useFactorySource, useSnapshot } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { Messages } from '../../i18n/fr.ts';
 import type { Locale } from '../../i18n/locale.ts';
+import { VersionBadge } from '../../ui/badge/VersionBadge.tsx';
 import { LiveDot } from '../../ui/LiveDot.tsx';
 import page from '../../ui/page.module.css';
 import { DemoGitHubSection, LiveGitHubSection } from './GitHubSection.tsx';
@@ -137,7 +138,11 @@ export function SettingsPage() {
               </li>
             ))}
           </ul>
-          <p className={page.muted}>{t.settings.version(demo)}</p>
+          <p className={styles.versions}>
+            <VersionBadge of="factory-live" version="0.1.0" />
+            <VersionBadge of="Hermès" version="0.22.2" />
+            <span className={page.muted}>{t.settings.dataSource(demo)}</span>
+          </p>
         </div>
       </section>
     </section>

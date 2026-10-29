@@ -1,11 +1,10 @@
 import type { AgentActivity } from '@factory-live/contracts';
 import { CommentDiscussionIcon, TerminalIcon, ToolsIcon } from '@primer/octicons-react';
-import { Link } from 'react-router';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
+import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
-import { issuePath } from '../../ui/paths.ts';
 import styles from './line.module.css';
 
 const ACTION_ICON = { llm: CommentDiscussionIcon, tool: ToolsIcon, cli: TerminalIcon } as const;
@@ -47,17 +46,8 @@ export function LiveAgents({
               <p className={styles.liveHead}>
                 <span className={styles.liveName}>{agent.profile}</span>
                 <span className={styles.liveState}>{t.agentState[agent.state]}</span>
-                <span className={styles.liveWhere}>
-                  {t.station[agent.station]}
-                  {agent.issueKey ? (
-                    <>
-                      {' · '}
-                      <Link to={issuePath(agent.issueKey)} className={styles.liveIssue}>
-                        {agent.issueKey}
-                      </Link>
-                    </>
-                  ) : null}
-                </span>
+                <span className={styles.liveWhere}>{t.station[agent.station]}</span>
+                {agent.issueKey ? <IssueBadge issueKey={agent.issueKey} link /> : null}
                 {agent.runStartedAt ? (
                   <span className={styles.liveElapsed}>
                     <Elapsed since={agent.runStartedAt} />
@@ -86,9 +76,7 @@ export function LiveAgents({
               {agent.model ? (
                 <p className={styles.liveModels}>
                   <ModelBadge model={agent.model} />
-                  {agent.laneModel ? (
-                    <ModelBadge model={agent.laneModel} prefix={t.common.lane} emphasis />
-                  ) : null}
+                  {agent.laneModel ? <ModelBadge model={agent.laneModel} lane /> : null}
                 </p>
               ) : null}
             </div>

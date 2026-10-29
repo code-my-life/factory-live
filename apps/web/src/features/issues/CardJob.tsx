@@ -10,6 +10,7 @@ import {
 import type { Icon } from '@primer/octicons-react';
 import { ProgressBar } from '@primer/react';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
+import { CardBadge } from '../../ui/badge/CardBadge.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import { JobBox, JobDetail } from '../../ui/work/JobBox.tsx';
 import { cardWorkState } from '../../ui/work/workState.tsx';
@@ -57,8 +58,7 @@ export function CardJob({
       {...(since ? { since } : {})}
       id={card.id}
       state={cardWorkState(card, agent, t)}
-      badge={card.kind}
-      context={card.id}
+      badge={<CardBadge kind={card.kind} id={card.id} />}
       title={shortCardTitle(card, t)}
       onSelect={onSelect}
       selected={selected}
@@ -66,10 +66,7 @@ export function CardJob({
     >
       {model ? (
         <span className={styles.models}>
-          <ModelBadge
-            {...(laneModel ? { prefix: t.common.lane, emphasis: true } : {})}
-            model={laneModel ?? model}
-          />
+          <ModelBadge model={laneModel ?? model} lane={laneModel !== null} />
         </span>
       ) : null}
       {agent?.action ? (

@@ -13,6 +13,7 @@ import { MotionToggle } from '../../ui/motion.tsx';
 import { useNow } from '../../ui/useNow.ts';
 import { LINE_STATIONS } from '../../ui/vocabulary.ts';
 import { JobList } from '../../ui/work/JobBox.tsx';
+import { WorkStateLabel, cardWorkState } from '../../ui/work/workState.tsx';
 import { IssueJob } from './IssueJob.tsx';
 import { LiveActivity } from './LiveActivity.tsx';
 import { LiveAgents } from './LiveAgents.tsx';
@@ -194,8 +195,11 @@ export function FactoryLinePage() {
                 <span className={styles.sideText}>
                   <span className={styles.sideTitle}>{card.title}</span>
                   <span className={styles.sideMeta}>
-                    {card.assignee ?? t.issue.unassigned} · {t.cardStatus[card.status]} ·{' '}
-                    <Elapsed since={card.openedAt} mode="age" />
+                    <WorkStateLabel state={cardWorkState(card, null, t)} />
+                    <span>
+                      {card.assignee ?? t.issue.unassigned} ·{' '}
+                      <Elapsed since={card.openedAt} mode="age" />
+                    </span>
                   </span>
                   {card.note ? <span className={styles.sideNote}>{card.note}</span> : null}
                 </span>

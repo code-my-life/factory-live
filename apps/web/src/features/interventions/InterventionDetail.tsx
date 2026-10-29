@@ -5,9 +5,10 @@ import { useId, useState } from 'react';
 import { describeError } from '../../data/errors.ts';
 import { useFactorySource } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
+import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
+import { CardBadge } from '../../ui/badge/CardBadge.tsx';
+import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Markdown } from '../../ui/Markdown.tsx';
-import { InlineLink } from '../../ui/InlineLink.tsx';
-import { issuePath } from '../../ui/paths.ts';
 import styles from './interventions.module.css';
 
 const SEVERITY_VARIANT = { critical: 'danger', warning: 'attention', info: 'accent' } as const;
@@ -166,11 +167,14 @@ export function InterventionDetail({ intervention }: { intervention: Interventio
           {text(intervention.title)}
         </Heading>
         <p className={styles.context}>
-          {intervention.issueKey ? (
-            <InlineLink to={issuePath(intervention.issueKey)}>{intervention.issueKey}</InlineLink>
+          {intervention.issueKey ? <IssueBadge issueKey={intervention.issueKey} link /> : null}
+          {intervention.cardId ? <CardBadge id={intervention.cardId} /> : null}
+          {intervention.profile ? (
+            <span className={styles.agent}>
+              <AgentAvatar profile={intervention.profile} size={16} named />
+              {intervention.profile}
+            </span>
           ) : null}
-          {intervention.cardId ? <span className="fl-mono"> · {intervention.cardId}</span> : null}
-          {intervention.profile ? <span> · {intervention.profile}</span> : null}
           <span>{t.interventions.openedAt(fmt.clock(intervention.openedAt))}</span>
         </p>
       </header>

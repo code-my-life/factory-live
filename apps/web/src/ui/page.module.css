@@ -72,6 +72,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * Une cellule de tableau qui commence par un badge (issue) : le badge garde sa largeur, le texte prend
+ * la place qui reste et passe à la ligne.
+ */
+.badgeCell {
+  gap: var(--base-size-8);
+}
+
+.cellText {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* Les tableaux sont des composants Table de Primer ; ce cadre ne fait que défiler en largeur sur iPhone. */
 .tableBox {
   max-width: 100%;

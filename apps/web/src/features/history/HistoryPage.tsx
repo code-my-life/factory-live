@@ -1,10 +1,11 @@
 import { Heading, Label } from '@primer/react';
 import { Table } from '@primer/react/experimental';
-import { Link } from 'react-router';
 import { useFactorySource, useHistory } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
+import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
+import { VersionBadge } from '../../ui/badge/VersionBadge.tsx';
 import { BarList } from '../../ui/charts/BarList.tsx';
-import { issuePath } from '../../ui/paths.ts';
+import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import page from '../../ui/page.module.css';
 
 const OUTCOME_VARIANT = { merged: 'done', stopped: 'secondary', closed: 'secondary' } as const;
@@ -86,8 +87,12 @@ export function HistoryPage() {
                 {history.gatePassRate.map((row) => (
                   <Table.Row key={`${row.harness}-${row.model ?? ''}`}>
                     <Table.Cell>{row.harness}</Table.Cell>
-                    <Table.Cell className={row.model ? 'fl-mono' : undefined}>
-                      {row.model ?? t.history.agentModel}
+                    <Table.Cell>
+                      {row.model ? (
+                        <ModelBadge model={{ model: row.model }} overflow="clamp" />
+                      ) : (
+                        t.history.agentModel
+                      )}
                     </Table.Cell>
                     <Table.Cell align="end">{row.runs}</Table.Cell>
                     <Table.Cell align="end">
@@ -123,11 +128,9 @@ export function HistoryPage() {
             <Table.Body>
               {history.recent.map((row) => (
                 <Table.Row key={row.key}>
-                  <Table.Cell>
-                    <Link to={issuePath(row.key)} className="fl-mono">
-                      {row.key}
-                    </Link>{' '}
-                    {row.title}
+                  <Table.Cell className={page.badgeCell}>
+                    <IssueBadge issueKey={row.key} link />
+                    <span className={page.cellText}>{row.title}</span>
                   </Table.Cell>
                   <Table.Cell>
                     <Label variant={OUTCOME_VARIANT[row.outcome]}>
@@ -135,7 +138,9 @@ export function HistoryPage() {
                     </Label>
                   </Table.Cell>
                   <Table.Cell align="end">{fmt.minutes(row.leadTimeMinutes)}</Table.Cell>
-                  <Table.Cell className="fl-mono">{row.version ?? t.history.noTag}</Table.Cell>
+                  <Table.Cell>
+                    {row.version ? <VersionBadge version={row.version} /> : t.history.noTag}
+                  </Table.Cell>
                   <Table.Cell>{fmt.dayMonth(row.finishedAt)}</Table.Cell>
                 </Table.Row>
               ))}

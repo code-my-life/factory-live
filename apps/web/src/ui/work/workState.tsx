@@ -52,7 +52,7 @@ const CARD_STATE: Record<KanbanStatus, { tone: WorkTone; icon: Icon }> = {
 };
 
 export function issueWorkState(
-  issue: IssueSummary,
+  issue: Pick<IssueSummary, 'status'>,
   agent: AgentActivity | null,
   t: Messages,
 ): WorkState {
@@ -63,7 +63,11 @@ export function issueWorkState(
   };
 }
 
-export function cardWorkState(card: CardView, agent: AgentActivity | null, t: Messages): WorkState {
+export function cardWorkState(
+  card: Pick<CardView, 'status'>,
+  agent: AgentActivity | null,
+  t: Messages,
+): WorkState {
   return {
     label: t.cardStatus[card.status],
     ...CARD_STATE[card.status],

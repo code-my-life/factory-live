@@ -4,6 +4,8 @@ import { Heading } from '@primer/react';
 import { Link, useParams } from 'react-router';
 import { useSnapshot } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
+import { CardBadge } from '../../ui/badge/CardBadge.tsx';
+import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { InterventionDetail } from './InterventionDetail.tsx';
 import styles from './interventions.module.css';
@@ -67,8 +69,15 @@ export function InterventionsPage() {
                     </span>
                     <span className={styles.itemTitle}>{text(intervention.title)}</span>
                     <span className={styles.itemMeta}>
-                      {intervention.issueKey ?? intervention.cardId} · {t.interventions.opened}{' '}
-                      <Elapsed since={intervention.openedAt} mode="age" />
+                      {intervention.issueKey ? (
+                        <IssueBadge issueKey={intervention.issueKey} />
+                      ) : intervention.cardId ? (
+                        <CardBadge id={intervention.cardId} />
+                      ) : null}
+                      <span>
+                        {t.interventions.opened}{' '}
+                        <Elapsed since={intervention.openedAt} mode="age" />
+                      </span>
                     </span>
                     {intervention.unblock ? (
                       <span className={styles.itemProgress}>

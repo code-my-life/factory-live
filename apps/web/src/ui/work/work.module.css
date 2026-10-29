@@ -99,20 +99,6 @@
   min-width: 0;
 }
 
-.jobBadge {
-  flex: none;
-  font-family: var(--fontStack-monospace);
-}
-
-.jobContext {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--fgColor-muted);
-  font: var(--text-caption-shorthand);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .jobSince {
   flex: none;
   margin-inline-start: auto;

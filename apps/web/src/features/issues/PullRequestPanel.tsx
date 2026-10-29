@@ -1,4 +1,4 @@
-import type { IssueSummary } from '@factory-live/contracts';
+import type { IssueSummary, PullRequestView } from '@factory-live/contracts';
 import {
   CheckCircleFillIcon,
   ClockIcon,
@@ -6,8 +6,33 @@ import {
   XCircleFillIcon,
 } from '@primer/octicons-react';
 import { Button, Link as PrimerLink, StateLabel } from '@primer/react';
+import type { ComponentProps } from 'react';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
+import { ChecksBadge } from '../../ui/badge/ChecksBadge.tsx';
 import styles from './issues.module.css';
+
+const PR_STATUS: Record<PullRequestView['state'], ComponentProps<typeof StateLabel>['status']> = {
+  draft: 'draft',
+  open: 'pullOpened',
+  merged: 'pullMerged',
+  closed: 'pullClosed',
+};
+
+/** L'état d'une PR, comme sur GitHub : le `StateLabel` de Primer, avec son icône. */
+export function PullRequestState({
+  state,
+  size = 'medium',
+}: {
+  state: PullRequestView['state'];
+  size?: 'small' | 'medium';
+}) {
+  const { t } = useI18n();
+  return (
+    <StateLabel status={PR_STATUS[state]} size={size}>
+      {t.pr.state[state]}
+    </StateLabel>
+  );
+}
 
 /** État de la PR de l'issue, tel que GitHub le donne (API Actions pour la CI). */
 export function PullRequestPanel({ issue }: { issue: IssueSummary }) {
@@ -27,14 +52,6 @@ export function PullRequestPanel({ issue }: { issue: IssueSummary }) {
   if (!pr) {
     return <p className={styles.muted}>{t.pr.none}</p>;
   }
-  const status =
-    pr.state === 'merged'
-      ? 'pullMerged'
-      : pr.state === 'closed'
-        ? 'pullClosed'
-        : pr.state === 'draft'
-          ? 'draft'
-          : 'pullOpened';
   const CheckIcon =
     pr.checks === 'success'
       ? CheckCircleFillIcon
@@ -44,7 +61,8 @@ export function PullRequestPanel({ issue }: { issue: IssueSummary }) {
   return (
     <div className={styles.pr}>
       <div className={styles.prHead}>
-        <StateLabel status={status}>{t.pr.state[pr.state]}</StateLabel>
+        <PullRequestState state={pr.state} />
+        <ChecksBadge checks={pr.checks} />
         <h3 className={styles.prTitle}>
           {pr.title} <span className={styles.muted}>#{pr.number}</span>
         </h3>

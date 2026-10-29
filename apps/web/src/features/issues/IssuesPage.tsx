@@ -1,13 +1,16 @@
 import type { IssueSummary } from '@factory-live/contracts';
 import { BellIcon } from '@primer/octicons-react';
-import { Heading, Label, SegmentedControl } from '@primer/react';
+import { Heading, SegmentedControl } from '@primer/react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useSnapshot } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { Messages } from '../../i18n/fr.ts';
+import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
+import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { issuePath } from '../../ui/paths.ts';
+import { WorkStateLabel, issueWorkState } from '../../ui/work/workState.tsx';
 import styles from './issues.module.css';
 
 const FILTERS: {
@@ -18,15 +21,6 @@ const FILTERS: {
   { label: 'finished', keep: (issue) => issue.status === 'done' || issue.status === 'stopped' },
   { label: 'all', keep: () => true },
 ];
-
-const STATUS_VARIANT = {
-  active: 'accent',
-  queued: 'secondary',
-  waiting_human: 'attention',
-  blocked: 'danger',
-  done: 'done',
-  stopped: 'secondary',
-} as const;
 
 export function IssuesPage() {
   const { t } = useI18n();
@@ -60,15 +54,18 @@ export function IssuesPage() {
           <li key={issue.key} className={styles.issueListItem}>
             <Link to={issuePath(issue.key)} className={styles.issueRow}>
               <span className={styles.issueRowMain}>
-                <span className={styles.issueRowKey}>{issue.key}</span>
+                <IssueBadge issueKey={issue.key} />
                 <span className={styles.issueRowTitle}>{issue.title}</span>
               </span>
               <span className={styles.issueRowMeta}>
-                <Label variant={STATUS_VARIANT[issue.status]}>{t.issueStatus[issue.status]}</Label>
+                <WorkStateLabel state={issueWorkState(issue, null, t)} />
                 <span>{t.station[issue.station]}</span>
-                {issue.activeProfiles.length > 0 ? (
-                  <span className="fl-mono">{issue.activeProfiles.join(', ')}</span>
-                ) : null}
+                {issue.activeProfiles.map((profile) => (
+                  <span key={profile} className={styles.agentCell}>
+                    <AgentAvatar profile={profile} size={16} named />
+                    {profile}
+                  </span>
+                ))}
                 {issue.interventionIds.length > 0 ? (
                   <span className={styles.issueRowBell}>
                     <BellIcon size={14} aria-hidden="true" /> {issue.interventionIds.length}

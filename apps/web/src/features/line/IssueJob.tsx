@@ -1,5 +1,6 @@
 import type { AgentActivity, Intervention, IssueSummary } from '@factory-live/contracts';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
+import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { issuePath } from '../../ui/paths.ts';
 import { JobAction, JobBox, JobDetail } from '../../ui/work/JobBox.tsx';
 import { issueWorkState } from '../../ui/work/workState.tsx';
@@ -35,8 +36,7 @@ export function IssueJob({
       {...(finished ? {} : { since })}
       id={issue.key}
       state={state}
-      badge={`#${issue.number}`}
-      context={issue.repo}
+      badge={<IssueBadge issueKey={issue.key} />}
       title={issue.title}
       to={issuePath(issue.key)}
       compact={compact}

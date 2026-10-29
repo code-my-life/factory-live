@@ -372,7 +372,8 @@ export const fr = {
     interventionsWaiting: (count: number) => `Interventions : ${count} en attente`,
     servicesToWatch: (count: number) =>
       `${count} ${f.plural(count, 'service', 'services')} à surveiller`,
-    sidebarFoot: 'Hermès 0.22.2 · board factory',
+    /** Étiquette du badge du board Hermès que lit factory-live, au pied de la navigation. */
+    board: 'board',
   },
 
   motion: {
@@ -442,8 +443,13 @@ export const fr = {
 
   model: {
     /** Infobulle d'un modèle : « lane : modèle via fournisseur, d'où vient l'information ». */
-    description: (prefix: string | null, model: string, provider: string, source: string) =>
-      `${prefix ? `${prefix} : ` : ''}${model} via ${provider}, ${source}`,
+    description: (
+      lane: string | null,
+      model: string,
+      provider: string | null,
+      source: string | null,
+    ) =>
+      `${lane ? `${lane} : ` : ''}${model}${provider ? ` via ${provider}` : ''}${source ? `, ${source}` : ''}`,
   },
 
   issues: {
@@ -477,7 +483,7 @@ export const fr = {
     reply: 'Répondre',
     cardsTitle: 'Cartes de l’issue',
     cardsHint: 'Choisis une carte pour voir ses runs.',
-    forcedSkills: (skills: string) => `Skills forcées : ${skills}`,
+    forcedSkills: 'Skills forcées :',
     unassigned: 'non assignée',
     tabsLabel: 'Détails de l’issue',
     tabs: {
@@ -531,12 +537,13 @@ export const fr = {
     none: 'Pas encore de PR : elle s’ouvre en brouillon à la fin de l’implémentation.',
     state: { draft: 'Brouillon', merged: 'Fusionnée', closed: 'Fermée', open: 'Ouverte' },
     /** L'état de la CI d'une PR, après « CI ». */
+    /** Le badge de la CI d'une PR : son étiquette, puis l'état des workflows. */
+    ciLabel: 'CI',
     ci: {
-      none: 'absente',
       pending: 'en cours',
-      success: 'verte',
-      failure: 'rouge',
-    } satisfies Record<ChecksState, string>,
+      success: 'réussie',
+      failure: 'en échec',
+    } satisfies Record<Exclude<ChecksState, 'none'>, string>,
     changes: 'Changements',
     review: 'Revue',
     reviewDecision: {
@@ -594,7 +601,7 @@ export const fr = {
     resolved: 'Cette intervention est résolue.',
     severity: { critical: 'Bloquant', warning: 'À traiter', info: 'Pour info' },
     pushSent: '· notification push envoyée',
-    openedAt: (time: string) => ` · ouverte à ${time}`,
+    openedAt: (time: string) => `ouverte à ${time}`,
     question: 'Question de l’agent',
     steps: {
       sent: {
@@ -706,7 +713,6 @@ export const fr = {
     byModel: 'Par modèle',
     columns: {
       model: 'Modèle',
-      provider: 'Fournisseur',
       calls: 'Appels',
       input: 'Entrée',
       output: 'Sortie',
@@ -767,8 +773,8 @@ export const fr = {
       },
     },
     sources: 'Sources',
-    version: (demo: boolean) =>
-      `Version 0.1.0 · ${demo ? 'données de démonstration' : 'données en direct'} · Hermès 0.22.2`,
+    /** D'où viennent les données affichées, après les versions en service. */
+    dataSource: (demo: boolean) => (demo ? 'données de démonstration' : 'données en direct'),
   },
 
   push: {

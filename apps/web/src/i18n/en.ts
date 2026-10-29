@@ -333,7 +333,7 @@ export const en: Messages = {
     replayDemo: 'Replay the demo scenario',
     interventionsWaiting: (count) => `Interventions: ${count} waiting`,
     servicesToWatch: (count) => `${count} ${f.plural(count, 'service', 'services')} to watch`,
-    sidebarFoot: 'Hermès 0.22.2 · factory board',
+    board: 'board',
   },
 
   motion: {
@@ -394,8 +394,8 @@ export const en: Messages = {
   },
 
   model: {
-    description: (prefix, model, provider, source) =>
-      `${prefix ? `${prefix}: ` : ''}${model} via ${provider}, ${source}`,
+    description: (lane, model, provider, source) =>
+      `${lane ? `${lane}: ` : ''}${model}${provider ? ` via ${provider}` : ''}${source ? `, ${source}` : ''}`,
   },
 
   issues: {
@@ -429,7 +429,7 @@ export const en: Messages = {
     reply: 'Reply',
     cardsTitle: 'Issue cards',
     cardsHint: 'Pick a card to see its runs.',
-    forcedSkills: (skills) => `Forced skills: ${skills}`,
+    forcedSkills: 'Forced skills:',
     unassigned: 'unassigned',
     tabsLabel: 'Issue details',
     tabs: {
@@ -482,7 +482,8 @@ export const en: Messages = {
       ' spotted by the factory; its state, reviews and CI will show once GitHub is connected (Settings, GitHub).',
     none: 'No PR yet: it opens as a draft at the end of implementation.',
     state: { draft: 'Draft', merged: 'Merged', closed: 'Closed', open: 'Open' },
-    ci: { none: 'none', pending: 'pending', success: 'passing', failure: 'failing' },
+    ciLabel: 'CI',
+    ci: { pending: 'pending', success: 'passing', failure: 'failing' },
     changes: 'Changes',
     review: 'Review',
     reviewDecision: {
@@ -540,7 +541,7 @@ export const en: Messages = {
     resolved: 'This intervention is resolved.',
     severity: { critical: 'Blocking', warning: 'To handle', info: 'FYI' },
     pushSent: '· push notification sent',
-    openedAt: (time) => ` · opened at ${time}`,
+    openedAt: (time) => `opened at ${time}`,
     question: 'Agent’s question',
     steps: {
       sent: {
@@ -649,7 +650,6 @@ export const en: Messages = {
     byModel: 'By model',
     columns: {
       model: 'Model',
-      provider: 'Provider',
       calls: 'Calls',
       input: 'Input',
       output: 'Output',
@@ -709,7 +709,7 @@ export const en: Messages = {
       },
     },
     sources: 'Sources',
-    version: (demo) => `Version 0.1.0 · ${demo ? 'demo data' : 'live data'} · Hermès 0.22.2`,
+    dataSource: (demo) => (demo ? 'demo data' : 'live data'),
   },
 
   push: {

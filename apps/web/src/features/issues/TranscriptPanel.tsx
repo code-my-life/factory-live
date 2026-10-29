@@ -14,6 +14,7 @@ import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { Messages } from '../../i18n/fr.ts';
 import { AnsiLog } from '../../ui/AnsiLog.tsx';
 import { Markdown } from '../../ui/Markdown.tsx';
+import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import styles from './issues.module.css';
 
 const ROLE_ICON = {
@@ -64,7 +65,7 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
         <p className={styles.entryHead}>
           <span className={styles.entryRole}>{t.transcript.role[entry.role]}</span>
           {entry.toolName ? <code className={styles.entryTool}>{entry.toolName}</code> : null}
-          {entry.model ? <span className={styles.entryModel}>{entry.model}</span> : null}
+          {entry.model ? <ModelBadge model={{ model: entry.model }} /> : null}
           <time className={styles.entryTime} dateTime={entry.at}>
             {fmt.clock(entry.at)}
           </time>
