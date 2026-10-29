@@ -5,6 +5,9 @@ import { VitePWA } from 'vite-plugin-pwa';
 // `source` résout les paquets du monorepo sur leurs sources TypeScript (voir les `exports`).
 // FACTORY_LIVE_BASE=./ produit un build relocalisable, publiable tel quel en artifact.
 const artifact = process.env.VITE_ARTIFACT === '1';
+// Ni manifeste ni service worker dans un artifact (l'hôte n'y permet pas de service worker), ni
+// avec FACTORY_LIVE_PWA=0 : la démo du site, servie sous un sous-chemin, ne s'installe pas.
+const pwa = !artifact && process.env.FACTORY_LIVE_PWA !== '0';
 // L'API de factory-live derrière le serveur de développement : le conteneur, ou le faux serveur des e2e.
 const api = process.env.FACTORY_LIVE_API ?? 'http://127.0.0.1:8446';
 // `changeOrigin` : factory-live n'accepte que ses propres hôtes (contrôle contre le DNS rebinding), la
@@ -16,9 +19,8 @@ export default defineConfig({
   plugins: [
     react(),
     // PWA installable (iPhone, PC, Mac) : manifeste, icônes, service worker maison pour les push.
-    // Pas dans un artifact : l'hôte n'y permet pas de service worker.
     VitePWA({
-      disable: artifact,
+      disable: !pwa,
       strategies: 'injectManifest',
       srcDir: 'src/sw',
       filename: 'sw.ts',
