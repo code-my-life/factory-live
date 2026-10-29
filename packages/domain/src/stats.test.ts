@@ -29,6 +29,48 @@ describe('median', () => {
 });
 
 describe('gateVerdicts', () => {
+  it('compte le premier verdict de la gate scriptée qui suit chaque demande de revue', () => {
+    const request = (id: number, endedAt: number) =>
+      aRun({
+        id,
+        taskId: IMPL.id,
+        profile: 'coder',
+        outcome: 'review_requested',
+        endedAt,
+        metadata: { harness: 'coder' },
+      });
+    const verdict = (id: number, body: string, createdAt: number) => ({
+      id,
+      taskId: IMPL.id,
+      author: 'factory-gate',
+      body,
+      createdAt,
+    });
+    const verdicts = gateVerdicts(
+      board({
+        runs: [request(1, 1_000), request(2, 3_000)],
+        comments: [
+          verdict(1, '❌ Gate rouge sur `abc1234` (PR #9), règle CI : checks rouges', 1_200),
+          verdict(
+            2,
+            '✅ Gate verte sur `def5678` (https://github.com/o/r/pull/9) : en attente',
+            3_300,
+          ),
+          // Même tour, nouvelle tête après une mise à jour de la branche : pas un nouveau passage.
+          verdict(
+            3,
+            '✅ Gate verte sur `0123456` (https://github.com/o/r/pull/9) : en attente',
+            3_900,
+          ),
+        ],
+      }),
+    );
+    expect(verdicts.map((v) => [v.implementerRunId, v.passed, v.at, v.harness])).toEqual([
+      [1, false, 1_200, 'coder'],
+      [2, true, 3_300, 'coder'],
+    ]);
+  });
+
   it('associe chaque demande de revue au verdict de la gate qui suit', () => {
     const verdicts = gateVerdicts(
       board({
@@ -99,6 +141,34 @@ describe('gateVerdicts', () => {
 });
 
 describe('stationMinutes', () => {
+  it('compte pour la gate scriptée le temps de la demande de revue à son verdict', () => {
+    const result = stationMinutes({
+      tasks: [IMPL],
+      runs: [
+        aRun({
+          id: 1,
+          taskId: IMPL.id,
+          profile: 'coder',
+          outcome: 'review_requested',
+          startedAt: 0,
+          endedAt: 600,
+        }),
+      ],
+      events: [],
+      links: [],
+      comments: [
+        {
+          id: 1,
+          taskId: IMPL.id,
+          author: 'factory-gate',
+          body: '✅ Gate verte sur `56045fb` (https://github.com/o/r/pull/9)',
+          createdAt: 1_500,
+        },
+      ],
+    });
+    expect(result.get('gate')).toEqual([15]);
+  });
+
   it('range la durée des runs terminés par station', () => {
     const brief = aTask({
       id: 't_brief001',

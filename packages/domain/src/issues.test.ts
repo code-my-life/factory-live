@@ -80,6 +80,25 @@ describe('issueStationOf', () => {
     expect(at(tasks, { runs })).toBe('gate');
   });
 
+  it('release quand la gate scriptée a rendu son vert : la carte attend l’approbation en revue', () => {
+    const tasks = [brief({ status: 'done' }), impl({ status: 'review' }), release()];
+    const runs = [aRun({ id: 1, taskId: 't_impl', outcome: 'review_requested', endedAt: 1_500 })];
+    const green = {
+      id: 1,
+      taskId: 't_impl',
+      author: 'factory-gate',
+      body: '✅ Gate verte sur `56045fb` (https://github.com/o/r/pull/9) : en attente',
+      createdAt: 2_000,
+    };
+    expect(at(tasks, { runs, comments: [green] })).toBe('release');
+    expect(
+      at(tasks, {
+        runs,
+        comments: [{ ...green, body: '❌ Gate rouge sur `56045fb` (PR #9), règle CI' }],
+      }),
+    ).toBe('gate');
+  });
+
   it('reste en implémentation si la gate demande des changements (carte repartie en ready)', () => {
     const tasks = [brief({ status: 'done' }), impl({ status: 'ready' }), release()];
     const events = [anEvent({ taskId: 't_impl', kind: 'changes_requested' })];

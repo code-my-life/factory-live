@@ -1,4 +1,5 @@
 import { cardKindOf, issueKeyOf, issueRefOfTask, runRoleOf } from './cards.ts';
+import { awaitingApproval } from './gateVerdicts.ts';
 import type { Board, Task } from './hermes.ts';
 
 export type Station =
@@ -73,7 +74,9 @@ export function issueStationOf(tasks: readonly Task[], board: Board): Station {
     (task) => task.status !== 'done',
   );
   if (openWork.length > 0) {
-    return openWork.every((task) => isReviewing(task, board)) ? 'gate' : 'implementation';
+    if (!openWork.every((task) => isReviewing(task, board))) return 'implementation';
+    // La gate scriptée a rendu son vert : la carte reste en revue jusqu'à la fusion, l'issue attend l'approbation humaine.
+    return openWork.every((task) => awaitingApproval(task, board)) ? 'release' : 'gate';
   }
 
   if (ofKind('release').some((task) => task.status !== 'done')) return 'release';

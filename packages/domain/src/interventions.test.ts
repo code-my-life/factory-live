@@ -343,6 +343,51 @@ describe('pullRequestUrl', () => {
   });
 });
 
+describe('vert de la gate scriptée', () => {
+  const impl = aTask({ id: 't_impl', title: 'impl factory-live#9 : version', status: 'review' });
+  const runs = [aRun({ id: 1, taskId: 't_impl', outcome: 'review_requested', endedAt: 1_500 })];
+  const green = {
+    id: 7,
+    taskId: 't_impl',
+    author: 'factory-gate',
+    body: "✅ Gate verte sur `56045fb` (https://github.com/code-my-life/factory-live/pull/9) : en attente de l'approbation sur GitHub.",
+    createdAt: 2_000,
+  };
+
+  it('ouvre « PR à approuver », avec le lien de la PR que cite le verdict', () => {
+    const [found] = interventionsOf(
+      { tasks: [impl], runs, events: [], links: [], comments: [green] },
+      ctx,
+    );
+    expect(found).toMatchObject({
+      kind: 'pr_approval',
+      severity: 'info',
+      cardId: 't_impl',
+      openedAt: 2_000,
+    });
+    expect(found?.actions).toEqual([
+      {
+        kind: 'link',
+        label: message('intervention.action.approvePr'),
+        url: 'https://github.com/code-my-life/factory-live/pull/9',
+      },
+    ]);
+  });
+
+  it('rien sans vert, ni sur une carte repartie chez l’implémenteur', () => {
+    const red = { ...green, body: '❌ Gate rouge sur `56045fb` (PR #9), règle CI : checks rouges' };
+    expect(
+      interventionsOf({ tasks: [impl], runs, events: [], links: [], comments: [red] }, ctx),
+    ).toEqual([]);
+    expect(
+      interventionsOf(
+        { tasks: [{ ...impl, status: 'ready' }], runs, events: [], links: [], comments: [green] },
+        ctx,
+      ),
+    ).toEqual([]);
+  });
+});
+
 describe('branchOf', () => {
   const card = (patch: Partial<Task> = {}) =>
     aTask({

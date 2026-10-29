@@ -1,4 +1,5 @@
 import { cardKindOf } from './cards.ts';
+import { awaitingApproval } from './gateVerdicts.ts';
 import type { Board, Run, Task, TaskEvent } from './hermes.ts';
 import { groupByIssue } from './issues.ts';
 import { message } from './messages.ts';
@@ -329,6 +330,31 @@ export function interventionsOf(board: Board, ctx: InterventionContext): Interve
           ],
         }),
       );
+    } else if (task.status === 'review') {
+      // Vert de la gate scriptée : la PR attend l'approbation humaine sur GitHub (la carte reste en revue jusqu'à la fusion).
+      const green = awaitingApproval(task, board);
+      if (green) {
+        const pr = green.pullRequest ?? pullRequestUrl([task], board);
+        const link = issueUrl(issueKey, ctx.owner);
+        found.push(
+          build('pr_approval', task, issueKey, undefined, green.at, {
+            severity: 'info',
+            title: message('intervention.title.prReady'),
+            question: message('intervention.question.prReady'),
+            actions: pr
+              ? [{ kind: 'link', label: message('intervention.action.approvePr'), url: pr }]
+              : link && issueKey
+                ? [
+                    {
+                      kind: 'link',
+                      label: message('intervention.action.openIssue', { issueKey }),
+                      url: link,
+                    },
+                  ]
+                : [],
+          }),
+        );
+      }
     } else if (task.status === 'ready') {
       const since = heldSince(events);
       if (since !== null && ctx.now - since >= ctx.heldAfterSeconds) {
