@@ -21,11 +21,16 @@ describe('ModelBadge', () => {
     expect(badge).toHaveAttribute('data-tone', 'neutral');
   });
 
-  it('teinte le modèle observé sur le dernier appel', () => {
+  it('dit le modèle observé sur le dernier appel en infobulle et au lecteur d’écran, valeur neutre', () => {
     const { container } = render(
       <ModelBadge model={{ model: 'mix', provider: 'moa', source: 'live' }} />,
     );
-    expect(badgeOf(container)).toHaveAttribute('data-tone', 'accent');
+    const badge = badgeOf(container);
+    expect(badge).toHaveAttribute('data-tone', 'neutral');
+    expect(badge).toHaveAttribute('title', 'mix via MoA, observé sur le dernier appel');
+    expect(screen.getByText('mix via MoA, observé sur le dernier appel')).toHaveClass(
+      'fl-visually-hidden',
+    );
   });
 
   it('nomme la lane CLI en étiquette, valeur neutre : un seul code couleur, celui de l’outil', () => {
@@ -130,5 +135,16 @@ describe('ModelBadge en anglais', () => {
       'title',
       'lane: claude-opus-5-5 via Claude, seen on the latest call',
     );
+  });
+
+  it('dit en anglais qu’un modèle est observé en direct, sans teinter sa valeur', () => {
+    localStorage.setItem('factory-live:locale', 'en');
+    const { container } = render(
+      <I18nProvider>
+        <ModelBadge model={{ model: 'mix', provider: 'moa', source: 'live' }} />
+      </I18nProvider>,
+    );
+    expect(badgeOf(container)).toHaveAttribute('data-tone', 'neutral');
+    expect(badgeOf(container)).toHaveAttribute('title', 'mix via MoA, seen on the latest call');
   });
 });
