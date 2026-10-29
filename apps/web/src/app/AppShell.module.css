@@ -251,9 +251,11 @@
 }
 
 @media (min-width: 1280px) {
+  /* La navigation latérale et son filet descendent jusqu'au bas de l'écran, même sur une page courte. */
   .body {
     display: grid;
     grid-template-columns: 232px minmax(0, 1fr);
+    min-height: calc(100dvh - var(--fl-header-height) - var(--fl-header-pad-top));
   }
 
   .sidebar {

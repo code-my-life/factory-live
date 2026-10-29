@@ -140,11 +140,15 @@ export function FactoryLinePage() {
         <Banner
           variant="critical"
           title={t.line.blockersWaiting(pushable.length)}
-          description={pushable
-            .map((intervention) =>
-              t.line.blockerItem(intervention.issueKey, text(intervention.title)),
-            )
-            .join(' · ')}
+          description={
+            <ul className={styles.blockers}>
+              {pushable.map((intervention) => (
+                <li key={intervention.id}>
+                  {t.line.blockerItem(intervention.issueKey, text(intervention.title))}
+                </li>
+              ))}
+            </ul>
+          }
           primaryAction={
             <Banner.PrimaryAction
               leadingVisual={BellIcon}

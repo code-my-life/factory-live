@@ -242,3 +242,13 @@
   align-items: center;
   gap: var(--base-size-4) var(--base-size-8);
 }
+
+/* Les blocages qui t'attendent, un par ligne : une clé d'issue ne se coupe plus en fin de ligne. */
+.blockers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
