@@ -62,7 +62,64 @@ test('la page de l’issue donne la cause, le verdict de chaque run et les vraie
     '5 outils refusés, puis sortie sans appel kanban',
     'bloqué après 12 outils refusés',
   ])
-    await expect(page.getByText(verdict).first()).toBeVisible();
+    // Fiches sur téléphone, tableau sur bureau : l'une des deux vues est masquée.
+    await expect(page.getByText(verdict).filter({ visible: true }).first()).toBeVisible();
   await page.getByRole('link', { name: 'Preuves' }).click();
   await expect(page.getByText('evidence/07-e2e.txt')).toBeVisible();
+});
+
+test('une boucle de refus : le même refus 65 fois, la réponse donne la commande exacte', async ({
+  page,
+}) => {
+  await page.goto('/interventions/iv-loop');
+  const detail = page.getByRole('article');
+  await expect(detail.getByRole('heading', { level: 2 })).toHaveText(
+    'L’agent bute 65 fois sur le même refus de coder-guard',
+  );
+  const panel = detail.getByRole('region', { name: 'Diagnostic du blocage' });
+  await expect(panel.getByText('À toi, une réponse')).toBeVisible();
+  await expect(
+    panel.getByText('Dans ta réponse, donner à l’agent la commande exacte qui respecte la garde'),
+  ).toBeVisible();
+  // L'agent accuse l'outillage : son texte reste là, tel quel, sous la vraie cause.
+  await expect(detail.getByText(/^Test infrastructure too fragile/)).toBeVisible();
+  await expect(page.getByLabel('Ta réponse')).toHaveValue(
+    /^Tu reçois toujours le même refus de coder-guard : « PR de tests, revue refusée/,
+  );
+  // Rien à corriger côté factory : « Débloquer » suffit, sans confirmation.
+  await expect(page.getByRole('button', { name: 'Débloquer', exact: true })).toBeVisible();
+});
+
+test('le disjoncteur d’un modèle faible : la gate sort trois fois sans rendre la carte', async ({
+  page,
+}) => {
+  await page.goto('/interventions/iv-breaker');
+  const detail = page.getByRole('article');
+  await expect(detail.getByRole('heading', { level: 2 })).toHaveText(
+    'Le modèle s’arrête sans rendre la carte (3 fois)',
+  );
+  const panel = detail.getByRole('region', { name: 'Diagnostic du blocage' });
+  await expect(panel.getByText('À toi, côté factory')).toBeVisible();
+  await expect(panel.getByText(/^Donner un autre modèle à la carte/)).toBeVisible();
+  await page.goto('/issues/cv-site/52');
+  await expect(
+    page
+      .getByText('Hermès l’avait relancé pour qu’il rende la carte : il est sorti quand même')
+      .first(),
+  ).toBeVisible();
+});
+
+test('une réponse refusée sur une carte déjà repartie : le refus, et plus de formulaire', async ({
+  page,
+}) => {
+  await page.goto('/interventions');
+  await expect(page.getByRole('heading', { name: 'Récemment débloquées' })).toBeVisible();
+  await page.goto('/interventions/iv-shortcut');
+  const detail = page.getByRole('article');
+  await expect(detail.getByText('Débloquée', { exact: true })).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('Réponse refusée par le bot');
+  await expect(page.getByText('Option 2 : ⌘J, et Ctrl+J sous Windows.')).toBeVisible();
+  // Le champ de réponse, et non la section « Suivi de ta réponse » qui contient les mêmes mots.
+  await expect(page.getByLabel('Ta réponse', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Débloquer/ })).toHaveCount(0);
 });

@@ -21,11 +21,16 @@ import {
   model,
 } from './catalog.ts';
 import {
+  BREAKER,
   HOOK_INCIDENT,
+  PROTOCOL_VIOLATION_ERROR,
+  REFUSAL_LOOP,
+  breakerDiagnosis,
   heldDiagnosis,
   hookTimeoutDiagnosis,
   incidentEvidenceFiles,
   questionDiagnosis,
+  refusalLoopDiagnosis,
 } from './diagnoses.ts';
 import { iso, nextId } from './state.ts';
 import type { DemoState } from './state.ts';
@@ -39,6 +44,8 @@ export const KEYS = {
   tags: 'claude-cockpit#68',
   footer: 'cv-site#44',
   hook: HOOK_INCIDENT.key,
+  loop: 'claude-cockpit#76',
+  breaker: 'cv-site#52',
   e2e: 'claude-cockpit#42',
   overlap: 'claude-cockpit#52',
   codeowners: 'cv-site#46',
@@ -70,6 +77,12 @@ export const CARDS = {
   hookBrief: HOOK_INCIDENT.brief,
   hookImpl: HOOK_INCIDENT.impl,
   hookRelease: HOOK_INCIDENT.release,
+  loopBrief: 't_7e5d1a20',
+  loopImpl: 't_7e5d2b31',
+  loopRelease: 't_7e5d3c42',
+  breakerBrief: 't_3b9a0c11',
+  breakerImpl: 't_3b9a1d22',
+  breakerRelease: 't_3b9a2e33',
 } as const;
 
 export const RUNS = { teamBrief: 181, contactImpl: 179, contactGate: 183, teamImpl: 184 } as const;
@@ -95,6 +108,10 @@ const LABELED = msg('github.labeled', { label: 'factory', actor: 'cddev' });
 /** La raison écrite par l'agent quand il a bloqué factory-live#2 (run 191), telle quelle. */
 const HOOK_REASON =
   "Terminal et tous les outils bloqués par 'pre_tool_call plugin callback timed out' - impossible de committer, push, créer PR ou appeler kanban_request_review. Travail d'implémentation terminé et vérifié (evidence/01-07 créés, 426 tests passent, typecheck/build/e2e OK), mais workflow git inachevé.";
+
+/** Ce qu'écrit l'agent en bloquant après sa boucle de refus : il accuse l'outillage (claude-cockpit#42). */
+const LOOP_REASON =
+  'Test infrastructure too fragile to generate all required factory-author-proof evidence in this session. Test file state keeps getting corrupted by git checkouts, preventing stable generation of all 5 sabotage red/green outputs and patch validation.';
 
 /** La lane Claude Code de coder-claude, telle que le terminal d'Hermès la lance. */
 export const LANE_COMMAND =
@@ -368,6 +385,44 @@ export function createInitialState(now: number): DemoState {
       interventionIds: [],
       startedAt: ago(80 * min),
       updatedAt: ago(22 * min),
+    },
+    {
+      key: KEYS.loop,
+      repo: 'claude-cockpit',
+      number: 76,
+      title: "E2E PR 3 : raccourcis clavier de l'île",
+      url: issueUrl(KEYS.loop),
+      labels: ['factory'],
+      station: 'implementation',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'blocked',
+      claudeModel: null,
+      harness: 'coder',
+      pr: null,
+      activeProfiles: [],
+      interventionIds: [],
+      startedAt: ago(170 * min),
+      updatedAt: ago(9 * min),
+    },
+    {
+      key: KEYS.breaker,
+      repo: 'cv-site',
+      number: 52,
+      title: 'Page À propos : liens trop pâles en mode sombre',
+      url: issueUrl(KEYS.breaker),
+      labels: ['factory'],
+      station: 'gate',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'blocked',
+      claudeModel: null,
+      harness: 'coder',
+      pr: null,
+      activeProfiles: [],
+      interventionIds: [],
+      startedAt: ago(95 * min),
+      updatedAt: ago(4 * min),
     },
     {
       key: KEYS.e2e,
@@ -954,6 +1009,182 @@ export function createInitialState(now: number): DemoState {
     ],
   };
 
+  // Boucle de refus (voir diagnoses.ts) : 65 fois le même refus de coder-guard, puis le blocage.
+  const loopOpened = 9 * min;
+  const loopDiagnosis = refusalLoopDiagnosis(clock, loopOpened);
+  const loopVerdict = (runId: number) =>
+    loopDiagnosis.runs.find((verdict) => verdict.runId === runId) ?? null;
+  details[KEYS.loop] = {
+    issue: find(KEYS.loop),
+    tokens: 9_840_000,
+    costUsd: 0,
+    cards: [
+      card(CARDS.loopBrief, `${KEYS.loop} : E2E PR 3 : raccourcis clavier de l'île`, {
+        kind: 'brief',
+        status: 'done',
+        assignee: 'coordinator',
+        station: 'brief',
+      }),
+      card(CARDS.loopImpl, `impl ${KEYS.loop}`, {
+        kind: 'impl',
+        status: 'blocked',
+        assignee: 'coder',
+        station: 'implementation',
+        blockKind: 'capability',
+        blockReason: LOOP_REASON,
+        parents: [CARDS.loopBrief],
+        skills: ['factory-author-proof'],
+        runs: [
+          run(REFUSAL_LOOP.runs.budget, 'coder', {
+            role: 'implementer',
+            status: 'timed_out',
+            outcome: 'timed_out',
+            startedAt: ago(loopOpened + 140 * min),
+            endedAt: ago(loopOpened + 50 * min),
+            model: coderModel,
+            verdict: loopVerdict(REFUSAL_LOOP.runs.budget),
+          }),
+          run(REFUSAL_LOOP.runs.blocked, 'coder', {
+            role: 'implementer',
+            status: 'blocked',
+            outcome: 'blocked',
+            startedAt: ago(loopOpened + 49 * min),
+            endedAt: ago(loopOpened),
+            model: coderModel,
+            verdict: loopVerdict(REFUSAL_LOOP.runs.blocked),
+          }),
+        ],
+      }),
+      card(CARDS.loopRelease, `release ${KEYS.loop}`, {
+        kind: 'release',
+        status: 'todo',
+        assignee: 'coordinator',
+        station: 'release',
+        parents: [CARDS.loopImpl],
+      }),
+    ],
+    timeline: [
+      timeline(ago(loopOpened + 150 * min), msg('timeline.completed'), {
+        profile: 'coordinator',
+        cardId: CARDS.loopBrief,
+        tone: 'success',
+      }),
+      timeline(ago(loopOpened + 140 * min), msg('timeline.claimed'), {
+        profile: 'coder',
+        cardId: CARDS.loopImpl,
+      }),
+      timeline(ago(loopOpened + 50 * min), msg('timeline.timedOut'), {
+        profile: 'coder',
+        cardId: CARDS.loopImpl,
+        tone: 'danger',
+        detail:
+          'Iteration budget exhausted (400/400) \u2014 task could not complete within the allowed iterations',
+      }),
+      timeline(ago(loopOpened), msg('timeline.blocked', { kind: 'capability' }), {
+        profile: 'coder',
+        cardId: CARDS.loopImpl,
+        tone: 'danger',
+        detail: LOOP_REASON,
+      }),
+    ],
+  };
+
+  // Disjoncteur d'un modèle faible (voir diagnoses.ts) : la gate, sur le modèle local, sort trois fois
+  // sans rendre la carte malgré les relances d'Hermès, puis le disjoncteur abandonne.
+  const breakerOpened = 4 * min;
+  const breakerDiag = breakerDiagnosis(clock, breakerOpened);
+  const breakerVerdict = (runId: number) =>
+    breakerDiag.runs.find((verdict) => verdict.runId === runId) ?? null;
+  const localModel = model('llamacpp', QWEN_LOCAL, 'session');
+  const [firstGate = 0, secondGate = 0, thirdGate = 0] = BREAKER.runs;
+  details[KEYS.breaker] = {
+    issue: find(KEYS.breaker),
+    tokens: 2_310_000,
+    costUsd: 0,
+    cards: [
+      card(
+        CARDS.breakerBrief,
+        `${KEYS.breaker} : Page À propos : liens trop pâles en mode sombre`,
+        {
+          kind: 'brief',
+          status: 'done',
+          assignee: 'coordinator',
+          station: 'brief',
+        },
+      ),
+      card(CARDS.breakerImpl, `impl ${KEYS.breaker}`, {
+        kind: 'impl',
+        status: 'blocked',
+        assignee: 'gate',
+        station: 'gate',
+        parents: [CARDS.breakerBrief],
+        skills: ['factory-author-proof'],
+        runs: [
+          run(185, 'coder', {
+            role: 'implementer',
+            status: 'done',
+            outcome: 'review_requested',
+            startedAt: ago(breakerOpened + 46 * min),
+            endedAt: ago(breakerOpened + 7 * min),
+            model: coderModel,
+          }),
+          ...[
+            [firstGate, 7, 5],
+            [secondGate, 5, 3],
+            [thirdGate, 3, 0],
+          ].map(([id = 0, from = 0, to = 0]) =>
+            run(id, 'gate', {
+              role: 'reviewer',
+              status: 'crashed',
+              outcome: 'crashed',
+              startedAt: ago(breakerOpened + from * min),
+              endedAt: ago(breakerOpened + to * min),
+              model: localModel,
+              verdict: breakerVerdict(id),
+            }),
+          ),
+        ],
+      }),
+      card(CARDS.breakerRelease, `release ${KEYS.breaker}`, {
+        kind: 'release',
+        status: 'todo',
+        assignee: 'coordinator',
+        station: 'release',
+        parents: [CARDS.breakerImpl],
+      }),
+    ],
+    timeline: [
+      timeline(ago(breakerOpened + 50 * min), msg('timeline.completed'), {
+        profile: 'coordinator',
+        cardId: CARDS.breakerBrief,
+        tone: 'success',
+      }),
+      timeline(
+        ago(breakerOpened + 7 * min),
+        msg('timeline.reviewRequested', { reviewer: 'gate' }),
+        {
+          profile: 'coder',
+          cardId: CARDS.breakerImpl,
+        },
+      ),
+      ...[5, 3, 0].map((minutes) =>
+        timeline(ago(breakerOpened + minutes * min + 2), msg('timeline.protocolViolation'), {
+          profile: 'gate',
+          cardId: CARDS.breakerImpl,
+          tone: 'danger',
+          // Hermès a relancé la gate deux fois à chaque sortie (six relances en tout), en vain.
+          detail: msg('timeline.protocolViolation.nudged'),
+        }),
+      ),
+      timeline(ago(breakerOpened), msg('timeline.gaveUp', { failures: 3 }), {
+        profile: 'gate',
+        cardId: CARDS.breakerImpl,
+        tone: 'danger',
+        detail: PROTOCOL_VIOLATION_ERROR,
+      }),
+    ],
+  };
+
   const doneDetail = (key: string, cards: CardView[], tokens: number, costUsd: number) => {
     details[key] = {
       issue: find(key),
@@ -1106,6 +1337,99 @@ export function createInitialState(now: number): DemoState {
       followUp: null,
     },
     {
+      id: 'iv-loop',
+      kind: 'capability',
+      severity: 'critical',
+      title: LOOP_REASON,
+      issueKey: KEYS.loop,
+      cardId: CARDS.loopImpl,
+      profile: 'coder',
+      question: LOOP_REASON,
+      openedAt: ago(loopOpened),
+      push: true,
+      actions: [
+        { kind: 'unblock' },
+        {
+          kind: 'copy',
+          label: msg('intervention.action.showCard'),
+          command: `hermes kanban --board factory show ${CARDS.loopImpl}`,
+        },
+        {
+          kind: 'link',
+          label: msg('intervention.action.openIssue', { issueKey: KEYS.loop }),
+          url: issueUrl(KEYS.loop),
+        },
+      ],
+      unblock: null,
+      diagnosis: loopDiagnosis,
+      resolvedAt: null,
+      followUp: null,
+    },
+    {
+      id: 'iv-breaker',
+      kind: 'gave_up',
+      severity: 'critical',
+      title: msg('intervention.title.gaveUp', { failures: 3 }),
+      issueKey: KEYS.breaker,
+      cardId: CARDS.breakerImpl,
+      profile: 'gate',
+      question: PROTOCOL_VIOLATION_ERROR,
+      openedAt: ago(breakerOpened),
+      push: true,
+      actions: [
+        { kind: 'unblock' },
+        {
+          kind: 'copy',
+          label: msg('intervention.action.showCard'),
+          command: `hermes kanban --board factory show ${CARDS.breakerImpl}`,
+        },
+        {
+          kind: 'link',
+          label: msg('intervention.action.openIssue', { issueKey: KEYS.breaker }),
+          url: issueUrl(KEYS.breaker),
+        },
+      ],
+      unblock: null,
+      diagnosis: breakerDiag,
+      resolvedAt: null,
+      followUp: null,
+    },
+    {
+      // Débloquée depuis Telegram juste avant la réponse postée par l'app : le bot a réagi 😕.
+      id: 'iv-shortcut',
+      kind: 'needs_input',
+      severity: 'critical',
+      title: 'Quel raccourci retenir pour répondre à la dernière question ?',
+      issueKey: KEYS.shortcut,
+      cardId: CARDS.shortcutBrief,
+      profile: 'coordinator',
+      question: [
+        'Quel raccourci retenir pour répondre à la dernière question ?',
+        '',
+        '1. ⌘⇧R, proposé dans l’issue, mais il recharge déjà la vue intégrée.',
+        '2. ⌘J, libre sur macOS comme sous Windows (Ctrl+J).',
+      ].join('\n'),
+      openedAt: ago(26 * min),
+      push: true,
+      actions: [
+        { kind: 'unblock' },
+        {
+          kind: 'link',
+          label: msg('intervention.action.openIssue', { issueKey: KEYS.shortcut }),
+          url: issueUrl(KEYS.shortcut),
+        },
+      ],
+      unblock: {
+        state: 'rejected',
+        text: 'Option 2 : ⌘J, et Ctrl+J sous Windows.',
+        commentUrl: `${issueUrl(KEYS.shortcut)}#issuecomment-3462817701`,
+        at: ago(5 * min),
+      },
+      diagnosis: questionDiagnosis(clock, 26 * min),
+      resolvedAt: ago(6 * min),
+      followUp: null,
+    },
+    {
       id: 'iv-projects',
       kind: 'needs_input',
       severity: 'critical',
@@ -1197,6 +1521,8 @@ export function createInitialState(now: number): DemoState {
     },
   ];
   for (const intervention of interventions) {
+    // Une intervention débloquée ne compte plus pour son issue.
+    if (intervention.resolvedAt) continue;
     const summary = summaries.find((candidate) => candidate.key === intervention.issueKey);
     if (summary) summary.interventionIds.push(intervention.id);
   }
