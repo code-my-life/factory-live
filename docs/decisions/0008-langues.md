@@ -1,6 +1,6 @@
 # ADR 0008 : interface en français et en anglais
 
-Date : 2026-10-29. Statut : proposé.
+Date : 2026-10-29. Statut : accepté (Clément, 2026-10-29).
 
 ## Contexte
 
