@@ -326,7 +326,13 @@ export const Message = z.discriminatedUnion('code', [
 ]);
 export type Message = z.infer<typeof Message>;
 export type MessageCode = Message['code'];
-export type MessageParams<C extends MessageCode> = Extract<Message, { code: C }>['params'];
+/**
+ * Chaque message par son code, calculé une fois. `Extract<Message, { code: C }>` parcourait l'union
+ * entière à chaque appel de `msg` (et encore par inférence depuis le type attendu) : avec plus de deux
+ * cents codes, la vérification des types du serveur passait de 2 à 30 s.
+ */
+type MessageOf = { [M in Message as M['code']]: M };
+export type MessageParams<C extends MessageCode> = MessageOf[C]['params'];
 
 /**
  * Un texte affiché : écrit ailleurs (agent, outil, kanban, sonde, GitHub) et montré tel quel, ou
@@ -343,9 +349,6 @@ type Args<C extends MessageCode> =
     : [params: MessageParams<C>];
 
 /** Un texte fabriqué : `msg('health.probe.last', { seconds: 8 })`, `msg('health.probe')`. */
-export function msg<C extends MessageCode>(
-  code: C,
-  ...[params]: Args<C>
-): Extract<Message, { code: C }> {
-  return { code, params: params ?? {} } as Extract<Message, { code: C }>;
+export function msg<C extends MessageCode>(code: C, ...[params]: Args<C>): MessageOf[C] {
+  return { code, params: params ?? {} } as MessageOf[C];
 }
