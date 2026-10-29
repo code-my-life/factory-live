@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "recipe": {
+    "name": "Node.js (npm workspaces)",
+    "kind": "node",
+    "bootstrap": ["npm ci"],
+    "build": ["npm run build"],
+    "test": ["npm run verify:fast"],
+    "start": null,
+    "port": null,
+    "readinessPath": "/",
+    "evidence": [
+      "Detected package.json (npm workspaces, package-lock.json)",
+      "Package manager: npm",
+      "verify:fast = format:check, lint, lint:css, typecheck, check:text, check:arch, test:coverage (AGENTS.md)",
+      "Pas de start : le serveur prendrait le port 8446 du service factory-live en production",
+      "E2E à part : npm run e2e (Chromium), WebKit dans l'image Playwright (RUNBOOK)"
+    ]
+  },
+  "updatedAt": "2026-10-28T23:00:00+00:00"
+}
