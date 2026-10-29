@@ -145,6 +145,26 @@
 }
 
 /* Sous le titre de la carte : son badge, son état, l'agent qui la tient ; puis ses skills forcées. */
+/* La cause du blocage de la carte, avec le lien vers son diagnostic. */
+.cardCause {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--base-size-4) var(--base-size-8);
+  min-width: 0;
+  margin: 0;
+  padding: var(--base-size-8) var(--base-size-12);
+  border-left: var(--borderWidth-thick) solid var(--borderColor-danger-emphasis);
+  background: var(--bgColor-danger-muted);
+  border-radius: 0 var(--borderRadius-medium) var(--borderRadius-medium) 0;
+  font: var(--text-body-shorthand-small);
+  overflow-wrap: anywhere;
+}
+
+.cardCauseLink {
+  color: var(--fgColor-accent);
+}
+
 .cardPanelMeta {
   display: flex;
   flex-wrap: wrap;
@@ -278,6 +298,11 @@
   display: block;
   color: var(--fgColor-muted);
   font-size: var(--base-text-size-xs);
+}
+
+/* L'issue d'un run qui l'arrête sans le finir : en rouge, comme la carte bloquée. */
+.outcome[data-tone='danger'] {
+  color: var(--fgColor-danger);
 }
 
 .tabPanel {
@@ -464,10 +489,21 @@
 .evidenceList {
   display: flex;
   flex-direction: column;
-  gap: var(--base-size-4);
+  gap: var(--base-size-6);
   margin: 0;
-  padding-left: var(--base-size-16);
+  padding: 0;
+  list-style: none;
   font-size: var(--base-text-size-xs);
+}
+
+/* Un fichier de preuve : son chemin, puis sa taille et son heure, à la ligne sur téléphone. */
+.evidenceFile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--base-size-2) var(--base-size-8);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .listHead {

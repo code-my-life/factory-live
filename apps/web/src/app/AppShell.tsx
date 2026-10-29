@@ -119,10 +119,12 @@ export function AppShell() {
   const location = useLocation();
   const moreRef = useRef<HTMLButtonElement>(null);
 
-  const openInterventions = snapshot.interventions.length;
+  // Une intervention débloquée reste visible le temps du suivi, mais n'attend plus rien.
+  const open = snapshot.interventions.filter((intervention) => !intervention.resolvedAt);
+  const openInterventions = open.length;
   // Pastille de l'icône de l'app installée : les blocages qui t'attendent, comme le serveur la pose
   // à chaque push (notify.ts) ; la démo n'y touche pas.
-  const waiting = snapshot.interventions.filter(
+  const waiting = open.filter(
     (intervention) => intervention.kind !== 'pr_approval' && intervention.kind !== 'main_red',
   ).length;
   useEffect(() => {

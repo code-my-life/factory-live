@@ -43,10 +43,12 @@ describe('DemoSource', () => {
     expect(station(KEYS.team)).toBe('gate');
   });
 
-  it('suit un déblocage : envoyé, pris en compte, carte repartie, puis intervention close', async () => {
+  it('suit un déblocage : envoyé, pris en compte, carte repartie, puis intervention gardée et marquée débloquée', async () => {
     const source = new DemoSource();
     const intervention = () =>
       source.getSnapshot().interventions.find((candidate) => candidate.id === 'iv-projects');
+    const issue = () =>
+      source.getSnapshot().issues.find((candidate) => candidate.key === KEYS.projects);
 
     await source.unblock('iv-projects', 'Option 2');
     expect(intervention()?.unblock?.state).toBe('sent');
@@ -55,7 +57,37 @@ describe('DemoSource', () => {
     vi.advanceTimersByTime(2_500);
     expect(intervention()?.unblock?.state).toBe('resumed');
     vi.advanceTimersByTime(11_000);
-    expect(intervention()).toBeUndefined();
+    // Elle reste visible sous « Récemment débloquées », mais n'est plus comptée sur l'issue.
+    expect(intervention()?.resolvedAt).not.toBeNull();
+    expect(issue()?.interventionIds).not.toContain('iv-projects');
+  });
+
+  it('refuse de débloquer factory-live#2 tant que la cause est là, sauf « Débloquer quand même »', async () => {
+    const source = new DemoSource();
+    const intervention = () =>
+      source.getSnapshot().interventions.find((candidate) => candidate.id === 'iv-hook');
+    expect(intervention()?.diagnosis?.unblock.when).toBe('after_fix');
+    const refused = await source.unblock('iv-hook', 'Reprends').catch((error: unknown) => error);
+    expect(refused).toMatchObject({ action: 'unblock', status: 409, code: 'cause_present' });
+    expect(intervention()?.unblock).toBeNull();
+
+    await source.unblock('iv-hook', 'Reprends', { acknowledgeCause: true });
+    expect(intervention()?.unblock?.state).toBe('sent');
+  });
+
+  it('bascule le diagnostic de factory-live#2 quand la config est corrigée, puis reportée', () => {
+    const source = new DemoSource();
+    const diagnosis = () =>
+      source.getSnapshot().interventions.find((candidate) => candidate.id === 'iv-hook')?.diagnosis;
+    expect(diagnosis()?.primary.cause.state).toBe('present');
+    vi.advanceTimersByTime(73_000);
+    expect(diagnosis()?.primary.cause).toMatchObject({ state: 'fixed', durable: false });
+    expect(diagnosis()?.unblock.when).toBe('now');
+    expect(diagnosis()?.primary.setting).toMatchObject({ current: 600, effective: 420 });
+    vi.advanceTimersByTime(12_000);
+    expect(diagnosis()?.primary.cause).toMatchObject({ state: 'fixed', durable: true });
+    const coder = source.getProfiles().find((profile) => profile.name === 'coder');
+    expect(coder?.limits.find((limit) => limit.key === 'hook_callback_timeout')?.value).toBe(600);
   });
 
   it('écrit en codes ce que factory-live fabrique, pour suivre la langue choisie', async () => {

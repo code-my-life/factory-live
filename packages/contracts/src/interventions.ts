@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { IssueKey, Severity, Timestamp } from './common.ts';
+import { Diagnosis } from './diagnosis.ts';
 import { Text } from './messages.ts';
 
 export const InterventionKind = z.enum([
@@ -47,8 +48,28 @@ export const Intervention = z.object({
   push: z.boolean(),
   actions: z.array(InterventionAction),
   unblock: UnblockProgress.nullable(),
+  /** Pourquoi la carte bloque, calculé par des règles ; `null` quand rien n'est à expliquer. */
+  diagnosis: Diagnosis.nullable().default(null),
+  /** Débloquée : l'intervention reste visible un temps pour suivre la reprise de la carte. */
+  resolvedAt: Timestamp.nullable().default(null),
+  /** Le run lancé après le déblocage : en cours, puis son issue, et s'il rebloque pour la même cause. */
+  followUp: z
+    .object({
+      runId: z.number().int().positive(),
+      outcome: z.string().nullable(),
+      sameCause: z.boolean().nullable(),
+    })
+    .nullable()
+    .default(null),
 });
 export type Intervention = z.infer<typeof Intervention>;
 
-export const UnblockRequest = z.object({ text: z.string().trim().min(1).max(4000) });
+/**
+ * La réponse postée sur l'issue. `acknowledgeCause` : débloquer malgré une cause encore présente côté
+ * factory (le serveur refuse sinon, `cause_present`).
+ */
+export const UnblockRequest = z.object({
+  text: z.string().trim().min(1).max(4000),
+  acknowledgeCause: z.boolean().default(false),
+});
 export type UnblockRequest = z.infer<typeof UnblockRequest>;

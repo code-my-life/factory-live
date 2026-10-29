@@ -80,10 +80,16 @@ export function patchCard(
   Object.assign(card, patch);
 }
 
-export function addRun(state: DemoState, key: IssueKey, cardId: string, run: RunView): void {
+/** Un run qui démarre : sans verdict tant qu'il n'a ni échoué ni bloqué. */
+export function addRun(
+  state: DemoState,
+  key: IssueKey,
+  cardId: string,
+  run: Omit<RunView, 'verdict'> & Partial<Pick<RunView, 'verdict'>>,
+): void {
   const card = requireIssue(state, key).cards.find((candidate) => candidate.id === cardId);
   if (!card) throw new Error(`Carte de démo inconnue : ${cardId}`);
-  card.runs.push(run);
+  card.runs.push({ verdict: null, ...run });
 }
 
 export function patchRun(
@@ -113,7 +119,18 @@ export function addCost(state: DemoState, key: IssueKey, tokens: number, costUsd
   detail.costUsd = Math.round((detail.costUsd + costUsd) * 100) / 100;
 }
 
-export function openIntervention(state: DemoState, intervention: Intervention): void {
+/** Une intervention qui s'ouvre ; sans diagnostic ni suivi tant que rien ne les donne. */
+export function openIntervention(
+  state: DemoState,
+  opened: Omit<Intervention, 'diagnosis' | 'resolvedAt' | 'followUp'> &
+    Partial<Pick<Intervention, 'diagnosis' | 'resolvedAt' | 'followUp'>>,
+): void {
+  const intervention: Intervention = {
+    diagnosis: null,
+    resolvedAt: null,
+    followUp: null,
+    ...opened,
+  };
   state.snapshot.interventions.unshift(intervention);
   if (intervention.issueKey) {
     const summary = state.snapshot.issues.find((issue) => issue.key === intervention.issueKey);
@@ -133,6 +150,21 @@ export function patchIntervention(
   const intervention = state.snapshot.interventions.find((candidate) => candidate.id === id);
   if (!intervention) return;
   Object.assign(intervention, patch);
+}
+
+/** Débloquée : l'intervention reste dans la liste, marquée, le temps de suivre la reprise. */
+export function resolveIntervention(state: DemoState, id: string, at: string): void {
+  const intervention = state.snapshot.interventions.find((candidate) => candidate.id === id);
+  if (!intervention) return;
+  intervention.resolvedAt = at;
+  if (intervention.issueKey) {
+    const summary = state.snapshot.issues.find((issue) => issue.key === intervention.issueKey);
+    if (summary) {
+      patchIssue(state, summary.key, {
+        interventionIds: summary.interventionIds.filter((candidate) => candidate !== id),
+      });
+    }
+  }
 }
 
 export function closeIntervention(state: DemoState, id: string): void {

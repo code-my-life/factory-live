@@ -13,7 +13,12 @@ import { MotionToggle } from '../../ui/motion.tsx';
 import { useNow } from '../../ui/useNow.ts';
 import { LINE_STATIONS } from '../../ui/vocabulary.ts';
 import { JobList } from '../../ui/work/JobBox.tsx';
-import { WorkStateLabel, cardWorkState, interventionTone } from '../../ui/work/workState.tsx';
+import {
+  WorkStateLabel,
+  cardWorkState,
+  interventionHeadline,
+  interventionTone,
+} from '../../ui/work/workState.tsx';
 import { IssueJob } from './IssueJob.tsx';
 import { LiveActivity } from './LiveActivity.tsx';
 import { LiveAgents } from './LiveAgents.tsx';
@@ -93,8 +98,9 @@ export function FactoryLinePage() {
                   ) ?? null
                 }
                 intervention={
-                  snapshot.interventions.find((intervention) =>
-                    issue.interventionIds.includes(intervention.id),
+                  snapshot.interventions.find(
+                    (intervention) =>
+                      !intervention.resolvedAt && issue.interventionIds.includes(intervention.id),
                   ) ?? null
                 }
                 maxInProgress={snapshot.factory.maxInProgress}
@@ -107,7 +113,9 @@ export function FactoryLinePage() {
     };
   });
 
-  const pushable = snapshot.interventions.filter((intervention) => intervention.push);
+  const pushable = snapshot.interventions.filter(
+    (intervention) => intervention.push && !intervention.resolvedAt,
+  );
   // Rouge si l'une des interventions bloque, jaune si elles ne sont qu'à traiter.
   const blocking = pushable.some((intervention) => interventionTone(intervention) === 'danger');
   const lastEvent = [...snapshot.activity].sort((left, right) =>
@@ -147,7 +155,10 @@ export function FactoryLinePage() {
             <ul className={styles.blockers}>
               {pushable.map((intervention) => (
                 <li key={intervention.id}>
-                  {t.line.blockerItem(intervention.issueKey, text(intervention.title))}
+                  {t.line.blockerItem(
+                    intervention.issueKey,
+                    text(interventionHeadline(intervention)),
+                  )}
                 </li>
               ))}
             </ul>

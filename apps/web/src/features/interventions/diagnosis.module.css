@@ -1,0 +1,320 @@
+/*
+ * Le diagnostic d'un blocage : une boîte de Primer découpée en sections, la cause d'abord, les
+ * preuves repliées. Couleurs des jetons seulement : la gravité reste portée par l'étiquette du haut.
+ */
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  background: var(--bgColor-default);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+  margin: 0;
+  padding: var(--base-size-12) var(--base-size-16);
+}
+
+.panel > * + * {
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+
+.kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-6);
+  margin: 0;
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.why {
+  max-width: 72ch;
+  margin: 0;
+  font: var(--text-body-shorthand-medium);
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  color: var(--fgColor-muted);
+}
+
+.warning {
+  color: var(--fgColor-attention);
+}
+
+/* Qui agit, et si débloquer suffit : côte à côte dès que la place le permet. */
+.verdict {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--base-size-12);
+}
+
+@media (min-width: 640px) {
+  .verdict {
+    grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
+  }
+}
+
+.verdictItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-6);
+  min-width: 0;
+}
+
+.verdictValue {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--base-size-6);
+  margin: 0;
+  font-size: var(--text-body-size-small);
+  overflow-wrap: anywhere;
+}
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-6);
+  min-width: 0;
+}
+
+.settingKey {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--base-size-6);
+  margin: 0;
+  font-size: var(--text-body-size-small);
+  overflow-wrap: anywhere;
+}
+
+.settingName {
+  font: var(--text-codeInline-shorthand);
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.settingValues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8) var(--base-size-24);
+  margin: 0;
+}
+
+.settingValue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-2);
+  min-width: 0;
+}
+
+.settingTerm {
+  color: var(--fgColor-muted);
+  font-size: var(--base-text-size-xs);
+}
+
+.settingNote {
+  color: var(--fgColor-muted);
+  font-weight: var(--base-text-weight-normal);
+}
+
+.settingData {
+  margin: 0;
+  font-size: var(--text-body-size-small);
+  font-weight: var(--base-text-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--base-size-8);
+  min-width: 0;
+  font-size: var(--text-body-size-small);
+}
+
+.step[data-done='true'] {
+  color: var(--fgColor-muted);
+}
+
+.stepMark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--base-size-20);
+  height: var(--base-size-20);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-full);
+  font: var(--text-caption-shorthand);
+}
+
+.step[data-done='true'] .stepMark {
+  border-color: var(--borderColor-success-emphasis);
+  background: var(--bgColor-success-emphasis);
+  color: var(--fgColor-onEmphasis);
+}
+
+.stepBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--base-size-6);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.work {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--base-size-8);
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .work {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) minmax(0, 0.6fr);
+  }
+}
+
+.workItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-2);
+  min-width: 0;
+}
+
+.workTerm {
+  color: var(--fgColor-muted);
+  font-size: var(--base-text-size-xs);
+}
+
+.workData {
+  margin: 0;
+  font-size: var(--text-body-size-small);
+  overflow-wrap: anywhere;
+}
+
+/* Les preuves, les runs et les autres constats : repliés, une ligne chacun quand ils sont fermés. */
+.more {
+  min-width: 0;
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  min-height: 44px;
+  padding: 0 var(--base-size-16);
+  cursor: pointer;
+  font-size: var(--text-body-size-small);
+  font-weight: var(--base-text-weight-semibold);
+  list-style: none;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.chevron {
+  flex: none;
+  color: var(--fgColor-muted);
+  transition: transform var(--motion-transition-stateChange);
+}
+
+.more[open] > .summary .chevron {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}
+
+.summary:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: calc(-1 * var(--borderWidth-thick));
+}
+
+.evidence,
+.runs,
+.others {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-12);
+  margin: 0;
+  padding: 0 var(--base-size-16) var(--base-size-16);
+  list-style: none;
+}
+
+.evidenceItem,
+.other {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4);
+  min-width: 0;
+  font-size: var(--text-body-size-small);
+}
+
+.evidenceHead,
+.otherHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-4) var(--base-size-8);
+}
+
+.evidenceFact {
+  overflow-wrap: anywhere;
+}
+
+/* La citation exacte de la source : telle quelle, sur fond d'encart, coupée là où il faut. */
+.quote {
+  display: block;
+  padding: var(--base-size-6) var(--base-size-8);
+  border-radius: var(--borderRadius-medium);
+  background: var(--bgColor-inset);
+  font: var(--text-codeInline-shorthand);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.run {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--base-size-4) var(--base-size-8);
+  min-width: 0;
+  font-size: var(--text-body-size-small);
+}
+
+.runText {
+  flex: 1 1 14rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .summary:hover {
+    background: var(--bgColor-muted);
+  }
+}

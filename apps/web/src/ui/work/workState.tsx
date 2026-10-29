@@ -4,6 +4,7 @@ import type {
   Intervention,
   IssueSummary,
   KanbanStatus,
+  Text,
 } from '@factory-live/contracts';
 import {
   AlertFillIcon,
@@ -94,6 +95,20 @@ export function interventionTone(
   intervention: Pick<Intervention, 'severity'>,
 ): 'attention' | 'danger' {
   return intervention.severity === 'critical' ? 'danger' : 'attention';
+}
+
+/**
+ * Le titre d'une intervention, le même partout : la cause quand le diagnostic en a trouvé une,
+ * sinon la phrase de l'agent, telle quelle (une vraie question, ou un blocage que rien n'explique,
+ * se lit mieux dans ses mots que dans une formule générale).
+ */
+export function interventionHeadline(
+  intervention: Pick<Intervention, 'title' | 'diagnosis'>,
+): Text {
+  const finding = intervention.diagnosis?.primary;
+  return finding && finding.code !== 'question' && finding.code !== 'unexplained'
+    ? finding.summary
+    : intervention.title;
 }
 
 /**

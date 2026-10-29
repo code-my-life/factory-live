@@ -9,18 +9,21 @@ import type {
   UsageReport,
 } from '@factory-live/contracts';
 import { ActionError } from '../data/errors.ts';
-import type { Connection, FactoryDataSource, UsagePeriod } from '../data/source.ts';
+import type { Connection, FactoryDataSource, UnblockOptions, UsagePeriod } from '../data/source.ts';
 import { CARDS, KEYS } from './initial.ts';
 import { createInitialState } from './initial.ts';
 import { buildScript } from './script.ts';
+import { HOOK_INCIDENT, answered } from './diagnoses.ts';
 import {
+  addRun,
   addTimeline,
-  closeIntervention,
   iso,
   patchCard,
   patchIntervention,
   patchIssue,
+  patchRun,
   pushActivity,
+  resolveIntervention,
 } from './state.ts';
 import type { DemoState } from './state.ts';
 
@@ -84,17 +87,21 @@ export class DemoSource implements FactoryDataSource {
     return Promise.resolve(pkgVersion ?? '0.1.0');
   }
 
-  unblock(interventionId: string, text: string): Promise<void> {
+  unblock(interventionId: string, text: string, options: UnblockOptions = {}): Promise<void> {
     const intervention = this.state.snapshot.interventions.find(
       (candidate) => candidate.id === interventionId,
     );
     if (!intervention?.issueKey) return Promise.reject(new ActionError('unblockUnknown'));
+    // Comme le serveur : tant que la cause est là côté factory, il faut « Débloquer quand même ».
+    if (intervention.diagnosis?.unblock.when === 'after_fix' && !options.acknowledgeCause)
+      return Promise.reject(new ActionError('unblock', 409, 'cause_present'));
     const issueKey = intervention.issueKey;
     const commentUrl = `${this.state.details[issueKey]?.issue.url ?? ''}#issuecomment-2471993104`;
 
     this.update((state, now) => {
       patchIntervention(state, interventionId, {
         unblock: { state: 'sent', text, commentUrl, at: iso(now) },
+        diagnosis: answered(intervention.diagnosis),
       });
       pushActivity(state, {
         at: iso(now),
@@ -146,6 +153,31 @@ export class DemoSource implements FactoryDataSource {
           blockReason: null,
         });
       }
+      if (intervention.cardId === CARDS.hookImpl) {
+        // factory-live#2 repart : run 192 de coder, suivi sous l'intervention débloquée.
+        patchCard(state, KEYS.hook, CARDS.hookImpl, {
+          status: 'running',
+          blockKind: null,
+          blockReason: null,
+        });
+        addRun(state, KEYS.hook, CARDS.hookImpl, {
+          id: HOOK_INCIDENT.runs.after,
+          profile: 'coder',
+          role: 'implementer',
+          status: 'running',
+          outcome: null,
+          startedAt: iso(now),
+          endedAt: null,
+          model: { model: 'auto', provider: 'freellmapi', source: 'live' },
+          laneModel: null,
+          summary: null,
+          tokens: null,
+          costUsd: null,
+        });
+        patchIntervention(state, interventionId, {
+          followUp: { runId: HOOK_INCIDENT.runs.after, outcome: null, sameCause: null },
+        });
+      }
       patchIssue(state, issueKey, { status: 'queued', updatedAt: iso(now) });
       pushActivity(state, {
         at: iso(now),
@@ -169,7 +201,25 @@ export class DemoSource implements FactoryDataSource {
         tone: 'success',
       });
     });
-    this.later(16, (state) => closeIntervention(state, interventionId));
+    // Débloquée, elle reste visible sous « Récemment débloquées » : on y suit la reprise.
+    this.later(6, (state, now) => resolveIntervention(state, interventionId, iso(now)));
+    if (intervention.cardId === CARDS.hookImpl) {
+      this.later(24, (state, now) => {
+        patchRun(state, KEYS.hook, CARDS.hookImpl, HOOK_INCIDENT.runs.after, {
+          status: 'review',
+          outcome: 'review_requested',
+          endedAt: iso(now),
+        });
+        patchCard(state, KEYS.hook, CARDS.hookImpl, { status: 'review' });
+        patchIntervention(state, interventionId, {
+          followUp: {
+            runId: HOOK_INCIDENT.runs.after,
+            outcome: 'review_requested',
+            sameCause: false,
+          },
+        });
+      });
+    }
     return Promise.resolve();
   }
 

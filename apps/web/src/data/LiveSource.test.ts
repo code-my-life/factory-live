@@ -174,6 +174,19 @@ describe('LiveSource', () => {
     const body = call?.init?.body;
     expect(JSON.parse(typeof body === 'string' ? body : 'null')).toEqual({
       text: 'Prends PostgreSQL',
+      acknowledgeCause: false,
+    });
+  });
+
+  it('passe outre une cause encore présente seulement quand on le demande', async () => {
+    const { source, calls } = setup();
+    await source
+      .unblock('capability:t_1:12', 'Reprends', { acknowledgeCause: true })
+      .catch(() => undefined);
+    const body = calls.at(-1)?.init?.body;
+    expect(JSON.parse(typeof body === 'string' ? body : 'null')).toEqual({
+      text: 'Reprends',
+      acknowledgeCause: true,
     });
   });
 

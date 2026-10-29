@@ -20,6 +20,7 @@ function card(title: string, kind: CardView['kind'] = 'impl'): CardView {
     changedFiles: [],
     testsPassed: null,
     testsTotal: null,
+    evidence: [],
   };
 }
 

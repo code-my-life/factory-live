@@ -29,6 +29,8 @@ services:
       PUBLIC_ORIGINS: ${PUBLIC_ORIGINS:-http://localhost:8446}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
       DASHBOARD_URL: ${DASHBOARD_URL:-}
+      # Le journal d'Hermès note l'heure locale de ce PC sans fuseau ; le conteneur, lui, est en UTC.
+      HERMES_TZ: ${HERMES_TZ:-Europe/Paris}
     volumes:
       - factory-live-data:/data
       # Bases d'Hermès : dossiers en écriture pour le seul `-shm` de SQLite (lecteur WAL), bases ouvertes en lecture seule.

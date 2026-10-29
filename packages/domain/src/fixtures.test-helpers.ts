@@ -19,6 +19,11 @@ export function aTask(patch: Partial<Task> = {}): Task {
     modelOverride: null,
     providerOverride: null,
     lastHeartbeatAt: null,
+    branchName: null,
+    consecutiveFailures: 0,
+    blockRecurrences: 0,
+    lastFailureError: null,
+    maxRuntimeSeconds: null,
     ...patch,
   };
 }
@@ -34,6 +39,7 @@ export function aRun(patch: Partial<Run> = {}): Run {
     endedAt: null,
     summary: null,
     metadata: {},
+    error: null,
     ...patch,
   };
 }

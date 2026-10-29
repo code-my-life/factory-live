@@ -33,13 +33,16 @@ export interface UnblockDeps {
 /**
  * Répond à une intervention depuis l'app : commentaire `/factory unblock <réponse>` posté sur l'issue au
  * nom de Clément (son jeton). C'est le chemin existant de la factory, relais `active_pr` compris ; le bot
- * accuse réception par une réaction, puis la carte repart. Une deuxième demande ne reposte rien.
+ * accuse réception par une réaction, puis la carte repart. Une deuxième demande ne reposte rien, sauf
+ * après un refus du bot. Tant que le diagnostic voit la cause encore présente côté factory, il faut
+ * `acknowledgeCause` : la carte retomberait dans le même échec, et le 2e blocage l'envoie en triage.
  */
 export async function unblockIntervention(
   deps: UnblockDeps,
   interventionId: string,
   text: string,
   actor: string,
+  acknowledgeCause = false,
 ): Promise<UnblockRecord> {
   const intervention = deps.hub.openInterventions.find((item) => item.id === interventionId);
   if (!intervention)
@@ -58,19 +61,41 @@ export async function unblockIntervention(
       'Connecte-toi à GitHub dans factory-live (Réglages) pour débloquer depuis l’app',
     );
   }
+  const primary = intervention.diagnosis?.primary ?? null;
+  const causePresent = intervention.diagnosis?.unblock.when === 'after_fix';
+  if (causePresent && !acknowledgeCause) {
+    deps.store.audit(
+      actor,
+      'unblock-refused',
+      `${intervention.issueKey} ${interventionId} : cause présente (${primary?.code ?? '?'})`,
+      deps.now(),
+    );
+    throw new UnblockError(
+      409,
+      'cause_present',
+      'La cause du blocage est encore là côté factory : corrige-la, ou débloque quand même',
+    );
+  }
   const now = deps.now();
-  const reserved = deps.store.reserveUnblock({
+  const reservation = {
     interventionId,
     issueKey: intervention.issueKey,
     text,
     actor,
-    state: 'sent',
+    state: 'sent' as const,
     at: now,
-  });
-  if (!reserved) {
+  };
+  if (!deps.store.reserveUnblock(reservation)) {
     const existing = deps.store.unblock(interventionId);
-    if (existing) return existing;
+    // Une réponse refusée par le bot (😕) peut être renvoyée, corrigée.
+    if (existing?.state === 'rejected') {
+      deps.store.forgetUnblock(interventionId);
+      deps.store.reserveUnblock(reservation);
+    } else if (existing) return existing;
   }
+  const cause = primary
+    ? ` [cause ${primary.code} : ${causePresent ? 'présente, déblocage voulu' : primary.cause.state}]`
+    : '';
   const [repo = '', number = '0'] = intervention.issueKey.split('#');
   try {
     const comment = await deps.github.comment(repo, Number(number), `/factory unblock ${text}`);
@@ -82,7 +107,7 @@ export async function unblockIntervention(
     deps.store.audit(
       actor,
       'unblock',
-      `${intervention.issueKey} ${interventionId} → ${comment.url}`,
+      `${intervention.issueKey} ${interventionId} → ${comment.url}${cause}`,
       deps.now(),
     );
     deps.log.info(

@@ -29,6 +29,7 @@ import { fromTimelineEntry } from '../../ui/timeline/rows.ts';
 import {
   WorkStateLabel,
   cardWorkState,
+  interventionHeadline,
   interventionTone,
   issueWorkState,
 } from '../../ui/work/workState.tsx';
@@ -98,8 +99,7 @@ function RunsTable({
               </p>
             ) : null}
             <p className={styles.runOutcome}>
-              {run.outcome ?? t.issue.runs.running}
-              {run.summary ? <span className={styles.cellNote}>{run.summary}</span> : null}
+              <RunOutcome run={run} />
             </p>
             <Button size="small" onClick={() => onSelectRun(run.id)}>
               {t.issue.runs.transcriptOf(run.id)}
@@ -147,8 +147,7 @@ function RunsTable({
                 </Table.Cell>
                 <Table.Cell>
                   <span className={styles.cellStack}>
-                    {run.outcome ?? t.issue.runs.running}
-                    {run.summary ? <span className={styles.cellNote}>{run.summary}</span> : null}
+                    <RunOutcome run={run} />
                   </span>
                 </Table.Cell>
                 <Table.Cell align="end" className="fl-tabular">
@@ -168,18 +167,48 @@ function RunsTable({
   );
 }
 
-const EVIDENCE: Record<string, string[]> = {
-  impl: [
-    'evidence/brief.md',
-    'evidence/01-fail-on-base.txt',
-    'evidence/10-claude-run.json',
-    'evidence/11-cli-diff.patch',
-    'evidence/04-tests-after.txt',
-    'evidence/pr-body.md',
-  ],
-  brief: ['evidence/brief-input.md', 'evidence/brief-claude.json'],
-  release: ['evidence/gate/1/review.md', 'evidence/gate/1/claude-verdict.json'],
-};
+/** Les issues d'un run qui l'arrêtent sans le finir : en rouge, comme la carte bloquée. */
+const FAILED_OUTCOMES = new Set(['crashed', 'blocked', 'gave_up', 'timed_out', 'spawn_failed']);
+
+/** L'issue d'un run, traduite, puis ce que le diagnostic en dit (ou le résumé de l'agent). */
+function RunOutcome({ run }: { run: RunView }) {
+  const { t, text } = useI18n();
+  const outcome = run.outcome ? (t.runOutcome[run.outcome] ?? run.outcome) : t.issue.runs.running;
+  return (
+    <>
+      <span
+        className={styles.outcome}
+        data-tone={run.outcome && FAILED_OUTCOMES.has(run.outcome) ? 'danger' : undefined}
+      >
+        {outcome}
+      </span>
+      {run.verdict ? (
+        <span className={styles.cellNote}>{text(run.verdict.text)}</span>
+      ) : run.summary ? (
+        <span className={styles.cellNote}>{run.summary}</span>
+      ) : null}
+    </>
+  );
+}
+
+/** Les vrais fichiers de `evidence/` de la carte, lus dans son worktree. */
+function EvidenceFiles({ card }: { card: CardView | null }) {
+  const { t, fmt } = useI18n();
+  if (!card || card.evidence.length === 0)
+    return <p className={styles.muted}>{t.issue.evidenceEmpty}</p>;
+  return (
+    <ul className={styles.evidenceList}>
+      {card.evidence.map((file) => (
+        <li key={file.name} className={styles.evidenceFile}>
+          <span className="fl-mono">evidence/{file.name}</span>
+          <span className={styles.muted}>
+            {t.issue.evidenceFile(t.issue.bytes(file.bytes), fmt.clock(file.at))}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function IssuePage() {
   const i18n = useI18n();
@@ -219,9 +248,18 @@ export function IssuePage() {
     detail.cards.flatMap((card) => card.runs).at(-1)?.id ??
     null;
   const interventions = snapshot.interventions.filter(
-    (intervention) => intervention.issueKey === key,
+    (intervention) => intervention.issueKey === key && !intervention.resolvedAt,
   );
   const agents = snapshot.agents.filter((agent) => agent.issueKey === key);
+  const selectedCardIntervention =
+    interventions.find((intervention) => intervention.cardId === selectedCard?.id) ?? null;
+  const causes = new Map(
+    interventions.flatMap((intervention) =>
+      intervention.cardId && intervention.diagnosis
+        ? [[intervention.cardId, interventionHeadline(intervention)] as const]
+        : [],
+    ),
+  );
   const elapsedEnd = issue.status === 'done' ? Date.parse(issue.updatedAt) : null;
 
   return (
@@ -317,22 +355,33 @@ export function IssuePage() {
         </div>
       </dl>
 
-      {interventions.map((intervention) => (
-        <Banner
-          key={intervention.id}
-          // La couleur de l'intervention dans sa liste et sur la ligne : rouge si elle bloque, jaune sinon.
-          variant={interventionTone(intervention) === 'danger' ? 'critical' : 'warning'}
-          title={t.common.labelValue(t.intervention[intervention.kind], text(intervention.title))}
-          description={t.issue.bannerDescription}
-          primaryAction={
-            <Banner.PrimaryAction
-              onClick={() => void navigate(`/interventions/${intervention.id}`)}
-            >
-              {t.issue.reply}
-            </Banner.PrimaryAction>
-          }
-        />
-      ))}
+      {interventions.map((intervention) => {
+        const diagnosis = intervention.diagnosis;
+        return (
+          <Banner
+            key={intervention.id}
+            // La couleur de l'intervention dans sa liste et sur la ligne : rouge si elle bloque, jaune sinon.
+            variant={interventionTone(intervention) === 'danger' ? 'critical' : 'warning'}
+            // Avec un diagnostic : la cause, qui agit et si débloquer suffit ; sinon la phrase de l'agent.
+            title={t.common.labelValue(
+              t.intervention[intervention.kind],
+              text(interventionHeadline(intervention)),
+            )}
+            description={
+              diagnosis
+                ? `${t.diagnosis.actor[diagnosis.primary.actor]}. ${t.diagnosis.advice[diagnosis.unblock.when]}`
+                : t.issue.bannerDescription
+            }
+            primaryAction={
+              <Banner.PrimaryAction
+                onClick={() => void navigate(`/interventions/${intervention.id}`)}
+              >
+                {diagnosis ? t.issue.seeDiagnosis : t.issue.reply}
+              </Banner.PrimaryAction>
+            }
+          />
+        );
+      })}
 
       <section className={styles.section} aria-labelledby="graph-title">
         <div className={styles.sectionHead}>
@@ -344,6 +393,7 @@ export function IssuePage() {
         <IssueGraph
           cards={detail.cards}
           agents={agents}
+          causes={causes}
           selectedCardId={selectedCard?.id ?? null}
           onSelectCard={(cardId) => {
             setSelectedCardId(cardId);
@@ -372,6 +422,18 @@ export function IssuePage() {
                 {selectedCard.assignee ?? t.issue.unassigned}
               </span>
             </p>
+            {selectedCardIntervention?.diagnosis ? (
+              <p className={styles.cardCause}>
+                <span className={styles.muted}>{t.issue.cardCause}</span>
+                <span>{text(interventionHeadline(selectedCardIntervention))}</span>
+                <Link
+                  to={`/interventions/${encodeURIComponent(selectedCardIntervention.id)}`}
+                  className={styles.cardCauseLink}
+                >
+                  {t.issue.seeDiagnosis}
+                </Link>
+              </p>
+            ) : null}
             {selectedCard.skills.length > 0 ? (
               <p className={styles.cardPanelMeta}>
                 <span className={styles.muted}>{t.issue.forcedSkills}</span>
@@ -480,13 +542,7 @@ export function IssuePage() {
           {tab === 'evidence' ? (
             <div className={styles.evidence}>
               <p className={styles.muted}>{t.issue.evidence(selectedCard?.id ?? null)}</p>
-              <ul className={styles.evidenceList}>
-                {(EVIDENCE[selectedCard?.kind ?? 'impl'] ?? []).map((file) => (
-                  <li key={file} className="fl-mono">
-                    {file}
-                  </li>
-                ))}
-              </ul>
+              <EvidenceFiles card={selectedCard} />
             </div>
           ) : null}
         </div>

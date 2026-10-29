@@ -5,7 +5,11 @@ import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import { actionModel } from '../../ui/modelText.ts';
 import { issuePath } from '../../ui/paths.ts';
 import { JobAction, JobBox, JobDetail } from '../../ui/work/JobBox.tsx';
-import { interventionTone, issueWorkState } from '../../ui/work/workState.tsx';
+import {
+  interventionHeadline,
+  interventionTone,
+  issueWorkState,
+} from '../../ui/work/workState.tsx';
 
 /**
  * Une issue sur la ligne d'usine : sa boîte, son état, l'agent qui la tient, et ce qu'il y fait
@@ -73,7 +77,10 @@ function IssueJobDetail({
       <>
         {/* L'intervention garde sa couleur, la même que dans sa liste : rouge si elle bloque. */}
         {intervention ? (
-          <JobDetail tone={interventionTone(intervention)}>{text(intervention.title)}</JobDetail>
+          <JobDetail tone={interventionTone(intervention)}>
+            {/* La cause trouvée par le diagnostic, sinon la phrase de l'agent. */}
+            {text(interventionHeadline(intervention))}
+          </JobDetail>
         ) : null}
         {intervention ? (
           <JobAction to={`/interventions/${encodeURIComponent(intervention.id)}`}>

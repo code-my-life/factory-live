@@ -8,7 +8,7 @@ import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { CardBadge } from '../../ui/badge/CardBadge.tsx';
 import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
-import { interventionTone } from '../../ui/work/workState.tsx';
+import { interventionHeadline, interventionTone } from '../../ui/work/workState.tsx';
 import { InterventionDetail } from './InterventionDetail.tsx';
 import styles from './interventions.module.css';
 
@@ -26,12 +26,64 @@ function sortInterventions(interventions: readonly Intervention[]): Intervention
   );
 }
 
-export function InterventionsPage() {
+/** Une ligne de la liste : la cause quand un diagnostic l'a trouvée, qui agit, et le suivi. */
+function InterventionItem({
+  intervention,
+  current,
+}: {
+  intervention: Intervention;
+  current: boolean;
+}) {
   const { t, text } = useI18n();
+  const diagnosis = intervention.diagnosis;
+  return (
+    <li>
+      <Link
+        to={`/interventions/${intervention.id}`}
+        className={styles.item}
+        data-tone={interventionTone(intervention)}
+        data-resolved={intervention.resolvedAt ? 'true' : undefined}
+        aria-current={current ? 'page' : undefined}
+      >
+        <span className={styles.itemKind}>
+          {intervention.push ? <BellIcon size={12} aria-label={t.interventions.push} /> : null}
+          {t.intervention[intervention.kind]}
+        </span>
+        <span className={styles.itemTitle}>{text(interventionHeadline(intervention))}</span>
+        {diagnosis && !intervention.resolvedAt ? (
+          <span className={styles.itemActor}>{t.diagnosis.actor[diagnosis.primary.actor]}</span>
+        ) : null}
+        <span className={styles.itemMeta}>
+          {intervention.issueKey ? (
+            <IssueBadge issueKey={intervention.issueKey} state="open" />
+          ) : intervention.cardId ? (
+            <CardBadge id={intervention.cardId} />
+          ) : null}{' '}
+          <span>
+            {t.interventions.opened} <Elapsed since={intervention.openedAt} mode="age" />
+          </span>
+        </span>
+        {intervention.unblock ? (
+          <span className={styles.itemProgress}>
+            {t.interventions.progress[intervention.unblock.state]}
+          </span>
+        ) : null}
+      </Link>
+    </li>
+  );
+}
+
+export function InterventionsPage() {
+  const { t } = useI18n();
   const { id } = useParams();
   const snapshot = useSnapshot();
-  const interventions = sortInterventions(snapshot.interventions);
-  const selected = interventions.find((intervention) => intervention.id === id) ?? null;
+  const all = sortInterventions(snapshot.interventions);
+  // Débloquées : encore visibles le temps de suivre la reprise, sous les interventions ouvertes.
+  const interventions = all.filter((intervention) => !intervention.resolvedAt);
+  const recent = all
+    .filter((intervention) => intervention.resolvedAt)
+    .sort((left, right) => (right.resolvedAt ?? '').localeCompare(left.resolvedAt ?? ''));
+  const selected = all.find((intervention) => intervention.id === id) ?? null;
   const showDetailOnly = id !== undefined;
 
   return (
@@ -47,7 +99,7 @@ export function InterventionsPage() {
         <p className={styles.intro}>{t.interventions.intro}</p>
       </header>
 
-      {interventions.length === 0 && !showDetailOnly ? (
+      {all.length === 0 && !showDetailOnly ? (
         // Rien n'attend : l'état vide de Primer, à la place des deux colonnes vides.
         <Blankslate border spacious>
           <Blankslate.Visual>
@@ -65,41 +117,28 @@ export function InterventionsPage() {
             ) : (
               <ul className={styles.items}>
                 {interventions.map((intervention) => (
-                  <li key={intervention.id}>
-                    <Link
-                      to={`/interventions/${intervention.id}`}
-                      className={styles.item}
-                      data-tone={interventionTone(intervention)}
-                      aria-current={intervention.id === id ? 'page' : undefined}
-                    >
-                      <span className={styles.itemKind}>
-                        {intervention.push ? (
-                          <BellIcon size={12} aria-label={t.interventions.push} />
-                        ) : null}
-                        {t.intervention[intervention.kind]}
-                      </span>
-                      <span className={styles.itemTitle}>{text(intervention.title)}</span>
-                      <span className={styles.itemMeta}>
-                        {intervention.issueKey ? (
-                          <IssueBadge issueKey={intervention.issueKey} state="open" />
-                        ) : intervention.cardId ? (
-                          <CardBadge id={intervention.cardId} />
-                        ) : null}{' '}
-                        <span>
-                          {t.interventions.opened}{' '}
-                          <Elapsed since={intervention.openedAt} mode="age" />
-                        </span>
-                      </span>
-                      {intervention.unblock ? (
-                        <span className={styles.itemProgress}>
-                          {t.interventions.progress[intervention.unblock.state]}
-                        </span>
-                      ) : null}
-                    </Link>
-                  </li>
+                  <InterventionItem
+                    key={intervention.id}
+                    intervention={intervention}
+                    current={intervention.id === id}
+                  />
                 ))}
               </ul>
             )}
+            {recent.length > 0 ? (
+              <>
+                <h2 className={styles.groupTitle}>{t.interventions.recent}</h2>
+                <ul className={styles.items}>
+                  {recent.map((intervention) => (
+                    <InterventionItem
+                      key={intervention.id}
+                      intervention={intervention}
+                      current={intervention.id === id}
+                    />
+                  ))}
+                </ul>
+              </>
+            ) : null}
           </nav>
 
           <div className={styles.detail}>

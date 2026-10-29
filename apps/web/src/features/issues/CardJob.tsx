@@ -1,4 +1,4 @@
-import type { AgentActivity, CardView } from '@factory-live/contracts';
+import type { AgentActivity, CardView, Text } from '@factory-live/contracts';
 import { ProgressBar } from '@primer/react';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { CardBadge } from '../../ui/badge/CardBadge.tsx';
@@ -20,12 +20,15 @@ export function CardJob({
   selected,
   onSelect,
   now,
+  cause = null,
 }: {
   card: CardView;
   agent: AgentActivity | null;
   selected: boolean;
   onSelect: () => void;
   now: number;
+  /** La cause trouvée par le diagnostic quand la carte bloque : elle passe avant la phrase de l'agent. */
+  cause?: Text | null;
 }) {
   const { t, fmt, text } = useI18n();
   const run = card.runs.at(-1) ?? null;
@@ -56,6 +59,8 @@ export function CardJob({
           {text(agent.action.label)}
           {agent.action.detail && !actionModel(agent) ? ` · ${agent.action.detail}` : ''}
         </JobDetail>
+      ) : cause ? (
+        <JobDetail tone="danger">{text(cause)}</JobDetail>
       ) : card.blockReason ? (
         <JobDetail tone="danger">{card.blockReason}</JobDetail>
       ) : card.testsTotal ? (

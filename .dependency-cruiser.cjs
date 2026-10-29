@@ -56,6 +56,25 @@ module.exports = {
       to: { dependencyTypes: ['core'] },
     },
     {
+      name: 'diagnosis-is-offline',
+      severity: 'error',
+      comment:
+        'Le diagnostic des blocages lit des fichiers locaux, rien d’autre : ni réseau, ni processus, ni modèle (ADR 0009).',
+      from: {
+        path: [
+          '^packages/domain/src/diagnosis',
+          '^apps/server/src/application/diagnosis\\.ts$',
+          '^apps/server/src/adapters/hermes/(paths|profiles|sessions|files|agentLog)\\.ts$',
+        ],
+      },
+      to: {
+        path: [
+          '^(node:)?(http|https|http2|net|tls|dgram|dns|child_process|cluster|worker_threads)$',
+          'node_modules/(undici|web-push|@octokit|openai|@anthropic-ai|@hono)',
+        ],
+      },
+    },
+    {
       name: 'no-test-code-in-production',
       severity: 'error',
       from: { pathNot: '\\.test\\.tsx?$' },

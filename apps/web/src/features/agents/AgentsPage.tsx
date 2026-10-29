@@ -1,4 +1,4 @@
-import type { AgentActivity, ProfileView } from '@factory-live/contracts';
+import type { AgentActivity, ProfileLimit, ProfileView } from '@factory-live/contracts';
 import { AlertIcon, ArrowRightIcon } from '@primer/octicons-react';
 import { Heading, Token } from '@primer/react';
 import { useProfiles, useSnapshot } from '../../data/FactoryProvider.tsx';
@@ -26,6 +26,47 @@ function DriftModels({ models, fallback }: { models: ModelName[] | null; fallbac
   );
 }
 
+/** La limite appliquée : la valeur réglée, sinon celle d'Hermès par défaut ; `null` : sans limite. */
+function applied(limit: ProfileLimit | undefined): number | null {
+  return limit ? (limit.value ?? limit.defaultValue) : null;
+}
+
+/**
+ * Le délai réel du hook d'un plugin : celui du hook, plafonné par celui de l'appel d'outil, qui
+ * englobe le hook (le plafond des outils d'Hermès coupe aussi un contrôle lancé dans un hook).
+ */
+function effectiveHookLimit(limits: readonly ProfileLimit[]): number | null {
+  const hook = applied(limits.find((limit) => limit.key === 'hook_callback_timeout'));
+  const tool = applied(limits.find((limit) => limit.key === 'tool_deadline'));
+  if (hook === null) return tool;
+  return tool === null ? hook : Math.min(hook, tool);
+}
+
+/** Les délais d'Hermès qui coupent le travail de l'agent, réglés ou par défaut. */
+function Limits({ limits }: { limits: readonly ProfileLimit[] }) {
+  const { t, fmt } = useI18n();
+  if (limits.length === 0) return null;
+  const write = (limit: ProfileLimit) => {
+    const value = limit.value ?? limit.defaultValue;
+    if (value === null) return t.agents.unlimited;
+    const text = limit.unit === 'turns' ? t.agents.turns(value) : fmt.duration(value * 1000);
+    return t.agents.limitValue(text, limit.value === null);
+  };
+  return (
+    <section className={styles.block} aria-label={t.agents.limits}>
+      <h3 className={styles.blockTitle}>{t.agents.limits}</h3>
+      <dl className={styles.limits}>
+        {limits.map((limit) => (
+          <div key={limit.key} className={styles.limit}>
+            <dt className={styles.limitTerm}>{t.agents.limit[limit.key]}</dt>
+            <dd className={styles.limitData}>{write(limit)}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 function AgentProfileCard({
   profile,
   activity,
@@ -35,6 +76,7 @@ function AgentProfileCard({
 }) {
   const { t, fmt, text } = useI18n();
   const working = activity && activity.state !== 'idle';
+  const hookLimit = effectiveHookLimit(profile.limits);
   // La pastille dit l'état comme l'anneau de l'avatar : bleue au travail, rouge bloqué, grise sinon.
   const busy =
     activity?.state === 'thinking' || activity?.state === 'tool' || activity?.state === 'cli';
@@ -178,19 +220,42 @@ function AgentProfileCard({
           {profile.plugins.map((plugin) => (
             <Token
               key={plugin.name}
-              text={
-                plugin.refusals > 0 ? t.agents.refusals(plugin.name, plugin.refusals) : plugin.name
-              }
+              text={[
+                plugin.refusals > 0 ? t.agents.refusals(plugin.name, plugin.refusals) : plugin.name,
+                ...(plugin.timeouts > 0 ? [t.agents.timeouts(plugin.timeouts)] : []),
+              ].join(' · ')}
               size="small"
             />
           ))}
         </div>
+        {/* Une garde dont le code peut attendre plus longtemps que son hook : le risque de l'incident #2. */}
+        {profile.plugins
+          .filter(
+            (plugin) =>
+              plugin.longestSeconds !== null &&
+              hookLimit !== null &&
+              plugin.longestSeconds >= hookLimit,
+          )
+          .map((plugin) => (
+            <p key={plugin.name} className={styles.risk}>
+              <AlertIcon size={12} aria-hidden="true" className={styles.riskIcon} />
+              <span>
+                <code>{plugin.name}</code>{' '}
+                {t.agents.risk(
+                  fmt.duration((plugin.longestSeconds ?? 0) * 1000),
+                  fmt.duration((hookLimit ?? 0) * 1000),
+                )}
+              </span>
+            </p>
+          ))}
         <h3 className={styles.blockTitle}>{t.agents.toolsets(profile.mcp.length > 0)}</h3>
         <p className={styles.toolsets}>
           {profile.toolsets.join(' · ')}
           {profile.mcp.length > 0 ? ` · MCP ${profile.mcp.join(', ')}` : ''}
         </p>
       </section>
+
+      <Limits limits={profile.limits} />
 
       <dl className={styles.stats}>
         <div className={styles.stat}>

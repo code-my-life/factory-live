@@ -80,6 +80,12 @@ function toTask(row: Record<string, unknown>): Task {
     modelOverride: text(row['model_override']),
     providerOverride: text(row['provider_override']),
     lastHeartbeatAt: int(row['last_heartbeat_at']),
+    // Colonnes lues sans les exiger : un Hermès qui ne les a pas laisse le diagnostic sans elles.
+    branchName: text(row['branch_name']),
+    consecutiveFailures: int(row['consecutive_failures']) ?? 0,
+    blockRecurrences: int(row['block_recurrences']) ?? 0,
+    lastFailureError: text(row['last_failure_error']),
+    maxRuntimeSeconds: int(row['max_runtime_seconds']),
   };
 }
 
@@ -94,6 +100,7 @@ function toRun(row: Record<string, unknown>): Run {
     endedAt: int(row['ended_at']),
     summary: text(row['summary']),
     metadata: json(row['metadata']),
+    error: text(row['error']),
   };
 }
 
