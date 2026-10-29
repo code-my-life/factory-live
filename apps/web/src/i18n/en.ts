@@ -726,6 +726,10 @@ export const en: Messages = {
     },
     sources: 'Sources',
     dataSource: (demo) => (demo ? 'demo data' : 'live data'),
+    /** When the server is unreachable, instead of showing a made-up version. */
+    unknownServerVersion: 'server version unknown',
+    /** In demo: the package version, not the server version. */
+    demoVersion: 'demo',
   },
 
   push: {

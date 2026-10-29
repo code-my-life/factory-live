@@ -38,6 +38,8 @@ export interface FactoryDataSource {
   logoutGitHub?(): Promise<void>;
   /** Démo seulement : rejoue le scénario depuis le début. */
   restart?(): void;
+  /** Version de factory-live annoncée par le serveur (`GET /healthz`), ou la version du paquet en démo. */
+  getServerVersion(): Promise<string | null>;
 }
 
 export type UsagePeriod = 1 | 7 | 30;

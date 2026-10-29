@@ -1,6 +1,13 @@
+import { readFileSync } from 'node:fs';
 import react from '@vitejs/plugin-react';
 import { defaultClientConditions, defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+
+// La version de l'app (apps/web/package.json), injectée pour la démo : sans serveur, c'est elle qu'affiche
+// Réglages, avec la mention « démo ». Le serveur (/healthz) la surpasse en mode live.
+const webVersion = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
+  version: string;
+};
 
 // `source` résout les paquets du monorepo sur leurs sources TypeScript (voir les `exports`).
 // FACTORY_LIVE_BASE=./ produit un build relocalisable, publiable tel quel en artifact.
@@ -61,6 +68,9 @@ export default defineConfig({
     }),
   ],
   resolve: { conditions: ['source', ...defaultClientConditions] },
+  define: {
+    'import.meta.env.PACKAGE_VERSION': JSON.stringify(webVersion.version),
+  },
   server: {
     port: 5173,
     strictPort: true,

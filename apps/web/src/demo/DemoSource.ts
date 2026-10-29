@@ -79,6 +79,11 @@ export class DemoSource implements FactoryDataSource {
     return this.state.history;
   }
 
+  getServerVersion(): Promise<string | null> {
+    const pkgVersion = import.meta.env.PACKAGE_VERSION as string | undefined;
+    return Promise.resolve(pkgVersion ?? '0.1.0');
+  }
+
   unblock(interventionId: string, text: string): Promise<void> {
     const intervention = this.state.snapshot.interventions.find(
       (candidate) => candidate.id === interventionId,

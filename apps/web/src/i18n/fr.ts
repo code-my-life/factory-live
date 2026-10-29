@@ -795,6 +795,10 @@ export const fr = {
     sources: 'Sources',
     /** D'où viennent les données affichées, après les versions en service. */
     dataSource: (demo: boolean) => (demo ? 'données de démonstration' : 'données en direct'),
+    /** Quand le serveur est injoignable, au lieu d'afficher une version inventée. */
+    unknownServerVersion: 'version du serveur inconnue',
+    /** En démo : la version du paquet, pas celle du serveur. */
+    demoVersion: 'démo',
   },
 
   push: {

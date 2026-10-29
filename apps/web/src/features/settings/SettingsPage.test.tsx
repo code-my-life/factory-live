@@ -1,5 +1,5 @@
 import type { Snapshot } from '@factory-live/contracts';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,12 +15,24 @@ const ADDRESSES: Snapshot['addresses'] = {
   tailnet: 'https://machine.tailnet.ts.net:8446',
 };
 
-function sourceWith(addresses: Snapshot['addresses']): FactoryDataSource {
+/** Source de test : implémentation minimale du contrat `FactoryDataSource`. */
+function sourceWith(
+  fetchImpl?: typeof fetch,
+  kind: 'demo' | 'live' = 'demo',
+  addresses: Snapshot['addresses'] = ADDRESSES,
+): FactoryDataSource {
   const snapshot = { health: [], addresses } as unknown as Snapshot;
   return {
-    kind: 'demo',
+    kind,
     subscribe: () => () => undefined,
     getSnapshot: () => snapshot,
+    getServerVersion: fetchImpl
+      ? async () => {
+          const response = await fetchImpl('/healthz');
+          const data = (await response.json()) as { ok: boolean; version: string };
+          return data.ok ? data.version : null;
+        }
+      : () => '0.1.1', // demo package version (apps/web/package.json)
   } as unknown as FactoryDataSource;
 }
 
@@ -28,7 +40,7 @@ function renderSettings(addresses: Snapshot['addresses'] = ADDRESSES) {
   return render(
     <I18nProvider>
       <ColorModeProvider>
-        <FactoryProvider source={sourceWith(addresses)}>
+        <FactoryProvider source={sourceWith(undefined, 'demo', addresses)}>
           <MemoryRouter>
             <SettingsPage />
           </MemoryRouter>
@@ -158,5 +170,39 @@ describe('Réglages, installer l’app', () => {
     const section = screen.getByRole('region', { name: 'Install the app' });
     expect(section).toHaveTextContent('Open http://localhost:8446 on this PC, then:');
     expect(section).not.toHaveTextContent('tailnet');
+  });
+});
+
+describe('SettingsPage server version in live mode', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it('SettingsPage shows server version from healthz in live mode', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ok: true, version: '0.2.0' }), { status: 200 }),
+      );
+    const source = sourceWith(fetchMock, 'live');
+
+    render(
+      <I18nProvider>
+        <ColorModeProvider>
+          <FactoryProvider source={source}>
+            <MemoryRouter>
+              <SettingsPage />
+            </MemoryRouter>
+          </FactoryProvider>
+        </ColorModeProvider>
+      </I18nProvider>,
+    );
+
+    // Should fetch /healthz and display version 0.2.0 instead of static 0.1.0 and remove Hermès version
+    await waitFor(() => {
+      expect(screen.getByText('0.2.0')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('0.22.2')).not.toBeInTheDocument();
   });
 });
