@@ -330,6 +330,10 @@ export class Hub {
       this.pendingActivity.push(...lines);
       this.deps.store.appendActivity(lines);
     }
+    // Un refus ou une erreur sur une carte : son diagnostic se relit au prochain passage (2 s au plus).
+    for (const line of lines)
+      if (line.cardId && (line.status === 'blocked' || line.status === 'error'))
+        this.deps.diagnoses?.touch(line.cardId);
     this.dirty.add('agents');
   }
 

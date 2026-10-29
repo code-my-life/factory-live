@@ -193,6 +193,8 @@ interface Entry {
 export class DiagnosisService {
   private readonly deps: DiagnosisDeps;
   private readonly entries = new Map<string, Entry>();
+  /** Refus et erreurs reçus par webhook depuis le dernier calcul, carte par carte. */
+  private readonly touched = new Map<string, number>();
   private readonly verdicts = new Map<
     string,
     { fingerprint: string; runs: Map<number, RunVerdictView> }
@@ -205,6 +207,14 @@ export class DiagnosisService {
   /** Le diagnostic en cache d'une intervention ; `null` tant qu'il n'est pas calculé, ou sans objet. */
   of(interventionId: string): DiagnosisView | null {
     return this.entries.get(interventionId)?.view ?? null;
+  }
+
+  /**
+   * Un refus ou une erreur vient de toucher cette carte (webhook) : son diagnostic sera recalculé au
+   * prochain `refresh`, sans attendre le créneau suivant. Plusieurs refus d'affilée n'en font qu'un.
+   */
+  touch(cardId: string): void {
+    this.touched.set(cardId, (this.touched.get(cardId) ?? 0) + 1);
   }
 
   /** La cause principale en cache, pour comparer un blocage au précédent. */
@@ -307,6 +317,7 @@ export class DiagnosisService {
       runs.map((run) => `${run.id}:${run.status}:${run.outcome ?? ''}:${run.endedAt ?? ''}`),
       profile ? this.safe(() => this.deps.profiles.factsStamp(profile), '-') : '-',
       this.safe(() => this.deps.files.evidenceStamp(task.id), '-'),
+      this.touched.get(task.id) ?? 0,
     ]);
   }
 

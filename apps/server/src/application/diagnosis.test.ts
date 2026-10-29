@@ -202,6 +202,16 @@ describe('DiagnosisService', () => {
     expect(fixed?.unblock.when).toBe('now');
   });
 
+  it('recalcule tout de suite une carte touchée par un refus, sans attendre le créneau', () => {
+    service.refresh(board(), [INTERVENTION], NOW_MS);
+    service.touch(CARD);
+    service.touch(CARD);
+    service.refresh(board(), [INTERVENTION], NOW_MS + 1_000);
+    expect(deps.sessions.runFacts).toHaveBeenCalledTimes(2);
+    service.refresh(board(), [INTERVENTION], NOW_MS + 1_500);
+    expect(deps.sessions.runFacts).toHaveBeenCalledTimes(2);
+  });
+
   it('recalcule à chaque créneau, sans rien renvoyer quand seul l’instant de calcul change', () => {
     service.refresh(board(), [INTERVENTION], NOW_MS);
     const first = service.of(INTERVENTION.id);
