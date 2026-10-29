@@ -424,7 +424,7 @@
 
   .hero-title {
     grid-column: 2 / span 8;
-    max-width: 13ch;
+    max-width: 16ch;
     margin-inline: 0;
     padding-block: clamp(var(--base-size-32), 7svh, var(--base-size-96)) var(--base-size-40);
   }
@@ -1678,6 +1678,14 @@
   }
 
   .reveal-ready [data-reveal].is-in {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* À l'impression, tout est là, sans attendre une entrée en scène. */
+@media print {
+  .reveal-ready [data-reveal] {
     opacity: 1;
     transform: none;
   }
