@@ -1,3 +1,4 @@
+import { msg } from '@factory-live/contracts';
 import type {
   AgentActivity,
   CardView,
@@ -76,6 +77,13 @@ export function prUrl(repo: string, number: number): string {
   return `${REPOS[repo] ?? 'https://github.com/code-my-life'}/pull/${number}`;
 }
 
+/** Le label qui fait entrer une issue dans la factory, posé par cddev. */
+const LABELED = msg('github.labeled', { label: 'factory', actor: 'cddev' });
+
+/** La lane Claude Code de coder-claude, telle que le terminal d'Hermès la lance. */
+export const LANE_COMMAND =
+  'claude -p "$(cat evidence/brief.md)" --model claude-opus-5-5 --max-turns 40 --output-format json';
+
 function pr(
   repo: string,
   number: number,
@@ -136,7 +144,7 @@ function run(
 
 function timeline(
   at: string,
-  label: string,
+  label: TimelineEntry['label'],
   patch: Partial<Omit<TimelineEntry, 'id' | 'at' | 'label'>> = {},
 ): TimelineEntry {
   return {
@@ -480,36 +488,37 @@ export function createInitialState(now: number): DemoState {
       }),
     ],
     timeline: [
-      timeline(ago(39 * min), 'Label factory posé par cddev', { source: 'github' }),
-      timeline(ago(39 * min), "Carte brief créée par l'intake", {
+      timeline(ago(39 * min), LABELED, { source: 'github' }),
+      timeline(ago(39 * min), msg('timeline.created'), {
         cardId: CARDS.teamBrief,
-        detail: 'Label claude:opus : modèle claude-opus-5-5 pour tout le parcours',
+        detail: msg('timeline.created.for', { assignee: 'coordinator-claude' }),
       }),
-      timeline(ago(38 * min), 'coordinator-claude prend le brief', {
+      timeline(ago(38 * min), msg('timeline.claimed'), {
         profile: 'coordinator-claude',
         cardId: CARDS.teamBrief,
       }),
-      timeline(ago(31 * min), 'Brief rédigé, 2 cartes créées', {
+      timeline(ago(31 * min), msg('timeline.completed'), {
         profile: 'coordinator-claude',
         cardId: CARDS.teamBrief,
-        tone: 'success',
-        detail: 'impl → coder-claude, release → coordinator-claude',
+        tone: 'done',
+        detail:
+          'Brief rédigé : base 3f9c2e1, test fail-first desktop/test/team.test.js, 2 cartes créées',
       }),
-      timeline(ago(11 * min), "coder-claude prend l'implémentation", {
+      timeline(ago(11 * min), msg('timeline.claimed'), {
         profile: 'coder-claude',
         cardId: CARDS.teamImpl,
       }),
-      timeline(ago(8 * min), 'Échec prouvé sur la base : 2 tests rouges', {
+      timeline(ago(8 * min), msg('timeline.comment', { author: 'coder-claude' }), {
+        source: 'comment',
+        profile: 'coder-claude',
+        cardId: CARDS.teamImpl,
+        detail: 'Échec prouvé sur la base 3f9c2e1 : 2 tests rouges (npm test -- team)',
+      }),
+      timeline(ago(7 * min), 'claude -p', {
         source: 'hermes',
         profile: 'coder-claude',
         cardId: CARDS.teamImpl,
-        tone: 'attention',
-        detail: 'npm test -- team sur 3f9c2e1',
-      }),
-      timeline(ago(7 * min), 'claude -p lancé (claude-opus-5-5, 40 tours au plus)', {
-        source: 'hermes',
-        profile: 'coder-claude',
-        cardId: CARDS.teamImpl,
+        detail: LANE_COMMAND,
       }),
     ],
   };
@@ -586,36 +595,51 @@ export function createInitialState(now: number): DemoState {
       }),
     ],
     timeline: [
-      timeline(ago(83 * min), 'Label factory posé par cddev', { source: 'github' }),
-      timeline(ago(82 * min), 'coordinator prend le brief', {
+      timeline(ago(83 * min), LABELED, { source: 'github' }),
+      timeline(ago(82 * min), msg('timeline.claimed'), {
         profile: 'coordinator',
         cardId: CARDS.contactBrief,
       }),
-      timeline(ago(74 * min), 'Brief rédigé, 2 cartes créées', {
+      timeline(ago(74 * min), msg('timeline.completed'), {
         profile: 'coordinator',
         cardId: CARDS.contactBrief,
-        tone: 'success',
+        tone: 'done',
+        detail: 'Brief rédigé : base 8d41c07, test fail-first api/test/contact.test.ts',
       }),
-      timeline(ago(70 * min), "coder prend l'implémentation", {
+      timeline(ago(70 * min), msg('timeline.claimed'), {
         profile: 'coder',
         cardId: CARDS.contactImpl,
       }),
-      timeline(ago(52 * min), '429 sur agnes-2.5-flash, fallback vers dots3-note-preview', {
-        source: 'hermes',
+      timeline(
+        ago(52 * min),
+        msg('activity.llm.rateLimited', {
+          model: 'agnes-2.5-flash',
+          attempt: null,
+          attempts: null,
+        }),
+        {
+          source: 'hermes',
+          profile: 'coder',
+          cardId: CARDS.contactImpl,
+          tone: 'danger',
+          detail: 'Too Many Requests',
+        },
+      ),
+      timeline(ago(12 * min), msg('github.prOpened', { pr: 52, draft: true }), {
+        source: 'github',
+        cardId: CARDS.contactImpl,
+        detail: msg('github.diffstat', { additions: 214, deletions: 18, files: 5 }),
+      }),
+      timeline(ago(9 * min), msg('timeline.reviewRequested', { reviewer: 'gate' }), {
         profile: 'coder',
         cardId: CARDS.contactImpl,
         tone: 'attention',
-      }),
-      timeline(ago(12 * min), 'PR #52 ouverte en brouillon par la GitHub App', {
-        source: 'github',
-        cardId: CARDS.contactImpl,
-      }),
-      timeline(ago(9 * min), 'Revue demandée à gate', {
-        profile: 'coder',
-        cardId: CARDS.contactImpl,
         detail: 'coder-guard : branche poussée au même commit, PR citée dans le handoff',
       }),
-      timeline(ago(6 * min), 'gate prend la revue', { profile: 'gate', cardId: CARDS.contactImpl }),
+      timeline(ago(6 * min), msg('timeline.claimed'), {
+        profile: 'gate',
+        cardId: CARDS.contactImpl,
+      }),
     ],
   };
 
@@ -637,9 +661,10 @@ export function createInitialState(now: number): DemoState {
       ),
     ],
     timeline: [
-      timeline(ago(4 * min), 'Label factory posé par cddev', { source: 'github' }),
-      timeline(ago(4 * min), 'Carte brief créée, en file : 2 cartes en cours sur 2 autorisées', {
+      timeline(ago(4 * min), LABELED, { source: 'github' }),
+      timeline(ago(4 * min), msg('timeline.created'), {
         cardId: CARDS.shortcutBrief,
+        detail: msg('timeline.created.for', { assignee: 'coordinator' }),
       }),
     ],
   };
@@ -672,20 +697,23 @@ export function createInitialState(now: number): DemoState {
       }),
     ],
     timeline: [
-      timeline(ago(26 * min), 'Label factory posé par cddev', { source: 'github' }),
-      timeline(ago(25 * min), 'coordinator prend le brief', {
+      timeline(ago(26 * min), LABELED, { source: 'github' }),
+      timeline(ago(25 * min), msg('timeline.claimed'), {
         profile: 'coordinator',
         cardId: CARDS.projectsBrief,
       }),
-      timeline(ago(14 * min), 'Bloqué : décision attendue', {
+      timeline(ago(14 * min), msg('timeline.blocked', { kind: 'needs_input' }), {
         profile: 'coordinator',
         cardId: CARDS.projectsBrief,
-        tone: 'attention',
+        tone: 'danger',
         detail: 'Carte UI sans maquette jointe',
       }),
-      timeline(ago(14 * min), 'Question publiée sur l’issue et envoyée sur Telegram', {
+      timeline(ago(14 * min), msg('timeline.comment', { author: 'coordinator' }), {
         source: 'comment',
+        profile: 'coordinator',
         cardId: CARDS.projectsBrief,
+        detail:
+          'Question publiée sur l’issue : joindre une maquette, ou valider des filtres en pastilles au-dessus de la grille ?',
       }),
     ],
   };
@@ -725,19 +753,23 @@ export function createInitialState(now: number): DemoState {
       }),
     ],
     timeline: [
-      timeline(ago(180 * min), 'Label factory posé par cddev', { source: 'github' }),
-      timeline(ago(31 * min), 'Gate : approuvé', {
+      timeline(ago(180 * min), LABELED, { source: 'github' }),
+      timeline(ago(31 * min), msg('timeline.completed'), {
         profile: 'gate',
         cardId: CARDS.tagsImpl,
-        tone: 'success',
+        tone: 'done',
+        detail: 'Approuvé : 52 tests, CI verte (Tests, E2E, GitHub Pages)',
       }),
-      timeline(ago(30 * min), 'PR #74 prête, revue demandée à @cddev, auto-merge armé', {
-        source: 'github',
-      }),
-      timeline(ago(22 * min), 'Release : prêt à merger, en attente de ton approbation', {
+      timeline(
+        ago(30 * min),
+        msg('github.reviewRequested', { pr: 74, reviewer: 'cddev', autoMerge: true }),
+        { source: 'github' },
+      ),
+      timeline(ago(22 * min), msg('timeline.blocked', { kind: 'needs_input' }), {
         profile: 'coordinator',
         cardId: CARDS.tagsRelease,
-        tone: 'attention',
+        tone: 'danger',
+        detail: 'Prêt à merger claude-cockpit#74',
       }),
     ],
   };
@@ -769,17 +801,17 @@ export function createInitialState(now: number): DemoState {
       }),
     ],
     timeline: [
-      timeline(ago(120 * min), 'Label factory posé par cddev', { source: 'github' }),
-      timeline(ago(61 * min), 'Gate : changements demandés', {
+      timeline(ago(120 * min), LABELED, { source: 'github' }),
+      timeline(ago(61 * min), msg('timeline.changesRequested', { reviewer: 'gate' }), {
         profile: 'gate',
         cardId: CARDS.footerImpl,
-        tone: 'attention',
+        tone: 'danger',
         detail: 'Lien LinkedIn sans rel="noopener"',
       }),
-      timeline(ago(42 * min), 'Carte prête mais retenue par la garde active_pr', {
+      timeline(ago(42 * min), msg('timeline.respawnGuarded'), {
         cardId: CARDS.footerImpl,
-        tone: 'danger',
-        detail: 'Un commentaire de moins de 24 h cite la PR #50, sans relais depuis',
+        tone: 'attention',
+        detail: msg('timeline.respawnGuarded.activePr'),
       }),
     ],
   };
@@ -791,11 +823,8 @@ export function createInitialState(now: number): DemoState {
       costUsd,
       cards,
       timeline: [
-        timeline(find(key).startedAt, 'Label factory posé par cddev', { source: 'github' }),
-        timeline(find(key).updatedAt, 'Fusionné dans main, workflows verts', {
-          source: 'github',
-          tone: 'done',
-        }),
+        timeline(find(key).startedAt, LABELED, { source: 'github' }),
+        timeline(find(key).updatedAt, msg('github.merged'), { source: 'github', tone: 'done' }),
       ],
     };
   };
@@ -931,7 +960,11 @@ export function createInitialState(now: number): DemoState {
       push: true,
       actions: [
         { kind: 'unblock' },
-        { kind: 'link', label: "Ouvrir l'issue cv-site#49", url: issueUrl(KEYS.projects) },
+        {
+          kind: 'link',
+          label: msg('intervention.action.openIssue', { issueKey: KEYS.projects }),
+          url: issueUrl(KEYS.projects),
+        },
       ],
       unblock: null,
     },
@@ -939,21 +972,24 @@ export function createInitialState(now: number): DemoState {
       id: 'iv-footer',
       kind: 'held_active_pr',
       severity: 'warning',
-      title: 'Carte prête mais retenue depuis 42 min',
+      title: msg('intervention.title.held', { minutes: 42 }),
       issueKey: KEYS.footer,
       cardId: CARDS.footerImpl,
       profile: 'coder',
-      question:
-        "La carte impl est prête, mais le dispatcher la retient : un commentaire de moins de 24 h cite la PR #50, sans relais depuis. C'est la garde `active_pr` d'Hermès contre les PR en double. `/factory unblock` ne s'applique pas (la carte n'est pas bloquée) : il faut relayer la carte.",
+      question: msg('intervention.question.held'),
       openedAt: ago(42 * min),
       push: true,
       actions: [
         {
           kind: 'copy',
-          label: 'Relancer par relais (scribe puis coder)',
+          label: msg('intervention.action.relay', { owner: 'coder' }),
           command: `hermes kanban --board factory reassign ${CARDS.footerImpl} scribe --reason "relais active_pr" && hermes kanban --board factory reassign ${CARDS.footerImpl} coder --reason "reprise sur la PR"`,
         },
-        { kind: 'link', label: 'Voir la PR #50', url: prUrl('cv-site', 50) },
+        {
+          kind: 'link',
+          label: msg('intervention.action.prWorkflows'),
+          url: prUrl('cv-site', 50),
+        },
       ],
       unblock: null,
     },
@@ -961,7 +997,7 @@ export function createInitialState(now: number): DemoState {
       id: 'iv-tags',
       kind: 'pr_approval',
       severity: 'info',
-      title: 'PR #74 prête à approuver',
+      title: msg('intervention.title.prReady'),
       issueKey: KEYS.tags,
       cardId: CARDS.tagsRelease,
       profile: 'coordinator',
@@ -970,7 +1006,11 @@ export function createInitialState(now: number): DemoState {
       openedAt: ago(22 * min),
       push: false,
       actions: [
-        { kind: 'link', label: 'Approuver la PR #74 sur GitHub', url: prUrl('claude-cockpit', 74) },
+        {
+          kind: 'link',
+          label: msg('intervention.action.approvePr'),
+          url: prUrl('claude-cockpit', 74),
+        },
       ],
       unblock: null,
     },
@@ -989,7 +1029,7 @@ export function createInitialState(now: number): DemoState {
       {
         runId: RUNS.teamImpl,
         source: 'hermes',
-        title: 'Session Hermès · coder-claude',
+        title: msg('transcript.hermes', { profile: 'coder-claude', session: null }),
         entries: [
           entry(ago(11 * min), 'user', `work kanban task ${CARDS.teamImpl}`),
           entry(
@@ -1087,7 +1127,7 @@ export function createInitialState(now: number): DemoState {
       {
         runId: RUNS.teamImpl,
         source: 'claude-code',
-        title: 'Claude Code · claude-opus-5-5',
+        title: msg('transcript.claudeCode', { costUsd: null }),
         entries: [
           entry(
             ago(7 * min),
@@ -1137,7 +1177,7 @@ export function createInitialState(now: number): DemoState {
       {
         runId: RUNS.contactGate,
         source: 'hermes',
-        title: 'Session Hermès · gate',
+        title: msg('transcript.hermes', { profile: 'gate', session: null }),
         entries: [
           entry(ago(6 * min), 'user', `work kanban task ${CARDS.contactImpl}`),
           entry(ago(6 * min - 4), 'tool_call', '{"name": "factory-gate"}', {
@@ -1170,7 +1210,7 @@ export function createInitialState(now: number): DemoState {
       {
         runId: RUNS.teamBrief,
         source: 'hermes',
-        title: 'Session Hermès · coordinator-claude',
+        title: msg('transcript.hermes', { profile: 'coordinator-claude', session: null }),
         entries: [
           entry(ago(38 * min), 'user', `work kanban task ${CARDS.teamBrief}`),
           entry(ago(37 * min), 'tool_call', 'desktop/src/team', {
@@ -1231,7 +1271,7 @@ export function createInitialState(now: number): DemoState {
           status: 'triage',
           assignee: 'coordinator',
           openedAt: ago(21 * min),
-          note: 'Anomalie relevée par factory-watch (toutes les 30 min)',
+          note: null,
         },
       ],
       interventions,
@@ -1296,7 +1336,7 @@ export function createInitialState(now: number): DemoState {
           issueKey: KEYS.team,
           cardId: CARDS.teamImpl,
           label: 'Bash',
-          detail: 'npm test -- team : 12 passing, 1 failing',
+          detail: 'npm test -- team',
           status: 'error',
           durationMs: 8_900,
           model: 'claude-opus-5-5',
@@ -1308,8 +1348,8 @@ export function createInitialState(now: number): DemoState {
           profile: null,
           issueKey: KEYS.shortcut,
           cardId: CARDS.shortcutBrief,
-          label: 'Carte créée par l’intake',
-          detail: 'En file : 2 cartes en cours sur 2 autorisées',
+          label: msg('timeline.created'),
+          detail: msg('timeline.created.for', { assignee: 'coordinator' }),
           status: null,
           durationMs: null,
           model: null,
@@ -1321,7 +1361,7 @@ export function createInitialState(now: number): DemoState {
           profile: 'coder',
           issueKey: KEYS.contact,
           cardId: CARDS.contactImpl,
-          label: 'Revue demandée à gate',
+          label: msg('timeline.reviewRequested', { reviewer: 'gate' }),
           detail: 'coder-guard : branche poussée, PR #52 citée',
           status: 'ok',
           durationMs: null,
@@ -1334,7 +1374,7 @@ export function createInitialState(now: number): DemoState {
           profile: 'coordinator',
           issueKey: KEYS.projects,
           cardId: CARDS.projectsBrief,
-          label: 'Bloqué : décision attendue',
+          label: 'blocked',
           detail: 'Carte UI sans maquette jointe',
           status: 'blocked',
           durationMs: null,
@@ -1347,8 +1387,8 @@ export function createInitialState(now: number): DemoState {
           profile: null,
           issueKey: KEYS.tags,
           cardId: null,
-          label: 'PR #74 : revue demandée à @cddev',
-          detail: 'CI verte, auto-merge armé',
+          label: msg('github.reviewRequested', { pr: 74, reviewer: 'cddev', autoMerge: true }),
+          detail: null,
           status: null,
           durationMs: null,
           model: null,

@@ -35,7 +35,7 @@ Détails : `docs/ARCHITECTURE.md`. Exploitation : `docs/RUNBOOK.md`. Décisions 
 ## Règles de code
 
 - TypeScript strict. Imports relatifs avec l'extension `.ts` ou `.tsx`. Identifiants en anglais, docs en français, interface en français (langue source) et en anglais.
-- Textes, jamais en dur (ADR 0008) : un texte de l'interface s'écrit dans `apps/web/src/i18n/fr.ts` puis sous la même clé dans `en.ts` (la compilation refuse une clé absente) et se lit par `useI18n().t` ; un texte que le serveur ou le domaine fabrique devient un code du catalogue `Message` (`packages/contracts/src/messages.ts`), émis par `msg()` ou `message()` et écrit par la section `server` des deux dictionnaires. Ce qui vient d'ailleurs (agents, sonde, GitHub, scénario de démo) reste tel quel.
+- Textes, jamais en dur (ADR 0008) : un texte de l'interface s'écrit dans `apps/web/src/i18n/fr.ts` puis sous la même clé dans `en.ts` (la compilation refuse une clé absente) et se lit par `useI18n().t` ; un texte que le serveur ou le domaine fabrique devient un code du catalogue `Message` (`packages/contracts/src/messages.ts`), émis par `msg()` ou `message()` et écrit par la section `server` des deux dictionnaires. Ce qui vient d'ailleurs (agents, sonde, titres d'issues et de cartes, transcriptions) reste tel quel ; le scénario de démo suit la même règle.
 - Aucun tiret cadratin, nulle part (`npm run check:text`).
 - Test d'abord : chaque règle ou correctif commence par un test qui échoue. Un adaptateur se teste sur des données réelles anonymisées (`fixtures/`).
 - Les adaptateurs Hermès lisent seulement : bases SQLite ouvertes en `readOnly`, aucune écriture dans `~/.hermes` (règle de lint dédiée).
@@ -57,6 +57,6 @@ Détails : `docs/ARCHITECTURE.md`. Exploitation : `docs/RUNBOOK.md`. Décisions 
 
 ## Données de démonstration
 
-`apps/web/src/demo/` rejoue un scénario réaliste de la factory sans serveur. Il sert à la maquette publiée en artifact et aux tests de bout en bout. Le test `DemoSource.test.ts` vérifie qu'il respecte les contrats.
+`apps/web/src/demo/` rejoue un scénario réaliste de la factory sans serveur. Il sert à la maquette publiée en artifact et sur GitHub Pages, et aux tests de bout en bout. Le test `DemoSource.test.ts` vérifie qu'il respecte les contrats, et que ses lignes qui imitent ce que factory-live fabrique (fil, timeline, interventions, santé, transcriptions) sont des codes `msg()` : la démo suit la langue choisie. Seul ce qui imite un contenu venu d'ailleurs (titres d'issues et de PR, résumés et questions des agents, commandes, sonde) s'écrit en clair.
 
 Builds du front : `VITE_DATA_SOURCE=live` pour l'app servie par le conteneur (vraies données, service worker, notifications), `demo` par défaut pour la maquette et les e2e ; la maquette en artifact se construit avec `VITE_ARTIFACT=1 VITE_ROUTER=memory FACTORY_LIVE_BASE=./` (sans service worker, que l'hôte n'autorise pas). Le service worker (`src/sw/sw.ts`) a son propre projet TypeScript (`tsconfig.sw.json`, types WebWorker).

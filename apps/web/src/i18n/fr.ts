@@ -244,6 +244,17 @@ const server: ServerMessages = {
   'health.value.none': () => 'aucun',
   'health.value.ago': ({ seconds }) => f.ago(seconds),
 
+  'github.labeled': ({ label, actor }) => `Label ${label} posé par ${actor}`,
+  'github.prOpened': ({ pr, draft }) => `PR #${pr} ouverte${draft ? ' en brouillon' : ''}`,
+  'github.diffstat': ({ additions, deletions, files }) =>
+    `+${additions} −${deletions}, ${files} ${f.plural(files, 'fichier', 'fichiers')}`,
+  'github.reviewRequested': ({ pr, reviewer, autoMerge }) =>
+    `PR #${pr} : revue demandée à @${reviewer}${autoMerge === true ? ', auto-merge armé' : autoMerge === false ? ', sans auto-merge' : ''}`,
+  'github.merged': () => 'Fusionné dans main, workflows verts',
+  'github.answerPosted': ({ issueKey }) => `Réponse postée sur ${issueKey}`,
+  'github.answerAcknowledged': () => 'Le bot a pris la réponse en compte',
+  'unblock.sent': () => 'Réponse envoyée depuis factory-live',
+
   'transcript.hermes': ({ profile, session }) =>
     `Session Hermès de ${profile}${session ? ` (${session})` : ''}`,
   'transcript.claudeCode': ({ costUsd }) =>
@@ -760,18 +771,23 @@ export const fr = {
       connected: 'Connecté à GitHub : tes réponses partiront à ton nom.',
     },
     install: 'Installer l’app',
+    installIntro:
+      'factory-live est une PWA : elle s’installe depuis le navigateur, sans passer par un store.',
+    /** Les deux adresses de l'app : `local` sur ce PC, `tailnet` depuis les autres appareils. */
+    installOpen: (local: string, tailnet: string) =>
+      `Ouvre ${local} sur ce PC, ${tailnet} sur tes autres appareils du tailnet, puis :`,
     installSteps: {
-      iphone: {
-        device: 'iPhone',
-        text: ' : Safari sur https://desktop-gja56n4.tail40220c.ts.net:8446, Partager, Sur l’écran d’accueil, puis ouvre l’app et active les notifications.',
+      computer: {
+        device: 'Ordinateur',
+        text: ' : dans Chrome ou Edge, Installer l’application.',
       },
-      pc: {
-        device: 'Ce PC',
-        text: ' : http://localhost:8446 dans Edge ou Chrome, puis Installer l’application.',
+      android: {
+        device: 'Android',
+        text: ' : dans Chrome, menu, Installer l’application. Les notifications marchent dès le navigateur.',
       },
-      mac: {
-        device: 'Mac ou autre PC du tailnet',
-        text: ' : la même adresse que l’iPhone, dans Chrome, Edge ou Safari.',
+      ios: {
+        device: 'iPhone ou iPad',
+        text: ' : dans Safari, Partager, Sur l’écran d’accueil, puis ouvre l’app pour activer les notifications (iOS 16.4 ou plus).',
       },
     },
     sources: 'Sources',
@@ -830,7 +846,7 @@ export const fr = {
     notSignedIn: 'Pas connecté : connecte-toi pour débloquer depuis l’app',
     login: 'Se connecter à GitHub',
     loginHelp:
-      'Depuis ce PC comme depuis l’iPhone : GitHub te ramène ici. Seul le compte cddev est accepté.',
+      'Depuis ce PC comme depuis ton smartphone ou ta tablette : GitHub te ramène ici. Seul le compte cddev est accepté.',
   },
 
   charts: {

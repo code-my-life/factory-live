@@ -1,6 +1,7 @@
+import { msg } from '@factory-live/contracts';
 import type { ActivityEvent } from '@factory-live/contracts';
 import { NEMOTRON_SUPER, QWEN_LOCAL, model } from './catalog.ts';
-import { CARDS, KEYS, RUNS, prUrl } from './initial.ts';
+import { CARDS, KEYS, LANE_COMMAND, RUNS, prUrl } from './initial.ts';
 import {
   addCost,
   addRun,
@@ -60,7 +61,7 @@ const CLAUDE_LANE: ToolStep[] = [
 ];
 
 const GATE_CONTACT: ToolStep[] = [
-  { tool: 'terminal', detail: 'pnpm -r test : 34 réussis', status: 'ok', durationMs: 33_800 },
+  { tool: 'terminal', detail: 'pnpm -r test', status: 'ok', durationMs: 33_800 },
   {
     tool: 'terminal',
     detail: 'docker run --network none cv-site-build',
@@ -81,7 +82,7 @@ const CODER_SHORTCUT: ToolStep[] = [
   { tool: 'read_file', detail: 'desktop/src/island/QuickReply.tsx', status: 'ok', durationMs: 200 },
   {
     tool: 'terminal',
-    detail: 'npm test -- quick-reply (rouge sur la base, attendu)',
+    detail: 'npm test -- quick-reply',
     status: 'error',
     durationMs: 7_800,
   },
@@ -97,11 +98,17 @@ const GATE_TEAM: ToolStep[] = [
   { tool: 'terminal', detail: 'xvfb-run -a npm run test:e2e', status: 'ok', durationMs: 52_000 },
   {
     tool: 'terminal',
-    detail: 'claude -p (verdict, claude-opus-5-5)',
+    detail:
+      'claude -p "$(cat evidence/gate/1/00-rubric.md)" --model claude-opus-5-5 --max-turns 40 --output-format json',
     status: 'running',
     durationMs: null,
   },
 ];
+
+/** Résumés de fin de run, écrits par les agents : la timeline les montre tels quels. */
+const GATE_CONTACT_SUMMARY = 'Approuvé : 34 tests, build hors ligne vert, checks de la PR verts';
+const SHORTCUT_BRIEF_SUMMARY =
+  'Brief rédigé : base a41d9e0, test fail-first desktop/test/quick-reply.test.js';
 
 function toolLoop(
   steps: ToolStep[],
@@ -272,7 +279,7 @@ export function buildScript(): ScenarioStep[] {
           status: 'done',
           outcome: 'completed',
           endedAt: iso(now),
-          summary: 'Approuvé : 34 tests, build hors ligne vert, checks de la PR verts',
+          summary: GATE_CONTACT_SUMMARY,
         });
         patchCard(state, KEYS.contact, CARDS.contactRelease, {
           status: 'blocked',
@@ -300,25 +307,24 @@ export function buildScript(): ScenarioStep[] {
           source: 'kanban',
           profile: 'gate',
           cardId: CARDS.contactImpl,
-          label: 'Gate : approuvé',
-          detail: '34 tests, build hors ligne vert, checks de la PR verts',
-          tone: 'success',
+          label: msg('timeline.completed'),
+          detail: GATE_CONTACT_SUMMARY,
+          tone: 'done',
         });
         addTimeline(state, KEYS.contact, {
           at: iso(now),
           source: 'github',
           profile: null,
           cardId: null,
-          label: 'PR #52 prête, revue demandée à @cddev',
-          detail:
-            "Dépôt privé : pas d'auto-merge, l’agent release fusionnera après ton approbation",
+          label: msg('github.reviewRequested', { pr: 52, reviewer: 'cddev', autoMerge: false }),
+          detail: null,
           tone: 'neutral',
         });
         openIntervention(state, {
           id: 'iv-contact',
           kind: 'pr_approval',
           severity: 'info',
-          title: 'PR #52 prête à approuver',
+          title: msg('intervention.title.prReady'),
           issueKey: KEYS.contact,
           cardId: CARDS.contactRelease,
           profile: 'coordinator',
@@ -327,7 +333,11 @@ export function buildScript(): ScenarioStep[] {
           openedAt: iso(now),
           push: false,
           actions: [
-            { kind: 'link', label: 'Approuver la PR #52 sur GitHub', url: prUrl('cv-site', 52) },
+            {
+              kind: 'link',
+              label: msg('intervention.action.approvePr'),
+              url: prUrl('cv-site', 52),
+            },
           ],
           unblock: null,
         });
@@ -336,8 +346,8 @@ export function buildScript(): ScenarioStep[] {
           profile: 'gate',
           issueKey: KEYS.contact,
           cardId: CARDS.contactImpl,
-          label: 'Gate : approuvé',
-          detail: 'PR #52 prête pour ta revue',
+          label: 'completed',
+          detail: GATE_CONTACT_SUMMARY,
           status: 'ok',
         });
         state.snapshot.factory.running = 1;
@@ -351,8 +361,8 @@ export function buildScript(): ScenarioStep[] {
           model: model('moa', 'mix', 'live'),
           action: {
             kind: 'llm',
-            label: 'Appel au modèle',
-            detail: 'mix : références fusion et auto, agrégateur nemotron-3-ultra-550b',
+            label: msg('activity.action.llm'),
+            detail: 'mix',
             startedAt: iso(now),
           },
           runStartedAt: iso(now),
@@ -383,7 +393,7 @@ export function buildScript(): ScenarioStep[] {
           source: 'kanban',
           profile: 'coordinator',
           cardId: CARDS.shortcutBrief,
-          label: 'coordinator prend le brief (une place libérée)',
+          label: msg('timeline.claimed'),
           detail: null,
           tone: 'neutral',
         });
@@ -393,7 +403,7 @@ export function buildScript(): ScenarioStep[] {
           issueKey: KEYS.shortcut,
           cardId: CARDS.shortcutBrief,
           label: 'claimed',
-          detail: 'Le dispatcher lance coordinator sur le brief',
+          detail: msg('activity.kanban.claimed', { profile: 'coordinator' }),
           status: 'ok',
         });
         state.snapshot.factory.running = 2;
@@ -438,7 +448,7 @@ export function buildScript(): ScenarioStep[] {
           kind: 'skill',
           profile: 'coordinator',
           issueKey: KEYS.shortcut,
-          label: 'Skill chargée',
+          label: msg('activity.skill', { action: 'loaded' }),
           detail: 'factory-brief',
           status: 'ok',
         });
@@ -453,7 +463,7 @@ export function buildScript(): ScenarioStep[] {
           action: {
             kind: 'tool',
             label: 'terminal',
-            detail: 'npm test (relancé par Hermès)',
+            detail: 'npm test',
             startedAt: iso(now),
           },
         });
@@ -462,8 +472,8 @@ export function buildScript(): ScenarioStep[] {
           profile: 'coder-claude',
           issueKey: KEYS.team,
           cardId: CARDS.teamImpl,
-          label: 'claude -p terminé',
-          detail: '6 min 12 s, 23 tours, 0,84 $US',
+          label: 'claude -p',
+          detail: LANE_COMMAND,
           status: 'ok',
           durationMs: 372_000,
           model: 'claude-opus-5-5',
@@ -501,7 +511,7 @@ export function buildScript(): ScenarioStep[] {
           issueKey: KEYS.team,
           cardId: CARDS.teamImpl,
           label: 'terminal',
-          detail: 'npm test : 13 réussis (relancé par Hermès)',
+          detail: 'npm test',
           status: 'ok',
           durationMs: 30_800,
           model: QWEN_LOCAL,
@@ -530,16 +540,16 @@ export function buildScript(): ScenarioStep[] {
           kind: 'github',
           profile: 'coder-claude',
           issueKey: KEYS.team,
-          label: 'PR #75 ouverte en brouillon',
-          detail: 'Par la GitHub App code-my-life-factory',
+          label: msg('github.prOpened', { pr: 75, draft: true }),
+          detail: msg('github.diffstat', { additions: 184, deletions: 23, files: 3 }),
         });
         addTimeline(state, KEYS.team, {
           at: iso(now),
           source: 'github',
           profile: 'coder-claude',
           cardId: CARDS.teamImpl,
-          label: 'PR #75 ouverte en brouillon',
-          detail: '+184 −23, 3 fichiers',
+          label: msg('github.prOpened', { pr: 75, draft: true }),
+          detail: msg('github.diffstat', { additions: 184, deletions: 23, files: 3 }),
           tone: 'neutral',
         });
       },
@@ -573,17 +583,17 @@ export function buildScript(): ScenarioStep[] {
           source: 'kanban',
           profile: 'coder-claude',
           cardId: CARDS.teamImpl,
-          label: 'Revue demandée à gate-claude',
+          label: msg('timeline.reviewRequested', { reviewer: 'gate-claude' }),
           detail: 'coder-guard : branche poussée au même commit, PR #75 citée',
-          tone: 'success',
+          tone: 'attention',
         });
         activity(state, now, {
           kind: 'kanban',
           profile: 'coder-claude',
           issueKey: KEYS.team,
           cardId: CARDS.teamImpl,
-          label: 'Revue demandée à gate-claude',
-          detail: 'Label claude:opus : la gate passe par gate-claude',
+          label: msg('timeline.reviewRequested', { reviewer: 'gate-claude' }),
+          detail: 'coder-guard : branche poussée au même commit, PR #75 citée',
           status: 'ok',
         });
         state.snapshot.factory.running = 1;
@@ -622,8 +632,8 @@ export function buildScript(): ScenarioStep[] {
           model: model('freellmapi', 'agnes-2.5-flash', 'live'),
           action: {
             kind: 'llm',
-            label: 'Appel au modèle',
-            detail: 'auto, routé vers agnes-2.5-flash',
+            label: msg('activity.action.llm'),
+            detail: 'agnes-2.5-flash',
             startedAt: iso(now),
           },
           runStartedAt: iso(now),
@@ -651,7 +661,7 @@ export function buildScript(): ScenarioStep[] {
           issueKey: KEYS.team,
           cardId: CARDS.teamImpl,
           label: 'claimed',
-          detail: 'gate-claude prend la revue',
+          detail: msg('activity.kanban.claimed', { profile: 'gate-claude' }),
           status: 'ok',
         });
         state.snapshot.factory.running = 2;
@@ -672,7 +682,7 @@ export function buildScript(): ScenarioStep[] {
           status: 'done',
           outcome: 'completed',
           endedAt: iso(now),
-          summary: 'Brief rédigé : base a41d9e0, test fail-first desktop/test/quick-reply.test.js',
+          summary: SHORTCUT_BRIEF_SUMMARY,
         });
         const detail = state.details[KEYS.shortcut];
         detail?.cards.push(
@@ -721,9 +731,9 @@ export function buildScript(): ScenarioStep[] {
           source: 'kanban',
           profile: 'coordinator',
           cardId: CARDS.shortcutBrief,
-          label: 'Brief rédigé, 2 cartes créées',
-          detail: 'impl → coder (Hermès natif), release → coordinator',
-          tone: 'success',
+          label: msg('timeline.completed'),
+          detail: SHORTCUT_BRIEF_SUMMARY,
+          tone: 'done',
         });
         state.snapshot.factory.running = 1;
       },
@@ -738,8 +748,8 @@ export function buildScript(): ScenarioStep[] {
           model: model('freellmapi', 'agnes-2.5-flash', 'live'),
           action: {
             kind: 'llm',
-            label: 'Appel au modèle',
-            detail: 'auto, routé vers agnes-2.5-flash',
+            label: msg('activity.action.llm'),
+            detail: 'agnes-2.5-flash',
             startedAt: iso(now),
           },
           runStartedAt: iso(now),
@@ -757,7 +767,7 @@ export function buildScript(): ScenarioStep[] {
           issueKey: KEYS.shortcut,
           cardId: CARDS.shortcutImpl,
           label: 'claimed',
-          detail: "coder prend l'implémentation",
+          detail: msg('activity.kanban.claimed', { profile: 'coder' }),
           status: 'ok',
         });
         state.snapshot.factory.running = 2;
@@ -770,8 +780,8 @@ export function buildScript(): ScenarioStep[] {
           model: model('freellmapi', 'dots3-note-preview', 'live'),
           action: {
             kind: 'llm',
-            label: 'Appel au modèle',
-            detail: 'Fallback : dots3-note-preview après un 429 sur agnes-2.5-flash',
+            label: msg('activity.action.llm'),
+            detail: 'dots3-note-preview',
             startedAt: iso(now),
           },
         });
@@ -780,8 +790,12 @@ export function buildScript(): ScenarioStep[] {
           profile: 'coder',
           issueKey: KEYS.shortcut,
           cardId: CARDS.shortcutImpl,
-          label: '429 sur agnes-2.5-flash',
-          detail: 'freellmapi : fallback vers dots3-note-preview',
+          label: msg('activity.llm.rateLimited', {
+            model: 'agnes-2.5-flash',
+            attempt: null,
+            attempts: null,
+          }),
+          detail: 'Too Many Requests',
           status: 'error',
           model: 'agnes-2.5-flash',
         });
@@ -789,7 +803,7 @@ export function buildScript(): ScenarioStep[] {
           status: 'degraded',
           detail: '429 en hausse sur agnes-2.5-flash, fallback actif',
           checkedAt: iso(now),
-          metrics: [{ label: '429 sur 10 min', value: '3' }],
+          metrics: [{ label: msg('health.metric.rateLimited'), value: '3' }],
         });
       },
     },

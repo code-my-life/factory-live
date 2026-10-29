@@ -1,6 +1,6 @@
 # ADR 0008 : interface en français et en anglais
 
-Date : 2026-10-29. Statut : proposé.
+Date : 2026-10-29. Statut : accepté (Clément, 2026-10-29).
 
 ## Contexte
 
@@ -21,5 +21,6 @@ Toute l'interface était écrite en dur, en français, côté PWA comme côté s
 ## Conséquences
 
 - Un texte s'ajoute en deux endroits (français puis anglais) ; un texte du serveur, en trois (le code au catalogue, puis les deux dictionnaires).
-- Ce qui vient d'ailleurs n'est pas traduit : raisons et réponses des agents, noms d'outils et de modèles, détails de la sonde, titres d'issues et de cartes, transcriptions, scénario de démo. Les lignes d'activité enregistrées en français avant ce changement restent lisibles, telles quelles.
+- Ce qui vient d'ailleurs n'est pas traduit : raisons et réponses des agents, noms d'outils et de modèles, détails de la sonde, titres d'issues et de cartes, transcriptions. Les lignes d'activité enregistrées en français avant ce changement restent lisibles, telles quelles.
+- Le scénario de démo (publié sur GitHub Pages, lu d'abord en anglais) suit la même règle : ses lignes qui imitent ce que factory-live fabrique (fil d'activité, timeline, interventions, santé, transcriptions, rôles des agents, note d'usage) sont des codes du catalogue, et un test le vérifie ; seul ce qui imite un contenu venu d'ailleurs reste tel quel. Les événements GitHub et le suivi d'un déblocage qu'elle raconte (`github.*`, `unblock.sent`) ont leurs codes, que le serveur pourra reprendre.
 - Le service worker embarque les deux dictionnaires (environ 23 ko compressés).

@@ -192,6 +192,17 @@ const server: ServerMessages = {
   'health.value.none': () => 'none',
   'health.value.ago': ({ seconds }) => f.ago(seconds),
 
+  'github.labeled': ({ label, actor }) => `Label ${label} added by ${actor}`,
+  'github.prOpened': ({ pr, draft }) => `PR #${pr} opened${draft ? ' as a draft' : ''}`,
+  'github.diffstat': ({ additions, deletions, files }) =>
+    `+${additions} −${deletions}, ${files} ${f.plural(files, 'file', 'files')}`,
+  'github.reviewRequested': ({ pr, reviewer, autoMerge }) =>
+    `PR #${pr}: review requested from @${reviewer}${autoMerge === true ? ', auto-merge on' : autoMerge === false ? ', no auto-merge' : ''}`,
+  'github.merged': () => 'Merged into main, workflows green',
+  'github.answerPosted': ({ issueKey }) => `Answer posted on ${issueKey}`,
+  'github.answerAcknowledged': () => 'The bot acknowledged the answer',
+  'unblock.sent': () => 'Answer sent from factory-live',
+
   'transcript.hermes': ({ profile, session }) =>
     `Hermès session of ${profile}${session ? ` (${session})` : ''}`,
   'transcript.claudeCode': ({ costUsd }) =>
@@ -212,7 +223,7 @@ export const en: Messages = {
     release: 'Release',
     done: 'Done',
     stopped: 'Stopped',
-    side: 'Off the line',
+    side: 'Side track',
   },
   stationHint: {
     intake: 'Issue labeled factory, card created',
@@ -695,18 +706,21 @@ export const en: Messages = {
       connected: 'Connected to GitHub: your answers will be posted in your name.',
     },
     install: 'Install the app',
+    installIntro: 'factory-live is a PWA: you install it from the browser, no app store needed.',
+    installOpen: (local, tailnet) =>
+      `Open ${local} on this PC, ${tailnet} on your other devices on the tailnet, then:`,
     installSteps: {
-      iphone: {
-        device: 'iPhone',
-        text: ': Safari at https://desktop-gja56n4.tail40220c.ts.net:8446, Share, Add to Home Screen, then open the app and turn on notifications.',
+      computer: {
+        device: 'Computer',
+        text: ': in Chrome or Edge, Install app.',
       },
-      pc: {
-        device: 'This PC',
-        text: ': http://localhost:8446 in Edge or Chrome, then Install app.',
+      android: {
+        device: 'Android',
+        text: ': in Chrome, menu, Install app. Notifications work right in the browser.',
       },
-      mac: {
-        device: 'Mac or another PC on the tailnet',
-        text: ': the same address as the iPhone, in Chrome, Edge or Safari.',
+      ios: {
+        device: 'iPhone or iPad',
+        text: ': in Safari, Share, Add to Home Screen, then open the app to turn on notifications (iOS 16.4 or later).',
       },
     },
     sources: 'Sources',
@@ -764,7 +778,7 @@ export const en: Messages = {
     notSignedIn: 'Not signed in: sign in to unblock from the app',
     login: 'Sign in to GitHub',
     loginHelp:
-      'From this PC or the iPhone alike: GitHub brings you back here. Only the cddev account is accepted.',
+      'From this PC or your phone or tablet alike: GitHub brings you back here. Only the cddev account is accepted.',
   },
 
   charts: {

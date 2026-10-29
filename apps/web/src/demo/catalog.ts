@@ -1,3 +1,4 @@
+import { msg } from '@factory-live/contracts';
 import type {
   ConfigDrift,
   HistoryStats,
@@ -30,12 +31,14 @@ const driftModel = (live: string, repo = 'agnes-2.5-flash (freellmapi)'): Config
 });
 const DRIFT_AUTO = driftModel('auto (freellmapi)');
 
-/** Profils de la factory tels qu'ils tournent aujourd'hui (config en service, 18/10). */
+/**
+ * Profils de la factory tels qu'ils tournent aujourd'hui (config en service, 18/10). Le rôle est
+ * écrit comme le serveur l'écrit : la liste des skills du profil.
+ */
 export function buildProfiles(): ProfileView[] {
-  return [
+  const profiles: Omit<ProfileView, 'role'>[] = [
     {
       name: 'coordinator',
-      role: 'Écrit le brief et le graphe de cartes, relit les diffs. Ne code jamais.',
       station: 'brief',
       modelChain: [
         model('moa', 'mix'),
@@ -68,7 +71,6 @@ export function buildProfiles(): ProfileView[] {
     },
     {
       name: 'coordinator-claude',
-      role: 'Brief des issues labellisées claude : rédigé par claude -p, relu par Hermès.',
       station: 'brief',
       modelChain: [
         model('freellmapi', 'auto'),
@@ -98,7 +100,6 @@ export function buildProfiles(): ProfileView[] {
     },
     {
       name: 'coder',
-      role: "Implémente une carte avec les outils Hermès : test rouge d'abord, correctif, preuves.",
       station: 'implementation',
       modelChain: [
         model('freellmapi', 'auto'),
@@ -131,7 +132,6 @@ export function buildProfiles(): ProfileView[] {
     },
     {
       name: 'coder-claude',
-      role: "Même contrat que coder, implémentation déléguée à Claude Code (claude -p) sur l'abonnement.",
       station: 'implementation',
       modelChain: [
         model('llamacpp', QWEN_LOCAL),
@@ -152,7 +152,6 @@ export function buildProfiles(): ProfileView[] {
     },
     {
       name: 'coder-opencode',
-      role: 'Même contrat que coder, implémentation déléguée à OpenCode sur freellmapi.',
       station: 'implementation',
       modelChain: [
         model('nvidia', NEMOTRON_ULTRA),
@@ -172,7 +171,6 @@ export function buildProfiles(): ProfileView[] {
     },
     {
       name: 'gate',
-      role: "Vérificateur indépendant : build, suite complète, CI verte exigée. N'édite jamais le code.",
       station: 'gate',
       modelChain: [
         model('nvidia', NEMOTRON_SUPER),
@@ -204,7 +202,6 @@ export function buildProfiles(): ProfileView[] {
     },
     {
       name: 'gate-claude',
-      role: 'Gate des issues labellisées claude : verdict rendu par claude -p, vérifié par gate-readonly.',
       station: 'gate',
       modelChain: [
         model('freellmapi', 'auto'),
@@ -234,7 +231,6 @@ export function buildProfiles(): ProfileView[] {
     },
     {
       name: 'scribe',
-      role: 'Tâches mécaniques : docs, résumés de logs, relais de cartes.',
       station: 'implementation',
       modelChain: [model('freellmapi', 'auto'), model('llamacpp', 'Qwen3.5-9B-Q4_K_M')],
       effort: 'low',
@@ -250,7 +246,6 @@ export function buildProfiles(): ProfileView[] {
     },
     {
       name: 'release',
-      role: 'Merge après ton approbation, tag, surveillance des workflows de main.',
       station: 'release',
       modelChain: [model('freellmapi', 'auto'), model('llamacpp', 'gpt-oss-20b-MXFP4')],
       effort: 'medium',
@@ -266,7 +261,6 @@ export function buildProfiles(): ProfileView[] {
     },
     {
       name: 'tool-setup',
-      role: "Onboarding d'un dépôt : projet Hermès, AGENTS.md, outils vérifiés.",
       station: 'side',
       modelChain: [model('freellmapi', 'auto')],
       effort: null,
@@ -279,6 +273,10 @@ export function buildProfiles(): ProfileView[] {
       stats: { runs: 6, gatePassRate: null, medianRunMinutes: 11, costUsd: null },
     },
   ];
+  return profiles.map((profile) => ({
+    ...profile,
+    role: profile.skills.join(', ') || msg('agent.role.default'),
+  }));
 }
 
 function usageRow(
@@ -294,8 +292,7 @@ function usageRow(
   return { model: name, provider, calls, inputTokens, outputTokens, costUsd, rateLimited, errors };
 }
 
-const CLAUDE_NOTE =
-  "Abonnement Claude : coût estimé par Claude Code, pas un débit réel. Le solde des fenêtres de 5 h et de la semaine n'a pas de source fiable ; il s'affiche seulement quand une transcription signale une limite.";
+const CLAUDE_NOTE = msg('usage.claudeNote');
 
 /** Chiffres d'exemple, proportionnés sur la période. */
 export function buildUsage(now: number): Record<UsagePeriod, UsageReport> {
@@ -438,15 +435,19 @@ export function buildHistory(now: number): HistoryStats {
   };
 }
 
+/**
+ * Santé de la factory : ce que factory-live écrit lui-même est un code (comme le serveur), les
+ * libellés et détails rapportés par la sonde restent ses chaînes.
+ */
 export function buildHealth(now: number): ServiceHealth[] {
   const ago = (seconds: number) => iso(now - seconds * 1000);
   return [
     {
       id: 'gateway',
-      label: 'Gateway Hermès',
+      label: msg('health.gateway'),
       group: 'hermes',
       status: 'ok',
-      detail: 'En marche depuis 6 h 12, battement il y a 9 s',
+      detail: msg('health.gateway.running', { seconds: 9 }),
       checkedAt: ago(9),
       metrics: [
         { label: 'Version', value: '0.22.2' },
@@ -455,14 +456,17 @@ export function buildHealth(now: number): ServiceHealth[] {
     },
     {
       id: 'dispatcher',
-      label: 'Dispatcher kanban',
+      label: msg('health.dispatcher'),
       group: 'hermes',
       status: 'ok',
-      detail: 'Dernier tick il y a 12 s',
+      detail: msg('health.dispatcher.lastTick', { seconds: 12 }),
       checkedAt: ago(12),
       metrics: [
-        { label: 'En cours', value: '2 sur 2' },
-        { label: 'Par agent', value: '1 au plus' },
+        {
+          label: msg('health.metric.running'),
+          value: msg('health.value.ofTotal', { value: 2, total: 2 }),
+        },
+        { label: msg('health.metric.perAgent'), value: msg('health.value.atMost', { max: 1 }) },
       ],
     },
     {
@@ -490,14 +494,14 @@ export function buildHealth(now: number): ServiceHealth[] {
       status: 'ok',
       detail: 'Routeur joignable, 14 modèles',
       checkedAt: ago(20),
-      metrics: [{ label: '429 sur 10 min', value: '0' }],
+      metrics: [{ label: msg('health.metric.rateLimited'), value: '0' }],
     },
     {
       id: 'nvidia',
-      label: 'API NVIDIA',
+      label: msg('health.nvidia'),
       group: 'models',
       status: 'ok',
-      detail: 'Dernier appel réussi il y a 31 s',
+      detail: msg('health.provider.lastOk', { seconds: 31 }),
       checkedAt: ago(31),
       metrics: [],
     },
@@ -512,10 +516,10 @@ export function buildHealth(now: number): ServiceHealth[] {
     },
     {
       id: 'claude',
-      label: 'Claude Code (abonnement)',
+      label: msg('health.claude'),
       group: 'models',
       status: 'ok',
-      detail: 'Dernière session il y a 40 s, aucune limite signalée',
+      detail: msg('health.claude.lastSession', { seconds: 40 }),
       checkedAt: ago(40),
       metrics: [],
     },
@@ -530,16 +534,21 @@ export function buildHealth(now: number): ServiceHealth[] {
     },
     {
       id: 'github',
-      label: 'API GitHub',
+      label: msg('health.github'),
       group: 'tools',
       status: 'ok',
-      detail: 'Jeton fine-grained de cddev valide',
+      detail: msg('health.github.ok'),
       checkedAt: ago(14),
-      metrics: [{ label: 'Quota restant', value: '4 812 sur 5 000' }],
+      metrics: [
+        {
+          label: msg('health.metric.quota'),
+          value: msg('health.value.ofTotal', { value: 4812, total: 5000 }),
+        },
+      ],
     },
     {
       id: 'webhook',
-      label: 'Webhooks GitHub',
+      label: msg('health.webhook'),
       group: 'intake',
       status: 'ok',
       detail: 'Dernière livraison acceptée (200) il y a 3 min',
@@ -566,21 +575,29 @@ export function buildHealth(now: number): ServiceHealth[] {
     },
     {
       id: 'probe',
-      label: 'Sonde factory-live-probe',
+      label: msg('health.probe'),
       group: 'factory-live',
       status: 'ok',
-      detail: 'Dernier rapport il y a 8 s',
+      detail: msg('health.probe.last', { seconds: 8 }),
       checkedAt: ago(8),
       metrics: [],
     },
     {
       id: 'sources',
-      label: 'Sources de factory-live',
+      label: msg('health.sources'),
       group: 'factory-live',
       status: 'ok',
-      detail: 'kanban.db lu il y a 0,3 s, webhooks reçus : 46 par minute',
+      detail: msg('health.sources.detail', {
+        kanban: 'read',
+        cards: 64,
+        kanbanError: null,
+        sessionsError: null,
+      }),
       checkedAt: ago(1),
-      metrics: [],
+      metrics: [
+        { label: msg('health.metric.hooksPerMinute'), value: '46' },
+        { label: msg('health.metric.lastHook'), value: msg('health.value.ago', { seconds: 1 }) },
+      ],
     },
   ];
 }

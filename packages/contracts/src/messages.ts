@@ -156,6 +156,21 @@ export const Message = z.discriminatedUnion('code', [
   message('health.value.none', none),
   message('health.value.ago', seconds),
 
+  // Événements GitHub et suivi d'un déblocage, racontés par factory-live (sources `github` et
+  // `factory-live` de la timeline, type `github` du fil) : la démo les montre, le serveur pas encore.
+  message('github.labeled', { label: z.string(), actor: z.string() }),
+  message('github.prOpened', { pr: count, draft: z.boolean() }),
+  message('github.diffstat', { additions: count, deletions: count, files: count }),
+  message('github.reviewRequested', {
+    pr: count,
+    reviewer: z.string(),
+    autoMerge: z.boolean().nullable(),
+  }),
+  message('github.merged', none),
+  message('github.answerPosted', { issueKey: z.string() }),
+  message('github.answerAcknowledged', none),
+  message('unblock.sent', none),
+
   // Transcriptions, agents, coûts, notifications.
   message('transcript.hermes', { profile: z.string(), session: z.string().nullable() }),
   message('transcript.claudeCode', { costUsd: z.number().nonnegative().nullable() }),
