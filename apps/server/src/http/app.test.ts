@@ -24,6 +24,11 @@ afterEach(() => {
   h.close();
 });
 
+/** Ce PC, tel que le navigateur l'annonce : sans un hôte autorisé, factory-live refuse tout (DNS rebinding). */
+const THIS_PC = { host: 'localhost:8446' };
+/** Hermès et la sonde postent sur 127.0.0.1, au port du service (install.sh de la factory). */
+const FROM_HERMES = { host: '127.0.0.1:8446' };
+
 function hook(
   event: string,
   patch: Record<string, unknown> = {},
@@ -48,7 +53,11 @@ function postHook(body: unknown, secret = SECRET) {
   return h.app.request('/api/ingest/hermes', {
     method: 'POST',
     body: raw,
-    headers: { 'content-type': 'application/json', 'x-hermes-signature-256': sign(raw, secret) },
+    headers: {
+      ...FROM_HERMES,
+      'content-type': 'application/json',
+      'x-hermes-signature-256': sign(raw, secret),
+    },
   });
 }
 
@@ -71,7 +80,7 @@ const TAILNET = {
 };
 
 async function snapshot() {
-  return Snapshot.parse(await (await h.app.request('/api/snapshot')).json());
+  return Snapshot.parse(await (await h.app.request('/api/snapshot', { headers: THIS_PC })).json());
 }
 
 describe('instantané', () => {
@@ -106,6 +115,75 @@ describe('instantané', () => {
       'release',
     ]);
     expect(data.factory).toMatchObject({ maxInProgress: 2, running: 0, paused: false });
+  });
+});
+
+describe('contrôle de l’hôte, contre le DNS rebinding', () => {
+  const as = (host: string | null, path = '/api/snapshot') =>
+    h.app.request(path, { headers: host === null ? {} : { host } });
+  const READS = [
+    '/healthz',
+    '/api/snapshot',
+    '/api/stream',
+    '/api/profiles',
+    '/api/issues/cv-site/49',
+    '/api/runs/1/transcripts',
+    '/api/usage',
+    '/api/history',
+    '/api/sources',
+    '/api/push/key',
+    '/api/github/status',
+    '/api/openapi.json',
+    '/settings',
+  ];
+
+  it('refuse toute route, lecture comprise, à un hôte inconnu, sur un autre port ou absent', async () => {
+    for (const path of READS)
+      for (const host of ['evil.example:8446', 'evil.example', 'localhost:5173', null])
+        expect(await refusal(await as(host, path)), `${path} ${String(host)}`).toEqual([
+          421,
+          'host_refused',
+        ]);
+  });
+
+  it('refuse aussi les écritures et l’ingestion, avant leur propre garde', async () => {
+    const id = encodeURIComponent((await snapshot()).interventions[0]?.id ?? '');
+    const unblock = await h.app.request(`/api/interventions/${id}/unblock`, {
+      method: 'POST',
+      headers: { ...LOCAL, host: 'evil.example:8446' },
+      body: JSON.stringify({ text: 'ok' }),
+    });
+    expect(await refusal(unblock)).toEqual([421, 'host_refused']);
+    const raw = JSON.stringify(
+      hook('pre_tool_call', { tool_name: 'terminal', tool_input: { command: 'npm test' } }),
+    );
+    const ingest = await h.app.request('/api/ingest/hermes', {
+      method: 'POST',
+      body: raw,
+      headers: { host: 'evil.example:8446', 'x-hermes-signature-256': sign(raw, SECRET) },
+    });
+    expect(await refusal(ingest)).toEqual([421, 'host_refused']);
+    expect(h.github.calls.filter((call) => call.method === 'POST')).toHaveLength(0);
+    expect((await snapshot()).agents.find((agent) => agent.profile === 'coder')?.state).not.toBe(
+      'tool',
+    );
+  });
+
+  it('laisse passer ce PC sur le port du service et l’hôte tailnet de la configuration', async () => {
+    for (const host of [
+      'localhost:8446',
+      '127.0.0.1:8446',
+      '[::1]:8446',
+      'LocalHost:8446',
+      TAILNET.host,
+    ])
+      expect((await as(host)).status, host).toBe(200);
+  });
+
+  it('garde /healthz joignable par le healthcheck Docker (127.0.0.1 au port du service)', async () => {
+    const response = await as('127.0.0.1:8446', '/healthz');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, version: 'test' });
   });
 });
 
@@ -204,7 +282,7 @@ describe('ingestion des webhooks d’Hermès', () => {
     const response = await h.app.request('/api/ingest/health', {
       method: 'POST',
       body: report,
-      headers: { 'x-factory-live-signature-256': sign(report, SECRET) },
+      headers: { ...FROM_HERMES, 'x-factory-live-signature-256': sign(report, SECRET) },
     });
     expect(response.status).toBe(202);
     const data = await snapshot();
@@ -319,7 +397,7 @@ describe('déblocage depuis l’app', () => {
 
 describe('détail d’une issue', () => {
   it('respecte le contrat : cartes, runs, timeline', async () => {
-    const response = await h.app.request('/api/issues/cv-site/49');
+    const response = await h.app.request('/api/issues/cv-site/49', { headers: THIS_PC });
     expect(response.status).toBe(200);
     const detail = IssueDetail.parse(await response.json());
     expect(detail.cards.map((card) => [card.id, card.kind, card.station])).toEqual([
@@ -335,8 +413,8 @@ describe('détail d’une issue', () => {
       msg('timeline.blocked', { kind: 'needs_input' }),
     );
     expect(detail.issue.prUrl).toBeNull();
-    expect((await h.app.request('/api/issues/cv-site/50')).status).toBe(404);
-    expect((await h.app.request('/api/issues/..%2Fetc/1')).status).toBe(400);
+    expect((await h.app.request('/api/issues/cv-site/50', { headers: THIS_PC })).status).toBe(404);
+    expect((await h.app.request('/api/issues/..%2Fetc/1', { headers: THIS_PC })).status).toBe(400);
   });
 });
 
@@ -352,7 +430,9 @@ describe('PR relevée par la factory', () => {
       metadata: { pr_url: 'https://github.com/code-my-life/cv-site/pull/52' },
     });
     h.syncKanban();
-    const detail = IssueDetail.parse(await (await h.app.request('/api/issues/cv-site/49')).json());
+    const detail = IssueDetail.parse(
+      await (await h.app.request('/api/issues/cv-site/49', { headers: THIS_PC })).json(),
+    );
     expect(detail.issue).toMatchObject({
       pr: null,
       prUrl: 'https://github.com/code-my-life/cv-site/pull/52',
@@ -398,7 +478,7 @@ describe('flux SSE', () => {
   }
 
   it('commence par un instantané, puis n’envoie que ce qui change', async () => {
-    const response = await h.app.request('/api/stream');
+    const response = await h.app.request('/api/stream', { headers: THIS_PC });
     expect(response.headers.get('content-type')).toContain('text/event-stream');
     const reading = read(response, 3);
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -415,7 +495,7 @@ describe('flux SSE', () => {
   it('bat quand rien ne part, sans id pour ne pas fausser la reprise', async () => {
     h.close();
     h = harness({ streamPingMs: 30 });
-    const events = await read(await h.app.request('/api/stream'), 2);
+    const events = await read(await h.app.request('/api/stream', { headers: THIS_PC }), 2);
     expect(events[0]?.event).toBe('snapshot');
     expect(events[1]).toEqual({ id: null, event: 'ping', data: {} });
   });
@@ -426,7 +506,9 @@ describe('flux SSE', () => {
     await postHook(hook('pre_tool_call', { tool_name: 'terminal', tool_input: { command: 'ls' } }));
     h.hub.flush();
     const events = await read(
-      await h.app.request('/api/stream', { headers: { 'last-event-id': String(lastId) } }),
+      await h.app.request('/api/stream', {
+        headers: { ...THIS_PC, 'last-event-id': String(lastId) },
+      }),
       1,
     );
     expect(events[0]?.event).not.toBe('snapshot');
@@ -459,7 +541,9 @@ describe('notifications', () => {
         })
       ).status,
     ).toBe(204);
-    expect(await (await h.app.request('/api/push/key')).json()).toEqual({ publicKey: 'BPUBLIC' });
+    expect(await (await h.app.request('/api/push/key', { headers: THIS_PC })).json()).toEqual({
+      publicKey: 'BPUBLIC',
+    });
     const result = await (
       await h.app.request('/api/push/test', { method: 'POST', headers: LOCAL })
     ).json();
@@ -478,7 +562,9 @@ describe('GitHub App et connexion de Clément', () => {
   const decode = (html: string) =>
     html.replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)));
   const status = async () =>
-    GitHubAccess.parse(await (await h.app.request('/api/github/status')).json());
+    GitHubAccess.parse(
+      await (await h.app.request('/api/github/status', { headers: THIS_PC })).json(),
+    );
   const interventionId = async () => (await snapshot()).interventions[0]?.id as string;
   const unblock = async (id: string) =>
     h.app.request(`/api/interventions/${encodeURIComponent(id)}/unblock`, {
@@ -575,8 +661,9 @@ describe('GitHub App et connexion de Clément', () => {
   it('réserve ces pages à ce PC et au login Tailscale de Clément', async () => {
     const get = (headers: Record<string, string>) =>
       h.app.request('/api/github/setup', { headers });
-    expect((await get({})).status).toBe(403);
-    expect((await get({ host: 'evil.example' })).status).toBe(403);
+    // Hôte absent ou inconnu : refusé avant même cette garde (contrôle de l'hôte, DNS rebinding).
+    expect((await get({})).status).toBe(421);
+    expect((await get({ host: 'evil.example' })).status).toBe(421);
     expect((await get({ ...NAV, 'x-forwarded-for': '100.64.0.7' })).status).toBe(403);
     expect(
       (await get({ host: TAILNET_HOST, 'tailscale-user-login': 'intrus@github' })).status,
@@ -635,7 +722,7 @@ describe('GitHub App et connexion de Clément', () => {
     });
     expect(await french.text()).toContain('Créer l’App GitHub de factory-live');
     const refused = await h.app.request('/api/github/setup', {
-      headers: { 'accept-language': 'en-US' },
+      headers: { host: TAILNET_HOST, 'accept-language': 'en-US' },
     });
     expect(refused.status).toBe(403);
     expect(await refused.text()).toBe('Restricted to this PC and your Tailscale login.');
@@ -664,7 +751,7 @@ describe('GitHub App et connexion de Clément', () => {
 
 describe('documentation', () => {
   it('publie l’OpenAPI 3.1 des routes', async () => {
-    const doc = (await (await h.app.request('/api/openapi.json')).json()) as {
+    const doc = (await (await h.app.request('/api/openapi.json', { headers: THIS_PC })).json()) as {
       openapi: string;
       paths: Record<string, unknown>;
     };

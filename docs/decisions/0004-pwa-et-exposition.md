@@ -8,6 +8,7 @@ Date : 2026-10-28. Statut : accepté.
 - Ce PC : `http://localhost:8446` (Tailscale tourne seulement dans WSL). iPhone et Mac : `https://desktop-gja56n4.tail40220c.ts.net:8446`.
 - Web Push (VAPID, `web-push`) seulement pour les blocages qui attendent Clément : needs_input, capability, transient, boucle de blocage, carte retenue plus de 30 min, abandon. Telegram et `factory-notify` restent inchangés.
 - Accès sans mot de passe ; écritures réservées à localhost et au login Tailscale autorisé (en-tête `Tailscale-User-Login`).
+- Contrôle de l'hôte sur toutes les routes, lectures et `/healthz` compris (2026-10-29) : l'en-tête `Host` doit désigner ce PC au port du service (`localhost`, `127.0.0.1`, `[::1]`), l'hôte d'une origine publique (le nom tailnet) ou un hôte d'`ALLOWED_HOSTS`, sinon 421 `host_refused`. Contre le DNS rebinding : une page piégée qui fait pointer son domaine sur 127.0.0.1 envoie son propre nom, et ne lit donc ni l'instantané ni les transcriptions.
 
 ## L'app installée (phase 5, 2026-10-28)
 

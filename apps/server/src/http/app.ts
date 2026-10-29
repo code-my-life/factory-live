@@ -44,7 +44,7 @@ import type { ViewDeps } from '../application/views.ts';
 import type { Logger } from '../logger.ts';
 import { UnblockError, unblockIntervention } from '../application/unblock.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
-import { navigationGuard, requestOrigin, writeGuard } from './guard.ts';
+import { hostGuard, navigationGuard, requestOrigin, writeGuard } from './guard.ts';
 import { PAGE_TEXTS, localeCookie, pageLocale } from './pages.ts';
 import type { PageLocale } from './pages.ts';
 import type { StreamBuffer } from './stream.ts';
@@ -59,6 +59,8 @@ export interface AppDeps {
   githubAuth: GitHubAppAuth | null;
   hookSecret: string | null;
   origins: readonly string[];
+  /** Valeurs de l'en-tête `Host` acceptées (configuration) ; tout autre hôte reçoit 421. */
+  allowedHosts: readonly string[];
   tailscaleLogins: readonly string[];
   webDist: string | null;
   /** Battement du flux quand rien d'autre ne part (15 s ; plus court dans les tests). */
@@ -135,6 +137,8 @@ export function createApp(deps: AppDeps) {
     if (!c.res.headers.has('Content-Security-Policy')) c.header('Content-Security-Policy', CSP);
     c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   });
+  // Avant toute route, lectures et /healthz compris : contre le DNS rebinding (guard.ts).
+  app.use('*', hostGuard(deps.allowedHosts));
 
   app.onError((error, c) => {
     deps.log.error(

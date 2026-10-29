@@ -888,6 +888,7 @@ export const fr = {
       origin_refused: 'Origine refusée',
       csrf_missing: 'En-tête x-factory-live manquant',
       rate_limited: 'Trop de demandes, réessaie dans une minute',
+      host_refused: 'Adresse inconnue de factory-live : ouvre l’app par son adresse habituelle',
     } satisfies Record<ApiErrorCode, string>,
   },
 

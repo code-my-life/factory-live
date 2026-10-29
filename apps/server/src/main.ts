@@ -165,6 +165,7 @@ const app = createApp({
   githubAuth,
   hookSecret: config.secrets.hookSecret,
   origins: config.PUBLIC_ORIGINS,
+  allowedHosts: config.allowedHosts,
   tailscaleLogins: config.TAILSCALE_LOGINS,
   webDist: config.WEB_DIST,
   log,
@@ -182,6 +183,7 @@ const server = serve({ fetch: app.fetch, port: config.PORT, hostname: config.HOS
       github: githubAuth.status().mode,
       ingestion: config.secrets.hookSecret ? 'secret présent' : 'désactivée (secret absent)',
       tailscaleLogins: config.TAILSCALE_LOGINS,
+      allowedHosts: config.allowedHosts,
     },
     'factory-live démarré',
   );

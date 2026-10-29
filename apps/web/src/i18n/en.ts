@@ -816,6 +816,7 @@ export const en: Messages = {
       origin_refused: 'Origin refused',
       csrf_missing: 'Missing x-factory-live header',
       rate_limited: 'Too many requests, try again in a minute',
+      host_refused: 'Unknown address for factory-live: open the app at its usual address',
     },
   },
 

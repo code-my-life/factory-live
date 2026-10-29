@@ -14,6 +14,18 @@ const list = (fallback = '') =>
         .filter(Boolean),
     );
 
+/** Liste d'URL séparées par des virgules (origines publiques de la PWA). */
+const urls = z
+  .string()
+  .default('')
+  .transform((value) =>
+    value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean),
+  )
+  .pipe(z.array(z.url()));
+
 const flag = z
   .enum(['0', '1', 'true', 'false', ''])
   .default('')
@@ -43,8 +55,13 @@ const Env = z.object({
   GITHUB_API: z.url().default('https://api.github.com'),
   /** Logins Tailscale autorisés à écrire (en-tête `Tailscale-User-Login` posé par `tailscale serve`). */
   TAILSCALE_LOGINS: list(),
-  /** Origines de la PWA : localhost sur ce PC, nom tailnet pour les autres appareils. */
-  PUBLIC_ORIGINS: list('http://localhost:8446,https://desktop-gja56n4.tail40220c.ts.net:8446'),
+  /**
+   * Origines de la PWA : localhost au port du service si rien n'est dit, plus le nom tailnet pour les
+   * autres appareils (docker/.env). Leurs hôtes sont autorisés dans l'en-tête `Host`.
+   */
+  PUBLIC_ORIGINS: urls,
+  /** Hôtes autorisés en plus de ce PC et des origines publiques (port publié différent, autre nom). */
+  ALLOWED_HOSTS: list(),
   DASHBOARD_URL: z.url().default('https://desktop-gja56n4.tail40220c.ts.net:8443'),
   FREELLMAPI_URL: z.string().default(''),
   HELD_AFTER_MINUTES: z.coerce.number().int().positive().default(30),
@@ -59,6 +76,8 @@ export interface Secrets {
 }
 
 export type Config = z.infer<typeof Env> & {
+  /** Valeurs de l'en-tête `Host` acceptées (`allowedHosts`). */
+  allowedHosts: string[];
   boardDir: string;
   kanbanDb: string;
   profilesDir: string;
@@ -74,11 +93,36 @@ function readSecret(dir: string, name: string): string | null {
   }
 }
 
+/** Ce PC, quel que soit le nom qu'on lui donne dans l'adresse. */
+const LOOPBACK = ['localhost', '127.0.0.1', '[::1]'] as const;
+
+/**
+ * Hôtes acceptés dans l'en-tête `Host`, contre le DNS rebinding : ce PC au port du service, l'hôte de
+ * chaque origine publique (le nom tailnet), puis ceux d'`ALLOWED_HOSTS`. Une page piégée qui fait
+ * pointer son propre domaine sur 127.0.0.1 envoie son nom à elle : il n'est pas dans la liste.
+ */
+export function allowedHosts(
+  port: number,
+  origins: readonly string[],
+  extra: readonly string[] = [],
+): string[] {
+  const hosts = [
+    ...LOOPBACK.map((name) => `${name}:${port}`),
+    ...origins.map((origin) => new URL(origin).host),
+    ...extra,
+  ].map((host) => host.toLowerCase());
+  return [...new Set(hosts)];
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = Env.parse(env);
   const boardDir = join(parsed.HERMES_HOME, 'kanban', 'boards', parsed.HERMES_BOARD);
+  const origins =
+    parsed.PUBLIC_ORIGINS.length > 0 ? parsed.PUBLIC_ORIGINS : [`http://localhost:${parsed.PORT}`];
   return {
     ...parsed,
+    PUBLIC_ORIGINS: origins,
+    allowedHosts: allowedHosts(parsed.PORT, origins, parsed.ALLOWED_HOSTS),
     boardDir,
     kanbanDb: join(boardDir, 'kanban.db'),
     profilesDir: join(parsed.HERMES_HOME, 'profiles'),

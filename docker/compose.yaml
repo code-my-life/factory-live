@@ -25,6 +25,7 @@ services:
       GITHUB_OWNER: ${GITHUB_OWNER:-code-my-life}
       TAILSCALE_LOGINS: ${TAILSCALE_LOGINS:-cddev@github}
       PUBLIC_ORIGINS: ${PUBLIC_ORIGINS:-http://localhost:8446,https://desktop-gja56n4.tail40220c.ts.net:8446}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
       DASHBOARD_URL: ${DASHBOARD_URL:-https://desktop-gja56n4.tail40220c.ts.net:8443}
     volumes:
       - factory-live-data:/data

@@ -16,6 +16,7 @@ import { StreamBuffer } from '../http/stream.ts';
 import { Hub } from '../application/hub.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
 import { createLogger } from '../logger.ts';
+import { allowedHosts } from '../config.ts';
 import { appPem } from './github-fixtures.ts';
 import { insertEvent, insertRun, insertTask, kanbanDb, tempDir } from './hermes-fixtures.ts';
 import type { TempDir } from './hermes-fixtures.ts';
@@ -253,6 +254,7 @@ export function harness(
     githubAuth,
     hookSecret: SECRET,
     origins: ORIGINS,
+    allowedHosts: allowedHosts(8446, ORIGINS),
     tailscaleLogins: ['cddev@github'],
     webDist: null,
     ...(options.streamPingMs ? { streamPingMs: options.streamPingMs } : {}),

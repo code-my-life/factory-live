@@ -58,6 +58,7 @@ export const ApiErrorCode = z.enum([
   'origin_refused',
   'csrf_missing',
   'rate_limited',
+  'host_refused',
 ]);
 export type ApiErrorCode = z.infer<typeof ApiErrorCode>;
 
