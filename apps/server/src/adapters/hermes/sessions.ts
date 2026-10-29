@@ -341,6 +341,17 @@ export class SessionReader implements SessionsPort {
     return facts;
   }
 
+  sessionsActiveAt(profile: string, at: number): string[] | null {
+    const db = this.db(profile);
+    if (!db) return null;
+    return db
+      .prepare(
+        'SELECT id FROM sessions WHERE started_at <= ? AND (ended_at IS NULL OR ended_at >= ?)',
+      )
+      .all(at, at)
+      .map((row) => String(row['id']));
+  }
+
   close(): void {
     for (const db of this.open.values()) db.close();
     this.open.clear();

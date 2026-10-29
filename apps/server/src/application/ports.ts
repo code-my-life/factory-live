@@ -142,6 +142,8 @@ export interface SessionsPort {
    * reste introuvable n'en a pas ; `null` : la base de l'agent est illisible.
    */
   runFacts(profile: string, runs: readonly RunRef[]): SessionFacts[] | null;
+  /** Les sessions de l'agent ouvertes à cet instant (secondes epoch) ; `null` : base illisible. */
+  sessionsActiveAt(profile: string, at: number): string[] | null;
 }
 
 // --- Fichiers de la factory (logs de cartes, lanes Claude Code) -------------------------------------

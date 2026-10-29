@@ -51,7 +51,10 @@ const paths = new HermesPaths({
 const profiles = new ProfileConfigReader(config.HERMES_HOME, config.FACTORY_REPO, paths);
 const sessions = new SessionReader(config.profilesDir);
 const files = new CardFiles(config.boardDir, config.CLAUDE_PROJECTS, paths);
-const agentLog = new AgentLogReader(paths, config.HERMES_TZ);
+// Une ligne du journal sans session prend la seule session ouverte de l'agent à ce moment.
+const agentLog = new AgentLogReader(paths, config.HERMES_TZ, (profile, at) =>
+  sessions.sessionsActiveAt(profile, at),
+);
 // GitHub : App factory-live (lectures, quota propre) et connexion de Clément (déblocage) ; le jeton
 // fine-grained de ~/.config/factory-live/github-token sert de repli tant que l'App n'existe pas.
 const githubAuth = new GitHubAppAuth({

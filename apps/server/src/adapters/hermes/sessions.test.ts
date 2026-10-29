@@ -281,6 +281,14 @@ describe('SessionReader.runFacts', () => {
     expect(JSON.stringify(facts)).not.toContain(token);
   });
 
+  it('donne les sessions ouvertes à un instant, une session jamais close comprise', () => {
+    session('20261029_101049_0612ab', 1_793_265_050, { ended_at: null });
+    expect(reader.sessionsActiveAt('coder', 1_793_263_100)).toEqual(['20261029_093652_fc383d']);
+    expect(reader.sessionsActiveAt('coder', 1_793_265_100)).toEqual(['20261029_101049_0612ab']);
+    expect(reader.sessionsActiveAt('coder', 1_793_200_000)).toEqual([]);
+    expect(reader.sessionsActiveAt('inconnu', 1_793_263_100)).toBeNull();
+  });
+
   it('rend null quand la base de l’agent est absente', () => {
     expect(reader.runFacts('inconnu', [run()])).toBeNull();
     expect(reader.runFacts('../coder', [run()])).toBeNull();

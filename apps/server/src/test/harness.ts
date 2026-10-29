@@ -136,7 +136,9 @@ export function harness(
   const profiles = new ProfileConfigReader(hermes, factory, paths);
   const sessions = new SessionReader(join(hermes, 'profiles'));
   const files = new CardFiles(boardDir, join(dir.path, 'claude-projects'), paths);
-  const agentLog = new AgentLogReader(paths, 'Europe/Paris');
+  const agentLog = new AgentLogReader(paths, 'Europe/Paris', (profile, at) =>
+    sessions.sessionsActiveAt(profile, at),
+  );
   const github: Harness['github'] = { calls: [], reactions: [] };
   const fakeFetch = ((input: string | URL | Request, init: RequestInit = {}) => {
     const url = input instanceof Request ? input.url : input.toString();
