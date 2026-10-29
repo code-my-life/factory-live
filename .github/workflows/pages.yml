@@ -1,0 +1,67 @@
+name: Site
+
+# Le site (site/) et sa démo : construits et testés à chaque pull request, publiés sur GitHub Pages
+# depuis main. La publication attend que le dépôt soit public et que Pages soit activé (source :
+# GitHub Actions) ; d'ici là, le job de publication est sauté.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Site, build et tests (Chromium, WebKit)
+    runs-on: ubuntu-24.04
+    container:
+      # La même image que les tests de bout en bout de l'app : mêmes navigateurs, mêmes polices.
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
+      options: --ipc=host
+    env:
+      CI: 'true'
+      E2E_WEBKIT: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: npm ci
+      - name: Construire le site et la démo
+        run: npm run site:build
+      - name: Structure (langues, liens, ancres, démo)
+        run: node --test site/test/structure.test.mjs
+      - name: Navigateurs (débordement, accessibilité, onglets, démo)
+        run: npx playwright test -c site/playwright.config.ts
+      - name: Rapport et traces en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: site-playwright-report
+          path: |
+            playwright-report/site
+            test-results/site
+          retention-days: 7
+      - name: Préparer la publication
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !github.event.repository.private
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site/dist
+
+  deploy:
+    name: Publication sur GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !github.event.repository.private
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
