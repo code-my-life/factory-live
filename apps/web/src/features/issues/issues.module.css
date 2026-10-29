@@ -181,8 +181,9 @@
   }
 }
 
+/* Sur téléphone, les runs passent en fiches (.runList) : seul leur tableau disparaît. */
 @media (max-width: 543.98px) {
-  .tableBox {
+  .runTable {
     display: none;
   }
 }

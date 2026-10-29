@@ -102,7 +102,7 @@ function RunsTable({
           </li>
         ))}
       </ul>
-      <div className={styles.tableBox}>
+      <div className={`${styles.tableBox} ${styles.runTable}`}>
         <Table
           gridTemplateColumns="auto auto minmax(0, 2fr) minmax(0, 2fr) auto auto"
           cellPadding="condensed"
@@ -411,7 +411,7 @@ export function IssuePage() {
           {tab === 'costs' ? (
             <div className={styles.tableBox}>
               <Table
-                gridTemplateColumns="auto auto minmax(0, 1fr) auto auto"
+                gridTemplateColumns="auto auto minmax(10rem, 1fr) auto auto"
                 cellPadding="condensed"
                 aria-label="Consommation par run"
               >

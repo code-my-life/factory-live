@@ -38,3 +38,24 @@ test('les colonnes des dernières issues terminées ne débordent pas l’une su
   }
   await expectNoHorizontalOverflow(page);
 });
+
+test('les coûts d’une issue s’affichent aussi sur téléphone, sans colonne qui déborde', async ({
+  page,
+}) => {
+  await page.goto('/issues/claude-cockpit/71');
+  await page.getByRole('link', { name: 'Coûts' }).click();
+  const table = page.getByRole('table', { name: 'Consommation par run' });
+  await expect(table).toBeVisible();
+  const rows = table.getByRole('row').filter({ has: page.getByRole('cell') });
+  await expect(rows.first()).toBeVisible();
+  for (const row of await rows.all()) {
+    for (const cell of await row.getByRole('cell').all()) {
+      const overflow = await cell.evaluate((element) => element.scrollWidth - element.clientWidth);
+      expect(
+        overflow,
+        `contenu qui déborde de sa colonne : ${await cell.innerText()}`,
+      ).toBeLessThanOrEqual(0);
+    }
+  }
+  await expectNoHorizontalOverflow(page);
+});
