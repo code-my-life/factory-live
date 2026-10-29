@@ -111,6 +111,7 @@ const unblockDeps = {
   store,
   github: githubClient,
   canWrite: () => githubAuth.canWrite(),
+  factoryBot: config.FACTORY_BOT_LOGIN,
   log,
   now,
 };

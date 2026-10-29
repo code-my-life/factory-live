@@ -230,6 +230,7 @@ export function harness(
     store,
     github: client,
     canWrite: () => githubAuth.canWrite(),
+    factoryBot: 'code-my-life-factory[bot]',
     log,
     now,
   };

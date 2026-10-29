@@ -21,6 +21,11 @@ export interface UnblockDeps {
   github: GitHubWritePort | null;
   /** Faux tant que Clément n'est pas connecté à GitHub (et sans jeton de repli). */
   canWrite?: () => boolean;
+  /**
+   * Login du bot de la factory : seule sa réaction au commentaire compte, n'importe qui pouvant réagir
+   * sur un dépôt public.
+   */
+  factoryBot: string;
   log: LoggerPort;
   now: () => number;
 }
@@ -114,7 +119,10 @@ export async function trackUnblockReactions(deps: UnblockDeps): Promise<void> {
     if (record.state !== 'sent' || record.commentId === null) continue;
     const [repo = ''] = record.issueKey.split('#');
     try {
-      const reactions = await deps.github.reactions(repo, record.commentId);
+      const bot = deps.factoryBot.toLowerCase();
+      const reactions = (await deps.github.reactions(repo, record.commentId)).filter(
+        (reaction) => reaction.user.toLowerCase() === bot,
+      );
       const state = reactions.some((reaction) => reaction.content === 'confused')
         ? 'rejected'
         : reactions.some((reaction) => reaction.content === '+1')

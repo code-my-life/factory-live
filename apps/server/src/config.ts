@@ -54,6 +54,8 @@ const Env = z.object({
   GITHUB_OWNER: z.string().default('code-my-life'),
   GITHUB_LOGIN: z.string().default('cddev'),
   GITHUB_API: z.url().default('https://api.github.com'),
+  /** Bot de la factory (GitHub App) : seule sa réaction au commentaire de déblocage compte. */
+  FACTORY_BOT_LOGIN: z.string().min(1).default('code-my-life-factory[bot]'),
   /** Logins Tailscale autorisés à écrire (en-tête `Tailscale-User-Login` posé par `tailscale serve`). */
   TAILSCALE_LOGINS: list(),
   /**

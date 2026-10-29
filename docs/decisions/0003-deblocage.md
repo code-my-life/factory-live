@@ -11,7 +11,7 @@ Date : 2026-10-28, révisée le même jour pour la GitHub App. Statut : accepté
   - écriture du commentaire avec le jeton utilisateur de Clément, obtenu par la connexion GitHub de l'App (OAuth web, PKCE S256, état à usage unique de 10 min), depuis ce PC comme depuis l'iPhone ; jeton de 8 h rafraîchi seul pendant 6 mois ;
   - permissions : Metadata, Issues en écriture ; Pull requests, Actions, Checks, Statuses, Contents et Webhooks des dépôts en lecture.
 - Le jeton fine-grained de `~/.config/factory-live/github-token` reste un repli, utilisé tant que l'App n'existe pas, n'est pas installée ou que Clément n'est pas connecté.
-- Le suivi se lit sur la réaction du bot au commentaire (+1 accepté, confused rien à débloquer) puis sur l'événement `unblocked` du kanban.
+- Le suivi se lit sur la réaction du bot au commentaire (+1 accepté, confused rien à débloquer) puis sur l'événement `unblocked` du kanban. Seule la réaction du bot compte (`FACTORY_BOT_LOGIN`, `code-my-life-factory[bot]` par défaut) : sur un dépôt public, n'importe qui peut réagir au commentaire.
 - Une carte sans issue, un triage ou une carte retenue par `active_pr` ne passent pas par là : l'app affiche les commandes exactes à copier.
 - Le merge reste une approbation de la PR sur GitHub.
 

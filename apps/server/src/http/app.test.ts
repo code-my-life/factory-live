@@ -336,6 +336,24 @@ describe('déblocage depuis l’app', () => {
     });
   });
 
+  it('ne croit que la réaction du bot de la factory : celle d’un passant ne change rien', async () => {
+    const id = await interventionId();
+    await h.app.request(`/api/interventions/${encodeURIComponent(id)}/unblock`, {
+      method: 'POST',
+      headers: LOCAL,
+      body: JSON.stringify({ text: 'Prends PostgreSQL' }),
+    });
+    h.github.reactions.push(
+      { content: '+1', user: { login: 'passant' } },
+      { content: 'confused', user: { login: 'passant' } },
+    );
+    await trackUnblockReactions(h.unblock);
+    expect(h.store.unblock(id)?.state).toBe('sent');
+    h.github.reactions.push({ content: 'confused', user: { login: 'Code-My-Life-Factory[bot]' } });
+    await trackUnblockReactions(h.unblock);
+    expect(h.store.unblock(id)?.state).toBe('rejected');
+  });
+
   it('suit la carte jusqu’à sa reprise', async () => {
     const id = await interventionId();
     await h.app.request(`/api/interventions/${encodeURIComponent(id)}/unblock`, {
@@ -643,7 +661,7 @@ describe('GitHub App et connexion de Clément', () => {
     await createAndConnect();
     const id = await interventionId();
     expect((await unblock(id)).status).toBe(200);
-    h.github.reactions.push({ content: '+1', user: { login: 'factory-bot' } });
+    h.github.reactions.push({ content: '+1', user: { login: 'code-my-life-factory[bot]' } });
     await trackUnblockReactions(h.unblock);
     const comment = h.github.calls.find(
       (call) => call.method === 'POST' && call.url.endsWith('/issues/49/comments'),

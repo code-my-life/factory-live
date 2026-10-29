@@ -60,3 +60,12 @@ describe('configuration, valeurs propres à ce PC (docker/.env, jamais dans le d
     expect(loadConfig({ ...BASE, DASHBOARD_URL: '' }).DASHBOARD_URL).toBeNull();
   });
 });
+
+describe('configuration, bot de la factory', () => {
+  it('seule sa réaction au déblocage compte : code-my-life-factory[bot] par défaut, réglable', () => {
+    expect(loadConfig(BASE).FACTORY_BOT_LOGIN).toBe('code-my-life-factory[bot]');
+    expect(loadConfig({ ...BASE, FACTORY_BOT_LOGIN: 'autre-factory[bot]' }).FACTORY_BOT_LOGIN).toBe(
+      'autre-factory[bot]',
+    );
+  });
+});
