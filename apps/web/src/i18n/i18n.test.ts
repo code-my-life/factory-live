@@ -90,6 +90,8 @@ function sample(schema: unknown): unknown {
       return 3;
     case 'string':
       return 'x';
+    case 'boolean':
+      return true;
     case 'nullable':
       return sample(def['innerType']);
     case 'enum':

@@ -1,3 +1,4 @@
+import { msg } from '@factory-live/contracts';
 import type {
   HistoryStats,
   IssueDetail,
@@ -96,7 +97,7 @@ export class DemoSource implements FactoryDataSource {
         profile: null,
         issueKey,
         cardId: intervention.cardId,
-        label: `Réponse postée sur ${issueKey}`,
+        label: msg('github.answerPosted', { issueKey }),
         detail: `/factory unblock ${text}`,
         status: 'ok',
         durationMs: null,
@@ -107,7 +108,7 @@ export class DemoSource implements FactoryDataSource {
         source: 'factory-live',
         profile: null,
         cardId: intervention.cardId,
-        label: 'Réponse envoyée depuis factory-live',
+        label: msg('unblock.sent'),
         detail: text,
         tone: 'neutral',
       });
@@ -122,8 +123,8 @@ export class DemoSource implements FactoryDataSource {
         profile: null,
         issueKey,
         cardId: intervention.cardId,
-        label: 'Le bot a pris la réponse en compte',
-        detail: 'Réaction +1 sur ton commentaire',
+        label: msg('github.answerAcknowledged'),
+        detail: null,
         status: 'ok',
         durationMs: null,
         model: null,
@@ -148,7 +149,7 @@ export class DemoSource implements FactoryDataSource {
         issueKey,
         cardId: intervention.cardId,
         label: 'unblocked',
-        detail: 'La carte repart. En file : 2 cartes en cours sur 2 autorisées',
+        detail: null,
         status: 'ok',
         durationMs: null,
         model: null,
@@ -158,8 +159,8 @@ export class DemoSource implements FactoryDataSource {
         source: 'kanban',
         profile: null,
         cardId: intervention.cardId,
-        label: 'Carte débloquée par ta réponse',
-        detail: 'Elle reprendra dès qu’une place se libère',
+        label: msg('timeline.unblocked'),
+        detail: null,
         tone: 'success',
       });
     });

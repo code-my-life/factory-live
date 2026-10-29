@@ -192,6 +192,17 @@ const server: ServerMessages = {
   'health.value.none': () => 'none',
   'health.value.ago': ({ seconds }) => f.ago(seconds),
 
+  'github.labeled': ({ label, actor }) => `Label ${label} added by ${actor}`,
+  'github.prOpened': ({ pr, draft }) => `PR #${pr} opened${draft ? ' as a draft' : ''}`,
+  'github.diffstat': ({ additions, deletions, files }) =>
+    `+${additions} −${deletions}, ${files} ${f.plural(files, 'file', 'files')}`,
+  'github.reviewRequested': ({ pr, reviewer, autoMerge }) =>
+    `PR #${pr}: review requested from @${reviewer}${autoMerge === true ? ', auto-merge on' : autoMerge === false ? ', no auto-merge' : ''}`,
+  'github.merged': () => 'Merged into main, workflows green',
+  'github.answerPosted': ({ issueKey }) => `Answer posted on ${issueKey}`,
+  'github.answerAcknowledged': () => 'The bot acknowledged the answer',
+  'unblock.sent': () => 'Answer sent from factory-live',
+
   'transcript.hermes': ({ profile, session }) =>
     `Hermès session of ${profile}${session ? ` (${session})` : ''}`,
   'transcript.claudeCode': ({ costUsd }) =>
