@@ -40,7 +40,7 @@ function hook(
     tool_name: null,
     tool_input: null,
     session_id: '20261028_170000_abcdef',
-    cwd: '/home/cleme/.hermes/kanban/boards/factory/workspaces/t_1a9f0049',
+    cwd: '/home/user/.hermes/kanban/boards/factory/workspaces/t_1a9f0049',
     extra: {},
     delivery_id: deliveryId,
     timestamp: new Date(NOW - 1_000).toISOString(),
@@ -215,7 +215,7 @@ describe('ingestion des webhooks d’Hermès', () => {
   });
 
   it('rattache la reprise de la gate à sa carte, pas à la carte impl dont elle occupe le worktree', async () => {
-    const worktree = '/home/cleme/perso/cv-site/.worktrees/t_1a9f0049';
+    const worktree = '/home/user/perso/cv-site/.worktrees/t_1a9f0049';
     insertTask(h.writer, {
       id: 't_9a7e0049',
       title: 'rework cv-site#49 : tests manquants (revue gate)',

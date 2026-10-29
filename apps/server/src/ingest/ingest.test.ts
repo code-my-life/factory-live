@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { HermesHookBody } from '@factory-live/contracts';
 import { describe, expect, it } from 'vitest';
 import { toHookEvent } from './hermes.ts';
+import { SECRET } from '../test/harness.ts';
 import { ReplayGuard, sign, verifySignature } from './signature.ts';
 
 const samples = JSON.parse(
@@ -24,6 +25,19 @@ describe('verifySignature', () => {
     expect(verifySignature(body, header.replace('sha256=', 'sha1='), 'secret')).toBe(false);
     expect(verifySignature(body, 'sha256=abcd', 'secret')).toBe(false);
     expect(verifySignature(body, undefined, 'secret')).toBe(false);
+  });
+});
+
+describe('charges de référence (fixtures)', () => {
+  it('sont signées avec le secret des tests, jamais avec un vrai secret', () => {
+    for (const sample of samples)
+      expect(
+        verifySignature(
+          Buffer.from(JSON.stringify(sample.body)),
+          sample.headers['x-hermes-signature-256'],
+          SECRET,
+        ),
+      ).toBe(true);
   });
 });
 

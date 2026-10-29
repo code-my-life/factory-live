@@ -4,7 +4,7 @@
       "content-type": "application/json",
       "x-hermes-event": "pre_tool_call",
       "x-hermes-delivery": "649951b5f7824027833bac94c5c89654",
-      "x-hermes-signature-256": "sha256=7e0097d691bda063238ea540314dc7b77c6879bcbe1ffb3855514823d5a64146"
+      "x-hermes-signature-256": "sha256=8c289d12dec541be91a34cbe64832df962993ed25ca4daf0bc3fa7d86b097811"
     },
     "body": {
       "hook_event_name": "pre_tool_call",
@@ -14,7 +14,7 @@
         "command": "npm test -- team"
       },
       "session_id": "20261028_160211_ab12cd",
-      "cwd": "/home/cleme/.hermes/hermes-agent",
+      "cwd": "/home/user/.hermes/hermes-agent",
       "extra": {
         "task_id": "uuid-du-tour",
         "tool_call_id": "call_1",
@@ -29,7 +29,7 @@
       "content-type": "application/json",
       "x-hermes-event": "post_api_request",
       "x-hermes-delivery": "cc0bd214fbf74ba4b28a608da635cb66",
-      "x-hermes-signature-256": "sha256=fa08fb592aac59f9a393ed301db1689cdb2e30e92152b6aa0a3f6aacae979282"
+      "x-hermes-signature-256": "sha256=61d6a6b0a6f8048b73a204579bacb44f96813593f2a4e8c2ed9cbfc058af9545"
     },
     "body": {
       "hook_event_name": "post_api_request",
@@ -37,7 +37,7 @@
       "tool_name": null,
       "tool_input": null,
       "session_id": "20261028_160211_ab12cd",
-      "cwd": "/home/cleme/.hermes/hermes-agent",
+      "cwd": "/home/user/.hermes/hermes-agent",
       "extra": {
         "model": "agnes-2.5-flash",
         "provider": "freellmapi",

@@ -30,6 +30,8 @@ const EXAMPLE_TAILNET_HOSTS = new Set(['machine.tailnet.ts.net']);
 const EXAMPLE_TAILSCALE_LOGINS = new Set(['alice@github', 'intrus@github']);
 const TAILNET_HOST = /\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net\b/gi;
 const TAILSCALE_LOGIN = /\b[\w.-]+@github(?![\w.-])/g;
+/** Dossier personnel : seul l'exemple `/home/user`, jamais le nom d'un vrai compte. */
+const HOME_DIR = /\/home\/[a-z_][\w-]*/g;
 
 const files = execFileSync(
   'git',
@@ -59,6 +61,8 @@ for (const file of files) {
     for (const [login] of line.matchAll(TAILSCALE_LOGIN))
       if (!EXAMPLE_TAILSCALE_LOGINS.has(login))
         infrastructure.push(`${file}:${index + 1} (login Tailscale)`);
+    for (const [home] of line.matchAll(HOME_DIR))
+      if (home !== '/home/user') infrastructure.push(`${file}:${index + 1} (dossier personnel)`);
   });
 }
 

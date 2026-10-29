@@ -8,7 +8,7 @@ const body = {
   tool_name: 'terminal',
   tool_input: { command: 'npm test' },
   session_id: '20261028_160211_ab12cd',
-  cwd: '/home/cleme/.hermes/kanban/boards/factory/workspaces/t_5e21c0d9',
+  cwd: '/home/user/.hermes/kanban/boards/factory/workspaces/t_5e21c0d9',
   extra: { tool_call_id: 'call_1' },
   delivery_id: '649951b5f7824027833bac94c5c89654',
   timestamp: '2026-10-28T17:41:53.546969Z',
