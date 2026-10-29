@@ -10,6 +10,7 @@ test-results/
 !.env.example
 .DS_Store
 apps/web/dist-e2e/
+site/dist/
 # Manifeste Hermès versionné : chaque carte travaille dans un clone neuf et le lit là.
 .hermes/*
 !.hermes/environment.json

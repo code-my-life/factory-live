@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "build": "tsc -b && npm run build -w @factory-live/web",
-    "typecheck": "tsc -b && tsc -b apps/web && tsc -p tsconfig.config.json && tsc -p e2e/tsconfig.json",
+    "typecheck": "tsc -b && tsc -b apps/web && tsc -p tsconfig.config.json && tsc -p e2e/tsconfig.json && tsc -p site/tsconfig.json",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -27,9 +27,13 @@
     "dev:server": "npm run dev -w @factory-live/server",
     "verify:fast": "npm run format:check && npm run lint && npm run lint:css && npm run typecheck && npm run check:text && npm run check:arch && npm run test:coverage",
     "verify": "npm run verify:fast && npm run build",
-    "lint:css": "stylelint \"apps/web/src/**/*.css\"",
+    "lint:css": "stylelint \"apps/web/src/**/*.css\" \"site/src/**/*.css\"",
     "e2e": "playwright test",
-    "e2e:captures": "playwright test --project=captures-bureau --project=captures-iphone"
+    "e2e:captures": "playwright test --project=captures-bureau --project=captures-iphone",
+    "site:build": "node site/build.mjs",
+    "site:preview": "node site/serve.mjs",
+    "site:test": "node --test site/test/structure.test.mjs && playwright test -c site/playwright.config.ts",
+    "site:captures": "node site/capture.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

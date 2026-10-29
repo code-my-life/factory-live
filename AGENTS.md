@@ -8,20 +8,24 @@ factory-live montre en temps réel la factory Hermès (dépôt `code-my-life/her
 
 ## Commandes
 
-| Besoin               | Commande                                                                |
-| -------------------- | ----------------------------------------------------------------------- |
-| Installer            | `npm ci` (Node 24.15 ou plus ; l'image Docker utilise 24.22.1)          |
-| Tout vérifier, vite  | `npm run verify:fast` : format, lint, types, texte, architecture, tests |
-| Tout vérifier        | `npm run verify` : la même chose plus le build                          |
-| Front sur la démo    | `npm run dev:web` puis http://127.0.0.1:5173                            |
-| Serveur (dev)        | `npm run dev:server` : lit `~/.hermes` en lecture seule, port 8446      |
-| Conteneur            | `docker compose -f docker/compose.yaml up -d --build` (voir RUNBOOK)    |
-| Tests seuls          | `npm test` ; couverture : `npm run test:coverage`                       |
-| Bout en bout         | `npm run e2e` (Chromium : démo, app « live » sur un faux serveur d'API) |
-| Bout en bout, WebKit | dans l'image de Playwright : voir RUNBOOK, « Tests de bout en bout »    |
-| Formater             | `npm run format`                                                        |
+| Besoin               | Commande                                                                  |
+| -------------------- | ------------------------------------------------------------------------- |
+| Installer            | `npm ci` (Node 24.15 ou plus ; l'image Docker utilise 24.22.1)            |
+| Tout vérifier, vite  | `npm run verify:fast` : format, lint, types, texte, architecture, tests   |
+| Tout vérifier        | `npm run verify` : la même chose plus le build                            |
+| Front sur la démo    | `npm run dev:web` puis http://127.0.0.1:5173                              |
+| Serveur (dev)        | `npm run dev:server` : lit `~/.hermes` en lecture seule, port 8446        |
+| Conteneur            | `docker compose -f docker/compose.yaml up -d --build` (voir RUNBOOK)      |
+| Tests seuls          | `npm test` ; couverture : `npm run test:coverage`                         |
+| Bout en bout         | `npm run e2e` (Chromium : démo, app « live » sur un faux serveur d'API)   |
+| Bout en bout, WebKit | dans l'image de Playwright : voir RUNBOOK, « Tests de bout en bout »      |
+| Formater             | `npm run format`                                                          |
+| Site, construire     | `npm run site:build` : pages EN et FR et démo dans `site/dist`            |
+| Site, aperçu         | `npm run site:preview` puis http://127.0.0.1:4195/factory-live/           |
+| Site, tests          | `npm run site:test` (structure, puis Playwright : débordement, axe, démo) |
+| Site, captures       | `npm run site:captures`, dans l'image de Playwright (RUNBOOK)             |
 
-La CI (GitHub Actions) lance `npm run verify` sur Node 24 et 26, puis les tests de bout en bout (Chromium, WebKit iPhone et bureau, captures de référence) dans l'image officielle de Playwright. Une PR n'est prête que si la CI est verte. Une capture qui change exprès se régénère dans cette même image (RUNBOOK), jamais sur un poste : les polices différeraient.
+La CI (GitHub Actions) lance `npm run verify` sur Node 24 et 26, puis les tests de bout en bout (Chromium, WebKit iPhone et bureau, captures de référence) dans l'image officielle de Playwright. Le workflow Site (`pages.yml`) construit et teste le site public (`site/`) à chaque PR et le publie sur GitHub Pages depuis main, une fois le dépôt public. Une PR n'est prête que si la CI est verte. Une capture qui change exprès se régénère dans cette même image (RUNBOOK), jamais sur un poste : les polices différeraient.
 
 ## Architecture (vérifiée par `npm run check:arch`)
 
@@ -54,6 +58,10 @@ Détails : `docs/ARCHITECTURE.md`. Exploitation : `docs/RUNBOOK.md`. Décisions 
 - `git push --force`, `git add .` sans relire, commit de secrets (`.env`, jetons, clés).
 - Écrire dans `~/.hermes` ou dans les bases d'Hermès depuis ce dépôt.
 - Ajouter un service externe (SaaS, CDN à l'exécution) ou un module natif.
+
+## Site public
+
+`site/` est la page d'accueil de factory-live (anglais, et français sous `fr/`), servie par GitHub Pages sous `/factory-live/` avec la vraie app en démo sous `demo/`. Une seule structure (`site/src/page.mjs`), les textes de chaque langue dans `site/src/content/`. Mêmes règles que l'app : jetons Primer (`npm run lint:css`), Mona Sans embarquée, aucun CDN, le motif de la ligne d'usine, aucun tiret cadratin ni nom d'hôte de tailnet réel (`npm run check:text`). Une capture qui change se refait par `npm run site:captures` dans l'image de Playwright.
 
 ## Données de démonstration
 

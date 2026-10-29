@@ -10,7 +10,11 @@ export default {
   overrides: [
     {
       // Remise à zéro globale et rendu du Markdown (contenu sans classes) : seuls les éléments sont ciblables.
-      files: ['apps/web/src/styles/global.css', 'apps/web/src/ui/Markdown.module.css'],
+      files: [
+        'apps/web/src/styles/global.css',
+        'apps/web/src/ui/Markdown.module.css',
+        'site/src/reset.css',
+      ],
       rules: { 'selector-max-type': null, 'selector-no-qualifying-type': null },
     },
   ],

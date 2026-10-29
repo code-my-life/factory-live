@@ -55,6 +55,24 @@ docker run --rm --ipc=host --user "$(id -u):$(id -g)" -e HOME=/tmp -e E2E_WEBKIT
 
 Une capture qui change exprès : la même commande avec `npm run e2e:captures -- --update-snapshots` à la place de `npx playwright test`, puis relire les images de `e2e/captures.spec.ts-snapshots/` avant de les commiter.
 
+## Le site public
+
+`site/` construit la page d'accueil (anglais, `fr/`) et la démo de l'app dans `site/dist`, servi sous `/factory-live/` comme sur GitHub Pages :
+
+| Besoin               | Commande                                                                                     |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| Construire           | `npm run site:build`                                                                         |
+| Prévisualiser        | `npm run site:preview`, puis http://127.0.0.1:4195/factory-live/                             |
+| Tester               | `npm run site:test` (WebKit : la commande des e2e ci-dessus, `-c site/playwright.config.ts`) |
+| Refaire les captures | la commande ci-dessous, puis relire `site/src/img/` et `docs/factory-live.png`               |
+
+```sh
+docker run --rm --ipc=host --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  -v "$PWD":/work -w /work mcr.microsoft.com/playwright:v1.64.1-noble node site/capture.mjs
+```
+
+Publication : le workflow Site (`.github/workflows/pages.yml`) publie depuis main dès que le dépôt est public. À faire une fois, dans les réglages du dépôt : Pages, Source « GitHub Actions ».
+
 ## Ce que le conteneur voit
 
 | Montage                           | Mode               | Pourquoi                                                          |

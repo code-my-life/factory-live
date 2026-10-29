@@ -73,6 +73,16 @@ export default defineConfig([
     languageOptions: { globals: globals.node },
   },
   {
+    // Le script du site tourne dans le navigateur, sans module ni outillage.
+    files: ['site/src/site.js'],
+    languageOptions: { globals: globals.browser, sourceType: 'script' },
+  },
+  {
+    // Les captures passent du code au navigateur (page.evaluate) : Node et navigateur à la fois.
+    files: ['site/capture.mjs'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
     files: ['apps/web/src/**/*.{ts,tsx}'],
     extends: [reactHooks.configs.flat.recommended],
     languageOptions: { globals: globals.browser },

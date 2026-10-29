@@ -1,0 +1,91 @@
+/*
+ * Socle du site : remise à zéro des éléments et comportement de la page. Tout le reste est dans
+ * site.css, par classes. Couleurs, tailles et polices viennent des jetons de Primer, comme dans l'app.
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+  /* stylelint-disable plugin/browser-compat, property-no-vendor-prefix -- iOS Safari ne lit que la forme préfixée ; ailleurs, sans effet */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* stylelint-enable plugin/browser-compat, property-no-vendor-prefix */
+  scroll-padding-top: var(--base-size-16);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+body {
+  margin: 0;
+  background-color: var(--bgColor-default);
+  color: var(--fgColor-default);
+  font: var(--text-body-shorthand-large);
+  text-rendering: optimizelegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+ul,
+ol,
+li,
+figure,
+pre {
+  margin: 0;
+  padding: 0;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+img,
+svg,
+picture {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: var(--fgColor-accent);
+  text-underline-offset: 0.2em;
+}
+
+code {
+  font: var(--text-codeInline-shorthand);
+}
+
+pre code {
+  font: var(--text-codeBlock-shorthand);
+}
+
+button {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--base-size-2);
+}
+
+::selection {
+  background-color: var(--selection-bgColor);
+}
+
+[hidden] {
+  display: none !important;
+}

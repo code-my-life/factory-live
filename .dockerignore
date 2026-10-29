@@ -15,3 +15,6 @@ fixtures
 **/*.test-helpers.ts
 apps/server/src/test
 apps/web/src/test
+
+# Le site (pages, captures, démo construite) ne fait pas partie de l’image.
+site
