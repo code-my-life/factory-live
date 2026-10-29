@@ -14,17 +14,19 @@
   gap: var(--base-size-8) var(--base-size-16);
 }
 
+/* Le texte courant (description d'une page ou d'une section) se lit en 14 px ; le 12 px reste aux métadonnées. */
 .intro {
   margin: var(--base-size-4) 0 0;
   max-width: 68ch;
   color: var(--fgColor-muted);
-  font-size: var(--text-body-size-small);
+  font: var(--text-body-shorthand-medium);
 }
 
 .muted {
   margin: 0;
+  max-width: 68ch;
   color: var(--fgColor-muted);
-  font-size: var(--text-body-size-small);
+  font: var(--text-body-shorthand-medium);
 }
 
 .section {

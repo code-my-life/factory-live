@@ -246,11 +246,11 @@ export function IssuePage() {
       </header>
 
       <dl className={styles.facts}>
-        <div>
+        <div className={styles.fact}>
           <dt className={styles.factTerm}>{t.issue.facts.harness}</dt>
           <dd className={styles.factValue}>{issue.harness ?? t.issue.facts.harnessPending}</dd>
         </div>
-        <div>
+        <div className={styles.fact}>
           <dt className={styles.factTerm}>{t.issue.facts.claudeModel}</dt>
           <dd className={styles.factValue}>
             {issue.claudeModel ? (
@@ -260,7 +260,7 @@ export function IssuePage() {
             )}
           </dd>
         </div>
-        <div>
+        <div className={styles.fact}>
           <dt className={styles.factTerm}>{t.issue.facts.pr}</dt>
           <dd className={styles.factValue}>
             {issue.pr ? (
@@ -283,7 +283,7 @@ export function IssuePage() {
             )}
           </dd>
         </div>
-        <div>
+        <div className={styles.fact}>
           <dt className={styles.factTerm}>{t.issue.facts.duration}</dt>
           <dd className={styles.factValue}>
             {elapsedEnd !== null ? (
@@ -293,11 +293,11 @@ export function IssuePage() {
             )}
           </dd>
         </div>
-        <div>
+        <div className={styles.fact}>
           <dt className={styles.factTerm}>{t.issue.facts.tokens}</dt>
           <dd className={styles.factValue}>{fmt.compact(detail.tokens)}</dd>
         </div>
-        <div>
+        <div className={styles.fact}>
           <dt className={styles.factTerm}>{t.issue.facts.cost}</dt>
           <dd className={styles.factValue}>
             {detail.costUsd > 0 ? fmt.usd(detail.costUsd) : t.issue.facts.noCost}

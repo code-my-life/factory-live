@@ -21,7 +21,7 @@
 .pageSubtitle {
   margin: var(--base-size-4) 0 0;
   color: var(--fgColor-muted);
-  font: var(--text-body-shorthand-small);
+  font: var(--text-body-shorthand-medium);
 }
 
 .pageTools {
@@ -99,7 +99,7 @@
 .quiet {
   margin: 0;
   color: var(--fgColor-muted);
-  font: var(--text-body-shorthand-small);
+  font: var(--text-body-shorthand-medium);
 }
 
 /* Cartes des agents au travail. */

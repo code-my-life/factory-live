@@ -77,6 +77,25 @@
   overflow-wrap: anywhere;
 }
 
+/* Téléphone : un fait par ligne, son nom à gauche et sa valeur à droite, au lieu d'une longue colonne. */
+@media (max-width: 543.98px) {
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--base-size-8);
+  }
+
+  .fact {
+    display: grid;
+    grid-template-columns: minmax(0, 7rem) minmax(0, 1fr);
+    gap: 0 var(--base-size-12);
+    align-items: baseline;
+  }
+
+  .factValue {
+    margin: 0;
+  }
+}
+
 /* Une PR dans les faits de l'issue : son état, son numéro et sa CI, à la ligne si la place manque. */
 .factBadges {
   display: flex;
