@@ -13,6 +13,7 @@ import page from '../../ui/page.module.css';
 import { DemoGitHubSection, LiveGitHubSection } from './GitHubSection.tsx';
 import { DemoPushSection, LivePushSection } from './PushSection.tsx';
 import styles from './settings.module.css';
+import { useEffect, useState } from 'react';
 
 const THEMES: readonly ColorPreference[] = ['dark', 'light', 'system'];
 
@@ -46,6 +47,32 @@ export function SettingsPage() {
   const returned = githubReturn(params.get('github'), t);
   const sources = snapshot.health.filter((service) => service.group === 'factory-live');
   const demo = source.kind === 'demo';
+  const [serverVersion, setServerVersion] = useState<string | null>(null);
+  const [versionLoading, setVersionLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchVersion() {
+      setVersionLoading(true);
+      try {
+        const version = await source.getServerVersion();
+        if (!cancelled) {
+          setServerVersion(version);
+        }
+      } finally {
+        if (!cancelled) {
+          setVersionLoading(false);
+        }
+      }
+    }
+
+    void fetchVersion();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [source]);
 
   return (
     <section className={page.page} aria-labelledby="settings-title">
@@ -147,8 +174,14 @@ export function SettingsPage() {
             ))}
           </ul>
           <p className={styles.versions}>
-            <VersionBadge of="factory-live" version="0.1.0" />
-            <VersionBadge of="Hermès" version="0.22.2" />
+            {serverVersion ? (
+              <VersionBadge of="factory-live" version={serverVersion} />
+            ) : versionLoading ? (
+              <VersionBadge of="factory-live" version="-" />
+            ) : (
+              <span className={page.muted}>{t.settings.unknownServerVersion}</span>
+            )}
+            {demo && <span className={page.muted}>{t.settings.demoVersion}</span>}
             <span className={page.muted}>{t.settings.dataSource(demo)}</span>
           </p>
         </div>
