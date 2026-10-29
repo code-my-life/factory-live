@@ -48,10 +48,11 @@
   /**
    * La démo s'ouvre dans la langue de la page : l'app lit `factory-live:locale` (sa langue choisie
    * dans Réglages) avant celle du navigateur. Sans script ou sans stockage, elle suit le navigateur.
+   * Les liens visent demo/ sur Pages, demo/index.html dans la maquette publiée en artifact.
    */
   const remember = (event) => {
     const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
-    if (!link || !/(^|\/)demo\/(#|$)/.test(link.getAttribute('href') ?? '')) return;
+    if (!link || !/(^|\/)demo\/(index\.html)?(#|$)/.test(link.getAttribute('href') ?? '')) return;
     try {
       localStorage.setItem('factory-live:locale', root.lang === 'fr' ? 'fr' : 'en');
     } catch {
