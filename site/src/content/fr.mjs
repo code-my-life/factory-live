@@ -243,7 +243,7 @@ export default {
           {
             title: 'Poser tes adresses',
             text: 'Copie <code>docker/.env.example</code> en <code>docker/.env</code>, puis nomme tes origines et le login Tailscale autorisé à écrire.',
-            code: `TAILSCALE_LOGINS=toi@github
+            code: `TAILSCALE_LOGINS=<login>@github
 PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
           },
           {

@@ -184,7 +184,7 @@ The variables of `docker/compose.yaml`, set in `docker/.env`:
 | Variable           | Role                                                                                  |
 | ------------------ | ------------------------------------------------------------------------------------- |
 | `PUBLIC_ORIGINS`   | Addresses of the app: `http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446` |
-| `TAILSCALE_LOGINS` | Tailscale logins allowed to write from another device, for example `you@github`       |
+| `TAILSCALE_LOGINS` | Tailscale logins allowed to write from another device, for example `<login>@github`   |
 | `HERMES_BOARD`     | The kanban board of the factory (`factory`)                                           |
 | `GITHUB_OWNER`     | The GitHub organization or account of the factory                                     |
 | `FACTORY_REPO`     | The repository of the factory, read for its configuration (drift)                     |

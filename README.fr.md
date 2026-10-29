@@ -181,15 +181,15 @@ Ouvre `http://localhost:8446/api/github/setup` et confirme sur GitHub : factory-
 
 Les variables de `docker/compose.yaml`, posées dans `docker/.env` :
 
-| Variable           | Rôle                                                                                       |
-| ------------------ | ------------------------------------------------------------------------------------------ |
-| `PUBLIC_ORIGINS`   | Les adresses de l’app : `http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`    |
-| `TAILSCALE_LOGINS` | Les logins Tailscale autorisés à écrire depuis un autre appareil, par exemple `toi@github` |
-| `HERMES_BOARD`     | Le kanban de la factory (`factory`)                                                        |
-| `GITHUB_OWNER`     | L’organisation ou le compte GitHub de la factory                                           |
-| `FACTORY_REPO`     | Le dépôt de la factory, lu pour sa configuration (dérive)                                  |
-| `DASHBOARD_URL`    | L’adresse du dashboard Hermès, liée depuis l’app                                           |
-| `LOG_LEVEL`        | `info` par défaut                                                                          |
+| Variable           | Rôle                                                                                           |
+| ------------------ | ---------------------------------------------------------------------------------------------- |
+| `PUBLIC_ORIGINS`   | Les adresses de l’app : `http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`        |
+| `TAILSCALE_LOGINS` | Les logins Tailscale autorisés à écrire depuis un autre appareil, par exemple `<login>@github` |
+| `HERMES_BOARD`     | Le kanban de la factory (`factory`)                                                            |
+| `GITHUB_OWNER`     | L’organisation ou le compte GitHub de la factory                                               |
+| `FACTORY_REPO`     | Le dépôt de la factory, lu pour sa configuration (dérive)                                      |
+| `DASHBOARD_URL`    | L’adresse du dashboard Hermès, liée depuis l’app                                               |
+| `LOG_LEVEL`        | `info` par défaut                                                                              |
 
 Les valeurs par défaut visent la factory de Code My Life ; le login GitHub autorisé à débloquer se règle dans `apps/server/src/config.ts`. Exploitation, montages, secrets et pannes : [docs/RUNBOOK.md](docs/RUNBOOK.md).
 
