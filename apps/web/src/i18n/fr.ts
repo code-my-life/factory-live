@@ -3,6 +3,7 @@ import type {
   ApiErrorCode,
   BlockKind,
   CardKind,
+  ChecksState,
   ConfigField,
   HealthStatus,
   InterventionKind,
@@ -529,6 +530,13 @@ export const fr = {
       ' relevée par la factory ; son état, ses revues et sa CI s’afficheront une fois GitHub relié (Réglages, GitHub).',
     none: 'Pas encore de PR : elle s’ouvre en brouillon à la fin de l’implémentation.',
     state: { draft: 'Brouillon', merged: 'Fusionnée', closed: 'Fermée', open: 'Ouverte' },
+    /** L'état de la CI d'une PR, après « CI ». */
+    ci: {
+      none: 'absente',
+      pending: 'en cours',
+      success: 'verte',
+      failure: 'rouge',
+    } satisfies Record<ChecksState, string>,
     changes: 'Changements',
     review: 'Revue',
     reviewDecision: {

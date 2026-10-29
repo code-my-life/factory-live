@@ -1,7 +1,10 @@
+import { msg } from '@factory-live/contracts';
 import type { AgentActivity, Intervention, IssueSummary } from '@factory-live/contracts';
 import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { I18nProvider } from '../../i18n/I18nProvider.tsx';
 import { JobList } from '../../ui/work/JobBox.tsx';
 import { IssueJob } from './IssueJob.tsx';
 
@@ -34,24 +37,29 @@ function renderJob(
   agent: AgentActivity | null,
   intervention: Intervention | null = null,
   compact = false,
+  wrap: (children: ReactNode) => ReactNode = (children) => children,
 ) {
   return render(
-    <MemoryRouter>
-      <JobList label="Issues">
-        <IssueJob
-          issue={{ ...ISSUE, ...patch }}
-          agent={agent}
-          intervention={intervention}
-          maxInProgress={2}
-          compact={compact}
-          now={NOW}
-        />
-      </JobList>
-    </MemoryRouter>,
+    wrap(
+      <MemoryRouter>
+        <JobList label="Issues">
+          <IssueJob
+            issue={{ ...ISSUE, ...patch }}
+            agent={agent}
+            intervention={intervention}
+            maxInProgress={2}
+            compact={compact}
+            now={NOW}
+          />
+        </JobList>
+      </MemoryRouter>,
+    ),
   );
 }
 
 describe('IssueJob', () => {
+  afterEach(() => localStorage.clear());
+
   it('dit qui travaille sur l’issue et ce qu’il fait, et mène à sa page', () => {
     renderJob({}, CODER);
     expect(screen.getByRole('link', { name: ISSUE.title })).toHaveAttribute(
@@ -88,6 +96,21 @@ describe('IssueJob', () => {
     } as Intervention;
     renderJob({ status: 'waiting_human' }, null, intervention);
     expect(screen.getByRole('link', { name: 'Approuver la PR' })).toBeInTheDocument();
+  });
+
+  it('écrit dans la langue choisie ce que factory-live fabrique, le texte de l’agent tel quel', () => {
+    localStorage.setItem('factory-live:locale', 'en');
+    const intervention = {
+      id: 'iv-projects',
+      kind: 'needs_input',
+      title: msg('intervention.title.needsInput'),
+    } as Intervention;
+    const english = (children: ReactNode) => <I18nProvider>{children}</I18nProvider>;
+    renderJob({ status: 'waiting_human' }, null, intervention, false, english);
+    expect(screen.getByText('Waiting for you')).toBeInTheDocument();
+    expect(screen.getByText('Decision needed')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Reply' })).toBeInTheDocument();
+    expect(screen.getByText('38m')).toBeInTheDocument();
   });
 
   it('résume une issue terminée : ni état, ni agent, ni ancienneté', () => {

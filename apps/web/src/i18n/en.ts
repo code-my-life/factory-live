@@ -482,6 +482,7 @@ export const en: Messages = {
       ' spotted by the factory; its state, reviews and CI will show once GitHub is connected (Settings, GitHub).',
     none: 'No PR yet: it opens as a draft at the end of implementation.',
     state: { draft: 'Draft', merged: 'Merged', closed: 'Closed', open: 'Open' },
+    ci: { none: 'none', pending: 'pending', success: 'passing', failure: 'failing' },
     changes: 'Changes',
     review: 'Review',
     reviewDecision: {

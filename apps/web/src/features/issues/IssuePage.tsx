@@ -268,7 +268,8 @@ export function IssuePage() {
           <dd className={styles.factValue}>
             {issue.pr ? (
               <PrimerLink href={issue.pr.url} target="_blank" rel="noreferrer">
-                #{issue.pr.number} · {issue.pr.state} · CI {issue.pr.checks}
+                #{issue.pr.number} · {t.pr.state[issue.pr.state].toLocaleLowerCase(i18n.locale)} ·
+                CI {t.pr.ci[issue.pr.checks]}
               </PrimerLink>
             ) : issue.prUrl ? (
               <>
