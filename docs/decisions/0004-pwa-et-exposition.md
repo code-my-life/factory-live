@@ -18,7 +18,7 @@ Date : 2026-10-28. Statut : accepté.
 - Une perte de réseau ne coupe pas toujours la connexion SSE (sortie du tailnet, iPhone en veille) : le serveur envoie un événement `ping` après 15 s sans rien d'autre ; un flux muet 45 s est relancé, et l'app se dit hors ligne 10 s plus tard s'il ne revient pas.
 - Notifications : la permission est demandée sur le toucher « Activer les notifications » (exigé par iOS), l'abonnement est enregistré par le serveur, « Envoyer un test » passe par le serveur. Le service worker affiche le push, ouvre l'intervention au toucher et pose la pastille de l'icône (blocages qui t'attendent) ; l'app ouverte la tient à jour.
 - Sur iPhone, Safari seul ne reçoit pas de push : Réglages le dit et renvoie à l'installation sur l'écran d'accueil. Barre d'état translucide : l'en-tête passe sous l'heure ; en thème clair, la bande de l'encoche reste sombre pour que l'heure, toujours blanche, se lise.
-- Les erreurs du front remontent au journal du serveur (`/api/client-logs`, cinq par minute au plus).
+- Les erreurs du front remontent au journal du serveur (`/api/client-logs`, cinq par minute au plus par appareil ; le serveur en accepte 60 par minute, tous appareils confondus, pour qu'aucun client ne noie le journal).
 
 ## Pourquoi
 

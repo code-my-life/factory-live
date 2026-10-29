@@ -756,6 +756,41 @@ describe('GitHub App et connexion de Clément', () => {
   });
 });
 
+describe('journal du front', () => {
+  const log = (headers: Record<string, string> = {}) =>
+    h.app.request('/api/client-logs', {
+      method: 'POST',
+      headers: { ...THIS_PC, origin: 'http://localhost:8446', ...headers },
+      body: JSON.stringify({
+        level: 'error',
+        message: 'TypeError: x is undefined',
+        stack: null,
+        url: 'http://localhost:8446/settings',
+        userAgent: 'test',
+        at: new Date(NOW).toISOString(),
+      }),
+    });
+
+  it('consigne une erreur du front, mais pas venue d’une origine étrangère', async () => {
+    expect((await log()).status).toBe(204);
+    expect(await refusal(await log({ origin: 'https://evil.example' }))).toEqual([
+      403,
+      'origin_refused',
+    ]);
+  });
+
+  it('limite le débit, tous appareils confondus : 60 envois par minute au plus', async () => {
+    for (let sent = 0; sent < 60; sent += 1) expect((await log()).status).toBe(204);
+    expect(await refusal(await log())).toEqual([429, 'rate_limited']);
+    expect(await refusal(await log({ origin: 'https://machine.tailnet.ts.net:8446' }))).toEqual([
+      429,
+      'rate_limited',
+    ]);
+    h.clock.now += 60_000;
+    expect((await log()).status).toBe(204);
+  });
+});
+
 describe('documentation', () => {
   it('publie l’OpenAPI 3.1 des routes', async () => {
     const doc = (await (await h.app.request('/api/openapi.json', { headers: THIS_PC })).json()) as {
