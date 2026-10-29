@@ -1,4 +1,5 @@
-// Généré depuis le kanban de la factory (cas réels, anonymisés) : ne pas modifier à la main.
+// Cas réels du kanban de la factory, anonymisés, capturés par `npm run capture:incident` : un cas
+// s'ajoute par ce script, jamais à la main (RUNBOOK, « Diagnostic des blocages »).
 import type { Run, Task, TaskEvent } from '../hermes.ts';
 import type { SessionFacts } from './types.ts';
 

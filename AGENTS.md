@@ -20,6 +20,7 @@ factory-live montre en temps réel la factory Hermès (dépôt `code-my-life/her
 | Bout en bout         | `npm run e2e` (Chromium : démo, app « live » sur un faux serveur d'API)   |
 | Bout en bout, WebKit | dans l'image de Playwright : voir RUNBOOK, « Tests de bout en bout »      |
 | Formater             | `npm run format`                                                          |
+| Capturer un incident | `npm run capture:incident -- <carte> --name <cas>` (RUNBOOK)              |
 | Site, construire     | `npm run site:build` : pages EN et FR et démo dans `site/dist`            |
 | Site, aperçu         | `npm run site:preview` puis http://127.0.0.1:4195/factory-live/           |
 | Site, tests          | `npm run site:test` (structure, puis Playwright : débordement, axe, démo) |
@@ -29,7 +30,7 @@ La CI (GitHub Actions) lance `npm run verify` sur Node 24 et 26, puis les tests 
 
 ## Architecture (vérifiée par `npm run check:arch`)
 
-- `packages/domain` : règles pures (stations, interventions, modèle effectif). Ne dépend de rien.
+- `packages/domain` : règles pures (stations, interventions, modèle effectif, diagnostic des blocages). Ne dépend de rien.
 - `packages/contracts` : schémas zod de l'API, de l'ingestion et du flux SSE. Ne dépend que de zod.
 - `apps/server` : cas d'usage (`application/`) qui ne connaissent que des ports ; adaptateurs (`adapters/`) qui les implémentent ; HTTP (`http/`).
 - `apps/web` : PWA React + Primer + Motion. Ne connaît que `contracts`.
@@ -43,6 +44,7 @@ Détails : `docs/ARCHITECTURE.md`. Exploitation : `docs/RUNBOOK.md`. Décisions 
 - Aucun tiret cadratin, nulle part (`npm run check:text`).
 - Test d'abord : chaque règle ou correctif commence par un test qui échoue. Un adaptateur se teste sur des données réelles anonymisées (`fixtures/`).
 - Les adaptateurs Hermès lisent seulement : bases SQLite ouvertes en `readOnly`, aucune écriture dans `~/.hermes` (règle de lint dédiée).
+- Diagnostic des blocages (ADR 0009) : jamais de modèle, ni pour conclure ni pour rédiger. Une règle lit les formats exacts d'Hermès (`hermesText.ts`), jamais le texte de l'agent ; chaque phrase est un gabarit `diagnosis.*` ; chaque cas nouveau part d'un incident réel capturé (`npm run capture:incident`). Les fichiers d'Hermès se lisent par la liste blanche `adapters/hermes/paths.ts`, et le chemin du diagnostic n'importe aucun module réseau (`check:arch`).
 - Primer : avant d'écrire un composant ou un CSS, interroger le MCP Primer (`.mcp.json` ; lancer Claude Code depuis la racine du dépôt pour qu'il soit chargé). `npm run lint` applique `eslint-plugin-primer-react`, `npm run lint:css` la config stylelint de Primer, la même vérification que l'outil `lint_css` du MCP.
 - Mouvement : jetons `--motion-*` de Primer, 500 ms au plus ; toute animation en boucle porte `data-loop` (coupée par le bouton de pause et par `prefers-reduced-motion`) ; jamais d'information portée par le seul mouvement.
 - Vocabulaire de l'interface, un concept, un mot : agent (jamais « profil »), carte, issue, station, intervention, lane (le CLI délégué). Vérifié par `npm run check:text`.

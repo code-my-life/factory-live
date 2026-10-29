@@ -25,6 +25,7 @@
     "test:coverage": "vitest run --coverage",
     "dev:web": "npm run dev -w @factory-live/web",
     "dev:server": "npm run dev -w @factory-live/server",
+    "capture:incident": "node scripts/capture-incident.mjs",
     "verify:fast": "npm run format:check && npm run lint && npm run lint:css && npm run typecheck && npm run check:text && npm run check:arch && npm run test:coverage",
     "verify": "npm run verify:fast && npm run build",
     "lint:css": "stylelint \"apps/web/src/**/*.css\" \"site/src/**/*.css\"",
