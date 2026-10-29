@@ -455,6 +455,29 @@ export class LiveSource implements FactoryDataSource {
     return this.history?.value ?? EMPTY_HISTORY;
   }
 
+  async getServerVersion(): Promise<string | null> {
+    if (!this.fresh(this.serverVersion, 60_000)) {
+      try {
+        const response = await this.fetchImpl(`${this.base}/healthz`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) return null;
+        const data = (await response.json()) as { ok: boolean; version: string };
+        this.serverVersion = {
+          value: data.ok ? data.version : null,
+          fetchedAt: this.now(),
+          stale: false,
+        };
+        this.notify();
+      } catch {
+        this.serverVersion = { value: null, fetchedAt: this.now(), stale: false };
+      }
+    }
+    return this.serverVersion?.value ?? null;
+  }
+
+  private serverVersion: Cached<string | null> | null = null;
+
   async unblock(interventionId: string, text: string): Promise<void> {
     const response = await this.fetchImpl(
       `${this.base}/api/interventions/${encodeURIComponent(interventionId)}/unblock`,
