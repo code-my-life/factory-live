@@ -223,7 +223,7 @@ export const en: Messages = {
     release: 'Release',
     done: 'Done',
     stopped: 'Stopped',
-    side: 'Off the line',
+    side: 'Side track',
   },
   stationHint: {
     intake: 'Issue labeled factory, card created',
