@@ -234,6 +234,13 @@ const server: ServerMessages = {
     `Quota de ${provider ?? 'son fournisseur'} atteint : la carte attend`,
   'diagnosis.summary.providerTerminal': ({ provider }) =>
     `${provider ?? 'Le fournisseur'} refuse la clé ou le modèle de l’agent`,
+  'diagnosis.summary.providerUnavailable': ({ mode, seconds }) =>
+    mode === 'stalled'
+      ? `Le modèle ne répond plus : tour coupé après ${seconds === null ? 'trop longtemps' : secs(seconds)} sans progrès`
+      : 'Tous les fournisseurs de la chaîne de l’agent échouent',
+  'diagnosis.summary.prAcceptanceMissing': () =>
+    'Hermès refuse de valider la PR : son contrat est incomplet',
+  'diagnosis.summary.spawnFailed': () => 'Hermès n’arrive pas à lancer l’agent',
   'diagnosis.summary.prAcceptanceInfra': () => 'Hermès n’a pas pu vérifier la PR sur GitHub',
   'diagnosis.summary.heldActivePr': ({ minutes }) =>
     `Carte prête mais retenue depuis ${minutes} min (garde active_pr)`,
@@ -270,6 +277,16 @@ const server: ServerMessages = {
     `${provider ?? 'Le fournisseur'} répond 429 : Hermès met la carte en attente, puis la relance seul.`,
   'diagnosis.why.providerTerminal': ({ provider }) =>
     `${provider ?? 'Le fournisseur'} rejette la clé ou le modèle configuré : relancer ne sert à rien tant que ce n’est pas corrigé.`,
+  'diagnosis.why.providerUnavailable': ({ mode, seconds }) =>
+    mode === 'stalled'
+      ? `Le fournisseur n’a plus rien envoyé pendant ${seconds === null ? 'trop longtemps' : secs(seconds)} : le garde-fou d’Hermès a coupé le tour et le worker s’est arrêté. Relancer peut suffire ; si ça se répète, change de modèle.`
+      : 'Chaque fournisseur de la chaîne de repli a échoué l’un après l’autre : Hermès a arrêté le tour au lieu de réessayer sans fin.',
+  'diagnosis.why.prAcceptanceMissing': ({ checks }) =>
+    checks
+      ? 'Avant d’accepter kanban_complete, le noyau kanban vérifie les checks requis de la PR. Le dépôt n’en déclare aucun : il faut des checks requis sur la branche protégée, ou un contrat local pour une carte sans CI.'
+      : 'Avant d’accepter kanban_complete, le noyau kanban vérifie que la PR déclarée correspond au contrat de la carte. Il en manque une partie : voir la citation exacte.',
+  'diagnosis.why.spawnFailed': () =>
+    'Le lancement du worker a échoué avant que l’agent ne travaille : voir l’erreur exacte d’Hermès.',
   'diagnosis.why.prAcceptanceInfra': () =>
     'Le contrôle de PR du noyau kanban n’a pas pu interroger GitHub (gh trop ancien, ou authentification).',
   'diagnosis.why.heldActivePr': () =>
@@ -300,6 +317,12 @@ const server: ServerMessages = {
   'diagnosis.step.relay': ({ owner }) => `Relancer par relais : scribe, puis ${owner}`,
   'diagnosis.step.leaveTriage': () =>
     'Sortir la carte du triage depuis le tableau de bord d’Hermès',
+  'diagnosis.step.updateGh': () =>
+    'Vérifier gh : version récente dans ~/.local/bin et authentification de l’App (RUNBOOK de la factory)',
+  'diagnosis.step.configureChecks': () =>
+    'Déclarer les checks requis de la branche protégée du dépôt, puis relancer la gate',
+  'diagnosis.step.fixWorkspace': () =>
+    'Recréer la carte, ou régler le dossier de travail par défaut du board (default_workdir)',
   'diagnosis.step.raiseLimit': ({ key, profile }) =>
     `Relever ${key} pour ${profile}, ou découper la carte`,
   'diagnosis.evidence.toolRefusals': ({ count, tools }) =>
@@ -320,11 +343,19 @@ const server: ServerMessages = {
     `${count} ${f.plural(count, 'relance', 'relances')} d’Hermès pour rendre la carte`,
   'diagnosis.evidence.guardMessage': ({ plugin, count }) =>
     `refus de ${plugin}${count > 1 ? ` (${count} fois)` : ''}`,
-  'diagnosis.evidence.commitPassed': ({ seconds }) => `commit contrôlé passé en ${secs(seconds)}`,
+  'diagnosis.evidence.commitPassed': ({ seconds }) =>
+    `contrôle du commit terminé en ${secs(seconds)}, sous le nouveau délai`,
   'diagnosis.evidence.breaker': ({ count }) =>
     `disjoncteur après ${count} sorties sans appel kanban`,
   'diagnosis.evidence.apiErrors': ({ count, provider }) =>
     `${count} ${f.plural(count, 'erreur', 'erreurs')} d’API${provider ? ` chez ${provider}` : ''}`,
+  'diagnosis.evidence.kanbanErrors': ({ count, tool }) =>
+    `${count} ${f.plural(count, 'appel', 'appels')} ${tool} en erreur`,
+  'diagnosis.evidence.prAcceptance': ({ classification, count }) =>
+    `contrôle de PR d’Hermès : ${classification}${count > 1 ? ` (${count} fois)` : ''}`,
+  'diagnosis.evidence.spawnError': () => 'erreur de lancement du worker',
+  'diagnosis.evidence.workerOutput': () => 'dernière sortie du worker',
+  'diagnosis.evidence.budget': ({ used, max }) => `${used} tours sur ${max}`,
   'diagnosis.evidence.lastSignals': ({ count }) =>
     `${count} ${f.plural(count, 'dernier signal', 'derniers signaux')}`,
   'diagnosis.run.modelStopped': () => 'arrêté sans appel kanban (le modèle)',
@@ -336,6 +367,10 @@ const server: ServerMessages = {
   'diagnosis.run.timedOut': () => 'arrêté par une limite d’Hermès',
   'diagnosis.run.quota': () => 'mis en attente par le fournisseur',
   'diagnosis.run.refusalLoop': ({ count }) => `${count} fois le même refus`,
+  'diagnosis.run.providerUnavailable': () => 'arrêté : fournisseur indisponible',
+  'diagnosis.run.spawnFailed': () => 'lancement en échec',
+  'diagnosis.run.prAcceptance': () => 'PR refusée par le contrôle d’Hermès',
+  'diagnosis.run.question': () => 'bloqué sur une question à toi',
   'diagnosis.run.unexplained': ({ outcome }) => `${outcomeLabel(outcome)}, sans cause reconnue`,
   'diagnosis.unblock.hookTimeoutFixed': ({ plugin, seconds, value, branch, committed, evidence }) =>
     [

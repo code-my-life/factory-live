@@ -181,6 +181,13 @@ const server: ServerMessages = {
     `${provider ?? 'Its provider'} quota reached: the card is waiting`,
   'diagnosis.summary.providerTerminal': ({ provider }) =>
     `${provider ?? 'The provider'} rejects the agent’s key or model`,
+  'diagnosis.summary.providerUnavailable': ({ mode, seconds }) =>
+    mode === 'stalled'
+      ? `The model stopped answering: turn cut after ${seconds === null ? 'too long' : secs(seconds)} without progress`
+      : 'Every provider in the agent’s chain is failing',
+  'diagnosis.summary.prAcceptanceMissing': () =>
+    'Hermès refuses to accept the PR: its contract is incomplete',
+  'diagnosis.summary.spawnFailed': () => 'Hermès cannot start the agent',
   'diagnosis.summary.prAcceptanceInfra': () => 'Hermès could not check the PR on GitHub',
   'diagnosis.summary.heldActivePr': ({ minutes }) =>
     `Card ready but held back for ${minutes}m (active_pr guard)`,
@@ -217,6 +224,16 @@ const server: ServerMessages = {
     `${provider ?? 'The provider'} answers 429: Hermès puts the card on hold, then restarts it on its own.`,
   'diagnosis.why.providerTerminal': ({ provider }) =>
     `${provider ?? 'The provider'} rejects the configured key or model: restarting is useless until that is fixed.`,
+  'diagnosis.why.providerUnavailable': ({ mode, seconds }) =>
+    mode === 'stalled'
+      ? `The provider sent nothing for ${seconds === null ? 'too long' : secs(seconds)}: the Hermès watchdog cut the turn and the worker stopped. Restarting may be enough; if it happens again, switch models.`
+      : 'Every provider in the fallback chain failed one after the other: Hermès stopped the turn instead of retrying forever.',
+  'diagnosis.why.prAcceptanceMissing': ({ checks }) =>
+    checks
+      ? 'Before accepting kanban_complete, the kanban core checks the PR’s required checks. The repository declares none: it needs required checks on the protected branch, or a local contract for a card without CI.'
+      : 'Before accepting kanban_complete, the kanban core checks that the declared PR matches the card’s contract. Part of it is missing: see the exact quote.',
+  'diagnosis.why.spawnFailed': () =>
+    'The worker failed to start before the agent did any work: see the exact Hermès error.',
   'diagnosis.why.prAcceptanceInfra': () =>
     'The PR check of the kanban core could not query GitHub (gh too old, or authentication).',
   'diagnosis.why.heldActivePr': () =>
@@ -244,6 +261,12 @@ const server: ServerMessages = {
     `Check the key and model of ${provider ?? 'its provider'}`,
   'diagnosis.step.relay': ({ owner }) => `Restart through a relay: scribe, then ${owner}`,
   'diagnosis.step.leaveTriage': () => 'Take the card out of triage from the Hermès dashboard',
+  'diagnosis.step.updateGh': () =>
+    'Check gh: a recent version in ~/.local/bin and the App authentication (factory RUNBOOK)',
+  'diagnosis.step.configureChecks': () =>
+    'Declare the required checks of the repository’s protected branch, then restart the gate',
+  'diagnosis.step.fixWorkspace': () =>
+    'Recreate the card, or set the board’s default working directory (default_workdir)',
   'diagnosis.step.raiseLimit': ({ key, profile }) =>
     `Raise ${key} for ${profile}, or split the card`,
   'diagnosis.evidence.toolRefusals': ({ count, tools }) =>
@@ -265,10 +288,17 @@ const server: ServerMessages = {
   'diagnosis.evidence.guardMessage': ({ plugin, count }) =>
     `${plugin} refusal${count > 1 ? ` (${count} times)` : ''}`,
   'diagnosis.evidence.commitPassed': ({ seconds }) =>
-    `checked commit went through in ${secs(seconds)}`,
+    `commit check finished in ${secs(seconds)}, within the new timeout`,
   'diagnosis.evidence.breaker': ({ count }) => `breaker after ${count} exits without a kanban call`,
   'diagnosis.evidence.apiErrors': ({ count, provider }) =>
     `${count} API ${f.plural(count, 'error', 'errors')}${provider ? ` at ${provider}` : ''}`,
+  'diagnosis.evidence.kanbanErrors': ({ count, tool }) =>
+    `${count} ${tool} ${f.plural(count, 'call', 'calls')} failed`,
+  'diagnosis.evidence.prAcceptance': ({ classification, count }) =>
+    `Hermès PR check: ${classification}${count > 1 ? ` (${count} times)` : ''}`,
+  'diagnosis.evidence.spawnError': () => 'worker start error',
+  'diagnosis.evidence.workerOutput': () => 'last worker output',
+  'diagnosis.evidence.budget': ({ used, max }) => `${used} of ${max} turns`,
   'diagnosis.evidence.lastSignals': ({ count }) =>
     `${count} latest ${f.plural(count, 'signal', 'signals')}`,
   'diagnosis.run.modelStopped': () => 'stopped without a kanban call (the model)',
@@ -280,6 +310,10 @@ const server: ServerMessages = {
   'diagnosis.run.timedOut': () => 'stopped by a Hermès limit',
   'diagnosis.run.quota': () => 'put on hold by the provider',
   'diagnosis.run.refusalLoop': ({ count }) => `same refusal ${count} times`,
+  'diagnosis.run.providerUnavailable': () => 'stopped: provider unavailable',
+  'diagnosis.run.spawnFailed': () => 'failed to start',
+  'diagnosis.run.prAcceptance': () => 'PR rejected by the Hermès check',
+  'diagnosis.run.question': () => 'blocked on a question for you',
   'diagnosis.run.unexplained': ({ outcome }) => `${outcomeLabel(outcome)}, no known cause`,
   'diagnosis.unblock.hookTimeoutFixed': ({ plugin, seconds, value, branch, committed, evidence }) =>
     [

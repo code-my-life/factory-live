@@ -32,6 +32,13 @@ export interface Task {
   modelOverride: string | null;
   providerOverride: string | null;
   lastHeartbeatAt: number | null;
+  /** Branche déclarée sur la carte ; `null` pour un workspace scratch (la branche vit alors dans le brief). */
+  branchName: string | null;
+  consecutiveFailures: number;
+  /** Blocages du même type d'affilée : au 2e, le noyau passe la carte en triage. */
+  blockRecurrences: number;
+  lastFailureError: string | null;
+  maxRuntimeSeconds: number | null;
 }
 
 export interface Run {
@@ -44,6 +51,8 @@ export interface Run {
   endedAt: number | null;
   summary: string | null;
   metadata: Readonly<Record<string, unknown>>;
+  /** Ce qu'Hermès a noté quand le run a échoué (violation de protocole, budget, crash), tel quel. */
+  error: string | null;
 }
 
 export interface TaskEvent {
