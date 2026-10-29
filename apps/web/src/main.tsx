@@ -11,6 +11,9 @@ import { createRoot } from 'react-dom/client';
 import { App } from './app/App.tsx';
 import { reportClientErrors } from './pwa/errors.ts';
 import { registerServiceWorker } from './pwa/register.ts';
+import { declareMonaSans } from './styles/fonts.ts';
+
+declareMonaSans();
 
 if (import.meta.env.VITE_ARTIFACT === '1') {
   // Dans un artifact, l'hôte pose déjà les marges des zones sûres sur :root.

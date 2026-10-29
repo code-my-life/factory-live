@@ -22,7 +22,8 @@ export default defineConfig({
       injectRegister: false,
       registerType: 'autoUpdate',
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
+        // La police (Mona Sans) aussi : hors ligne, l'app garde son apparence.
+        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest,woff2}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
       includeAssets: ['icons/icon.svg', 'icons/apple-touch-icon-180.png'],
