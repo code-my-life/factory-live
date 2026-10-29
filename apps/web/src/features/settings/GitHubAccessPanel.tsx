@@ -1,8 +1,8 @@
 import type { GitHubAccess } from '@factory-live/contracts';
 import { CheckCircleIcon, LinkExternalIcon, MarkGithubIcon } from '@primer/octicons-react';
 import { Avatar, Button, Flash, Link } from '@primer/react';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { LiveDot } from '../../ui/LiveDot.tsx';
-import { formatDuration } from '../../ui/format.ts';
 import { useNow } from '../../ui/useNow.ts';
 import page from '../../ui/page.module.css';
 import styles from './settings.module.css';
@@ -56,48 +56,44 @@ export function GitHubAccessPanel({
   /** Échec de la dernière action (déconnexion). */
   error?: string | null;
 }) {
+  const { t, fmt } = useI18n();
   const now = useNow();
   const { app, user } = access;
   return (
     <section className={page.panel} aria-labelledby="github-title">
       <div className={styles.block}>
         <h2 id="github-title" className={page.sectionTitle}>
-          GitHub
+          {t.github.title}
         </h2>
         <p className={page.muted}>
-          factory-live lit les issues, les PR et la CI avec sa propre App GitHub, et poste «
-          /factory unblock » à ton nom quand tu débloques une carte.
-          {demo ? ' Démo : rien n’est envoyé à GitHub.' : ''}
+          {t.github.intro}
+          {demo ? t.github.demo : ''}
         </p>
 
         <dl className={styles.access}>
           <div className={styles.accessRow}>
-            <dt className={styles.accessTerm}>App</dt>
+            <dt className={styles.accessTerm}>{t.github.app}</dt>
             <dd className={styles.accessValue}>
               {!app ? (
                 <>
                   <p className={styles.state}>
                     <LiveDot tone="muted" />
-                    {access.mode === 'token'
-                      ? 'Pas encore créée : factory-live lit GitHub avec le jeton de repli'
-                      : 'Pas encore créée : factory-live ne lit pas encore GitHub'}
+                    {access.mode === 'token' ? t.github.noAppToken : t.github.noApp}
                   </p>
                   <StepButton step={actions.create} primary>
-                    Créer l’App sur GitHub
+                    {t.github.create}
                   </StepButton>
-                  <p className={styles.help}>
-                    GitHub la crée en un clic dans code-my-life, privée et sans webhook. Tu reviens
-                    ici pour l’installer.
-                  </p>
+                  <p className={styles.help}>{t.github.createHelp}</p>
                 </>
               ) : app.installed === true ? (
                 <p className={styles.state}>
                   <CheckCircleIcon size={16} className={styles.ok} aria-hidden="true" />
                   <span>
-                    <span className="fl-mono">{app.slug}</span>, installée sur{' '}
+                    <span className="fl-mono">{app.slug}</span>
+                    {t.github.installedOn}
                     <span className={styles.nowrap}>code-my-life</span> ·{' '}
                     <Link href={app.url} target="_blank" rel="noreferrer">
-                      Voir sur GitHub <LinkExternalIcon size={12} aria-hidden="true" />
+                      {t.github.viewOnGitHub} <LinkExternalIcon size={12} aria-hidden="true" />
                     </Link>
                   </span>
                 </p>
@@ -106,17 +102,15 @@ export function GitHubAccessPanel({
                   <p className={styles.state}>
                     <LiveDot tone="attention" />
                     <span>
-                      <span className="fl-mono">{app.slug}</span> créée,{' '}
-                      {app.installed === false ? 'pas encore installée' : 'installation à vérifier'}
+                      <span className="fl-mono">{app.slug}</span>
+                      {t.github.created}
+                      {app.installed === false ? t.github.notInstalled : t.github.installToCheck}
                     </span>
                   </p>
                   <StepButton step={actions.install} primary>
-                    Installer sur les dépôts
+                    {t.github.install}
                   </StepButton>
-                  <p className={styles.help}>
-                    Choisis « All repositories » : les prochains dépôts de la factory seront
-                    couverts sans rien refaire.
-                  </p>
+                  <p className={styles.help}>{t.github.installHelp}</p>
                 </>
               )}
             </dd>
@@ -124,7 +118,7 @@ export function GitHubAccessPanel({
 
           {app ? (
             <div className={styles.accessRow}>
-              <dt className={styles.accessTerm}>Ton compte</dt>
+              <dt className={styles.accessTerm}>{t.github.account}</dt>
               <dd className={styles.accessValue}>
                 {user ? (
                   <>
@@ -135,28 +129,24 @@ export function GitHubAccessPanel({
                         <MarkGithubIcon size={16} aria-hidden="true" />
                       )}
                       <span>
-                        Connecté en tant que <strong>{user.login}</strong>
+                        {t.github.signedInAs} <strong>{user.login}</strong>
                       </span>
                     </p>
                     <p className={styles.help}>
-                      Tes réponses partent à ton nom. Jeton renouvelé seul, prochaine échéance dans{' '}
-                      {formatDuration(Date.parse(user.expiresAt) - now)}.
+                      {t.github.tokenHelp(fmt.duration(Date.parse(user.expiresAt) - now))}
                     </p>
-                    <StepButton step={actions.logout}>Se déconnecter</StepButton>
+                    <StepButton step={actions.logout}>{t.github.logout}</StepButton>
                   </>
                 ) : (
                   <>
                     <p className={styles.state}>
                       <LiveDot tone="muted" />
-                      Pas connecté : connecte-toi pour débloquer depuis l’app
+                      {t.github.notSignedIn}
                     </p>
                     <StepButton step={actions.login} primary>
-                      Se connecter à GitHub
+                      {t.github.login}
                     </StepButton>
-                    <p className={styles.help}>
-                      Depuis ce PC comme depuis l’iPhone : GitHub te ramène ici. Seul le compte
-                      cddev est accepté.
-                    </p>
+                    <p className={styles.help}>{t.github.loginHelp}</p>
                   </>
                 )}
               </dd>

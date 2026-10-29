@@ -1,7 +1,6 @@
 import type { AgentActivity, Intervention, IssueSummary } from '@factory-live/contracts';
-import { formatStay } from '../../ui/format.ts';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { issuePath } from '../../ui/paths.ts';
-import { AGENT_STATE_LABEL, INTERVENTION_ACTION_LABEL } from '../../ui/vocabulary.ts';
 import { JobAction, JobBox, JobDetail } from '../../ui/work/JobBox.tsx';
 import { issueWorkState } from '../../ui/work/workState.tsx';
 
@@ -26,10 +25,11 @@ export function IssueJob({
   compact: boolean;
   now: number;
 }) {
-  const state = issueWorkState(issue, agent);
+  const { t, fmt } = useI18n();
+  const state = issueWorkState(issue, agent, t);
   // Une issue finie n'attend plus rien : son ancienneté dans « Terminé » n'apprend rien.
   const finished = issue.status === 'done' || issue.status === 'stopped';
-  const since = formatStay(now - Date.parse(issue.stationChangedAt ?? issue.startedAt));
+  const since = fmt.stay(now - Date.parse(issue.stationChangedAt ?? issue.startedAt));
   return (
     <JobBox
       {...(finished ? {} : { since })}
@@ -65,6 +65,7 @@ function IssueJobDetail({
   intervention: Intervention | null;
   maxInProgress: number;
 }) {
+  const { t } = useI18n();
   if (issue.status === 'waiting_human' || issue.status === 'blocked') {
     const tone = issue.status === 'blocked' ? 'danger' : 'attention';
     return (
@@ -72,14 +73,14 @@ function IssueJobDetail({
         {intervention ? <JobDetail tone={tone}>{intervention.title}</JobDetail> : null}
         {intervention ? (
           <JobAction to={`/interventions/${encodeURIComponent(intervention.id)}`}>
-            {INTERVENTION_ACTION_LABEL[intervention.kind]}
+            {t.interventionAction[intervention.kind]}
           </JobAction>
         ) : null}
       </>
     );
   }
   if (issue.status === 'queued')
-    return <JobDetail>Attend une place : {maxInProgress} cartes en cours au plus</JobDetail>;
+    return <JobDetail>{t.common.waitingForSlot(maxInProgress)}</JobDetail>;
   if (!agent) return null;
   if (agent.action)
     return (
@@ -88,5 +89,5 @@ function IssueJobDetail({
         {agent.action.detail ? ` · ${agent.action.detail}` : ''}
       </JobDetail>
     );
-  return <JobDetail>{AGENT_STATE_LABEL[agent.state]}</JobDetail>;
+  return <JobDetail>{t.agentState[agent.state]}</JobDetail>;
 }

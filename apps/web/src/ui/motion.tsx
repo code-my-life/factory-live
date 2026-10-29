@@ -11,6 +11,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import type { ReactNode } from 'react';
+import { useI18n } from '../i18n/I18nProvider.tsx';
 
 /**
  * Préférence d'animation. Primer interdit tout mouvement en boucle sans contrôle de l'utilisateur et
@@ -96,12 +97,13 @@ export function useMotion(): MotionState {
 
 /** Bouton qui met en pause ou relance les animations en boucle (inactif si le système les réduit). */
 export function MotionToggle() {
+  const { t } = useI18n();
   const { paused, reduced, setPaused } = useMotion();
   if (reduced) {
     return (
       <IconButton
         icon={PauseIcon}
-        aria-label="Animations réduites par le système"
+        aria-label={t.motion.reduced}
         inactive
         size="small"
         variant="invisible"
@@ -111,7 +113,7 @@ export function MotionToggle() {
   return (
     <IconButton
       icon={paused ? PlayIcon : PauseIcon}
-      aria-label={paused ? 'Relancer les animations' : 'Mettre les animations en pause'}
+      aria-label={paused ? t.motion.resume : t.motion.pause}
       aria-pressed={paused}
       size="small"
       variant="invisible"

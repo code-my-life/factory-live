@@ -14,6 +14,7 @@ import {
   XIcon,
 } from '@primer/octicons-react';
 import type { Icon } from '@primer/octicons-react';
+import type { I18n } from '../../i18n/i18n.ts';
 
 /** Variantes du badge de `Timeline` (Primer) ; `null` : badge neutre. */
 export type RowTone = 'accent' | 'success' | 'attention' | 'severe' | 'danger' | 'done' | null;
@@ -36,20 +37,21 @@ export interface TimelineRow {
   running: boolean;
 }
 
-const KIND_ICON: Record<ActivityEvent['kind'], [Icon, string]> = {
-  tool: [ToolsIcon, 'Outil'],
-  llm: [CommentDiscussionIcon, 'Modèle'],
-  kanban: [WorkflowIcon, 'Kanban'],
-  github: [GitPullRequestIcon, 'GitHub'],
-  skill: [PackageIcon, 'Skill'],
-  guard: [ShieldCheckIcon, 'Garde'],
-  system: [InfoIcon, 'Système'],
+const KIND_ICON: Record<ActivityEvent['kind'], Icon> = {
+  tool: ToolsIcon,
+  llm: CommentDiscussionIcon,
+  kanban: WorkflowIcon,
+  github: GitPullRequestIcon,
+  skill: PackageIcon,
+  guard: ShieldCheckIcon,
+  system: InfoIcon,
 };
 
 const FREQUENT = new Set<ActivityEvent['kind']>(['tool', 'llm', 'skill']);
 
-export function fromActivity(event: ActivityEvent): TimelineRow {
-  const [kindIcon, kindLabel] = KIND_ICON[event.kind];
+export function fromActivity(event: ActivityEvent, { t }: I18n): TimelineRow {
+  const kindIcon = KIND_ICON[event.kind];
+  const kindLabel = t.activity.kind[event.kind];
   const failed = event.status === 'error';
   const blocked = event.status === 'blocked';
   const tone: RowTone = blocked
@@ -66,7 +68,7 @@ export function fromActivity(event: ActivityEvent): TimelineRow {
     at: event.at,
     tone,
     icon: blocked ? BlockedIcon : failed && FREQUENT.has(event.kind) ? XIcon : kindIcon,
-    iconLabel: blocked ? 'Refus' : failed ? `${kindLabel} en échec` : kindLabel,
+    iconLabel: blocked ? t.activity.refused : failed ? t.activity.failed(kindLabel) : kindLabel,
     condensed: FREQUENT.has(event.kind) && !failed && !blocked,
     agent: event.profile,
     title: event.label,
@@ -78,12 +80,12 @@ export function fromActivity(event: ActivityEvent): TimelineRow {
   };
 }
 
-const SOURCE_ICON: Record<TimelineEntry['source'], [Icon, string]> = {
-  kanban: [WorkflowIcon, 'Kanban'],
-  hermes: [PulseIcon, 'Hermès'],
-  github: [GitPullRequestIcon, 'GitHub'],
-  comment: [CommentIcon, 'Commentaire'],
-  'factory-live': [InfoIcon, 'factory-live'],
+const SOURCE_ICON: Record<TimelineEntry['source'], Icon> = {
+  kanban: WorkflowIcon,
+  hermes: PulseIcon,
+  github: GitPullRequestIcon,
+  comment: CommentIcon,
+  'factory-live': InfoIcon,
 };
 
 const TONE: Record<TimelineEntry['tone'], RowTone> = {
@@ -94,8 +96,9 @@ const TONE: Record<TimelineEntry['tone'], RowTone> = {
   done: 'done',
 };
 
-export function fromTimelineEntry(entry: TimelineEntry): TimelineRow {
-  const [sourceIcon, sourceLabel] = SOURCE_ICON[entry.source];
+export function fromTimelineEntry(entry: TimelineEntry, { t }: I18n): TimelineRow {
+  const sourceIcon = SOURCE_ICON[entry.source];
+  const sourceLabel = t.activity.source[entry.source];
   return {
     id: entry.id,
     at: entry.at,

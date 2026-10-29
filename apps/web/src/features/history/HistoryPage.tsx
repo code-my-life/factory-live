@@ -2,18 +2,15 @@ import { Heading, Label } from '@primer/react';
 import { Table } from '@primer/react/experimental';
 import { Link } from 'react-router';
 import { useFactorySource, useHistory } from '../../data/FactoryProvider.tsx';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { BarList } from '../../ui/charts/BarList.tsx';
-import { formatDayMonth, formatMinutes, formatPercent } from '../../ui/format.ts';
 import { issuePath } from '../../ui/paths.ts';
 import page from '../../ui/page.module.css';
 
-const OUTCOME = {
-  merged: { label: 'Fusionnée', variant: 'done' },
-  stopped: { label: 'Arrêtée', variant: 'secondary' },
-  closed: { label: 'Fermée', variant: 'secondary' },
-} as const;
+const OUTCOME_VARIANT = { merged: 'done', stopped: 'secondary', closed: 'secondary' } as const;
 
 export function HistoryPage() {
+  const { t, fmt } = useI18n();
   const source = useFactorySource();
   const history = useHistory();
   return (
@@ -21,41 +18,36 @@ export function HistoryPage() {
       <header className={page.head}>
         <div>
           <Heading as="h1" variant="medium" id="history-title">
-            Historique et stats
+            {t.history.title}
           </Heading>
-          <p className={page.intro}>
-            Les {history.periodDays} derniers jours. factory-live garde ce qu’Hermès purge après 30
-            jours.
-          </p>
-          {source.kind === 'demo' ? (
-            <p className={page.demoNote}>Chiffres d’exemple de la démo.</p>
-          ) : null}
+          <p className={page.intro}>{t.history.intro(history.periodDays)}</p>
+          {source.kind === 'demo' ? <p className={page.demoNote}>{t.costs.demoNote}</p> : null}
         </div>
       </header>
 
       <dl className={page.figures}>
         <div className={page.figure}>
-          <dt className={page.figureTerm}>Issues terminées</dt>
+          <dt className={page.figureTerm}>{t.history.issuesDone}</dt>
           <dd className={page.figureValue}>{history.issuesDone}</dd>
         </div>
         <div className={page.figure}>
-          <dt className={page.figureTerm}>Délai médian, label → merge</dt>
+          <dt className={page.figureTerm}>{t.history.leadTime}</dt>
           <dd className={page.figureValue}>
             {history.medianLeadTimeMinutes !== null
-              ? formatMinutes(history.medianLeadTimeMinutes)
-              : '?'}
+              ? fmt.minutes(history.medianLeadTimeMinutes)
+              : t.common.unknown}
           </dd>
         </div>
         <div className={page.figure}>
-          <dt className={page.figureTerm}>Blocages</dt>
+          <dt className={page.figureTerm}>{t.history.blocks}</dt>
           <dd className={page.figureValue}>{history.blocks}</dd>
         </div>
         <div className={page.figure}>
-          <dt className={page.figureTerm}>Ton temps de réponse médian</dt>
+          <dt className={page.figureTerm}>{t.history.responseTime}</dt>
           <dd className={page.figureValue}>
             {history.medianHumanResponseMinutes !== null
-              ? formatMinutes(history.medianHumanResponseMinutes)
-              : '?'}
+              ? fmt.minutes(history.medianHumanResponseMinutes)
+              : t.common.unknown}
           </dd>
         </div>
       </dl>
@@ -63,18 +55,18 @@ export function HistoryPage() {
       <div className={page.grid}>
         <div className={page.panel}>
           <BarList
-            title="Temps médian par station"
+            title={t.history.stationTime}
             data={history.stationMinutes.map((row) => ({
               key: row.station,
               label: row.station,
               value: row.medianMinutes,
             }))}
-            formatValue={formatMinutes}
+            formatValue={fmt.minutes}
           />
         </div>
         <section className={page.section} aria-labelledby="gate-title">
           <h2 id="gate-title" className={page.sectionTitle}>
-            Passage en gate du premier coup
+            {t.history.gateTitle}
           </h2>
           <div className={page.tableBox}>
             <Table
@@ -84,10 +76,10 @@ export function HistoryPage() {
             >
               <Table.Head>
                 <Table.Row>
-                  <Table.Header>Harnais</Table.Header>
-                  <Table.Header>Modèle</Table.Header>
-                  <Table.Header align="end">Runs</Table.Header>
-                  <Table.Header align="end">Taux</Table.Header>
+                  <Table.Header>{t.history.gate.harness}</Table.Header>
+                  <Table.Header>{t.history.gate.model}</Table.Header>
+                  <Table.Header align="end">{t.history.gate.runs}</Table.Header>
+                  <Table.Header align="end">{t.history.gate.rate}</Table.Header>
                 </Table.Row>
               </Table.Head>
               <Table.Body>
@@ -97,7 +89,7 @@ export function HistoryPage() {
                     <Table.Cell className="fl-mono">{row.model}</Table.Cell>
                     <Table.Cell align="end">{row.runs}</Table.Cell>
                     <Table.Cell align="end">
-                      {row.runs >= 3 ? formatPercent(row.rate) : 'trop peu'}
+                      {row.runs >= 3 ? fmt.percent(row.rate) : t.history.tooFew}
                     </Table.Cell>
                   </Table.Row>
                 ))}
@@ -109,7 +101,7 @@ export function HistoryPage() {
 
       <section className={page.section} aria-labelledby="recent-title">
         <h2 id="recent-title" className={page.sectionTitle}>
-          Dernières issues terminées
+          {t.history.recentTitle}
         </h2>
         <div className={page.tableBox}>
           <Table
@@ -119,11 +111,11 @@ export function HistoryPage() {
           >
             <Table.Head>
               <Table.Row>
-                <Table.Header>Issue</Table.Header>
-                <Table.Header>Résultat</Table.Header>
-                <Table.Header align="end">Délai</Table.Header>
-                <Table.Header>Version</Table.Header>
-                <Table.Header>Terminée le</Table.Header>
+                <Table.Header>{t.history.recent.issue}</Table.Header>
+                <Table.Header>{t.history.recent.outcome}</Table.Header>
+                <Table.Header align="end">{t.history.recent.leadTime}</Table.Header>
+                <Table.Header>{t.history.recent.version}</Table.Header>
+                <Table.Header>{t.history.recent.finishedAt}</Table.Header>
               </Table.Row>
             </Table.Head>
             <Table.Body>
@@ -136,13 +128,13 @@ export function HistoryPage() {
                     {row.title}
                   </Table.Cell>
                   <Table.Cell>
-                    <Label variant={OUTCOME[row.outcome].variant}>
-                      {OUTCOME[row.outcome].label}
+                    <Label variant={OUTCOME_VARIANT[row.outcome]}>
+                      {t.history.outcome[row.outcome]}
                     </Label>
                   </Table.Cell>
-                  <Table.Cell align="end">{formatMinutes(row.leadTimeMinutes)}</Table.Cell>
-                  <Table.Cell className="fl-mono">{row.version ?? 'sans tag'}</Table.Cell>
-                  <Table.Cell>{formatDayMonth(row.finishedAt)}</Table.Cell>
+                  <Table.Cell align="end">{fmt.minutes(row.leadTimeMinutes)}</Table.Cell>
+                  <Table.Cell className="fl-mono">{row.version ?? t.history.noTag}</Table.Cell>
+                  <Table.Cell>{fmt.dayMonth(row.finishedAt)}</Table.Cell>
                 </Table.Row>
               ))}
             </Table.Body>

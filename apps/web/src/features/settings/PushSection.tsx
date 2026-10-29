@@ -1,6 +1,9 @@
 import { BellIcon, CheckCircleIcon } from '@primer/octicons-react';
 import { Button, Flash } from '@primer/react';
 import { useEffect, useState } from 'react';
+import { describeError } from '../../data/errors.ts';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
+import type { Messages } from '../../i18n/fr.ts';
 import {
   disablePush,
   enablePush,
@@ -9,7 +12,6 @@ import {
   sendTestPush,
 } from '../../pwa/push.ts';
 import { LiveDot } from '../../ui/LiveDot.tsx';
-import { INTERVENTION_LABEL } from '../../ui/vocabulary.ts';
 import page from '../../ui/page.module.css';
 import styles from './settings.module.css';
 
@@ -23,40 +25,43 @@ const PUSHED = [
 ] as const;
 
 function Intro() {
+  const { t, locale } = useI18n();
   return (
     <>
       <h2 id="push-title" className={page.sectionTitle}>
-        Notifications de cet appareil
+        {t.push.title}
       </h2>
       <p className={page.muted}>
-        Un push part seulement quand un blocage t’attend :{' '}
-        {PUSHED.map((kind) => INTERVENTION_LABEL[kind].toLowerCase()).join(', ')}. Les PR à
-        approuver et la santé restent visibles ici sans notification. Telegram continue en
-        parallèle.
+        {t.push.intro(
+          PUSHED.map((kind) => t.intervention[kind].toLocaleLowerCase(locale)).join(', '),
+        )}
       </p>
     </>
   );
 }
 
 function Enabled({ demo = false }: { demo?: boolean }) {
+  const { t } = useI18n();
   return (
     <p className={styles.state}>
-      <CheckCircleIcon size={16} className={styles.ok} aria-hidden="true" /> Activées sur cet
-      appareil{demo ? ' (démo : rien n’est envoyé)' : ''}
+      <CheckCircleIcon size={16} className={styles.ok} aria-hidden="true" /> {t.push.enabled}
+      {demo ? t.push.demoEnabled : ''}
     </p>
   );
 }
 
 function Disabled() {
+  const { t } = useI18n();
   return (
     <p className={styles.state}>
-      <LiveDot tone="muted" /> Pas encore activées sur cet appareil
+      <LiveDot tone="muted" /> {t.push.disabled}
     </p>
   );
 }
 
 /** La démo simule l'abonnement et montre à quoi ressemble une notification. */
 export function DemoPushSection() {
+  const { t } = useI18n();
   const [push, setPush] = useState<'off' | 'on'>('off');
   const [preview, setPreview] = useState(false);
   return (
@@ -67,23 +72,23 @@ export function DemoPushSection() {
         <div className={styles.actions}>
           {push === 'off' ? (
             <Button variant="primary" leadingVisual={BellIcon} onClick={() => setPush('on')}>
-              Activer les notifications
+              {t.push.enable}
             </Button>
           ) : (
             <>
-              <Button onClick={() => setPreview(true)}>Envoyer un test</Button>
+              <Button onClick={() => setPreview(true)}>{t.push.test}</Button>
               <Button variant="invisible" onClick={() => setPush('off')}>
-                Désactiver
+                {t.push.disable}
               </Button>
             </>
           )}
         </div>
         {preview && push === 'on' ? (
           <div className={styles.notification} role="status">
-            <p className={styles.notificationApp}>factory-live · maintenant</p>
-            <p className={styles.notificationTitle}>Décision attendue · cv-site#49</p>
+            <p className={styles.notificationApp}>{t.push.previewApp}</p>
+            <p className={styles.notificationTitle}>{t.intervention.needs_input} · cv-site#49</p>
             <p className={styles.notificationBody}>
-              Carte UI sans maquette jointe. Touche pour répondre.
+              Carte UI sans maquette jointe. {t.push.previewTap}
             </p>
           </div>
         ) : null}
@@ -92,13 +97,18 @@ export function DemoPushSection() {
   );
 }
 
-type Status = { variant: 'success' | 'danger'; text: string } | null;
+/** Ce qu'une action réussie annonce, parmi les textes de la section. */
+type Done = Extract<keyof Messages['push'], 'testSent' | 'disabledDone' | 'enabledDone'>;
+
+/** Le résultat de la dernière action, écrit à l'affichage dans la langue en cours. */
+type Status = { variant: 'success'; done: Done } | { variant: 'danger'; cause: unknown } | null;
 
 /**
  * Le vrai abonnement Web Push de cet appareil : permission demandée au toucher (exigé par iOS),
  * abonnement enregistré par factory-live, test envoyé par le serveur, désabonnement.
  */
 export function LivePushSection() {
+  const { t } = useI18n();
   const [availability, setAvailability] = useState(() => pushAvailability());
   const [subscribed, setSubscribed] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -115,18 +125,15 @@ export function LivePushSection() {
     };
   }, []);
 
-  const run = async (action: () => Promise<void>, success: string, after: () => void) => {
+  const run = async (action: () => Promise<void>, done: Done, after: () => void) => {
     setBusy(true);
     setStatus(null);
     try {
       await action();
       after();
-      setStatus({ variant: 'success', text: success });
-    } catch (error) {
-      setStatus({
-        variant: 'danger',
-        text: error instanceof Error ? error.message : String(error),
-      });
+      setStatus({ variant: 'success', done });
+    } catch (cause) {
+      setStatus({ variant: 'danger', cause });
       setAvailability(pushAvailability());
     } finally {
       setBusy(false);
@@ -139,22 +146,19 @@ export function LivePushSection() {
         <Intro />
         {availability === 'install-first' ? (
           <p className={styles.state}>
-            <LiveDot tone="attention" /> Sur iPhone et iPad, les notifications passent par l’app
-            installée : dans Safari, Partager, Sur l’écran d’accueil, puis ouvre factory-live depuis
-            l’écran d’accueil et reviens ici.
+            <LiveDot tone="attention" /> {t.push.installFirst}
           </p>
         ) : availability === 'unsupported' ? (
           <p className={styles.state}>
-            <LiveDot tone="muted" /> Ce navigateur ne reçoit pas de notifications Web Push.
+            <LiveDot tone="muted" /> {t.push.unsupported}
           </p>
         ) : availability === 'denied' ? (
           <p className={styles.state}>
-            <LiveDot tone="danger" /> Notifications refusées pour factory-live : réautorise-les dans
-            les réglages de l’appareil, puis reviens ici.
+            <LiveDot tone="danger" /> {t.push.denied}
           </p>
         ) : subscribed === null ? (
           <p className={styles.state}>
-            <LiveDot tone="muted" /> Lecture de l’abonnement…
+            <LiveDot tone="muted" /> {t.push.reading}
           </p>
         ) : (
           <>
@@ -164,26 +168,18 @@ export function LivePushSection() {
                 <>
                   <Button
                     loading={busy}
-                    onClick={() =>
-                      void run(
-                        sendTestPush,
-                        'Test envoyé : la notification arrive dans quelques secondes.',
-                        () => undefined,
-                      )
-                    }
+                    onClick={() => void run(sendTestPush, 'testSent', () => undefined)}
                   >
-                    Envoyer un test
+                    {t.push.test}
                   </Button>
                   <Button
                     variant="invisible"
                     disabled={busy}
                     onClick={() =>
-                      void run(disablePush, 'Notifications désactivées sur cet appareil.', () =>
-                        setSubscribed(false),
-                      )
+                      void run(disablePush, 'disabledDone', () => setSubscribed(false))
                     }
                   >
-                    Désactiver
+                    {t.push.disable}
                   </Button>
                 </>
               ) : (
@@ -191,13 +187,9 @@ export function LivePushSection() {
                   variant="primary"
                   leadingVisual={BellIcon}
                   loading={busy}
-                  onClick={() =>
-                    void run(enablePush, 'Notifications activées sur cet appareil.', () =>
-                      setSubscribed(true),
-                    )
-                  }
+                  onClick={() => void run(enablePush, 'enabledDone', () => setSubscribed(true))}
                 >
-                  Activer les notifications
+                  {t.push.enable}
                 </Button>
               )}
             </div>
@@ -205,7 +197,7 @@ export function LivePushSection() {
         )}
         {status ? (
           <Flash variant={status.variant} className={styles.flash}>
-            {status.text}
+            {status.variant === 'success' ? t.push[status.done] : describeError(status.cause, t)}
           </Flash>
         ) : null}
       </div>

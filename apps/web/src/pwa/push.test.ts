@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ActionError, describeError } from '../data/errors.ts';
+import { en } from '../i18n/en.ts';
+import { fr } from '../i18n/fr.ts';
 import {
   deviceLabel,
   disablePush,
@@ -103,7 +106,10 @@ describe('abonnement', () => {
 
   it('s’arrête net si la permission est refusée', async () => {
     const { value, subscribe } = env({ granted: 'denied' });
-    await expect(enablePush(value)).rejects.toThrow(/Notifications refusées/);
+    const refused = await enablePush(value).catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(ActionError);
+    expect(describeError(refused, fr)).toMatch(/^Notifications refusées/);
+    expect(describeError(refused, en)).toMatch(/^Notifications blocked/);
     expect(subscribe).not.toHaveBeenCalled();
   });
 

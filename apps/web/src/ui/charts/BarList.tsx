@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import styles from './charts.module.css';
 
 export interface BarDatum {
@@ -17,6 +18,7 @@ export function BarList({
   data: readonly BarDatum[];
   formatValue: (value: number) => string;
 }) {
+  const { t } = useI18n();
   const max = Math.max(1, ...data.map((datum) => datum.value));
   return (
     <figure className={styles.figure}>
@@ -26,7 +28,7 @@ export function BarList({
           <li
             key={datum.key}
             className={styles.barRow}
-            title={`${datum.label} : ${formatValue(datum.value)}`}
+            title={t.common.labelValue(datum.label, formatValue(datum.value))}
             style={{ '--fl-pct': `${(datum.value / max) * 100}%` } as CSSProperties}
           >
             <span className={styles.barLabel}>{datum.label}</span>

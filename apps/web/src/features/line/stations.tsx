@@ -10,9 +10,9 @@ import {
 } from '@primer/octicons-react';
 import type { Icon } from '@primer/octicons-react';
 import { CounterLabel } from '@primer/react';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import type { FlowTone } from '../../ui/flow/FlowStop.tsx';
-import { AGENT_STATE_LABEL, STATION_LABEL } from '../../ui/vocabulary.ts';
 import styles from './line.module.css';
 
 export const STATION_ICON: Record<StationId, Icon> = {
@@ -51,9 +51,10 @@ export function stationTone(
 
 /** Le compteur d'issues posé sur l'arrêt ; il bat une fois quand une issue arrive. */
 export function StationCounter({ count, arrived }: { count: number; arrived: boolean }) {
+  const { t } = useI18n();
   return (
     <span className={styles.counter} data-arrived={arrived ? '' : undefined}>
-      <CounterLabel aria-label={`${count} issue${count > 1 ? 's' : ''}`}>{count}</CounterLabel>
+      <CounterLabel aria-label={t.common.issueCount(count)}>{count}</CounterLabel>
     </span>
   );
 }
@@ -66,6 +67,7 @@ export function StationCrew({
   station: StationView;
   agents: readonly AgentActivity[];
 }) {
+  const { t, locale } = useI18n();
   const crew = station.profiles.map(
     (profile) =>
       agents.find((agent) => agent.profile === profile) ?? { profile, state: 'idle' as const },
@@ -73,13 +75,16 @@ export function StationCrew({
   if (crew.length === 0) return null;
   crew.sort((left, right) => AGENT_ORDER[left.state] - AGENT_ORDER[right.state]);
   return (
-    <ul className={styles.crew} aria-label={`Agents de l’étape ${STATION_LABEL[station.id]}`}>
+    <ul className={styles.crew} aria-label={t.line.crewOf(t.station[station.id])}>
       {crew.map((member) => (
         <li
           key={member.profile}
           className={styles.crewMember}
           data-idle={member.state === 'idle' ? '' : undefined}
-          title={`${member.profile} : ${AGENT_STATE_LABEL[member.state].toLowerCase()}`}
+          title={t.common.labelValue(
+            member.profile,
+            t.agentState[member.state].toLocaleLowerCase(locale),
+          )}
         >
           <AgentAvatar profile={member.profile} size={20} />
         </li>

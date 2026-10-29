@@ -2,12 +2,11 @@ import type { AgentActivity, ProfileView } from '@factory-live/contracts';
 import { AlertIcon, ArrowRightIcon } from '@primer/octicons-react';
 import { Heading, Label, Token } from '@primer/react';
 import { useProfiles, useSnapshot } from '../../data/FactoryProvider.tsx';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { LiveDot } from '../../ui/LiveDot.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
-import { formatPercent, formatUsd } from '../../ui/format.ts';
-import { AGENT_STATE_LABEL, STATION_LABEL } from '../../ui/vocabulary.ts';
 import { InlineLink } from '../../ui/InlineLink.tsx';
 import { issuePath } from '../../ui/paths.ts';
 import page from '../../ui/page.module.css';
@@ -20,6 +19,7 @@ function AgentProfileCard({
   profile: ProfileView;
   activity: AgentActivity | undefined;
 }) {
+  const { t, fmt } = useI18n();
   const working = activity && activity.state !== 'idle';
   return (
     <article
@@ -32,7 +32,7 @@ function AgentProfileCard({
         <h2 id={`agent-${profile.name}`} className={styles.name}>
           {profile.name}
         </h2>
-        <Label variant="secondary">{STATION_LABEL[profile.station]}</Label>
+        <Label variant="secondary">{t.station[profile.station]}</Label>
       </header>
       <p className={styles.role}>{profile.role}</p>
 
@@ -40,23 +40,24 @@ function AgentProfileCard({
         <LiveDot tone={working ? 'success' : 'muted'} pulse={Boolean(working)} />
         {activity && working ? (
           <span>
-            {AGENT_STATE_LABEL[activity.state]}
+            {t.agentState[activity.state]}
             {activity.issueKey ? (
               <>
                 {' '}
-                sur <InlineLink to={issuePath(activity.issueKey)}>{activity.issueKey}</InlineLink>
+                {t.agents.on}{' '}
+                <InlineLink to={issuePath(activity.issueKey)}>{activity.issueKey}</InlineLink>
               </>
             ) : null}
             {activity.runStartedAt ? (
               <>
                 {' '}
-                depuis <Elapsed since={activity.runStartedAt} />
+                {t.agents.since} <Elapsed since={activity.runStartedAt} />
               </>
             ) : null}
           </span>
         ) : (
           <span className={styles.muted}>
-            {activity?.state === 'queued' ? 'En file' : 'Au repos'}
+            {activity?.state === 'queued' ? t.agentState.queued : t.agentState.idle}
           </span>
         )}
       </div>
@@ -67,8 +68,8 @@ function AgentProfileCard({
         </p>
       ) : null}
 
-      <section className={styles.block} aria-label="Chaîne de modèles">
-        <h3 className={styles.blockTitle}>Modèles, dans l’ordre des fallbacks</h3>
+      <section className={styles.block} aria-label={t.agents.chain}>
+        <h3 className={styles.blockTitle}>{t.agents.chainTitle}</h3>
         <ol className={styles.chain}>
           {profile.modelChain.map((model, index) => (
             <li key={`${model.provider}-${model.model}-${index}`} className={styles.chainItem}>
@@ -85,45 +86,47 @@ function AgentProfileCard({
             </li>
           ))}
         </ol>
-        {profile.effort ? (
-          <p className={styles.muted}>Effort de raisonnement : {profile.effort}</p>
-        ) : null}
+        {profile.effort ? <p className={styles.muted}>{t.agents.effort(profile.effort)}</p> : null}
       </section>
 
       {profile.drift.length > 0 ? (
-        <section className={styles.drift} aria-label="Dérive de configuration">
+        <section className={styles.drift} aria-label={t.agents.drift}>
           <p className={styles.driftTitle}>
-            <AlertIcon size={14} aria-hidden="true" /> En service, différent du dépôt de la factory
+            <AlertIcon size={14} aria-hidden="true" /> {t.agents.driftTitle}
           </p>
           <ul className={styles.driftList}>
             {profile.drift.map((drift) => (
               <li key={drift.field}>
-                <code>{drift.field}</code> : <span className={styles.driftLive}>{drift.live}</span>
-                <span className={styles.muted}> (dépôt : {drift.repo})</span>
+                <code>{drift.field}</code>
+                {t.common.colon}
+                <span className={styles.driftLive}>{drift.live}</span>
+                <span className={styles.muted}>{t.agents.driftRepo(drift.repo)}</span>
               </li>
             ))}
           </ul>
         </section>
       ) : null}
 
-      <section className={styles.block} aria-label="Outils, skills et plugins">
-        <h3 className={styles.blockTitle}>Skills</h3>
+      <section className={styles.block} aria-label={t.agents.tools}>
+        <h3 className={styles.blockTitle}>{t.agents.skills}</h3>
         <div className={styles.tokens}>
           {profile.skills.map((skill) => (
             <Token key={skill} text={skill} size="small" />
           ))}
         </div>
-        <h3 className={styles.blockTitle}>Plugins et refus des gardes (7 jours)</h3>
+        <h3 className={styles.blockTitle}>{t.agents.plugins}</h3>
         <div className={styles.tokens}>
           {profile.plugins.map((plugin) => (
             <Token
               key={plugin.name}
-              text={plugin.refusals > 0 ? `${plugin.name} · ${plugin.refusals} refus` : plugin.name}
+              text={
+                plugin.refusals > 0 ? t.agents.refusals(plugin.name, plugin.refusals) : plugin.name
+              }
               size="small"
             />
           ))}
         </div>
-        <h3 className={styles.blockTitle}>Toolsets{profile.mcp.length > 0 ? ' et MCP' : ''}</h3>
+        <h3 className={styles.blockTitle}>{t.agents.toolsets(profile.mcp.length > 0)}</h3>
         <p className={styles.toolsets}>
           {profile.toolsets.join(' · ')}
           {profile.mcp.length > 0 ? ` · MCP ${profile.mcp.join(', ')}` : ''}
@@ -132,29 +135,29 @@ function AgentProfileCard({
 
       <dl className={styles.stats}>
         <div>
-          <dt className={styles.statTerm}>Runs</dt>
+          <dt className={styles.statTerm}>{t.agents.runs}</dt>
           <dd className={styles.statValue}>{profile.stats.runs}</dd>
         </div>
         <div>
-          <dt className={styles.statTerm}>Passage en gate</dt>
+          <dt className={styles.statTerm}>{t.agents.gatePass}</dt>
           <dd className={styles.statValue}>
             {profile.stats.gatePassRate !== null
-              ? formatPercent(profile.stats.gatePassRate)
-              : 'sans objet'}
+              ? fmt.percent(profile.stats.gatePassRate)
+              : t.agents.notApplicable}
           </dd>
         </div>
         <div>
-          <dt className={styles.statTerm}>Durée médiane</dt>
+          <dt className={styles.statTerm}>{t.agents.medianDuration}</dt>
           <dd className={styles.statValue}>
             {profile.stats.medianRunMinutes !== null
-              ? `${profile.stats.medianRunMinutes} min`
-              : '?'}
+              ? fmt.minutes(profile.stats.medianRunMinutes)
+              : t.common.unknown}
           </dd>
         </div>
         <div>
-          <dt className={styles.statTerm}>Coût estimé</dt>
+          <dt className={styles.statTerm}>{t.agents.cost}</dt>
           <dd className={styles.statValue}>
-            {profile.stats.costUsd !== null ? formatUsd(profile.stats.costUsd) : 'gratuit'}
+            {profile.stats.costUsd !== null ? fmt.usd(profile.stats.costUsd) : t.common.free}
           </dd>
         </div>
       </dl>
@@ -163,6 +166,7 @@ function AgentProfileCard({
 }
 
 export function AgentsPage() {
+  const { t } = useI18n();
   const profiles = useProfiles();
   const snapshot = useSnapshot();
   const drifting = profiles.filter((profile) => profile.drift.length > 0).length;
@@ -171,13 +175,11 @@ export function AgentsPage() {
       <header className={page.head}>
         <div>
           <Heading as="h1" variant="medium" id="agents-title">
-            Agents
+            {t.agents.title}
           </Heading>
           <p className={page.intro}>
-            Les {profiles.length} agents de la factory, avec la configuration réellement en service.
-            {drifting > 0
-              ? ` ${drifting} agent${drifting > 1 ? 's' : ''} diffère${drifting > 1 ? 'nt' : ''} du dépôt hermes-software-factory.`
-              : ''}
+            {t.agents.intro(profiles.length)}
+            {drifting > 0 ? t.agents.drifting(drifting) : ''}
           </p>
         </div>
       </header>

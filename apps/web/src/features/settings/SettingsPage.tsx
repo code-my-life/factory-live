@@ -4,30 +4,44 @@ import { useSearchParams } from 'react-router';
 import type { ColorPreference } from '../../app/colorMode.tsx';
 import { useColorMode } from '../../app/colorMode.tsx';
 import { useFactorySource, useSnapshot } from '../../data/FactoryProvider.tsx';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
+import type { Messages } from '../../i18n/fr.ts';
+import type { Locale } from '../../i18n/locale.ts';
 import { LiveDot } from '../../ui/LiveDot.tsx';
 import page from '../../ui/page.module.css';
 import { DemoGitHubSection, LiveGitHubSection } from './GitHubSection.tsx';
 import { DemoPushSection, LivePushSection } from './PushSection.tsx';
 import styles from './settings.module.css';
 
-const THEMES: { value: ColorPreference; label: string }[] = [
-  { value: 'dark', label: 'Sombre' },
-  { value: 'light', label: 'Clair' },
-  { value: 'system', label: 'Système' },
+const THEMES: readonly ColorPreference[] = ['dark', 'light', 'system'];
+
+/**
+ * Chaque langue s'écrit dans sa propre langue, pour qu'on la reconnaisse quelle que soit celle de
+ * l'interface ; `lang` la fait lire correctement par les lecteurs d'écran.
+ */
+const LANGUAGES: readonly { value: Locale; label: string }[] = [
+  { value: 'fr', label: 'Français' },
+  { value: 'en', label: 'English' },
 ];
 
+const INSTALL = [
+  { device: 'iphone', icon: DeviceMobileIcon },
+  { device: 'pc', icon: DeviceDesktopIcon },
+  { device: 'mac', icon: DeviceDesktopIcon },
+] as const;
+
 /** Retours de GitHub après une étape faite chez lui (`/api/github/installed`, `/api/github/oauth/callback`). */
-const GITHUB_RETURN: Record<string, string> = {
-  installed: 'App GitHub installée : factory-live lit désormais tes dépôts avec elle.',
-  connected: 'Connecté à GitHub : tes réponses partiront à ton nom.',
-};
+function githubReturn(value: string | null, t: Messages): string | null {
+  return value === 'installed' || value === 'connected' ? t.settings.githubReturn[value] : null;
+}
 
 export function SettingsPage() {
+  const { t, locale, setLocale } = useI18n();
   const { preference, setPreference } = useColorMode();
   const source = useFactorySource();
   const snapshot = useSnapshot();
   const [params] = useSearchParams();
-  const githubReturn = GITHUB_RETURN[params.get('github') ?? ''];
+  const returned = githubReturn(params.get('github'), t);
   const sources = snapshot.health.filter((service) => service.group === 'factory-live');
   const demo = source.kind === 'demo';
 
@@ -35,13 +49,13 @@ export function SettingsPage() {
     <section className={page.page} aria-labelledby="settings-title">
       <header className={page.head}>
         <Heading as="h1" variant="medium" id="settings-title">
-          Réglages
+          {t.settings.title}
         </Heading>
       </header>
 
-      {githubReturn ? (
+      {returned ? (
         <Flash variant="success" className={styles.flash}>
-          {githubReturn}
+          {returned}
         </Flash>
       ) : null}
 
@@ -52,15 +66,37 @@ export function SettingsPage() {
       <section className={page.panel} aria-labelledby="theme-title">
         <div className={styles.block}>
           <h2 id="theme-title" className={page.sectionTitle}>
-            Thème
+            {t.settings.theme}
           </h2>
           <SegmentedControl
-            aria-label="Thème"
-            onChange={(index) => setPreference(THEMES[index ?? 0]?.value ?? 'dark')}
+            aria-label={t.settings.theme}
+            onChange={(index) => setPreference(THEMES[index ?? 0] ?? 'dark')}
           >
             {THEMES.map((theme) => (
-              <SegmentedControl.Button key={theme.value} selected={theme.value === preference}>
-                {theme.label}
+              <SegmentedControl.Button key={theme} selected={theme === preference}>
+                {t.settings.themes[theme]}
+              </SegmentedControl.Button>
+            ))}
+          </SegmentedControl>
+        </div>
+      </section>
+
+      <section className={page.panel} aria-labelledby="language-title">
+        <div className={styles.block}>
+          <h2 id="language-title" className={page.sectionTitle}>
+            {t.settings.language}
+          </h2>
+          <SegmentedControl
+            aria-label={t.settings.language}
+            onChange={(index) => setLocale(LANGUAGES[index ?? 0]?.value ?? locale)}
+          >
+            {LANGUAGES.map((language) => (
+              <SegmentedControl.Button
+                key={language.value}
+                lang={language.value}
+                selected={language.value === locale}
+              >
+                {language.label}
               </SegmentedControl.Button>
             ))}
           </SegmentedControl>
@@ -70,30 +106,18 @@ export function SettingsPage() {
       <section className={page.panel} aria-labelledby="install-title">
         <div className={styles.block}>
           <h2 id="install-title" className={page.sectionTitle}>
-            Installer l’app
+            {t.settings.install}
           </h2>
           <ul className={styles.install}>
-            <li className={styles.installItem}>
-              <DeviceMobileIcon size={16} aria-hidden="true" className={styles.installIcon} />
-              <span>
-                <strong>iPhone</strong> : Safari sur https://desktop-gja56n4.tail40220c.ts.net:8446,
-                Partager, Sur l’écran d’accueil, puis ouvre l’app et active les notifications.
-              </span>
-            </li>
-            <li className={styles.installItem}>
-              <DeviceDesktopIcon size={16} aria-hidden="true" className={styles.installIcon} />
-              <span>
-                <strong>Ce PC</strong> : http://localhost:8446 dans Edge ou Chrome, puis Installer
-                l’application.
-              </span>
-            </li>
-            <li className={styles.installItem}>
-              <DeviceDesktopIcon size={16} aria-hidden="true" className={styles.installIcon} />
-              <span>
-                <strong>Mac ou autre PC du tailnet</strong> : la même adresse que l’iPhone, dans
-                Chrome, Edge ou Safari.
-              </span>
-            </li>
+            {INSTALL.map(({ device, icon: DeviceIcon }) => (
+              <li key={device} className={styles.installItem}>
+                <DeviceIcon size={16} aria-hidden="true" className={styles.installIcon} />
+                <span>
+                  <strong>{t.settings.installSteps[device].device}</strong>
+                  {t.settings.installSteps[device].text}
+                </span>
+              </li>
+            ))}
           </ul>
         </div>
       </section>
@@ -101,20 +125,19 @@ export function SettingsPage() {
       <section className={page.panel} aria-labelledby="sources-title">
         <div className={styles.block}>
           <h2 id="sources-title" className={page.sectionTitle}>
-            Sources
+            {t.settings.sources}
           </h2>
           <ul className={styles.sources}>
             {sources.map((service) => (
               <li key={service.id}>
                 <LiveDot tone={service.status === 'ok' ? 'success' : 'attention'} />{' '}
-                <strong>{service.label}</strong> : {service.detail}
+                <strong>{service.label}</strong>
+                {t.common.colon}
+                {service.detail}
               </li>
             ))}
           </ul>
-          <p className={page.muted}>
-            Version 0.1.0 · {demo ? 'données de démonstration' : 'données en direct'} · Hermès
-            0.22.2
-          </p>
+          <p className={page.muted}>{t.settings.version(demo)}</p>
         </div>
       </section>
     </section>

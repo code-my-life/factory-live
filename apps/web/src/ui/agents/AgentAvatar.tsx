@@ -1,6 +1,6 @@
 import type { AgentState } from '@factory-live/contracts';
 import { Avatar } from '@primer/react';
-import { AGENT_STATE_LABEL } from '../vocabulary.ts';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { agentAvatarUri } from './avatar.ts';
 import styles from './AgentAvatar.module.css';
 
@@ -23,7 +23,8 @@ export function AgentAvatar({
   /** Vrai quand le nom de l'agent est écrit juste à côté : l'image devient décorative. */
   named?: boolean;
 }) {
-  const label = state ? `${profile}, ${AGENT_STATE_LABEL[state].toLowerCase()}` : profile;
+  const { t, locale } = useI18n();
+  const label = state ? `${profile}, ${t.agentState[state].toLocaleLowerCase(locale)}` : profile;
   return (
     <span
       className={styles.frame}

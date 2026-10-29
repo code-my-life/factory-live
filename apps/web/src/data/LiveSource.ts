@@ -11,6 +11,7 @@ import type {
   UsageReport,
 } from '@factory-live/contracts';
 import { STREAM_PING, STREAM_PING_EVERY_MS } from '@factory-live/contracts';
+import { ActionError } from './errors.ts';
 import type { Connection, FactoryDataSource, UsagePeriod } from './source.ts';
 
 type Fetch = typeof fetch;
@@ -363,7 +364,7 @@ export class LiveSource implements FactoryDataSource {
       method: 'POST',
       headers: { 'X-Factory-Live': '1' },
     });
-    if (!response.ok) throw new Error(`Déconnexion refusée (HTTP ${response.status})`);
+    if (!response.ok) throw new ActionError('logout', response.status);
     if (this.github) this.github.stale = true;
     this.getGitHubAccess();
   }
@@ -464,7 +465,7 @@ export class LiveSource implements FactoryDataSource {
     );
     if (!response.ok) {
       const body = (await response.json().catch(() => ({}))) as { error?: string };
-      throw new Error(body.error ?? `Déblocage refusé (HTTP ${response.status})`);
+      throw body.error ? new Error(body.error) : new ActionError('unblock', response.status);
     }
   }
 }

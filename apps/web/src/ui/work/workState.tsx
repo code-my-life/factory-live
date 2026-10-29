@@ -13,7 +13,7 @@ import {
 } from '@primer/octicons-react';
 import type { Icon } from '@primer/octicons-react';
 import { Label, Spinner } from '@primer/react';
-import { CARD_STATUS_LABEL, ISSUE_STATUS_LABEL } from '../vocabulary.ts';
+import type { Messages } from '../../i18n/fr.ts';
 import styles from './work.module.css';
 
 /** Couleur d'un état, prise aux variantes de `Label` de Primer. */
@@ -51,17 +51,21 @@ const CARD_STATE: Record<KanbanStatus, { tone: WorkTone; icon: Icon }> = {
   archived: { tone: 'secondary', icon: ArchiveIcon },
 };
 
-export function issueWorkState(issue: IssueSummary, agent: AgentActivity | null): WorkState {
+export function issueWorkState(
+  issue: IssueSummary,
+  agent: AgentActivity | null,
+  t: Messages,
+): WorkState {
   return {
-    label: ISSUE_STATUS_LABEL[issue.status],
+    label: t.issueStatus[issue.status],
     ...ISSUE_STATE[issue.status],
     working: issue.status === 'active' && agent !== null && BUSY.has(agent.state),
   };
 }
 
-export function cardWorkState(card: CardView, agent: AgentActivity | null): WorkState {
+export function cardWorkState(card: CardView, agent: AgentActivity | null, t: Messages): WorkState {
   return {
-    label: CARD_STATUS_LABEL[card.status],
+    label: t.cardStatus[card.status],
     ...CARD_STATE[card.status],
     working: card.status === 'running' && agent !== null && BUSY.has(agent.state),
   };

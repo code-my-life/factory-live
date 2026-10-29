@@ -1,13 +1,7 @@
 import type { ModelRef } from '@factory-live/contracts';
+import { useI18n } from '../i18n/I18nProvider.tsx';
 import { providerLabel } from './vocabulary.ts';
 import styles from './ModelBadge.module.css';
-
-const SOURCE_LABEL: Record<ModelRef['source'], string> = {
-  live: 'observé sur le dernier appel',
-  session: 'enregistré dans la session',
-  override: 'forcé sur la carte',
-  config: 'configuration de l’agent',
-};
 
 /**
  * Modèle et fournisseur. Le nom complet reste dans l'infobulle et pour les lecteurs d'écran :
@@ -22,7 +16,13 @@ export function ModelBadge({
   emphasis?: boolean;
   prefix?: string;
 }) {
-  const description = `${prefix ? `${prefix} : ` : ''}${model.model} via ${providerLabel(model.provider)}, ${SOURCE_LABEL[model.source]}`;
+  const { t } = useI18n();
+  const description = t.model.description(
+    prefix ?? null,
+    model.model,
+    providerLabel(model.provider),
+    t.modelSource[model.source],
+  );
   return (
     <span
       className={styles.badge}

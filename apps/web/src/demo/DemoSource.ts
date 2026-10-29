@@ -7,6 +7,7 @@ import type {
   TranscriptView,
   UsageReport,
 } from '@factory-live/contracts';
+import { ActionError } from '../data/errors.ts';
 import type { Connection, FactoryDataSource, UsagePeriod } from '../data/source.ts';
 import { CARDS, KEYS } from './initial.ts';
 import { createInitialState } from './initial.ts';
@@ -81,7 +82,7 @@ export class DemoSource implements FactoryDataSource {
     const intervention = this.state.snapshot.interventions.find(
       (candidate) => candidate.id === interventionId,
     );
-    if (!intervention?.issueKey) return Promise.reject(new Error('Intervention introuvable'));
+    if (!intervention?.issueKey) return Promise.reject(new ActionError('unblockUnknown'));
     const issueKey = intervention.issueKey;
     const commentUrl = `${this.state.details[issueKey]?.issue.url ?? ''}#issuecomment-2471993104`;
 

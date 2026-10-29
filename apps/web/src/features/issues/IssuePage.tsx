@@ -13,15 +13,14 @@ import { Table } from '@primer/react/experimental';
 import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useIssueDetail, useSnapshot } from '../../data/FactoryProvider.tsx';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
+import type { Messages } from '../../i18n/fr.ts';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import { useMotion } from '../../ui/motion.tsx';
 import { ActivityTimeline } from '../../ui/timeline/ActivityTimeline.tsx';
 import { fromTimelineEntry } from '../../ui/timeline/rows.ts';
-import { formatCompact, formatDuration, formatUsd } from '../../ui/format.ts';
-import { INTERVENTION_LABEL, ISSUE_STATUS_LABEL, STATION_LABEL } from '../../ui/vocabulary.ts';
-import { CARD_STATUS_LABEL, RUN_ROLE_LABEL } from '../../ui/vocabulary.ts';
 import { shortCardTitle } from './cardText.ts';
 import { IssueGraph } from './IssueGraph.tsx';
 import { issueKeyFromParams } from '../../ui/paths.ts';
@@ -29,15 +28,9 @@ import { PullRequestPanel } from './PullRequestPanel.tsx';
 import { TranscriptPanel } from './TranscriptPanel.tsx';
 import styles from './issues.module.css';
 
-type Tab = 'activity' | 'transcript' | 'pr' | 'costs' | 'evidence';
+type Tab = keyof Messages['issue']['tabs'];
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'activity', label: 'Activité' },
-  { id: 'transcript', label: 'Transcription' },
-  { id: 'pr', label: 'PR et CI' },
-  { id: 'costs', label: 'Coûts' },
-  { id: 'evidence', label: 'Preuves' },
-];
+const TABS: readonly Tab[] = ['activity', 'transcript', 'pr', 'costs', 'evidence'];
 
 function defaultCard(detail: IssueDetail): CardView | null {
   return (
@@ -57,20 +50,21 @@ function RunsTable({
   selectedRunId: number | null;
   onSelectRun: (runId: number) => void;
 }) {
+  const { t, fmt } = useI18n();
   if (card.runs.length === 0) {
-    return <p className={styles.muted}>Cette carte n’a pas encore tourné.</p>;
+    return <p className={styles.muted}>{t.issue.runs.notYet}</p>;
   }
   const runs = [...card.runs].reverse();
   const duration = (run: RunView) =>
     run.endedAt ? (
-      formatDuration(Date.parse(run.endedAt) - Date.parse(run.startedAt))
+      fmt.duration(Date.parse(run.endedAt) - Date.parse(run.startedAt))
     ) : (
       <Elapsed since={run.startedAt} />
     );
   return (
     <>
       {/* Téléphone : une fiche par run, lisible sans défilement de côté ; le tableau prend le relais au-delà. */}
-      <ul className={styles.runList} aria-label={`Runs de la carte ${card.id}`}>
+      <ul className={styles.runList} aria-label={t.issue.runs.of(card.id)}>
         {runs.map((run) => (
           <li
             key={run.id}
@@ -83,21 +77,23 @@ function RunsTable({
                 <AgentAvatar profile={run.profile} size={16} named />
                 {run.profile}
               </span>
-              <span className={styles.cellNote}>{RUN_ROLE_LABEL[run.role]}</span>
+              <span className={styles.cellNote}>{t.runRole[run.role]}</span>
               <span className={`${styles.runDuration} fl-tabular`}>{duration(run)}</span>
             </p>
             {run.model || run.laneModel ? (
               <p className={styles.runModels}>
                 {run.model ? <ModelBadge model={run.model} /> : null}
-                {run.laneModel ? <ModelBadge model={run.laneModel} prefix="lane" emphasis /> : null}
+                {run.laneModel ? (
+                  <ModelBadge model={run.laneModel} prefix={t.common.lane} emphasis />
+                ) : null}
               </p>
             ) : null}
             <p className={styles.runOutcome}>
-              {run.outcome ?? 'en cours'}
+              {run.outcome ?? t.issue.runs.running}
               {run.summary ? <span className={styles.cellNote}>{run.summary}</span> : null}
             </p>
             <Button size="small" onClick={() => onSelectRun(run.id)}>
-              Transcription du run #{run.id}
+              {t.issue.runs.transcriptOf(run.id)}
             </Button>
           </li>
         ))}
@@ -106,17 +102,17 @@ function RunsTable({
         <Table
           gridTemplateColumns="auto auto minmax(0, 2fr) minmax(0, 2fr) auto auto"
           cellPadding="condensed"
-          aria-label={`Runs de la carte ${card.id}`}
+          aria-label={t.issue.runs.of(card.id)}
         >
           <Table.Head>
             <Table.Row>
-              <Table.Header>Run</Table.Header>
-              <Table.Header>Agent</Table.Header>
-              <Table.Header>Modèle</Table.Header>
-              <Table.Header>Résultat</Table.Header>
-              <Table.Header>Durée</Table.Header>
+              <Table.Header>{t.issue.runs.run}</Table.Header>
+              <Table.Header>{t.issue.runs.agent}</Table.Header>
+              <Table.Header>{t.issue.runs.model}</Table.Header>
+              <Table.Header>{t.issue.runs.outcome}</Table.Header>
+              <Table.Header>{t.issue.runs.duration}</Table.Header>
               <Table.Header>
-                <span className="fl-visually-hidden">Transcription</span>
+                <span className="fl-visually-hidden">{t.issue.runs.transcript}</span>
               </Table.Header>
             </Table.Row>
           </Table.Head>
@@ -133,25 +129,25 @@ function RunsTable({
                       <AgentAvatar profile={run.profile} size={16} named />
                       {run.profile}
                     </span>
-                    <span className={styles.cellNote}>{RUN_ROLE_LABEL[run.role]}</span>
+                    <span className={styles.cellNote}>{t.runRole[run.role]}</span>
                   </span>
                 </Table.Cell>
                 <Table.Cell className={styles.modelCell}>
-                  {run.model ? <ModelBadge model={run.model} /> : '?'}
+                  {run.model ? <ModelBadge model={run.model} /> : t.common.unknown}
                   {run.laneModel ? (
-                    <ModelBadge model={run.laneModel} prefix="lane" emphasis />
+                    <ModelBadge model={run.laneModel} prefix={t.common.lane} emphasis />
                   ) : null}
                 </Table.Cell>
                 <Table.Cell>
                   <span className={styles.cellStack}>
-                    {run.outcome ?? 'en cours'}
+                    {run.outcome ?? t.issue.runs.running}
                     {run.summary ? <span className={styles.cellNote}>{run.summary}</span> : null}
                   </span>
                 </Table.Cell>
                 <Table.Cell className="fl-tabular">{duration(run)}</Table.Cell>
                 <Table.Cell>
                   <Button size="small" onClick={() => onSelectRun(run.id)}>
-                    Transcription
+                    {t.issue.runs.transcript}
                   </Button>
                 </Table.Cell>
               </Table.Row>
@@ -177,6 +173,8 @@ const EVIDENCE: Record<string, string[]> = {
 };
 
 export function IssuePage() {
+  const i18n = useI18n();
+  const { t, fmt } = i18n;
   const params = useParams();
   const navigate = useNavigate();
   const key = issueKeyFromParams(params.repo, params.number);
@@ -192,10 +190,10 @@ export function IssuePage() {
     return (
       <section className={styles.page}>
         <Heading as="h1" variant="medium">
-          Issue introuvable
+          {t.issue.notFound}
         </Heading>
         <p>
-          <Link to="/issues">Revenir à la liste des issues</Link>
+          <Link to="/issues">{t.issue.backToList}</Link>
         </p>
       </section>
     );
@@ -217,9 +215,9 @@ export function IssuePage() {
 
   return (
     <article className={styles.page}>
-      <nav aria-label="Fil d’Ariane">
+      <nav aria-label={t.issue.breadcrumb}>
         <Link to="/issues" className={styles.back}>
-          <ArrowLeftIcon size={14} /> Issues
+          <ArrowLeftIcon size={14} /> {t.nav.issues}
         </Link>
       </nav>
 
@@ -238,9 +236,9 @@ export function IssuePage() {
                   : 'accent'
             }
           >
-            {ISSUE_STATUS_LABEL[issue.status]}
+            {t.issueStatus[issue.status]}
           </Label>
-          <span className={styles.metaText}>Étape : {STATION_LABEL[issue.station]}</span>
+          <span className={styles.metaText}>{t.issue.stage(t.station[issue.station])}</span>
           <LabelGroup>
             {issue.labels.map((label) => (
               <Label key={label} variant="secondary">
@@ -249,24 +247,24 @@ export function IssuePage() {
             ))}
           </LabelGroup>
           <PrimerLink href={issue.url} target="_blank" rel="noreferrer" className={styles.external}>
-            Issue sur GitHub <LinkExternalIcon size={12} />
+            {t.issue.onGitHub} <LinkExternalIcon size={12} />
           </PrimerLink>
         </div>
       </header>
 
       <dl className={styles.facts}>
         <div>
-          <dt className={styles.factTerm}>Harnais</dt>
-          <dd className={styles.factValue}>{issue.harness ?? 'choisi au brief'}</dd>
+          <dt className={styles.factTerm}>{t.issue.facts.harness}</dt>
+          <dd className={styles.factValue}>{issue.harness ?? t.issue.facts.harnessPending}</dd>
         </div>
         <div>
-          <dt className={styles.factTerm}>Modèle Claude</dt>
+          <dt className={styles.factTerm}>{t.issue.facts.claudeModel}</dt>
           <dd className={`${styles.factValue} fl-mono`}>
-            {issue.claudeModel ?? 'aucun (pas de label claude)'}
+            {issue.claudeModel ?? t.issue.facts.noClaudeModel}
           </dd>
         </div>
         <div>
-          <dt className={styles.factTerm}>PR</dt>
+          <dt className={styles.factTerm}>{t.issue.facts.pr}</dt>
           <dd className={styles.factValue}>
             {issue.pr ? (
               <PrimerLink href={issue.pr.url} target="_blank" rel="noreferrer">
@@ -277,31 +275,31 @@ export function IssuePage() {
                 <PrimerLink href={issue.prUrl} target="_blank" rel="noreferrer">
                   #{issue.prUrl.split('/').at(-1)}
                 </PrimerLink>{' '}
-                <span className={styles.muted}>(état inconnu : GitHub pas encore relié)</span>
+                <span className={styles.muted}>{t.issue.facts.prUnknownState}</span>
               </>
             ) : (
-              'pas encore ouverte'
+              t.issue.facts.prNotOpened
             )}
           </dd>
         </div>
         <div>
-          <dt className={styles.factTerm}>Durée</dt>
+          <dt className={styles.factTerm}>{t.issue.facts.duration}</dt>
           <dd className={`${styles.factValue} fl-tabular`}>
             {elapsedEnd !== null ? (
-              formatDuration(elapsedEnd - Date.parse(issue.startedAt))
+              fmt.duration(elapsedEnd - Date.parse(issue.startedAt))
             ) : (
               <Elapsed since={issue.startedAt} />
             )}
           </dd>
         </div>
         <div>
-          <dt className={styles.factTerm}>Jetons</dt>
-          <dd className={`${styles.factValue} fl-tabular`}>{formatCompact(detail.tokens)}</dd>
+          <dt className={styles.factTerm}>{t.issue.facts.tokens}</dt>
+          <dd className={`${styles.factValue} fl-tabular`}>{fmt.compact(detail.tokens)}</dd>
         </div>
         <div>
-          <dt className={styles.factTerm}>Coût estimé</dt>
+          <dt className={styles.factTerm}>{t.issue.facts.cost}</dt>
           <dd className={`${styles.factValue} fl-tabular`}>
-            {detail.costUsd > 0 ? formatUsd(detail.costUsd) : 'nul (modèles gratuits)'}
+            {detail.costUsd > 0 ? fmt.usd(detail.costUsd) : t.issue.facts.noCost}
           </dd>
         </div>
       </dl>
@@ -310,13 +308,13 @@ export function IssuePage() {
         <Banner
           key={intervention.id}
           variant={intervention.push ? 'critical' : 'info'}
-          title={`${INTERVENTION_LABEL[intervention.kind]} : ${intervention.title}`}
-          description="Ta réponse ou ton action est attendue pour que la carte reparte."
+          title={t.common.labelValue(t.intervention[intervention.kind], intervention.title)}
+          description={t.issue.bannerDescription}
           primaryAction={
             <Banner.PrimaryAction
               onClick={() => void navigate(`/interventions/${intervention.id}`)}
             >
-              Répondre
+              {t.issue.reply}
             </Banner.PrimaryAction>
           }
         />
@@ -325,9 +323,9 @@ export function IssuePage() {
       <section className={styles.section} aria-labelledby="graph-title">
         <div className={styles.sectionHead}>
           <h2 id="graph-title" className={styles.sectionTitle}>
-            Cartes de l’issue
+            {t.issue.cardsTitle}
           </h2>
-          <span className={styles.muted}>Choisis une carte pour voir ses runs.</span>
+          <span className={styles.muted}>{t.issue.cardsHint}</span>
         </div>
         <IssueGraph
           cards={detail.cards}
@@ -350,15 +348,15 @@ export function IssuePage() {
         {selectedCard ? (
           <div ref={cardPanel} className={styles.cardPanel}>
             <h3 className={styles.cardPanelTitle}>
-              <span className="fl-mono">#{selectedCard.kind}</span> {shortCardTitle(selectedCard)}
+              <span className="fl-mono">#{selectedCard.kind}</span>{' '}
+              {shortCardTitle(selectedCard, t)}
               <span className={styles.muted}>
                 {' '}
-                · {selectedCard.id} · {CARD_STATUS_LABEL[selectedCard.status]} ·{' '}
-                {selectedCard.assignee}
+                · {selectedCard.id} · {t.cardStatus[selectedCard.status]} · {selectedCard.assignee}
               </span>
             </h3>
             {selectedCard.skills.length > 0 ? (
-              <p className={styles.muted}>Skills forcées : {selectedCard.skills.join(', ')}</p>
+              <p className={styles.muted}>{t.issue.forcedSkills(selectedCard.skills.join(', '))}</p>
             ) : null}
             <RunsTable
               card={selectedCard}
@@ -375,18 +373,18 @@ export function IssuePage() {
       <section className={styles.section}>
         {/* Sur téléphone, les onglets défilent de côté plutôt que de se replier dans « More », que Primer n'écrit qu'en anglais. */}
         <div className={styles.tabsScroller}>
-          <UnderlineNav aria-label="Détails de l’issue" className={styles.tabs}>
+          <UnderlineNav aria-label={t.issue.tabsLabel} className={styles.tabs}>
             {TABS.map((entry) => (
               <UnderlineNav.Item
-                key={entry.id}
-                href={`#${entry.id}`}
-                aria-current={tab === entry.id ? 'page' : undefined}
+                key={entry}
+                href={`#${entry}`}
+                aria-current={tab === entry ? 'page' : undefined}
                 onSelect={(event) => {
                   event.preventDefault();
-                  setTab(entry.id);
+                  setTab(entry);
                 }}
               >
-                {entry.label}
+                {t.issue.tabs[entry]}
               </UnderlineNav.Item>
             ))}
           </UnderlineNav>
@@ -396,15 +394,15 @@ export function IssuePage() {
             <ActivityTimeline
               rows={[...detail.timeline]
                 .sort((left, right) => right.at.localeCompare(left.at))
-                .map(fromTimelineEntry)}
-              label={`Activité de ${issue.key}`}
+                .map((entry) => fromTimelineEntry(entry, i18n))}
+              label={t.issue.activityOf(issue.key)}
             />
           ) : null}
           {tab === 'transcript' ? (
             runForTranscript !== null ? (
               <TranscriptPanel key={runForTranscript} runId={runForTranscript} />
             ) : (
-              <p className={styles.muted}>Aucun run pour l’instant.</p>
+              <p className={styles.muted}>{t.issue.noRun}</p>
             )
           ) : null}
           {tab === 'pr' ? <PullRequestPanel issue={issue} /> : null}
@@ -413,15 +411,15 @@ export function IssuePage() {
               <Table
                 gridTemplateColumns="auto auto minmax(10rem, 1fr) auto auto"
                 cellPadding="condensed"
-                aria-label="Consommation par run"
+                aria-label={t.issue.costs.label}
               >
                 <Table.Head>
                   <Table.Row>
-                    <Table.Header>Run</Table.Header>
-                    <Table.Header>Agent</Table.Header>
-                    <Table.Header>Modèle</Table.Header>
-                    <Table.Header>Jetons</Table.Header>
-                    <Table.Header>Coût</Table.Header>
+                    <Table.Header>{t.issue.costs.run}</Table.Header>
+                    <Table.Header>{t.issue.costs.agent}</Table.Header>
+                    <Table.Header>{t.issue.costs.model}</Table.Header>
+                    <Table.Header>{t.issue.costs.tokens}</Table.Header>
+                    <Table.Header>{t.issue.costs.cost}</Table.Header>
                   </Table.Row>
                 </Table.Head>
                 <Table.Body>
@@ -437,13 +435,13 @@ export function IssuePage() {
                           </span>
                         </Table.Cell>
                         <Table.Cell className="fl-mono">
-                          {run.laneModel?.model ?? run.model?.model ?? '?'}
+                          {run.laneModel?.model ?? run.model?.model ?? t.common.unknown}
                         </Table.Cell>
                         <Table.Cell className="fl-tabular">
-                          {run.tokens !== null ? formatCompact(run.tokens) : '?'}
+                          {run.tokens !== null ? fmt.compact(run.tokens) : t.common.unknown}
                         </Table.Cell>
                         <Table.Cell className="fl-tabular">
-                          {run.costUsd !== null ? formatUsd(run.costUsd) : 'gratuit'}
+                          {run.costUsd !== null ? fmt.usd(run.costUsd) : t.common.free}
                         </Table.Cell>
                       </Table.Row>
                     ))}
@@ -453,10 +451,7 @@ export function IssuePage() {
           ) : null}
           {tab === 'evidence' ? (
             <div className={styles.evidence}>
-              <p className={styles.muted}>
-                Fichiers de preuve de la carte sélectionnée ({selectedCard?.id ?? 'aucune'}), lus
-                dans son worktree ou dans les preuves archivées par la gate.
-              </p>
+              <p className={styles.muted}>{t.issue.evidence(selectedCard?.id ?? null)}</p>
               <ul className={styles.evidenceList}>
                 {(EVIDENCE[selectedCard?.kind ?? 'impl'] ?? []).map((file) => (
                   <li key={file} className="fl-mono">

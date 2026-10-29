@@ -3,8 +3,8 @@ import { ArrowLeftIcon, BellIcon, CheckCircleIcon } from '@primer/octicons-react
 import { Heading } from '@primer/react';
 import { Link, useParams } from 'react-router';
 import { useSnapshot } from '../../data/FactoryProvider.tsx';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
-import { INTERVENTION_LABEL } from '../../ui/vocabulary.ts';
 import { InterventionDetail } from './InterventionDetail.tsx';
 import styles from './interventions.module.css';
 
@@ -23,6 +23,7 @@ function sortInterventions(interventions: readonly Intervention[]): Intervention
 }
 
 export function InterventionsPage() {
+  const { t } = useI18n();
   const { id } = useParams();
   const snapshot = useSnapshot();
   const interventions = sortInterventions(snapshot.interventions);
@@ -37,19 +38,16 @@ export function InterventionsPage() {
     >
       <header className={styles.head}>
         <Heading as="h1" variant="medium" id="interventions-title">
-          Interventions
+          {t.interventions.title}
         </Heading>
-        <p className={styles.intro}>
-          Ce qui attend ta décision. Une cloche signale ce qui t’envoie une notification push ; le
-          reste se voit ici et sur la ligne.
-        </p>
+        <p className={styles.intro}>{t.interventions.intro}</p>
       </header>
 
       <div className={styles.layout}>
-        <nav className={styles.list} aria-label="Interventions en attente">
+        <nav className={styles.list} aria-label={t.interventions.listLabel}>
           {interventions.length === 0 ? (
             <p className={styles.empty}>
-              <CheckCircleIcon size={16} aria-hidden="true" /> Rien n’attend ta décision.
+              <CheckCircleIcon size={16} aria-hidden="true" /> {t.interventions.empty}
             </p>
           ) : (
             <ul className={styles.items}>
@@ -63,18 +61,18 @@ export function InterventionsPage() {
                   >
                     <span className={styles.itemKind}>
                       {intervention.push ? (
-                        <BellIcon size={12} aria-label="Notification push" />
+                        <BellIcon size={12} aria-label={t.interventions.push} />
                       ) : null}
-                      {INTERVENTION_LABEL[intervention.kind]}
+                      {t.intervention[intervention.kind]}
                     </span>
                     <span className={styles.itemTitle}>{intervention.title}</span>
                     <span className={styles.itemMeta}>
-                      {intervention.issueKey ?? intervention.cardId} · ouverte{' '}
+                      {intervention.issueKey ?? intervention.cardId} · {t.interventions.opened}{' '}
                       <Elapsed since={intervention.openedAt} mode="age" />
                     </span>
                     {intervention.unblock ? (
                       <span className={styles.itemProgress}>
-                        Réponse {PROGRESS_LABEL[intervention.unblock.state]}
+                        {t.interventions.progress[intervention.unblock.state]}
                       </span>
                     ) : null}
                   </Link>
@@ -87,14 +85,14 @@ export function InterventionsPage() {
         <div className={styles.detail}>
           {showDetailOnly ? (
             <Link to="/interventions" className={styles.back}>
-              <ArrowLeftIcon size={14} /> Toutes les interventions
+              <ArrowLeftIcon size={14} /> {t.interventions.all}
             </Link>
           ) : null}
           {selected ? (
             <InterventionDetail intervention={selected} />
           ) : id ? (
             <p className={styles.empty}>
-              <CheckCircleIcon size={16} aria-hidden="true" /> Cette intervention est résolue.
+              <CheckCircleIcon size={16} aria-hidden="true" /> {t.interventions.resolved}
             </p>
           ) : interventions[0] ? (
             <InterventionDetail intervention={interventions[0]} />
@@ -104,10 +102,3 @@ export function InterventionsPage() {
     </section>
   );
 }
-
-const PROGRESS_LABEL = {
-  sent: 'envoyée',
-  acknowledged: 'prise en compte',
-  resumed: 'appliquée',
-  rejected: 'refusée',
-} as const;

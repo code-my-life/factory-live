@@ -3,23 +3,20 @@ import { Table } from '@primer/react/experimental';
 import { useState } from 'react';
 import { useFactorySource, useUsage } from '../../data/FactoryProvider.tsx';
 import type { UsagePeriod } from '../../data/source.ts';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { BarList } from '../../ui/charts/BarList.tsx';
 import { ColumnChart } from '../../ui/charts/ColumnChart.tsx';
-import { formatCompact, formatDayMonth, formatInteger, formatUsd } from '../../ui/format.ts';
 import { providerLabel } from '../../ui/vocabulary.ts';
 import page from '../../ui/page.module.css';
 
-const PERIODS: { days: UsagePeriod; label: string }[] = [
-  { days: 1, label: '24 h' },
-  { days: 7, label: '7 jours' },
-  { days: 30, label: '30 jours' },
-];
+const PERIODS: readonly UsagePeriod[] = [1, 7, 30];
 
 export function CostsPage() {
+  const { t, fmt } = useI18n();
   const source = useFactorySource();
   const [periodIndex, setPeriodIndex] = useState(1);
-  const period = PERIODS[periodIndex] ?? { days: 7 as UsagePeriod, label: '7 jours' };
-  const usage = useUsage(period.days);
+  const period = PERIODS[periodIndex] ?? 7;
+  const usage = useUsage(period);
   const totalTokens = usage.models.reduce(
     (sum, row) => sum + row.inputTokens + row.outputTokens,
     0,
@@ -29,12 +26,12 @@ export function CostsPage() {
   const totalCost = usage.models.reduce((sum, row) => sum + (row.costUsd ?? 0), 0);
   const daily = usage.daily.map((day) => ({
     key: day.day,
-    label: formatDayMonth(`${day.day}T12:00:00Z`),
+    label: fmt.dayMonth(`${day.day}T12:00:00Z`),
     value: day.tokens,
   }));
   const dailyLimited = usage.daily.map((day) => ({
     key: day.day,
-    label: formatDayMonth(`${day.day}T12:00:00Z`),
+    label: fmt.dayMonth(`${day.day}T12:00:00Z`),
     value: day.rateLimited,
   }));
 
@@ -43,24 +40,19 @@ export function CostsPage() {
       <header className={page.head}>
         <div>
           <Heading as="h1" variant="medium" id="costs-title">
-            Coûts et quotas
+            {t.costs.title}
           </Heading>
-          <p className={page.intro}>
-            Jetons, appels et limites par modèle et par fournisseur, mesurés sur chaque appel des
-            agents.
-          </p>
-          {source.kind === 'demo' ? (
-            <p className={page.demoNote}>Chiffres d’exemple de la démo.</p>
-          ) : null}
+          <p className={page.intro}>{t.costs.intro}</p>
+          {source.kind === 'demo' ? <p className={page.demoNote}>{t.costs.demoNote}</p> : null}
         </div>
         <SegmentedControl
-          aria-label="Période"
+          aria-label={t.costs.period}
           size="small"
           onChange={(index) => setPeriodIndex(index ?? 1)}
         >
           {PERIODS.map((entry, index) => (
-            <SegmentedControl.Button key={entry.days} selected={index === periodIndex}>
-              {entry.label}
+            <SegmentedControl.Button key={entry} selected={index === periodIndex}>
+              {t.costs.periods[entry]}
             </SegmentedControl.Button>
           ))}
         </SegmentedControl>
@@ -68,20 +60,20 @@ export function CostsPage() {
 
       <dl className={page.figures}>
         <div className={page.figure}>
-          <dt className={page.figureTerm}>Jetons</dt>
-          <dd className={page.figureValue}>{formatCompact(totalTokens)}</dd>
+          <dt className={page.figureTerm}>{t.costs.tokens}</dt>
+          <dd className={page.figureValue}>{fmt.compact(totalTokens)}</dd>
         </div>
         <div className={page.figure}>
-          <dt className={page.figureTerm}>Appels aux modèles</dt>
-          <dd className={page.figureValue}>{formatInteger(totalCalls)}</dd>
+          <dt className={page.figureTerm}>{t.costs.calls}</dt>
+          <dd className={page.figureValue}>{fmt.integer(totalCalls)}</dd>
         </div>
         <div className={page.figure}>
-          <dt className={page.figureTerm}>Réponses 429</dt>
-          <dd className={page.figureValue}>{formatInteger(totalRateLimited)}</dd>
+          <dt className={page.figureTerm}>{t.costs.rateLimited}</dt>
+          <dd className={page.figureValue}>{fmt.integer(totalRateLimited)}</dd>
         </div>
         <div className={page.figure}>
-          <dt className={page.figureTerm}>Coût estimé (abonnement Claude)</dt>
-          <dd className={page.figureValue}>{formatUsd(totalCost)}</dd>
+          <dt className={page.figureTerm}>{t.costs.cost}</dt>
+          <dd className={page.figureValue}>{fmt.usd(totalCost)}</dd>
         </div>
       </dl>
 
@@ -89,18 +81,18 @@ export function CostsPage() {
         <div className={page.grid}>
           <div className={page.panel}>
             <ColumnChart
-              title="Jetons par jour"
+              title={t.costs.tokensPerDay}
               data={daily}
-              formatValue={(value) => `${formatCompact(value)} jetons`}
-              formatTick={formatCompact}
+              formatValue={(value) => t.costs.tokensValue(fmt.compact(value))}
+              formatTick={fmt.compact}
             />
           </div>
           <div className={page.panel}>
             <ColumnChart
-              title="Réponses 429 par jour"
+              title={t.costs.rateLimitedPerDay}
               data={dailyLimited}
-              formatValue={(value) => `${formatInteger(value)} réponses 429`}
-              formatTick={(value) => formatInteger(Math.round(value))}
+              formatValue={(value) => t.costs.rateLimitedValue(value, fmt.integer(value))}
+              formatTick={(value) => fmt.integer(Math.round(value))}
             />
           </div>
         </div>
@@ -108,7 +100,7 @@ export function CostsPage() {
 
       <section className={page.section} aria-labelledby="models-title">
         <h2 id="models-title" className={page.sectionTitle}>
-          Par modèle
+          {t.costs.byModel}
         </h2>
         <div className={page.tableBox}>
           <Table
@@ -118,14 +110,14 @@ export function CostsPage() {
           >
             <Table.Head>
               <Table.Row>
-                <Table.Header>Modèle</Table.Header>
-                <Table.Header>Fournisseur</Table.Header>
-                <Table.Header align="end">Appels</Table.Header>
-                <Table.Header align="end">Entrée</Table.Header>
-                <Table.Header align="end">Sortie</Table.Header>
-                <Table.Header align="end">429</Table.Header>
-                <Table.Header align="end">Erreurs</Table.Header>
-                <Table.Header align="end">Coût</Table.Header>
+                <Table.Header>{t.costs.columns.model}</Table.Header>
+                <Table.Header>{t.costs.columns.provider}</Table.Header>
+                <Table.Header align="end">{t.costs.columns.calls}</Table.Header>
+                <Table.Header align="end">{t.costs.columns.input}</Table.Header>
+                <Table.Header align="end">{t.costs.columns.output}</Table.Header>
+                <Table.Header align="end">{t.costs.columns.rateLimited}</Table.Header>
+                <Table.Header align="end">{t.costs.columns.errors}</Table.Header>
+                <Table.Header align="end">{t.costs.columns.cost}</Table.Header>
               </Table.Row>
             </Table.Head>
             <Table.Body>
@@ -135,13 +127,13 @@ export function CostsPage() {
                     {row.model}
                   </Table.Cell>
                   <Table.Cell>{providerLabel(row.provider)}</Table.Cell>
-                  <Table.Cell align="end">{formatInteger(row.calls)}</Table.Cell>
-                  <Table.Cell align="end">{formatCompact(row.inputTokens)}</Table.Cell>
-                  <Table.Cell align="end">{formatCompact(row.outputTokens)}</Table.Cell>
-                  <Table.Cell align="end">{formatInteger(row.rateLimited)}</Table.Cell>
-                  <Table.Cell align="end">{formatInteger(row.errors)}</Table.Cell>
+                  <Table.Cell align="end">{fmt.integer(row.calls)}</Table.Cell>
+                  <Table.Cell align="end">{fmt.compact(row.inputTokens)}</Table.Cell>
+                  <Table.Cell align="end">{fmt.compact(row.outputTokens)}</Table.Cell>
+                  <Table.Cell align="end">{fmt.integer(row.rateLimited)}</Table.Cell>
+                  <Table.Cell align="end">{fmt.integer(row.errors)}</Table.Cell>
                   <Table.Cell align="end">
-                    {row.costUsd !== null ? formatUsd(row.costUsd) : 'gratuit'}
+                    {row.costUsd !== null ? fmt.usd(row.costUsd) : t.common.free}
                   </Table.Cell>
                 </Table.Row>
               ))}
@@ -154,13 +146,13 @@ export function CostsPage() {
       <section className={page.section}>
         <div className={page.panel}>
           <BarList
-            title="Jetons par agent"
+            title={t.costs.byAgent}
             data={usage.byProfile.map((row) => ({
               key: row.profile,
               label: row.profile,
               value: row.tokens,
             }))}
-            formatValue={formatCompact}
+            formatValue={fmt.compact}
           />
         </div>
       </section>

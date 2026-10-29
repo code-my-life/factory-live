@@ -1,8 +1,8 @@
 import { Label, Timeline } from '@primer/react';
 import { Link } from 'react-router';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { issuePath } from '../paths.ts';
 import { AgentAvatar } from '../agents/AgentAvatar.tsx';
-import { formatClock, formatDuration } from '../format.ts';
 import type { TimelineRow } from './rows.ts';
 import styles from './ActivityTimeline.module.css';
 
@@ -11,6 +11,7 @@ import styles from './ActivityTimeline.module.css';
  * (historique) : composant `Timeline` de Primer, badge coloré par l'état, avatar de l'agent.
  */
 export function ActivityTimeline({ rows, label }: { rows: readonly TimelineRow[]; label: string }) {
+  const { t, fmt } = useI18n();
   return (
     <Timeline clipSidebar className={styles.timeline} aria-label={label}>
       {rows.map((row) => {
@@ -31,11 +32,11 @@ export function ActivityTimeline({ rows, label }: { rows: readonly TimelineRow[]
                 <span className={styles.title}>{row.title}</span>
                 {row.running ? (
                   <Label variant="accent" size="small">
-                    en cours
+                    {t.activity.running}
                   </Label>
                 ) : null}
                 <time className={styles.time} dateTime={row.at}>
-                  {formatClock(row.at)}
+                  {fmt.clock(row.at)}
                 </time>
               </div>
               {row.detail ? <p className={styles.detail}>{row.detail}</p> : null}
@@ -48,7 +49,7 @@ export function ActivityTimeline({ rows, label }: { rows: readonly TimelineRow[]
                   ) : null}
                   {row.model ? <span className={styles.model}>{row.model}</span> : null}
                   {row.durationMs !== null ? (
-                    <span className={styles.duration}>{formatDuration(row.durationMs)}</span>
+                    <span className={styles.duration}>{fmt.duration(row.durationMs)}</span>
                   ) : null}
                 </p>
               ) : null}

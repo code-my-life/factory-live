@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { Table } from '@primer/react/experimental';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import styles from './charts.module.css';
 
 export interface ColumnDatum {
@@ -30,6 +31,7 @@ export function ColumnChart({
   formatValue: (value: number) => string;
   formatTick: (value: number) => string;
 }) {
+  const { t } = useI18n();
   const [active, setActive] = useState<number | null>(null);
   const titleId = useId();
   const max = niceMax(Math.max(...data.map((datum) => datum.value)));
@@ -73,7 +75,7 @@ export function ColumnChart({
                 <button
                   type="button"
                   className={styles.columnHit}
-                  aria-label={`${datum.label} : ${formatValue(datum.value)}`}
+                  aria-label={t.common.labelValue(datum.label, formatValue(datum.value))}
                   onPointerEnter={() => setActive(index)}
                   onFocus={() => setActive(index)}
                   onBlur={() => setActive(null)}
@@ -109,16 +111,16 @@ export function ColumnChart({
         <span>{data.at(-1)?.label}</span>
       </div>
       <details className={styles.tableToggle}>
-        <summary className={styles.tableSummary}>Voir le tableau</summary>
+        <summary className={styles.tableSummary}>{t.charts.showTable}</summary>
         <Table
           gridTemplateColumns="auto auto"
           cellPadding="condensed"
-          aria-label={`${title}, en tableau`}
+          aria-label={t.charts.asTable(title)}
         >
           <Table.Head>
             <Table.Row>
-              <Table.Header>Jour</Table.Header>
-              <Table.Header align="end">Valeur</Table.Header>
+              <Table.Header>{t.charts.day}</Table.Header>
+              <Table.Header align="end">{t.charts.value}</Table.Header>
             </Table.Row>
           </Table.Head>
           <Table.Body>

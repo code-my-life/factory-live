@@ -1,11 +1,11 @@
 import type { AgentActivity, CardView } from '@factory-live/contracts';
 import { CounterLabel } from '@primer/react';
 import { LayoutGroup } from 'motion/react';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { FlowLine } from '../../ui/flow/FlowLine.tsx';
 import type { LineStep } from '../../ui/flow/FlowLine.tsx';
 import type { FlowTone } from '../../ui/flow/FlowStop.tsx';
 import { useNow } from '../../ui/useNow.ts';
-import { CARD_KIND_LABEL } from '../../ui/vocabulary.ts';
 import { JobList } from '../../ui/work/JobBox.tsx';
 import { CardJob, KIND_ICON } from './CardJob.tsx';
 
@@ -55,10 +55,11 @@ export function IssueGraph({
   selectedCardId: string | null;
   onSelectCard: (cardId: string) => void;
 }) {
+  const { t } = useI18n();
   const now = useNow();
   const stages = cardStages(cards);
   const steps: LineStep[] = stages.map((stage, index) => {
-    const title = [...new Set(stage.map((card) => CARD_KIND_LABEL[card.kind]))].join(' · ');
+    const title = [...new Set(stage.map((card) => t.cardKind[card.kind]))].join(' · ');
     const following = stages[index + 1];
     return {
       id: stage[0]?.id ?? String(index),
@@ -68,13 +69,15 @@ export function IssueGraph({
       ...(stage.length > 1
         ? {
             aside: (
-              <CounterLabel aria-label={`${stage.length} cartes`}>{stage.length}</CounterLabel>
+              <CounterLabel aria-label={t.common.cardCount(stage.length)}>
+                {stage.length}
+              </CounterLabel>
             ),
           }
         : {}),
       flowing: following ? following.some((card) => card.status === 'running') : false,
       children: (
-        <JobList label={`Cartes : ${title}`}>
+        <JobList label={t.issue.cardsOf(title)}>
           {stage.map((card) => (
             <CardJob
               key={card.id}
@@ -91,7 +94,7 @@ export function IssueGraph({
   });
   return (
     <LayoutGroup id="cartes">
-      <FlowLine steps={steps} label="Graphe des cartes de l’issue" columnMin={12} />
+      <FlowLine steps={steps} label={t.issue.graph} columnMin={12} />
     </LayoutGroup>
   );
 }

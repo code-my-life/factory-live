@@ -1,11 +1,11 @@
 import type { AgentActivity } from '@factory-live/contracts';
 import { CommentDiscussionIcon, TerminalIcon, ToolsIcon } from '@primer/octicons-react';
 import { Link } from 'react-router';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import { issuePath } from '../../ui/paths.ts';
-import { AGENT_STATE_LABEL, STATION_LABEL } from '../../ui/vocabulary.ts';
 import styles from './line.module.css';
 
 const ACTION_ICON = { llm: CommentDiscussionIcon, tool: ToolsIcon, cli: TerminalIcon } as const;
@@ -29,15 +29,12 @@ export function LiveAgents({
   agents: readonly AgentActivity[];
   maxInProgress: number;
 }) {
+  const { t } = useI18n();
   const busy = agents
     .filter((agent) => agent.state !== 'idle')
     .sort((left, right) => ORDER[left.state] - ORDER[right.state]);
   if (busy.length === 0) {
-    return (
-      <p className={styles.quiet}>
-        Aucun agent au travail : la ligne attend une issue labellisée factory.
-      </p>
-    );
+    return <p className={styles.quiet}>{t.line.noAgent}</p>;
   }
   return (
     <ul className={styles.liveList}>
@@ -49,9 +46,9 @@ export function LiveAgents({
             <div className={styles.liveBody}>
               <p className={styles.liveHead}>
                 <span className={styles.liveName}>{agent.profile}</span>
-                <span className={styles.liveState}>{AGENT_STATE_LABEL[agent.state]}</span>
+                <span className={styles.liveState}>{t.agentState[agent.state]}</span>
                 <span className={styles.liveWhere}>
-                  {STATION_LABEL[agent.station]}
+                  {t.station[agent.station]}
                   {agent.issueKey ? (
                     <>
                       {' · '}
@@ -84,15 +81,13 @@ export function LiveAgents({
                   </span>
                 </p>
               ) : agent.state === 'queued' ? (
-                <p className={styles.liveAction}>
-                  Attend une place : {maxInProgress} cartes en cours au plus
-                </p>
+                <p className={styles.liveAction}>{t.common.waitingForSlot(maxInProgress)}</p>
               ) : null}
               {agent.model ? (
                 <p className={styles.liveModels}>
                   <ModelBadge model={agent.model} />
                   {agent.laneModel ? (
-                    <ModelBadge model={agent.laneModel} prefix="lane" emphasis />
+                    <ModelBadge model={agent.laneModel} prefix={t.common.lane} emphasis />
                   ) : null}
                 </p>
               ) : null}

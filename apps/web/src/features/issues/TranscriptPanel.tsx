@@ -10,19 +10,11 @@ import {
 import { SegmentedControl } from '@primer/react';
 import { useState } from 'react';
 import { useTranscripts } from '../../data/FactoryProvider.tsx';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
+import type { Messages } from '../../i18n/fr.ts';
 import { AnsiLog } from '../../ui/AnsiLog.tsx';
 import { Markdown } from '../../ui/Markdown.tsx';
-import { formatClock } from '../../ui/format.ts';
 import styles from './issues.module.css';
-
-const ROLE_LABEL: Record<TranscriptEntry['role'], string> = {
-  user: 'Consigne',
-  assistant: 'Réponse',
-  reasoning: 'Raisonnement',
-  tool_call: 'Appel d’outil',
-  tool_result: 'Résultat',
-  system: 'Session',
-};
 
 const ROLE_ICON = {
   user: PersonIcon,
@@ -36,25 +28,25 @@ const ROLE_ICON = {
 type ViewChoice =
   { kind: 'entries'; view: TranscriptView } | { kind: 'terminal'; view: TranscriptView };
 
-function choices(views: readonly TranscriptView[]): { label: string; choice: ViewChoice }[] {
+function choices(
+  views: readonly TranscriptView[],
+  t: Messages,
+): { label: string; choice: ViewChoice }[] {
   const result: { label: string; choice: ViewChoice }[] = [];
   for (const view of views) {
-    result.push({
-      label:
-        view.source === 'hermes'
-          ? 'Session Hermès'
-          : view.source === 'claude-code'
-            ? 'Claude Code'
-            : 'OpenCode',
-      choice: { kind: 'entries', view },
-    });
+    result.push({ label: t.transcript.source[view.source], choice: { kind: 'entries', view } });
   }
   const terminal = views.find((view) => view.terminal.length > 0);
-  if (terminal) result.push({ label: 'Terminal', choice: { kind: 'terminal', view: terminal } });
+  if (terminal)
+    result.push({
+      label: t.transcript.source.terminal,
+      choice: { kind: 'terminal', view: terminal },
+    });
   return result;
 }
 
 function Entry({ entry }: { entry: TranscriptEntry }) {
+  const { t, fmt } = useI18n();
   const Icon = ROLE_ICON[entry.role];
   const long = (entry.text?.length ?? 0) > 280 || (entry.text?.split('\n').length ?? 0) > 6;
   const body =
@@ -70,17 +62,17 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
       </span>
       <div className={styles.entryBody}>
         <p className={styles.entryHead}>
-          <span className={styles.entryRole}>{ROLE_LABEL[entry.role]}</span>
+          <span className={styles.entryRole}>{t.transcript.role[entry.role]}</span>
           {entry.toolName ? <code className={styles.entryTool}>{entry.toolName}</code> : null}
           {entry.model ? <span className={styles.entryModel}>{entry.model}</span> : null}
           <time className={styles.entryTime} dateTime={entry.at}>
-            {formatClock(entry.at)}
+            {fmt.clock(entry.at)}
           </time>
         </p>
         {long ? (
           <details className={styles.entryDetails}>
             <summary className={styles.entrySummary}>
-              Afficher en entier ({entry.text?.length ?? 0} caractères)
+              {t.transcript.showAll(fmt.integer(entry.text?.length ?? 0))}
             </summary>
             {body}
           </details>
@@ -94,22 +86,18 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
 
 /** Transcription intégrale d'un run, à la demande : session Hermès, lane CLI, ou log brut. */
 export function TranscriptPanel({ runId }: { runId: number }) {
+  const { t } = useI18n();
   const views = useTranscripts(runId);
   const [index, setIndex] = useState(0);
   if (!views || views.length === 0) {
-    return (
-      <p className={styles.muted}>
-        Transcription non conservée pour ce run : Hermès purge les sessions des cartes terminées
-        après 30 jours.
-      </p>
-    );
+    return <p className={styles.muted}>{t.transcript.notKept}</p>;
   }
-  const options = choices(views);
+  const options = choices(views, t);
   const current = options[Math.min(index, options.length - 1)];
   return (
     <div className={styles.transcript}>
       <SegmentedControl
-        aria-label="Source de la transcription"
+        aria-label={t.transcript.sourceLabel}
         size="small"
         onChange={(next) => setIndex(next ?? 0)}
       >
@@ -123,7 +111,7 @@ export function TranscriptPanel({ runId }: { runId: number }) {
         ))}
       </SegmentedControl>
       {current?.choice.kind === 'terminal' ? (
-        <AnsiLog lines={current.choice.view.terminal} label={`Log brut du run ${runId}`} />
+        <AnsiLog lines={current.choice.view.terminal} label={t.transcript.rawLog(runId)} />
       ) : current ? (
         <>
           <p className={styles.muted}>{current.choice.view.title}</p>
@@ -142,9 +130,7 @@ export function TranscriptPanel({ runId }: { runId: number }) {
           </div>
         </>
       ) : null}
-      <p className={styles.redaction}>
-        Les secrets (jetons, clés, mots de passe) sont masqués avant affichage.
-      </p>
+      <p className={styles.redaction}>{t.transcript.redaction}</p>
     </div>
   );
 }

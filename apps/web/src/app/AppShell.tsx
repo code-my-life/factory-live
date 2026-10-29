@@ -37,6 +37,8 @@ import {
   useLastUpdate,
   useSnapshot,
 } from '../data/FactoryProvider.tsx';
+import { useI18n } from '../i18n/I18nProvider.tsx';
+import type { Messages } from '../i18n/fr.ts';
 import { setAppBadge } from '../pwa/badge.ts';
 import { Elapsed } from '../ui/Elapsed.tsx';
 import { LiveDot } from '../ui/LiveDot.tsx';
@@ -45,22 +47,22 @@ import styles from './AppShell.module.css';
 
 interface Destination {
   to: string;
-  label: string;
+  label: keyof Messages['nav'];
   icon: Icon;
 }
 
 const PRIMARY: Destination[] = [
-  { to: '/', label: 'Ligne d’usine', icon: WorkflowIcon },
-  { to: '/issues', label: 'Issues', icon: IssueOpenedIcon },
-  { to: '/interventions', label: 'Interventions', icon: BellIcon },
-  { to: '/agents', label: 'Agents', icon: AgentIcon },
+  { to: '/', label: 'line', icon: WorkflowIcon },
+  { to: '/issues', label: 'issues', icon: IssueOpenedIcon },
+  { to: '/interventions', label: 'interventions', icon: BellIcon },
+  { to: '/agents', label: 'agents', icon: AgentIcon },
 ];
 
 const SECONDARY: Destination[] = [
-  { to: '/health', label: 'Santé', icon: PulseIcon },
-  { to: '/costs', label: 'Coûts et quotas', icon: GraphIcon },
-  { to: '/history', label: 'Historique et stats', icon: HistoryIcon },
-  { to: '/settings', label: 'Réglages', icon: GearIcon },
+  { to: '/health', label: 'health', icon: PulseIcon },
+  { to: '/costs', label: 'costs', icon: GraphIcon },
+  { to: '/history', label: 'history', icon: HistoryIcon },
+  { to: '/settings', label: 'settings', icon: GearIcon },
 ];
 
 function useIsCurrent(to: string): boolean {
@@ -75,6 +77,7 @@ function SideNavItem({
   destination: Destination;
   trailing?: ReactNode;
 }) {
+  const { t } = useI18n();
   const current = useIsCurrent(destination.to);
   const IconComponent = destination.icon;
   return (
@@ -82,7 +85,7 @@ function SideNavItem({
       <NavList.LeadingVisual>
         <IconComponent />
       </NavList.LeadingVisual>
-      {destination.label}
+      {t.nav[destination.label]}
       {trailing ? <NavList.TrailingVisual>{trailing}</NavList.TrailingVisual> : null}
     </NavList.Item>
   );
@@ -105,6 +108,7 @@ function FactoryLogo() {
 }
 
 export function AppShell() {
+  const { t } = useI18n();
   const snapshot = useSnapshot();
   const source = useFactorySource();
   const connection = useConnection();
@@ -135,11 +139,7 @@ export function AppShell() {
     <div>
       <header className={styles.header}>
         <div className={styles.headerInner}>
-          <Link
-            to="/"
-            className={styles.brand}
-            aria-label="factory-live, revenir à la ligne d’usine"
-          >
+          <Link to="/" className={styles.brand} aria-label={t.shell.home}>
             <FactoryLogo />
             <span className={styles.brandName}>factory-live</span>
           </Link>
@@ -147,21 +147,22 @@ export function AppShell() {
             {connection === 'lost' ? (
               <>
                 <LiveDot tone="danger" />
-                <span className={styles.statusText}>Hors ligne</span>
+                <span className={styles.statusText}>{t.shell.offline}</span>
                 <span className={styles.statusDetail}>
                   {lastUpdate !== null ? (
                     <>
-                      dernier état <Elapsed since={new Date(lastUpdate).toISOString()} mode="age" />
+                      {t.shell.lastState}{' '}
+                      <Elapsed since={new Date(lastUpdate).toISOString()} mode="age" />
                     </>
                   ) : (
-                    'factory-live injoignable'
+                    t.shell.unreachable
                   )}
                 </span>
               </>
             ) : connection === 'connecting' ? (
               <>
                 <LiveDot tone="muted" />
-                <span className={styles.statusText}>Connexion…</span>
+                <span className={styles.statusText}>{t.shell.connecting}</span>
               </>
             ) : (
               <>
@@ -169,24 +170,22 @@ export function AppShell() {
                   <>
                     <LiveDot tone="attention" />
                     <span className={styles.statusText}>
-                      En pause
-                      {snapshot.factory.pauseReason ? ` : ${snapshot.factory.pauseReason}` : ''}
+                      {t.shell.paused(snapshot.factory.pauseReason)}
                     </span>
                   </>
                 ) : snapshot.factory.live ? (
                   <>
                     <LiveDot tone="success" pulse />
-                    <span className={styles.statusText}>En direct</span>
+                    <span className={styles.statusText}>{t.shell.live}</span>
                   </>
                 ) : (
                   <>
                     <LiveDot tone="attention" />
-                    <span className={styles.statusText}>Factory muette</span>
+                    <span className={styles.statusText}>{t.shell.silent}</span>
                   </>
                 )}
                 <span className={styles.statusDetail}>
-                  {snapshot.factory.running} carte{snapshot.factory.running > 1 ? 's' : ''} en cours
-                  sur {snapshot.factory.maxInProgress}
+                  {t.shell.running(snapshot.factory.running, snapshot.factory.maxInProgress)}
                 </span>
               </>
             )}
@@ -194,11 +193,11 @@ export function AppShell() {
           <div className={styles.headerActions}>
             {source.kind === 'demo' ? (
               <span className={styles.demo}>
-                <Label variant="attention">Démo</Label>
+                <Label variant="attention">{t.shell.demo}</Label>
                 {source.restart ? (
                   <IconButton
                     icon={UndoIcon}
-                    aria-label="Rejouer le scénario de démonstration"
+                    aria-label={t.shell.replayDemo}
                     size="small"
                     variant="invisible"
                     onClick={() => source.restart?.()}
@@ -212,16 +211,16 @@ export function AppShell() {
               size="small"
               count={openInterventions}
               onClick={() => void navigate('/interventions')}
-              aria-label={`Interventions : ${openInterventions} en attente`}
+              aria-label={t.shell.interventionsWaiting(openInterventions)}
             >
-              <span className={styles.hideNarrow}>Interventions</span>
+              <span className={styles.hideNarrow}>{t.nav.interventions}</span>
             </Button>
           </div>
         </div>
       </header>
 
       <div className={styles.body}>
-        <nav className={styles.sidebar} aria-label="Navigation principale">
+        <nav className={styles.sidebar} aria-label={t.nav.main}>
           <div className={styles.sidebarInner}>
             <NavList>
               <SideNavItem destination={PRIMARY[0] as Destination} />
@@ -243,7 +242,7 @@ export function AppShell() {
                 destination={SECONDARY[0] as Destination}
                 trailing={
                   unhealthy > 0 ? (
-                    <LiveDot tone="attention" label={`${unhealthy} service à surveiller`} />
+                    <LiveDot tone="attention" label={t.shell.servicesToWatch(unhealthy)} />
                   ) : null
                 }
               />
@@ -251,7 +250,7 @@ export function AppShell() {
               <SideNavItem destination={SECONDARY[2] as Destination} />
               <SideNavItem destination={SECONDARY[3] as Destination} />
             </NavList>
-            <p className={styles.sidebarFoot}>Hermès 0.22.2 · board factory</p>
+            <p className={styles.sidebarFoot}>{t.shell.sidebarFoot}</p>
           </div>
         </nav>
 
@@ -262,7 +261,7 @@ export function AppShell() {
         </main>
       </div>
 
-      <nav className={styles.tabbar} aria-label="Navigation">
+      <nav className={styles.tabbar} aria-label={t.nav.tabs}>
         {PRIMARY.map((destination) => {
           const IconComponent = destination.icon;
           const badge =
@@ -279,7 +278,7 @@ export function AppShell() {
                 {badge !== null ? <span className={styles.tabBadge}>{badge}</span> : null}
               </span>
               <span className={styles.tabLabel}>
-                {destination.label.replace('Ligne d’usine', 'Ligne')}
+                {destination.label === 'line' ? t.nav.lineShort : t.nav[destination.label]}
               </span>
             </NavLink>
           );
@@ -296,7 +295,7 @@ export function AppShell() {
                 <KebabHorizontalIcon size={20} />
                 {unhealthy > 0 ? <span className={styles.tabDot} /> : null}
               </span>
-              <span className={styles.tabLabel}>Plus</span>
+              <span className={styles.tabLabel}>{t.nav.more}</span>
             </button>
           </ActionMenu.Anchor>
           {/* Au-dessus du bouton : la barre est fixée en bas de l'écran, et en dessous (dans la page),
@@ -313,7 +312,7 @@ export function AppShell() {
                     <ActionList.LeadingVisual>
                       <IconComponent />
                     </ActionList.LeadingVisual>
-                    {destination.label}
+                    {t.nav[destination.label]}
                   </ActionList.Item>
                 );
               })}

@@ -1,6 +1,8 @@
 import type { GitHubAccess } from '@factory-live/contracts';
 import { useState } from 'react';
+import { describeError } from '../../data/errors.ts';
 import { useFactorySource, useGitHubAccess } from '../../data/FactoryProvider.tsx';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { LiveDot } from '../../ui/LiveDot.tsx';
 import page from '../../ui/page.module.css';
 import { GitHubAccessPanel } from './GitHubAccessPanel.tsx';
@@ -63,18 +65,19 @@ export function DemoGitHubSection() {
  * connecter mènent aux pages du serveur puis à GitHub, qui ramène ici ; la déconnexion est une écriture.
  */
 export function LiveGitHubSection() {
+  const { t } = useI18n();
   const source = useFactorySource();
   const access = useGitHubAccess();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ cause: unknown } | null>(null);
   if (!access) {
     return (
       <section className={page.panel} aria-labelledby="github-title">
         <div className={styles.block}>
           <h2 id="github-title" className={page.sectionTitle}>
-            GitHub
+            {t.github.title}
           </h2>
           <p className={styles.state}>
-            <LiveDot tone="muted" /> Lecture de l’accès GitHub…
+            <LiveDot tone="muted" /> {t.github.reading}
           </p>
         </div>
       </section>
@@ -84,7 +87,7 @@ export function LiveGitHubSection() {
     <GitHubAccessPanel
       access={access}
       demo={false}
-      error={error}
+      error={error ? describeError(error.cause, t) : null}
       actions={{
         create: { href: access.setupUrl },
         install: { href: access.app?.installUrl ?? access.setupUrl },
@@ -92,9 +95,7 @@ export function LiveGitHubSection() {
         logout: {
           onClick: () => {
             setError(null);
-            source.logoutGitHub?.().catch((reason: unknown) => {
-              setError(reason instanceof Error ? reason.message : String(reason));
-            });
+            source.logoutGitHub?.().catch((cause: unknown) => setError({ cause }));
           },
         },
       }}
