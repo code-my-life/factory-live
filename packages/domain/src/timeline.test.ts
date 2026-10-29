@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { aRun, anEvent } from './fixtures.test-helpers.ts';
 import { message } from './messages.ts';
 import { timelineOf } from './timeline.ts';
-import type { Comment } from './timeline.ts';
+import type { Comment } from './hermes.ts';
 
 const CARD = 't_d6702099';
 const assignees = new Map([[CARD, 'gate']]);

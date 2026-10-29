@@ -1,18 +1,8 @@
-import type { BlockKind, Run, TaskEvent } from './hermes.ts';
+import type { BlockKind, Comment, Run, TaskEvent } from './hermes.ts';
 import { wasNudged } from './diagnosis/hermesText.ts';
 import { message } from './messages.ts';
 import type { Message, Text } from './messages.ts';
 import { redactSecrets } from './redact.ts';
-
-/** Commentaire d'une carte (`task_comments`). */
-export interface Comment {
-  id: number;
-  taskId: string;
-  author: string;
-  body: string;
-  /** Secondes epoch. */
-  createdAt: number;
-}
 
 export type Tone = 'neutral' | 'success' | 'attention' | 'danger' | 'done';
 

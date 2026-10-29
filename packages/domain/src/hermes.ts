@@ -69,9 +69,21 @@ export interface Link {
   childId: string;
 }
 
+/** Commentaire d'une carte (`task_comments`). */
+export interface Comment {
+  id: number;
+  taskId: string;
+  author: string;
+  body: string;
+  /** Secondes epoch. */
+  createdAt: number;
+}
+
 export interface Board {
   tasks: readonly Task[];
   runs: readonly Run[];
   events: readonly TaskEvent[];
   links: readonly Link[];
+  /** Commentaires des cartes : la gate scriptée de la factory y rend ses verdicts (`gate.ts`). */
+  comments?: readonly Comment[];
 }

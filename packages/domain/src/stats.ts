@@ -1,5 +1,7 @@
 import { cardKindOf, runRoleOf } from './cards.ts';
 import type { RunRole } from './cards.ts';
+import { reviewRequests, scriptedVerdicts } from './gateVerdicts.ts';
+import type { ScriptedVerdict } from './gateVerdicts.ts';
 import type { Board, Run, Task } from './hermes.ts';
 import { groupByIssue, issueStationOf } from './issues.ts';
 import type { Station } from './issues.ts';
@@ -57,6 +59,34 @@ function runsByTask(board: Board): Map<string, Run[]> {
 }
 
 /** Chaque demande de revue et le verdict de la gate qui a suivi (approuvé : `completed`, refusé : `changes_requested`). */
+/**
+ * Les tours jugés par la gate scriptée de la factory : chaque demande de revue avec le premier verdict qui la suit
+ * (un sha rejugé dans le même tour, après une mise à jour de la branche, ne compte pas deux fois).
+ */
+function scriptedReviews(board: Board): { request: Run; verdict: ScriptedVerdict }[] {
+  const tasks = new Map(board.tasks.map((task) => [task.id, task]));
+  const verdictsOf = new Map<string, ScriptedVerdict[]>();
+  for (const verdict of scriptedVerdicts(board.comments ?? [])) {
+    const list = verdictsOf.get(verdict.taskId);
+    if (list) list.push(verdict);
+    else verdictsOf.set(verdict.taskId, [verdict]);
+  }
+  const reviews: { request: Run; verdict: ScriptedVerdict }[] = [];
+  for (const [taskId, verdicts] of verdictsOf) {
+    const task = tasks.get(taskId);
+    if (!task || cardKindOf(task) !== 'impl') continue;
+    const requests = reviewRequests(board, taskId);
+    requests.forEach((request, index) => {
+      const asked = request.endedAt ?? request.startedAt;
+      const next = requests[index + 1];
+      const until = next ? (next.endedAt ?? next.startedAt) : Number.POSITIVE_INFINITY;
+      const verdict = verdicts.find((candidate) => candidate.at >= asked && candidate.at < until);
+      if (verdict) reviews.push({ request, verdict });
+    });
+  }
+  return reviews;
+}
+
 export function gateVerdicts(board: Board, since = 0): GateVerdict[] {
   const tasks = new Map(board.tasks.map((task) => [task.id, task]));
   const verdicts: GateVerdict[] = [];
@@ -86,6 +116,18 @@ export function gateVerdicts(board: Board, since = 0): GateVerdict[] {
       pending = null;
     }
   }
+  for (const { request, verdict } of scriptedReviews(board)) {
+    if (verdict.at < since) continue;
+    verdicts.push({
+      cardId: verdict.taskId,
+      implementerRunId: request.id,
+      implementer: request.profile,
+      harness: (text(request.metadata['harness']) ?? request.profile).split(' (')[0] as string,
+      claudeModel: text(request.metadata['claude_model']),
+      passed: verdict.passed,
+      at: verdict.at,
+    });
+  }
   return verdicts;
 }
 
@@ -101,6 +143,13 @@ export function stationMinutes(board: Board, since = 0): Map<Station, number[]> 
     const list = durations.get(station) ?? [];
     list.push((run.endedAt - run.startedAt) / 60);
     durations.set(station, list);
+  }
+  // La gate scriptée ne laisse pas de run : son temps va de la demande de revue au verdict (CI comprise).
+  for (const { request, verdict } of scriptedReviews(board)) {
+    if (verdict.at < since) continue;
+    const list = durations.get('gate') ?? [];
+    list.push((verdict.at - (request.endedAt ?? request.startedAt)) / 60);
+    durations.set('gate', list);
   }
   return durations;
 }

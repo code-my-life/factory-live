@@ -2,6 +2,7 @@
 export * from './activity.ts';
 export * from './cards.ts';
 export * from './diagnosis/index.ts';
+export * from './gateVerdicts.ts';
 export * from './hermes.ts';
 export * from './interventions.ts';
 export * from './issues.ts';
