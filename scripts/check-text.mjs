@@ -66,6 +66,14 @@ for (const file of files) {
   });
 }
 
+// Workflows GitHub Actions : des permissions en lecture par défaut, en tête de fichier ; un job qui
+// a besoin de plus (Pages : pages et id-token en écriture) le déclare lui-même.
+const workflows = [];
+for (const file of files.filter((name) => /^\.github\/workflows\/.+\.ya?ml$/.test(name))) {
+  if (!/^permissions:\s*\n\s+contents: read\s*$/m.test(readFileSync(file, 'utf8')))
+    workflows.push(`${file} (permissions: contents: read attendu en tête)`);
+}
+
 // Vocabulaire de l'interface : un concept, un mot (AGENTS.md). Un profil Hermès s'appelle « agent »
 // à l'écran ; on cherche hors commentaires dans le code de la PWA et dans les textes du serveur.
 const GLOSSARY = [{ pattern: /\bprofils?\b/i, word: 'agent' }];
@@ -83,7 +91,14 @@ for (const file of files.filter((name) => UI_SOURCES.test(name) && !/\.test\.tsx
   });
 }
 
-if (offenders.length > 0 || vocabulary.length > 0 || infrastructure.length > 0) {
+if (
+  offenders.length > 0 ||
+  vocabulary.length > 0 ||
+  infrastructure.length > 0 ||
+  workflows.length > 0
+) {
+  if (workflows.length > 0)
+    console.error(`Workflow sans permissions par défaut :\n${workflows.join('\n')}`);
   if (offenders.length > 0)
     console.error(`Tiret cadratin interdit (U+2014) :\n${offenders.join('\n')}`);
   if (infrastructure.length > 0)
@@ -95,5 +110,5 @@ if (offenders.length > 0 || vocabulary.length > 0 || infrastructure.length > 0) 
   process.exit(1);
 }
 console.log(
-  `check-text : ${files.length} fichiers, aucun tiret cadratin, vocabulaire de l'interface respecté, aucune valeur propre à ce PC.`,
+  `check-text : ${files.length} fichiers, aucun tiret cadratin, vocabulaire de l'interface respecté, aucune valeur propre à ce PC, workflows en lecture par défaut.`,
 );
