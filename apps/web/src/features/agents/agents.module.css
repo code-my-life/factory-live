@@ -167,6 +167,14 @@
   border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
 }
 
+/* Un intitulé qui passe sur deux lignes ne décale pas sa valeur : les valeurs s'alignent en bas. */
+.stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+}
+
 .statTerm {
   color: var(--fgColor-muted);
   font: var(--text-caption-shorthand);

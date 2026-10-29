@@ -182,11 +182,11 @@ function AgentProfileCard({
       </section>
 
       <dl className={styles.stats}>
-        <div>
+        <div className={styles.stat}>
           <dt className={styles.statTerm}>{t.agents.runs}</dt>
           <dd className={styles.statValue}>{profile.stats.runs}</dd>
         </div>
-        <div>
+        <div className={styles.stat}>
           <dt className={styles.statTerm}>{t.agents.gatePass}</dt>
           <dd className={styles.statValue}>
             {profile.stats.gatePassRate !== null
@@ -194,7 +194,7 @@ function AgentProfileCard({
               : t.agents.notApplicable}
           </dd>
         </div>
-        <div>
+        <div className={styles.stat}>
           <dt className={styles.statTerm}>{t.agents.medianDuration}</dt>
           <dd className={styles.statValue}>
             {profile.stats.medianRunMinutes !== null
@@ -202,7 +202,7 @@ function AgentProfileCard({
               : t.common.unknown}
           </dd>
         </div>
-        <div>
+        <div className={styles.stat}>
           <dt className={styles.statTerm}>{t.agents.cost}</dt>
           <dd className={styles.statValue}>
             {profile.stats.costUsd !== null ? fmt.usd(profile.stats.costUsd) : t.common.free}
