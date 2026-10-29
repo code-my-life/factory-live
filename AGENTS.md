@@ -34,7 +34,8 @@ Détails : `docs/ARCHITECTURE.md`. Exploitation : `docs/RUNBOOK.md`. Décisions 
 
 ## Règles de code
 
-- TypeScript strict. Imports relatifs avec l'extension `.ts` ou `.tsx`. Identifiants en anglais, textes d'interface et docs en français.
+- TypeScript strict. Imports relatifs avec l'extension `.ts` ou `.tsx`. Identifiants en anglais, docs en français, interface en français (langue source) et en anglais.
+- Textes, jamais en dur (ADR 0008) : un texte de l'interface s'écrit dans `apps/web/src/i18n/fr.ts` puis sous la même clé dans `en.ts` (la compilation refuse une clé absente) et se lit par `useI18n().t` ; un texte que le serveur ou le domaine fabrique devient un code du catalogue `Message` (`packages/contracts/src/messages.ts`), émis par `msg()` ou `message()` et écrit par la section `server` des deux dictionnaires. Ce qui vient d'ailleurs (agents, sonde, GitHub, scénario de démo) reste tel quel.
 - Aucun tiret cadratin, nulle part (`npm run check:text`).
 - Test d'abord : chaque règle ou correctif commence par un test qui échoue. Un adaptateur se teste sur des données réelles anonymisées (`fixtures/`).
 - Les adaptateurs Hermès lisent seulement : bases SQLite ouvertes en `readOnly`, aucune écriture dans `~/.hermes` (règle de lint dédiée).
