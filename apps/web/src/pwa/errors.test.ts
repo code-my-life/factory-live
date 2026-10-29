@@ -32,7 +32,7 @@ describe('reportClientErrors', () => {
     target.dispatchEvent(
       new ErrorEvent('error', {
         message: 'Script error.',
-        filename: 'https://desktop-gja56n4.tail40220c.ts.net:8446/assets/index-abc.js',
+        filename: 'https://machine.tailnet.ts.net:8446/assets/index-abc.js',
         lineno: 12,
         colno: 345,
       }),

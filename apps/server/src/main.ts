@@ -72,6 +72,7 @@ const hub = new Hub(
     owner: config.GITHUB_OWNER,
     boardName: config.HERMES_BOARD,
     dashboardUrl: config.DASHBOARD_URL,
+    addresses: config.addresses,
     heldAfterSeconds: config.HELD_AFTER_MINUTES * 60,
     keepFinishedMs: 24 * 3600_000,
   },

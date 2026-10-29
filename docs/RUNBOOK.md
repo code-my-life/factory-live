@@ -14,12 +14,25 @@ Le conteneur tourne en `restart: unless-stopped`, utilisateur 1000:1000, racine 
 
 ## Accès
 
-| Appareil             | Adresse                                                              |
-| -------------------- | -------------------------------------------------------------------- |
-| Ce PC (Windows, WSL) | `http://localhost:8446`                                              |
-| iPhone, Mac          | `https://desktop-gja56n4.tail40220c.ts.net:8446` (tailnet seulement) |
+| Appareil             | Adresse                                                                          |
+| -------------------- | -------------------------------------------------------------------------------- |
+| Ce PC (Windows, WSL) | `http://localhost:8446`                                                          |
+| iPhone, Mac          | l'adresse tailnet, `https://<machine>.<tailnet>.ts.net:8446` (tailnet seulement) |
 
-Exposition tailnet : `tailscale serve --bg --https=8446 http://127.0.0.1:8446` (depuis WSL). Jamais Funnel. L'adresse tailnet ne répond pas depuis ce PC lui-même : la tester depuis un autre appareil. Ports déjà pris sur le nœud : 443 Funnel vers 8644 (webhook GitHub), 8443 dashboard Hermès, 8444 graphes, 8445 freellmapi, 8446 factory-live.
+Exposition tailnet : `tailscale serve --bg --https=8446 http://127.0.0.1:8446` (depuis WSL). Jamais Funnel. L'adresse tailnet ne répond pas depuis ce PC lui-même : la tester depuis un autre appareil. Le nom tailnet réel de ce PC est dans `docker/.env` (section suivante).
+
+## Valeurs propres à ce PC (`docker/.env`)
+
+Le nom tailnet de ce PC, le login Tailscale autorisé à écrire et l'adresse du dashboard d'Hermès n'entrent jamais dans le dépôt, qui est public : leurs vraies valeurs sont dans `docker/.env`, ignoré par git, que compose lit à chaque `up`. Modèle commenté : `docker/.env.example`. Sans `docker/.env`, factory-live ne répond qu'à ce PC (`http://localhost:8446`) et n'accepte d'écriture que de lui.
+
+| Variable           | Rôle                                                                                                               | Forme                                                           |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `PUBLIC_ORIGINS`   | adresses de la PWA : ce PC, puis l'adresse tailnet (Réglages, « Installer l'app », retours de GitHub, hôtes admis) | `http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446` |
+| `TAILSCALE_LOGINS` | logins Tailscale autorisés à écrire depuis les autres appareils                                                    | `<login>@github`                                                |
+| `DASHBOARD_URL`    | dashboard d'Hermès, lien des interventions ; vide : pas de lien                                                    | `https://<machine>.<tailnet>.ts.net:<port>`                     |
+| `ALLOWED_HOSTS`    | hôtes acceptés en plus (`nom:port`), par exemple si le port publié change                                          | vide                                                            |
+
+Après un changement : `docker compose -f docker/compose.yaml up -d`. Le fichier ne s'affiche pas en entier (`grep -c` ou `cut -d= -f1` pour vérifier ses clés). `npm run check:text` refuse tout nom tailnet ou login Tailscale réel dans le dépôt : doc, tests et démo n'emploient que le gabarit ci-dessus, l'exemple fictif `machine.tailnet.ts.net` et `alice@github`.
 
 ## Installer l'app et activer les notifications
 
@@ -81,5 +94,5 @@ Jamais monté : `~/.hermes` en entier (son `.env` porte toutes les clés), `open
 | En-tête « Hors ligne » sur l'iPhone                   | hors du tailnet, ou conteneur arrêté                                                  | Tailscale actif sur l'iPhone ; `docker ps --filter name=factory-live`                                   |
 | Aucun push sur l'iPhone                               | app pas installée, permission refusée, mode Concentration                             | Réglages de l'app (elle dit ce qui manque) ; Réglages iOS, Notifications, factory-live                  |
 | Erreur du front sur un appareil                       | remontée au journal du serveur                                                        | `docker logs factory-live \| grep '"component":"client"'`                                               |
-| Écriture refusée (403) depuis l'iPhone                | login Tailscale différent de `cddev@github`                                           | `TAILSCALE_LOGINS` dans `docker/.env`, puis `up -d`                                                     |
+| Écriture refusée (403) depuis l'iPhone                | login Tailscale absent de `TAILSCALE_LOGINS`                                          | `TAILSCALE_LOGINS` dans `docker/.env`, puis `up -d`                                                     |
 | Réponse 421 « Hôte inconnu » (`host_refused`)         | adresse hors liste : port publié différent, autre nom que localhost ou le nom tailnet | ajouter `nom:port` à `ALLOWED_HOSTS` (ou l'origine à `PUBLIC_ORIGINS`) dans `docker/.env`, puis `up -d` |

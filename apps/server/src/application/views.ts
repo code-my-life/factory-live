@@ -45,7 +45,7 @@ export interface ViewDeps {
   files: CardFilesPort;
   owner: string;
   boardName: string;
-  dashboardUrl: string;
+  dashboardUrl: string | null;
   heldAfterSeconds: number;
   now: () => number;
 }

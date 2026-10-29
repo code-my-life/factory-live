@@ -16,7 +16,7 @@ Première version du plan refusée : un plugin qui écrivait un journal JSONL et
 
 ## Pourquoi
 
-Le sens WSL vers conteneur est déjà éprouvé (Hermès joint freellmapi sur 127.0.0.1:3001). Le sens inverse passe par Windows et casse après une veille.
+Le sens WSL vers conteneur est déjà éprouvé (Hermès joint freellmapi sur 127.0.0.1). Le sens inverse passe par Windows et casse après une veille.
 
 ## Conséquences
 

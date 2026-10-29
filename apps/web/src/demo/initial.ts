@@ -1395,6 +1395,8 @@ export function createInitialState(now: number): DemoState {
         },
       ],
       health: buildHealth(now),
+      // Exemple générique : la vraie adresse tailnet ne vit que dans la configuration du serveur.
+      addresses: { local: 'http://localhost:8446', tailnet: 'https://machine.tailnet.ts.net:8446' },
     },
     details,
     transcripts,

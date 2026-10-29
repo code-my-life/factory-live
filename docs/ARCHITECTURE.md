@@ -16,7 +16,7 @@ WSL (hôte)                                            Conteneur factory-live (D
 +-----------------------------------------+ seule     +--------------------------------------+
 tailscale serve https:8446 -> 127.0.0.1:8446          sortant : api.github.com, Web Push,
 Windows : http://localhost:8446                       freellmapi par le réseau Docker
-iPhone, Mac : https://desktop-gja56n4.tail40220c.ts.net:8446
+iPhone, Mac : https://<machine>.<tailnet>.ts.net:8446
 ```
 
 - Aucun composant n'écrit de fichier pour factory-live. Le direct arrive par HTTP (WSL vers conteneur, le sens déjà utilisé par Hermès vers freellmapi) ; l'état durable et le rattrapage après un redémarrage se lisent dans les bases natives d'Hermès, en lecture seule.

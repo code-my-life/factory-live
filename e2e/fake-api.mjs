@@ -61,6 +61,7 @@ function snapshot() {
     interventions: [],
     activity: [],
     health: [],
+    addresses: { local: 'http://localhost:8446', tailnet: 'https://machine.tailnet.ts.net:8446' },
   };
 }
 

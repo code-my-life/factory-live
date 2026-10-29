@@ -1,6 +1,7 @@
 import { msg } from '@factory-live/contracts';
 import type {
   ActivityEvent,
+  AppAddresses,
   Intervention,
   ProbeReport,
   Snapshot,
@@ -34,7 +35,10 @@ import type {
 export interface HubOptions {
   owner: string;
   boardName: string;
-  dashboardUrl: string;
+  /** Dashboard d'Hermès (lien des interventions) ; `null` : pas de lien. */
+  dashboardUrl: string | null;
+  /** Où ouvrir l'app, d'après la configuration (Réglages). */
+  addresses: AppAddresses;
   heldAfterSeconds: number;
   keepFinishedMs: number;
 }
@@ -450,6 +454,7 @@ export class Hub {
       interventions: board.interventions,
       activity: this.activity.slice(-100),
       health: health.health,
+      addresses: this.options.addresses,
     };
   }
 

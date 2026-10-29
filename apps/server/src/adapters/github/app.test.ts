@@ -6,7 +6,7 @@ import type { AppCredentials, GitHubAuthStore, UserTokens } from './app.ts';
 
 const NOW = Date.parse('2026-10-28T18:00:00Z');
 const LOCAL = 'http://localhost:8446';
-const TAILNET = 'https://desktop-gja56n4.tail40220c.ts.net:8446';
+const TAILNET = 'https://machine.tailnet.ts.net:8446';
 const TOKEN_URL = 'POST https://github.com/login/oauth/access_token';
 const INSTALLATION_URL = 'GET https://api.github.com/orgs/code-my-life/installation';
 const ACCESS_TOKENS_URL = 'POST https://api.github.com/app/installations/99/access_tokens';

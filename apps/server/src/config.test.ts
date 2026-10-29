@@ -31,3 +31,32 @@ describe('configuration, hôtes autorisés (contrôle contre le DNS rebinding)',
     expect(() => loadConfig({ ...BASE, PUBLIC_ORIGINS: 'pas-une-url' })).toThrow();
   });
 });
+
+describe('configuration, valeurs propres à ce PC (docker/.env, jamais dans le dépôt)', () => {
+  it('sans rien de configuré : ce PC seulement, ni adresse tailnet, ni login Tailscale, ni dashboard', () => {
+    const config = loadConfig(BASE);
+    expect(config.PUBLIC_ORIGINS).toEqual(['http://localhost:8446']);
+    expect(config.addresses).toEqual({ local: 'http://localhost:8446', tailnet: null });
+    expect(config.TAILSCALE_LOGINS).toEqual([]);
+    expect(config.DASHBOARD_URL).toBeNull();
+  });
+
+  it('l’adresse tailnet, le login Tailscale et le dashboard viennent de la configuration', () => {
+    const config = loadConfig({
+      ...BASE,
+      PUBLIC_ORIGINS: 'http://localhost:8446,https://machine.tailnet.ts.net:8446',
+      DASHBOARD_URL: 'https://machine.tailnet.ts.net:9443',
+      TAILSCALE_LOGINS: 'alice@github',
+    });
+    expect(config.addresses).toEqual({
+      local: 'http://localhost:8446',
+      tailnet: 'https://machine.tailnet.ts.net:8446',
+    });
+    expect(config.DASHBOARD_URL).toBe('https://machine.tailnet.ts.net:9443');
+    expect(config.TAILSCALE_LOGINS).toEqual(['alice@github']);
+  });
+
+  it('un DASHBOARD_URL vide, comme le passe compose sans valeur, ne fait pas de lien', () => {
+    expect(loadConfig({ ...BASE, DASHBOARD_URL: '' }).DASHBOARD_URL).toBeNull();
+  });
+});

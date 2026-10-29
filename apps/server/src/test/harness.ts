@@ -16,7 +16,7 @@ import { StreamBuffer } from '../http/stream.ts';
 import { Hub } from '../application/hub.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
 import { createLogger } from '../logger.ts';
-import { allowedHosts } from '../config.ts';
+import { allowedHosts, appAddresses } from '../config.ts';
 import { appPem } from './github-fixtures.ts';
 import { insertEvent, insertRun, insertTask, kanbanDb, tempDir } from './hermes-fixtures.ts';
 import type { TempDir } from './hermes-fixtures.ts';
@@ -24,7 +24,7 @@ import type { TempDir } from './hermes-fixtures.ts';
 export const SECRET = 'secret-de-test';
 export const NOW = Date.parse('2026-10-28T18:00:00Z');
 export const NOW_S = Math.floor(NOW / 1000);
-export const ORIGINS = ['http://localhost:8446', 'https://desktop-gja56n4.tail40220c.ts.net:8446'];
+export const ORIGINS = ['http://localhost:8446', 'https://machine.tailnet.ts.net:8446'];
 
 export interface Harness {
   dir: TempDir;
@@ -201,7 +201,8 @@ export function harness(
     {
       owner: 'code-my-life',
       boardName: 'factory',
-      dashboardUrl: 'https://desktop-gja56n4.tail40220c.ts.net:8443',
+      dashboardUrl: 'https://machine.tailnet.ts.net:9443',
+      addresses: appAddresses(ORIGINS, 8446),
       heldAfterSeconds: 1_800,
       keepFinishedMs: 86_400_000,
     },
@@ -245,7 +246,7 @@ export function harness(
       files: new CardFiles(boardDir, join(dir.path, 'claude-projects')),
       owner: 'code-my-life',
       boardName: 'factory',
-      dashboardUrl: 'https://desktop-gja56n4.tail40220c.ts.net:8443',
+      dashboardUrl: 'https://machine.tailnet.ts.net:9443',
       heldAfterSeconds: 1_800,
       now,
     },
@@ -255,7 +256,7 @@ export function harness(
     hookSecret: SECRET,
     origins: ORIGINS,
     allowedHosts: allowedHosts(8446, ORIGINS),
-    tailscaleLogins: ['cddev@github'],
+    tailscaleLogins: ['alice@github'],
     webDist: null,
     ...(options.streamPingMs ? { streamPingMs: options.streamPingMs } : {}),
     log,

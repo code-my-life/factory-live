@@ -9,7 +9,7 @@ const ctx: InterventionContext = {
   now: 100_000,
   board: 'factory',
   owner: 'code-my-life',
-  dashboardUrl: 'https://desktop-gja56n4.tail40220c.ts.net:8443',
+  dashboardUrl: 'https://machine.tailnet.ts.net:9443',
   heldAfterSeconds: 1_800,
 };
 
@@ -148,6 +148,28 @@ describe('interventionsOf', () => {
     expect(found?.actions.map((action) => action.kind !== 'unblock' && action.label)).toEqual([
       message('intervention.action.dashboard'),
       message('intervention.action.showCard'),
+    ]);
+  });
+
+  it('sans dashboard configuré, la boucle de blocage ne propose que la commande à copier', () => {
+    const task = aTask({ id: 't_b', title: 'impl cv-site#49 : filtres', status: 'triage' });
+    const events = [
+      anEvent({
+        taskId: 't_b',
+        kind: 'block_loop_detected',
+        payload: { recurrences: 2, limit: 2 },
+      }),
+    ];
+    const [found] = interventionsOf(
+      { tasks: [task], runs: [], events, links: [] },
+      { ...ctx, dashboardUrl: null },
+    );
+    expect(found?.actions).toEqual([
+      {
+        kind: 'copy',
+        label: message('intervention.action.showCard'),
+        command: 'hermes kanban --board factory show t_b',
+      },
     ]);
   });
 

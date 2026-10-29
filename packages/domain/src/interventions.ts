@@ -71,7 +71,8 @@ export interface InterventionContext {
   now: number;
   board: string;
   owner: string;
-  dashboardUrl: string;
+  /** Dashboard d'Hermès ; `null` quand il n'est pas configuré : pas de lien vers lui. */
+  dashboardUrl: string | null;
   heldAfterSeconds: number;
 }
 
@@ -287,11 +288,15 @@ export function interventionsOf(board: Board, ctx: InterventionContext): Interve
           title: message('intervention.title.triageLoop'),
           question: message('intervention.question.triageLoop'),
           actions: [
-            {
-              kind: 'link',
-              label: message('intervention.action.dashboard'),
-              url: ctx.dashboardUrl,
-            },
+            ...(ctx.dashboardUrl
+              ? [
+                  {
+                    kind: 'link' as const,
+                    label: message('intervention.action.dashboard'),
+                    url: ctx.dashboardUrl,
+                  },
+                ]
+              : []),
             {
               kind: 'copy',
               label: message('intervention.action.showCard'),

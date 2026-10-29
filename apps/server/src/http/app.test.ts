@@ -73,8 +73,8 @@ async function refusal(response: Response): Promise<[number, string | undefined]
 }
 
 const TAILNET = {
-  host: 'desktop-gja56n4.tail40220c.ts.net:8446',
-  origin: 'https://desktop-gja56n4.tail40220c.ts.net:8446',
+  host: 'machine.tailnet.ts.net:8446',
+  origin: 'https://machine.tailnet.ts.net:8446',
   'x-factory-live': '1',
   'content-type': 'application/json',
 };
@@ -115,6 +115,13 @@ describe('instantané', () => {
       'release',
     ]);
     expect(data.factory).toMatchObject({ maxInProgress: 2, running: 0, paused: false });
+  });
+
+  it('dit où ouvrir l’app : ce PC et l’adresse tailnet de la configuration', async () => {
+    expect((await snapshot()).addresses).toEqual({
+      local: 'http://localhost:8446',
+      tailnet: 'https://machine.tailnet.ts.net:8446',
+    });
   });
 });
 
@@ -369,7 +376,7 @@ describe('déblocage depuis l’app', () => {
       'write_local_only',
     ]);
     expect(h.github.calls.filter((call) => call.method === 'POST')).toHaveLength(0);
-    expect((await post({ ...TAILNET, 'tailscale-user-login': 'cddev@github' })).status).toBe(200);
+    expect((await post({ ...TAILNET, 'tailscale-user-login': 'alice@github' })).status).toBe(200);
   });
 
   it('refuse une réponse vide et une intervention inconnue, avec un code que la PWA écrit dans sa langue', async () => {
@@ -536,7 +543,7 @@ describe('notifications', () => {
       (
         await h.app.request('/api/push/subscribe', {
           method: 'POST',
-          headers: { ...TAILNET, 'tailscale-user-login': 'cddev@github' },
+          headers: { ...TAILNET, 'tailscale-user-login': 'alice@github' },
           body: JSON.stringify(subscription),
         })
       ).status,
@@ -558,7 +565,7 @@ describe('notifications', () => {
 
 describe('GitHub App et connexion de Clément', () => {
   const NAV = { host: 'localhost:8446' };
-  const TAILNET_HOST = 'desktop-gja56n4.tail40220c.ts.net:8446';
+  const TAILNET_HOST = 'machine.tailnet.ts.net:8446';
   const decode = (html: string) =>
     html.replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)));
   const status = async () =>
@@ -670,7 +677,7 @@ describe('GitHub App et connexion de Clément', () => {
     ).toBe(403);
     const tailnet = await get({
       host: TAILNET_HOST,
-      'tailscale-user-login': 'cddev@github',
+      'tailscale-user-login': 'alice@github',
       'x-forwarded-for': '100.64.0.7',
     });
     expect(tailnet.status).toBe(200);

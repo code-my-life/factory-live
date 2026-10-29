@@ -776,6 +776,8 @@ export const fr = {
     /** Les deux adresses de l'app : `local` sur ce PC, `tailnet` depuis les autres appareils. */
     installOpen: (local: string, tailnet: string) =>
       `Ouvre ${local} sur ce PC, ${tailnet} sur tes autres appareils du tailnet, puis :`,
+    /** Sans adresse tailnet configurée sur le serveur : seulement celle de ce PC. */
+    installOpenLocal: (local: string) => `Ouvre ${local} sur ce PC, puis :`,
     installSteps: {
       computer: {
         device: 'Ordinateur',

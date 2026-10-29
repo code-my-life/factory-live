@@ -9,18 +9,26 @@ import type { FactoryDataSource } from '../../data/source.ts';
 import { I18nProvider } from '../../i18n/I18nProvider.tsx';
 import { SettingsPage } from './SettingsPage.tsx';
 
-const snapshot = { health: [] } as unknown as Snapshot;
-const source = {
-  kind: 'demo',
-  subscribe: () => () => undefined,
-  getSnapshot: () => snapshot,
-} as unknown as FactoryDataSource;
+/** Les adresses de l'app viennent de l'instantané : le serveur les tire de sa configuration. */
+const ADDRESSES: Snapshot['addresses'] = {
+  local: 'http://localhost:8446',
+  tailnet: 'https://machine.tailnet.ts.net:8446',
+};
 
-function renderSettings() {
+function sourceWith(addresses: Snapshot['addresses']): FactoryDataSource {
+  const snapshot = { health: [], addresses } as unknown as Snapshot;
+  return {
+    kind: 'demo',
+    subscribe: () => () => undefined,
+    getSnapshot: () => snapshot,
+  } as unknown as FactoryDataSource;
+}
+
+function renderSettings(addresses: Snapshot['addresses'] = ADDRESSES) {
   return render(
     <I18nProvider>
       <ColorModeProvider>
-        <FactoryProvider source={source}>
+        <FactoryProvider source={sourceWith(addresses)}>
           <MemoryRouter>
             <SettingsPage />
           </MemoryRouter>
@@ -100,13 +108,32 @@ describe('Réglages, installer l’app', () => {
     );
     expect(section).toHaveTextContent('http://localhost:8446 sur ce PC');
     expect(section).toHaveTextContent(
-      'https://desktop-gja56n4.tail40220c.ts.net:8446 sur tes autres appareils',
+      'https://machine.tailnet.ts.net:8446 sur tes autres appareils',
     );
     expect(steps(section)).toEqual([
       'Ordinateur : dans Chrome ou Edge, Installer l’application.',
       'Android : dans Chrome, menu, Installer l’application. Les notifications marchent dès le navigateur.',
       'iPhone ou iPad : dans Safari, Partager, Sur l’écran d’accueil, puis ouvre l’app pour activer les notifications (iOS 16.4 ou plus).',
     ]);
+  });
+
+  it('montre l’adresse tailnet que donne le serveur, pas une valeur écrite dans l’app', () => {
+    browserLanguage('fr-FR');
+    renderSettings({
+      local: 'http://localhost:8446',
+      tailnet: 'https://machine.tailnet.ts.net:9446',
+    });
+    expect(screen.getByRole('region', { name: 'Installer l’app' })).toHaveTextContent(
+      'Ouvre http://localhost:8446 sur ce PC, https://machine.tailnet.ts.net:9446 sur tes autres appareils du tailnet, puis :',
+    );
+  });
+
+  it('sans adresse tailnet configurée, ne parle que de ce PC', () => {
+    browserLanguage('fr-FR');
+    renderSettings({ local: 'http://localhost:8446', tailnet: null });
+    const section = screen.getByRole('region', { name: 'Installer l’app' });
+    expect(section).toHaveTextContent('Ouvre http://localhost:8446 sur ce PC, puis :');
+    expect(section).not.toHaveTextContent('tailnet');
   });
 
   it('dit la même chose en anglais', () => {
@@ -117,13 +144,19 @@ describe('Réglages, installer l’app', () => {
       'factory-live is a PWA: you install it from the browser, no app store needed.',
     );
     expect(section).toHaveTextContent('http://localhost:8446 on this PC');
-    expect(section).toHaveTextContent(
-      'https://desktop-gja56n4.tail40220c.ts.net:8446 on your other devices',
-    );
+    expect(section).toHaveTextContent('https://machine.tailnet.ts.net:8446 on your other devices');
     expect(steps(section)).toEqual([
       'Computer: in Chrome or Edge, Install app.',
       'Android: in Chrome, menu, Install app. Notifications work right in the browser.',
       'iPhone or iPad: in Safari, Share, Add to Home Screen, then open the app to turn on notifications (iOS 16.4 or later).',
     ]);
+  });
+
+  it('en anglais aussi, sans adresse tailnet, ne parle que de ce PC', () => {
+    browserLanguage('en-US');
+    renderSettings({ local: 'http://localhost:8446', tailnet: null });
+    const section = screen.getByRole('region', { name: 'Install the app' });
+    expect(section).toHaveTextContent('Open http://localhost:8446 on this PC, then:');
+    expect(section).not.toHaveTextContent('tailnet');
   });
 });

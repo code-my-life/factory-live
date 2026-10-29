@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
+import type { AppAddresses } from '@factory-live/contracts';
 import { z } from 'zod';
 
 const list = (fallback = '') =>
@@ -62,7 +63,11 @@ const Env = z.object({
   PUBLIC_ORIGINS: urls,
   /** Hôtes autorisés en plus de ce PC et des origines publiques (port publié différent, autre nom). */
   ALLOWED_HOSTS: list(),
-  DASHBOARD_URL: z.url().default('https://desktop-gja56n4.tail40220c.ts.net:8443'),
+  /** Adresse tailnet du dashboard d'Hermès, pour le lien des interventions (docker/.env) ; vide : pas de lien. */
+  DASHBOARD_URL: z
+    .union([z.literal(''), z.url()])
+    .default('')
+    .transform((value) => value || null),
   FREELLMAPI_URL: z.string().default(''),
   HELD_AFTER_MINUTES: z.coerce.number().int().positive().default(30),
   /** Contact exigé par Web Push (claim `sub`) : l'URL du dépôt plutôt qu'une adresse e-mail. */
@@ -78,6 +83,8 @@ export interface Secrets {
 export type Config = z.infer<typeof Env> & {
   /** Valeurs de l'en-tête `Host` acceptées (`allowedHosts`). */
   allowedHosts: string[];
+  /** Où ouvrir l'app, d'après les origines publiques (`appAddresses`). */
+  addresses: AppAddresses;
   boardDir: string;
   kanbanDb: string;
   profilesDir: string;
@@ -114,6 +121,19 @@ export function allowedHosts(
   return [...new Set(hosts)];
 }
 
+/**
+ * Où ouvrir l'app : sur ce PC, la première origine publique locale ; depuis les autres appareils, la
+ * première qui ne l'est pas (le nom tailnet de docker/.env), ou rien.
+ */
+export function appAddresses(origins: readonly string[], port: number): AppAddresses {
+  const onThisPc = (origin: string) =>
+    (LOOPBACK as readonly string[]).includes(new URL(origin).hostname);
+  return {
+    local: origins.find(onThisPc) ?? `http://localhost:${port}`,
+    tailnet: origins.find((origin) => !onThisPc(origin)) ?? null,
+  };
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = Env.parse(env);
   const boardDir = join(parsed.HERMES_HOME, 'kanban', 'boards', parsed.HERMES_BOARD);
@@ -123,6 +143,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     ...parsed,
     PUBLIC_ORIGINS: origins,
     allowedHosts: allowedHosts(parsed.PORT, origins, parsed.ALLOWED_HOSTS),
+    addresses: appAddresses(origins, parsed.PORT),
     boardDir,
     kanbanDb: join(boardDir, 'kanban.db'),
     profilesDir: join(parsed.HERMES_HOME, 'profiles'),

@@ -709,6 +709,7 @@ export const en: Messages = {
     installIntro: 'factory-live is a PWA: you install it from the browser, no app store needed.',
     installOpen: (local, tailnet) =>
       `Open ${local} on this PC, ${tailnet} on your other devices on the tailnet, then:`,
+    installOpenLocal: (local) => `Open ${local} on this PC, then:`,
     installSteps: {
       computer: {
         device: 'Computer',

@@ -26,6 +26,16 @@ export const SideCard = z.object({
 });
 export type SideCard = z.infer<typeof SideCard>;
 
+/**
+ * Où ouvrir l'app (Réglages, « Installer l'app ») : sur ce PC, et depuis les autres appareils du tailnet.
+ * Le serveur les tire de sa configuration (docker/.env) ; `tailnet` vaut `null` s'il n'en a pas.
+ */
+export const AppAddresses = z.object({
+  local: z.url(),
+  tailnet: z.url().nullable(),
+});
+export type AppAddresses = z.infer<typeof AppAddresses>;
+
 /** Tout ce qu'il faut pour dessiner l'accueil, en un seul envoi. */
 export const Snapshot = z.object({
   generatedAt: Timestamp,
@@ -37,5 +47,6 @@ export const Snapshot = z.object({
   interventions: z.array(Intervention),
   activity: z.array(ActivityEvent),
   health: z.array(ServiceHealth),
+  addresses: AppAddresses,
 });
 export type Snapshot = z.infer<typeof Snapshot>;
