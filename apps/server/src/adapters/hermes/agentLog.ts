@@ -91,6 +91,9 @@ export function zonedEpoch(
   return (chosen + millis) / 1000;
 }
 
+/** Les sessions d'un agent ouvertes à un instant (secondes epoch), d'après les sessions d'Hermès. */
+export type ActiveSessions = (profile: string, at: number) => readonly string[] | null;
+
 interface FileCache {
   inode: number;
   /** Octets déjà lus ; une ligne inachevée attend la suite dans `pending`. */
@@ -107,16 +110,41 @@ interface FileCache {
  * Le journal d'Hermès de chaque agent (`logs/agent.log`, puis `agent.log.1` après rotation), lu à la
  * demande et par morceaux : seules les lignes que le diagnostic sait lire sont gardées, datées dans le
  * fuseau de la machine (`HERMES_TZ`). Une relecture reprend où la précédente s'était arrêtée ; un
- * fichier remplacé (rotation) ou raccourci est relu depuis le début.
+ * fichier remplacé (rotation) ou raccourci est relu depuis le début. Une ligne sans session prend
+ * celle de l'appel d'outil qui la suit de près, sinon la seule session ouverte de l'agent à ce moment.
  */
 export class AgentLogReader implements AgentLogPort {
   private readonly paths: HermesPaths;
   private readonly timeZone: string;
+  private readonly activeSessions: ActiveSessions | null;
   private readonly files = new Map<string, FileCache>();
+  /** Session rattachée après coup à une ligne qui n'en nommait pas ; `null` : aucune ou plusieurs. */
+  private readonly attached = new WeakMap<LogFact, string | null>();
 
-  constructor(paths: HermesPaths, timeZone: string) {
+  constructor(paths: HermesPaths, timeZone: string, activeSessions: ActiveSessions | null = null) {
     this.paths = paths;
     this.timeZone = timeZone;
+    this.activeSessions = activeSessions;
+  }
+
+  /** La seule session de l'agent ouverte à l'heure de la ligne ; plusieurs ou aucune : on ne devine pas. */
+  private attach(profile: string, fact: LogFact): LogFact {
+    if (fact.sessionId || !this.activeSessions) return fact;
+    let session = this.attached.get(fact);
+    if (session === undefined) {
+      const open = this.openSessions(profile, fact.at);
+      session = open?.length === 1 ? (open[0] ?? null) : null;
+      this.attached.set(fact, session);
+    }
+    return session ? { ...fact, sessionId: session } : fact;
+  }
+
+  private openSessions(profile: string, at: number): readonly string[] | null {
+    try {
+      return this.activeSessions?.(profile, at) ?? null;
+    } catch {
+      return null;
+    }
   }
 
   facts(profile: string, from: number, to: number): LogFact[] | null {
@@ -127,7 +155,7 @@ export class AgentLogReader implements AgentLogPort {
       const cache = this.read(path);
       // Les dernières lignes sans session comptent aussi : l'agent peut s'être arrêté juste après.
       for (const fact of [...(cache?.facts ?? []), ...(cache?.orphans ?? [])])
-        if (fact.at >= from && fact.at <= to) facts.push(fact);
+        if (fact.at >= from && fact.at <= to) facts.push(this.attach(profile, fact));
     }
     return facts.sort((left, right) => left.at - right.at);
   }

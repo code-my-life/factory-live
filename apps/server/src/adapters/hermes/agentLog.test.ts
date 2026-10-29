@@ -101,6 +101,39 @@ describe('AgentLogReader', () => {
     ]);
   });
 
+  it('à défaut, rattache une ligne sans session à la seule session ouverte de l’agent', () => {
+    const bare = (time: string) =>
+      `2026-10-29 ${time},000 WARNING hermes_cli.plugins: Hook 'pre_tool_call' callback guard timed out after 30s \u2014 skipping`;
+    writeFileSync(
+      join(logs, 'agent.log'),
+      `${bare('09:00:00')}\n${bare('10:00:00')}\n${bare('11:00:00')}\n`,
+    );
+    const nine = Date.parse('2026-10-29T08:00:00Z') / 1000;
+    const ten = Date.parse('2026-10-29T09:00:00Z') / 1000;
+    const asked: number[] = [];
+    const withSessions = new AgentLogReader(
+      new HermesPaths({
+        profilesDir: join(dir.path, 'profiles'),
+        boardDir: join(dir.path, 'board'),
+        factoryRepo: join(dir.path, 'factory'),
+      }),
+      PARIS,
+      (profile, at) => {
+        asked.push(at);
+        // Une seule session à 9 h, deux à 10 h, aucune à 11 h : on ne devine jamais.
+        return profile !== 'coder' ? null : at === nine ? [SESSION] : at === ten ? ['a', 'b'] : [];
+      },
+    );
+    expect(withSessions.facts('coder', ...ALL)?.map((fact) => fact.sessionId)).toEqual([
+      SESSION,
+      null,
+      null,
+    ]);
+    // La réponse est gardée : relire le journal ne réinterroge pas les sessions.
+    withSessions.facts('coder', ...ALL);
+    expect(asked).toHaveLength(3);
+  });
+
   it('rend null quand l’agent n’a pas de journal', () => {
     expect(reader.facts('inconnu', ...ALL)).toBeNull();
     expect(reader.facts('../coder', ...ALL)).toBeNull();

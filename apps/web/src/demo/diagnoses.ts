@@ -323,6 +323,157 @@ export function heldDiagnosis(
   };
 }
 
+/**
+ * Une boucle de refus, sur le modèle de claude-cockpit#42 (2026-10-19) : la preuve par sabotage est
+ * refusée par coder-guard, l'agent redemande la revue 65 fois au lieu de corriger, épuise ses tours,
+ * puis bloque en accusant l'outillage. La cause est le refus répété, pas l'infrastructure.
+ */
+export const REFUSAL_LOOP = {
+  runs: { budget: 194, blocked: 196 },
+  sessions: { budget: '20261029_142214_7c1e0a', blocked: '20261029_160052_9d4b21' },
+  refusal: 'PR de tests, revue refusée (factory-author-proof 1bis) :',
+} as const;
+
+export function refusalLoopDiagnosis({ ago }: IncidentClock, openedSecondsAgo: number): Diagnosis {
+  const { runs, sessions, refusal } = REFUSAL_LOOP;
+  return {
+    computedAt: ago(openedSecondsAgo - 3),
+    episode: { from: ago(openedSecondsAgo + 140 * 60), runIds: [runs.budget, runs.blocked] },
+    primary: {
+      code: 'refusal_loop',
+      confidence: 'certain',
+      actor: 'you_answer',
+      cause: { state: 'none' },
+      summary: msg('diagnosis.summary.refusalLoop', { plugin: 'coder-guard', count: 65 }),
+      why: msg('diagnosis.why.refusalLoop', { plugin: 'coder-guard', count: 65 }),
+      subject: { profile: 'coder', plugin: 'coder-guard', tool: 'kanban_request_review' },
+      setting: null,
+      evidence: [
+        {
+          source: 'transcript',
+          at: ago(openedSecondsAgo + 88 * 60),
+          until: ago(openedSecondsAgo + 70),
+          runId: null,
+          fact: msg('diagnosis.evidence.guardMessage', { plugin: 'coder-guard', count: 65 }),
+          quote: `{"error": "coder-guard : ${refusal}\n- sabotages sans sortie dans 01-sabotage-red.txt : A4, B4, PR1-1, PR1-2\n- PR1-2.patch ne s'applique pas sur la tête de branche (git apply --check)"}`,
+          count: 65,
+        },
+      ],
+      steps: [
+        { text: msg('diagnosis.step.giveCommand'), command: null, done: false },
+        { text: msg('diagnosis.step.unblockWithTemplate'), command: null, done: false },
+      ],
+      runIds: [runs.budget, runs.blocked],
+    },
+    others: [],
+    unblock: {
+      when: 'now',
+      template: msg('diagnosis.unblock.refusalLoop', { plugin: 'coder-guard', refusal }),
+      nextBlock: 'triage',
+    },
+    runs: [
+      {
+        runId: runs.budget,
+        finding: 'refusal_loop',
+        role: 'cause',
+        text: msg('diagnosis.run.refusalLoop', { count: 62 }),
+        sessionId: sessions.budget,
+      },
+      {
+        runId: runs.blocked,
+        finding: 'refusal_loop',
+        role: 'cause',
+        text: msg('diagnosis.run.refusalLoop', { count: 3 }),
+        sessionId: sessions.blocked,
+      },
+    ],
+    work: {
+      branch: null,
+      commits: 'some',
+      commitsRefused: 0,
+      pushed: 'yes',
+      prUrl: null,
+      editedFiles: 31,
+      evidence: [],
+    },
+    sources: { transcript: true, agentLog: true, config: true, workspace: true },
+  };
+}
+
+/**
+ * Le disjoncteur d'un modèle faible, sur le modèle de la première tentative de factory-live#2
+ * (2026-10-29) : la gate, sur un modèle local, finit trois fois son tour sans appel kanban malgré six
+ * relances d'Hermès ; au troisième, le disjoncteur abandonne. Il faut un autre modèle.
+ */
+export const BREAKER = { runs: [186, 187, 188] } as const;
+
+/** Le texte exact qu'Hermès note sur un run sorti sans appel kanban (tiret long compris). */
+export const PROTOCOL_VIOLATION_ERROR =
+  'worker exited cleanly (rc=0) without kanban_complete, kanban_block or kanban_request_review \u2014 protocol violation. If the prior run already did the work, verify it and report it via kanban_complete (or kanban_request_review); a run without a terminal kanban call counts as failed no matter what it did';
+
+export function breakerDiagnosis({ ago }: IncidentClock, openedSecondsAgo: number): Diagnosis {
+  const [first, second, third] = BREAKER.runs;
+  return {
+    computedAt: ago(openedSecondsAgo - 3),
+    episode: { from: ago(openedSecondsAgo + 6 * 60), runIds: [...BREAKER.runs] },
+    primary: {
+      code: 'stopped_without_kanban_call',
+      confidence: 'certain',
+      actor: 'you_factory',
+      cause: { state: 'none' },
+      summary: msg('diagnosis.summary.stoppedWithoutKanbanCall', { count: 3 }),
+      why: msg('diagnosis.why.stoppedWithoutKanbanCall', { nudges: 6 }),
+      subject: { profile: 'gate', plugin: null, tool: null },
+      setting: null,
+      evidence: [
+        {
+          source: 'kanban',
+          at: ago(openedSecondsAgo + 3),
+          until: null,
+          runId: third,
+          fact: msg('diagnosis.evidence.workerExited'),
+          quote: PROTOCOL_VIOLATION_ERROR.slice(0, 299) + '…',
+          count: 3,
+        },
+        {
+          source: 'agent_log',
+          at: ago(openedSecondsAgo + 4 * 60 + 6),
+          until: ago(openedSecondsAgo + 65),
+          runId: null,
+          fact: msg('diagnosis.evidence.stopNudges', { count: 6 }),
+          quote: 'kanban stop-loop nudge issued (attempt 2) task=t_3b9a1d22',
+          count: 6,
+        },
+      ],
+      steps: [{ text: msg('diagnosis.step.chooseModel'), command: null, done: false }],
+      runIds: [...BREAKER.runs],
+    },
+    others: [],
+    unblock: {
+      when: 'now',
+      template: msg('diagnosis.unblock.finishWithKanbanCall'),
+      nextBlock: 'blocked',
+    },
+    runs: [first, second, third].map((runId) => ({
+      runId,
+      finding: 'stopped_without_kanban_call',
+      role: 'cause',
+      text: msg('diagnosis.run.modelStopped'),
+      sessionId: null,
+    })),
+    work: {
+      branch: 'fix/52-liens-a-propos-sombre',
+      commits: 'none',
+      commitsRefused: 11,
+      pushed: 'no',
+      prUrl: null,
+      editedFiles: 9,
+      evidence: [],
+    },
+    sources: { transcript: true, agentLog: true, config: true, workspace: true },
+  };
+}
+
 /** La réponse est postée : l'étape « Débloquer » ou « Répondre » du diagnostic est faite. */
 export function answered(diagnosis: Diagnosis | null): Diagnosis | null {
   if (!diagnosis) return null;

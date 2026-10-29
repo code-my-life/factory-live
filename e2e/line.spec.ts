@@ -32,7 +32,8 @@ test.describe('ligne d’usine (démo)', () => {
     await expect(stationJobs(page, 'Release')).toContainText('Formulaire de contact', {
       timeout: 40_000,
     });
-    await expect(page.getByRole('list', { name: 'Issues à l’étape Gate' })).toHaveCount(0);
+    // Elle a quitté la gate ; cv-site#52 y reste, arrêtée par le disjoncteur de son modèle.
+    await expect(stationJobs(page, 'Gate')).not.toContainText('Formulaire de contact');
   });
 
   test('toucher une issue ouvre sa page', async ({ page }) => {
