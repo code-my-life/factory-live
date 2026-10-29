@@ -72,6 +72,7 @@ const hub = new Hub(
     owner: config.GITHUB_OWNER,
     boardName: config.HERMES_BOARD,
     dashboardUrl: config.DASHBOARD_URL,
+    addresses: config.addresses,
     heldAfterSeconds: config.HELD_AFTER_MINUTES * 60,
     keepFinishedMs: 24 * 3600_000,
   },
@@ -110,6 +111,7 @@ const unblockDeps = {
   store,
   github: githubClient,
   canWrite: () => githubAuth.canWrite(),
+  factoryBot: config.FACTORY_BOT_LOGIN,
   log,
   now,
 };
@@ -165,6 +167,7 @@ const app = createApp({
   githubAuth,
   hookSecret: config.secrets.hookSecret,
   origins: config.PUBLIC_ORIGINS,
+  allowedHosts: config.allowedHosts,
   tailscaleLogins: config.TAILSCALE_LOGINS,
   webDist: config.WEB_DIST,
   log,
@@ -182,6 +185,7 @@ const server = serve({ fetch: app.fetch, port: config.PORT, hostname: config.HOS
       github: githubAuth.status().mode,
       ingestion: config.secrets.hookSecret ? 'secret présent' : 'désactivée (secret absent)',
       tailscaleLogins: config.TAILSCALE_LOGINS,
+      allowedHosts: config.allowedHosts,
     },
     'factory-live démarré',
   );

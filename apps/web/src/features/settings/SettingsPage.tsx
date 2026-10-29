@@ -32,12 +32,6 @@ const INSTALL = [
   { device: 'ios', icon: DeviceMobileIcon },
 ] as const;
 
-/** Adresses de l'app : sur ce PC, puis depuis les autres appareils du tailnet. */
-const ADDRESSES = {
-  local: 'http://localhost:8446',
-  tailnet: 'https://desktop-gja56n4.tail40220c.ts.net:8446',
-} as const;
-
 /** Retours de GitHub après une étape faite chez lui (`/api/github/installed`, `/api/github/oauth/callback`). */
 function githubReturn(value: string | null, t: Messages): string | null {
   return value === 'installed' || value === 'connected' ? t.settings.githubReturn[value] : null;
@@ -118,7 +112,10 @@ export function SettingsPage() {
           </h2>
           <p className={page.muted}>{t.settings.installIntro}</p>
           <p className={styles.installOpen}>
-            {t.settings.installOpen(ADDRESSES.local, ADDRESSES.tailnet)}
+            {/* Adresses données par le serveur (sa configuration) ; la démo montre un exemple. */}
+            {snapshot.addresses.tailnet
+              ? t.settings.installOpen(snapshot.addresses.local, snapshot.addresses.tailnet)
+              : t.settings.installOpenLocal(snapshot.addresses.local)}
           </p>
           <ul className={styles.install}>
             {INSTALL.map(({ device, icon: DeviceIcon }) => (

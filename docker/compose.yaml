@@ -23,9 +23,12 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       HERMES_BOARD: ${HERMES_BOARD:-factory}
       GITHUB_OWNER: ${GITHUB_OWNER:-code-my-life}
-      TAILSCALE_LOGINS: ${TAILSCALE_LOGINS:-cddev@github}
-      PUBLIC_ORIGINS: ${PUBLIC_ORIGINS:-http://localhost:8446,https://desktop-gja56n4.tail40220c.ts.net:8446}
-      DASHBOARD_URL: ${DASHBOARD_URL:-https://desktop-gja56n4.tail40220c.ts.net:8443}
+      # Valeurs propres à ce PC (nom tailnet, login Tailscale, dashboard) : dans docker/.env, jamais
+      # dans le dépôt (modèle : docker/.env.example). Sans elles, factory-live ne répond qu'à ce PC.
+      TAILSCALE_LOGINS: ${TAILSCALE_LOGINS:-}
+      PUBLIC_ORIGINS: ${PUBLIC_ORIGINS:-http://localhost:8446}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
+      DASHBOARD_URL: ${DASHBOARD_URL:-}
     volumes:
       - factory-live-data:/data
       # Bases d'Hermès : dossiers en écriture pour le seul `-shm` de SQLite (lecteur WAL), bases ouvertes en lecture seule.

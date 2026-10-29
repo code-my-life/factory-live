@@ -52,5 +52,5 @@ RUN mkdir -p /data && chown 1000:1000 /data
 USER 1000:1000
 EXPOSE 8446
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD ["node", "-e", "fetch('http://127.0.0.1:8446/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+  CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 8446) + '/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 CMD ["node", "apps/server/dist/main.js"]

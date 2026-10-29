@@ -20,6 +20,21 @@ function hostname(host: string | undefined): string {
 }
 
 /**
+ * Contrôle de l'hôte, avant toute route (lectures comprises) : seuls les hôtes de la configuration
+ * passent (`allowedHosts` : ce PC au port du service, le nom tailnet). Une page piégée qui fait pointer
+ * son propre domaine sur 127.0.0.1 (DNS rebinding) envoie son nom dans `Host` : refusée en 421.
+ */
+export function hostGuard(allowed: readonly string[]): MiddlewareHandler {
+  const hosts = new Set(allowed.map((host) => host.toLowerCase()));
+  return async (c, next) => {
+    if (!hosts.has((c.req.header('host') ?? '').toLowerCase()))
+      return c.json({ error: 'Hôte inconnu de factory-live', code: 'host_refused' }, 421);
+    await next();
+    return undefined;
+  };
+}
+
+/**
  * Garde des écritures (déblocage, abonnement push) : sans mot de passe, comme décidé, mais réservée
  * à ce PC (requête locale, sans en-tête Tailscale) et au login Tailscale de Clément (en-tête posé par
  * `tailscale serve`, qui retire celui qu'enverrait un client). Origine contrôlée, en-tête anti-CSRF

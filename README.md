@@ -16,7 +16,7 @@ npm run verify         # format, lint, types, texte, architecture, tests, build
 docker compose -f docker/compose.yaml up -d --build   # le service, http://localhost:8446
 ```
 
-Ouvrir : `http://localhost:8446` sur ce PC, `https://desktop-gja56n4.tail40220c.ts.net:8446` depuis l'iPhone ou le Mac (tailnet seulement).
+Ouvrir : `http://localhost:8446` sur ce PC, l'adresse tailnet (`https://<machine>.<tailnet>.ts.net:8446`, réglée dans `docker/.env`) depuis l'iPhone ou le Mac (tailnet seulement).
 
 ## Où regarder
 

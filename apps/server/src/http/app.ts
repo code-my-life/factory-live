@@ -44,7 +44,7 @@ import type { ViewDeps } from '../application/views.ts';
 import type { Logger } from '../logger.ts';
 import { UnblockError, unblockIntervention } from '../application/unblock.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
-import { navigationGuard, requestOrigin, writeGuard } from './guard.ts';
+import { hostGuard, navigationGuard, requestOrigin, writeGuard } from './guard.ts';
 import { PAGE_TEXTS, localeCookie, pageLocale } from './pages.ts';
 import type { PageLocale } from './pages.ts';
 import type { StreamBuffer } from './stream.ts';
@@ -59,6 +59,8 @@ export interface AppDeps {
   githubAuth: GitHubAppAuth | null;
   hookSecret: string | null;
   origins: readonly string[];
+  /** Valeurs de l'en-tête `Host` acceptées (configuration) ; tout autre hôte reçoit 421. */
+  allowedHosts: readonly string[];
   tailscaleLogins: readonly string[];
   webDist: string | null;
   /** Battement du flux quand rien d'autre ne part (15 s ; plus court dans les tests). */
@@ -105,6 +107,9 @@ const CSP = [
   "form-action 'self'",
 ].join('; ');
 
+/** Journal du front : 60 envois par minute au plus, tous appareils confondus (la PWA en fait 5 au plus). */
+const CLIENT_LOGS_PER_MINUTE = 60;
+
 export function createApp(deps: AppDeps) {
   const app = new OpenAPIHono<{ Variables: { actor: string } }>({
     defaultHook: (result, c) => {
@@ -135,6 +140,8 @@ export function createApp(deps: AppDeps) {
     if (!c.res.headers.has('Content-Security-Policy')) c.header('Content-Security-Policy', CSP);
     c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   });
+  // Avant toute route, lectures et /healthz compris : contre le DNS rebinding (guard.ts).
+  app.use('*', hostGuard(deps.allowedHosts));
 
   app.onError((error, c) => {
     deps.log.error(
@@ -445,10 +452,21 @@ export function createApp(deps: AppDeps) {
     return c.json(result, 200);
   });
 
+  const clientLogTimes: number[] = [];
   app.post('/api/client-logs', bodyLimit({ maxSize: 32 * 1024 }), async (c) => {
     const origin = c.req.header('origin');
     if (origin && !deps.origins.includes(origin))
       return c.json({ error: 'Origine refusée', code: 'origin_refused' }, 403);
+    // Débit borné : un client de ce PC ou du tailnet ne peut pas noyer le journal (rotation 10 Mo × 5).
+    const now = deps.now();
+    while (clientLogTimes.length > 0 && now - (clientLogTimes[0] ?? now) >= 60_000)
+      clientLogTimes.shift();
+    if (clientLogTimes.length >= CLIENT_LOGS_PER_MINUTE)
+      return c.json(
+        { error: 'Trop de demandes, réessaie dans une minute', code: 'rate_limited' },
+        429,
+      );
+    clientLogTimes.push(now);
     const parsed = ClientLog.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success)
       return c.json({ error: 'Journal inattendu', code: 'invalid_request' }, 400);

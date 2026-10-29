@@ -42,6 +42,7 @@ const SNAPSHOT: Snapshot = {
   interventions: [],
   activity: [],
   health: [],
+  addresses: { local: 'http://localhost:8446', tailnet: 'https://machine.tailnet.ts.net:8446' },
 };
 
 function activity(id: string, cardId = 't_1a9f0049'): ActivityEvent {

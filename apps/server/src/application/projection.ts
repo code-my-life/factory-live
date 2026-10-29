@@ -42,7 +42,7 @@ export interface ProjectionInput {
   board: Board & { comments: readonly Comment[] };
   owner: string;
   boardName: string;
-  dashboardUrl: string;
+  dashboardUrl: string | null;
   heldAfterSeconds: number;
   /** Profils de la factory (factory.yaml), dans l'ordre d'affichage. */
   profiles: readonly string[];

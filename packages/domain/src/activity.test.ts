@@ -11,7 +11,7 @@ function hook(event: string, patch: Partial<HookEvent> = {}): HookEvent {
     event,
     profile: 'coder-claude',
     sessionId: 's1',
-    cwd: `/home/cleme/.hermes/kanban/boards/factory/workspaces/${CARD}`,
+    cwd: `/home/user/.hermes/kanban/boards/factory/workspaces/${CARD}`,
     toolName: null,
     toolInput: null,
     extra: {},
@@ -37,22 +37,22 @@ function run(
 
 describe('taskIdFromCwd', () => {
   it('lit la carte dans le workspace ou le worktree du worker', () => {
-    expect(taskIdFromCwd('/home/cleme/.hermes/kanban/boards/factory/workspaces/t_83b0e611')).toBe(
+    expect(taskIdFromCwd('/home/user/.hermes/kanban/boards/factory/workspaces/t_83b0e611')).toBe(
       't_83b0e611',
     );
     expect(
-      taskIdFromCwd('/home/cleme/.hermes/kanban/boards/factory/workspaces/t_83b0e611/repo'),
+      taskIdFromCwd('/home/user/.hermes/kanban/boards/factory/workspaces/t_83b0e611/repo'),
     ).toBe('t_83b0e611');
-    expect(taskIdFromCwd('/home/cleme/perso/claude-cockpit/.worktrees/t_5e21c0d9')).toBe(
+    expect(taskIdFromCwd('/home/user/perso/claude-cockpit/.worktrees/t_5e21c0d9')).toBe(
       't_5e21c0d9',
     );
-    expect(taskIdFromCwd('/home/cleme/.hermes/hermes-agent')).toBeNull();
-    expect(taskIdFromCwd('/home/cleme/workspaces/t_83b0e611x')).toBeNull();
+    expect(taskIdFromCwd('/home/user/.hermes/hermes-agent')).toBeNull();
+    expect(taskIdFromCwd('/home/user/workspaces/t_83b0e611x')).toBeNull();
   });
 });
 
-const CLONE = '/home/cleme/perso/factory-live';
-const IMPL_WORKTREE = '/home/cleme/perso/claude-cockpit/.worktrees/t_2fe761e4';
+const CLONE = '/home/user/perso/factory-live';
+const IMPL_WORKTREE = '/home/user/perso/claude-cockpit/.worktrees/t_2fe761e4';
 
 describe('cardOfCwd', () => {
   it('relie un worker lancé dans le clone (workspace dir:) à la carte en cours de son profil', () => {
@@ -367,7 +367,7 @@ describe('applyHook', () => {
       hook('pre_tool_call', {
         toolName: 'terminal',
         toolInput: { command: 'pwd' },
-        cwd: '/home/cleme/.hermes/kanban/boards/factory/workspaces/t_00000001',
+        cwd: '/home/user/.hermes/kanban/boards/factory/workspaces/t_00000001',
         sessionId: 's2',
       }),
     ]);

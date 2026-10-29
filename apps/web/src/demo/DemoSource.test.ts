@@ -24,6 +24,13 @@ describe('DemoSource', () => {
     }
   });
 
+  it('montre une adresse tailnet d’exemple, générique : jamais celle d’un vrai PC', () => {
+    expect(new DemoSource().getSnapshot().addresses).toEqual({
+      local: 'http://localhost:8446',
+      tailnet: 'https://machine.tailnet.ts.net:8446',
+    });
+  });
+
   it('fait avancer les issues sur la ligne', () => {
     const source = new DemoSource();
     const station = (key: string) =>

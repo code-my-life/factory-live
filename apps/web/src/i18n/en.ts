@@ -709,6 +709,7 @@ export const en: Messages = {
     installIntro: 'factory-live is a PWA: you install it from the browser, no app store needed.',
     installOpen: (local, tailnet) =>
       `Open ${local} on this PC, ${tailnet} on your other devices on the tailnet, then:`,
+    installOpenLocal: (local) => `Open ${local} on this PC, then:`,
     installSteps: {
       computer: {
         device: 'Computer',
@@ -816,6 +817,7 @@ export const en: Messages = {
       origin_refused: 'Origin refused',
       csrf_missing: 'Missing x-factory-live header',
       rate_limited: 'Too many requests, try again in a minute',
+      host_refused: 'Unknown address for factory-live: open the app at its usual address',
     },
   },
 

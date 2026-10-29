@@ -84,6 +84,7 @@ const EMPTY_SNAPSHOT: Snapshot = {
   interventions: [],
   activity: [],
   health: [],
+  addresses: { local: 'http://localhost:8446', tailnet: null },
 };
 
 const EMPTY_USAGE = (periodDays: number): UsageReport => ({
