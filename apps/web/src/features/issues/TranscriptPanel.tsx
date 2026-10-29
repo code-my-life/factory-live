@@ -86,7 +86,7 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
 
 /** Transcription intégrale d'un run, à la demande : session Hermès, lane CLI, ou log brut. */
 export function TranscriptPanel({ runId }: { runId: number }) {
-  const { t } = useI18n();
+  const { t, text } = useI18n();
   const views = useTranscripts(runId);
   const [index, setIndex] = useState(0);
   if (!views || views.length === 0) {
@@ -114,12 +114,12 @@ export function TranscriptPanel({ runId }: { runId: number }) {
         <AnsiLog lines={current.choice.view.terminal} label={t.transcript.rawLog(runId)} />
       ) : current ? (
         <>
-          <p className={styles.muted}>{current.choice.view.title}</p>
+          <p className={styles.muted}>{text(current.choice.view.title)}</p>
           {/* Le plus récent en haut, dans une boîte qui défile seule : la page ne s'allonge plus avec le run. */}
           <div
             className={styles.entriesFrame}
             role="region"
-            aria-label={current.choice.view.title}
+            aria-label={text(current.choice.view.title)}
             tabIndex={0}
           >
             <ol className={styles.entries} reversed>

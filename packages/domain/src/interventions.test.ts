@@ -3,6 +3,7 @@ import { interventionsOf, pullRequestUrl } from './interventions.ts';
 import type { InterventionContext } from './interventions.ts';
 import { aRun, aTask, anEvent } from './fixtures.test-helpers.ts';
 import type { Board, Task, TaskEvent } from './hermes.ts';
+import { message } from './messages.ts';
 
 const ctx: InterventionContext = {
   now: 100_000,
@@ -72,7 +73,7 @@ describe('interventionsOf', () => {
     expect(run([blocked(null)], events)[0]).toMatchObject({
       kind: 'gave_up',
       push: true,
-      title: 'Abandon après 2 échecs',
+      title: message('intervention.title.gaveUp', { failures: 2 }),
     });
   });
 
@@ -104,7 +105,7 @@ describe('interventionsOf', () => {
     expect(found?.actions).toEqual([
       {
         kind: 'link',
-        label: 'Approuver la PR sur GitHub',
+        label: message('intervention.action.approvePr'),
         url: 'https://github.com/code-my-life/claude-cockpit/pull/74',
       },
     ]);
@@ -137,8 +138,17 @@ describe('interventionsOf', () => {
       }),
     ];
     const [found] = run([task], events);
-    expect(found).toMatchObject({ kind: 'triage_loop', push: true });
+    expect(found).toMatchObject({
+      kind: 'triage_loop',
+      push: true,
+      title: message('intervention.title.triageLoop'),
+      question: message('intervention.question.triageLoop'),
+    });
     expect(found?.actions.some((action) => action.kind === 'unblock')).toBe(false);
+    expect(found?.actions.map((action) => action.kind !== 'unblock' && action.label)).toEqual([
+      message('intervention.action.dashboard'),
+      message('intervention.action.showCard'),
+    ]);
   });
 
   it('carte retenue par active_pr au-delà de 30 min, depuis la dernière prise', () => {
@@ -159,9 +169,18 @@ describe('interventionsOf', () => {
     const tooRecent = run([task], [guarded(1, 99_000)]);
     expect(tooRecent).toEqual([]);
     const [held] = run([task], [guarded(1, 97_000), guarded(2, 99_900)]);
-    expect(held).toMatchObject({ kind: 'held_active_pr', push: true, openedAt: 97_000 });
+    expect(held).toMatchObject({
+      kind: 'held_active_pr',
+      push: true,
+      openedAt: 97_000,
+      title: message('intervention.title.held', { minutes: 50 }),
+      question: message('intervention.question.held'),
+    });
     const copy = held?.actions.find((action) => action.kind === 'copy');
     expect(copy?.kind === 'copy' ? copy.command : '').toContain('reassign t_h scribe');
+    expect(copy?.kind === 'copy' ? copy.label : null).toEqual(
+      message('intervention.action.relay', { owner: 'coder' }),
+    );
   });
 
   it('un claim remet le compteur de la carte retenue à zéro', () => {
@@ -195,6 +214,68 @@ describe('interventionsOf', () => {
       title: 'Arrêt opérateur',
     });
     expect(found?.actions.map((action) => action.kind)).toEqual(['unblock', 'copy', 'link']);
+  });
+
+  it('sans raison donnée par l’agent, titre et question sont des codes que le client écrit', () => {
+    const fallback = (kind: Task['blockKind']) => run([blocked(kind)], [blockedEvent('', kind)])[0];
+    expect(fallback('needs_input')).toMatchObject({
+      title: message('intervention.title.needsInput'),
+      question: message('intervention.question.needsInput'),
+    });
+    expect(fallback('capability')).toMatchObject({
+      title: message('intervention.title.capability'),
+      question: message('intervention.question.capability'),
+    });
+    expect(fallback('transient')).toMatchObject({
+      title: message('intervention.title.transient'),
+      question: message('intervention.question.transient'),
+    });
+    expect(fallback('transient')?.actions[1]).toMatchObject({
+      kind: 'copy',
+      label: message('intervention.action.reassignCoder'),
+    });
+    expect(fallback(null)).toMatchObject({
+      title: message('intervention.title.blocked'),
+      question: message('intervention.question.blocked'),
+    });
+    expect(fallback(null)?.actions.slice(1)).toMatchObject([
+      { kind: 'copy', label: message('intervention.action.showCard') },
+      {
+        kind: 'link',
+        label: message('intervention.action.openIssue', { issueKey: 'cv-site#49' }),
+        url: 'https://github.com/code-my-life/cv-site/issues/49',
+      },
+    ]);
+    const gaveUp = run(
+      [blocked(null)],
+      [anEvent({ id: 12, taskId: 't_b', kind: 'gave_up', payload: {}, createdAt: 90_000 })],
+    )[0];
+    expect(gaveUp).toMatchObject({
+      title: message('intervention.title.gaveUp', { failures: null }),
+      question: message('intervention.question.gaveUp'),
+    });
+  });
+
+  it('une release prête sans raison écrite : titre et question de secours, lien vers la PR', () => {
+    const release = aTask({
+      id: 't_rel',
+      title: 'release claude-cockpit#68',
+      status: 'blocked',
+      blockKind: 'needs_input',
+    });
+    const [found] = run([release], [anEvent({ taskId: 't_rel', kind: 'blocked', payload: {} })]);
+    expect(found).toMatchObject({
+      kind: 'pr_approval',
+      title: message('intervention.title.prReady'),
+      question: message('intervention.question.prReady'),
+    });
+    expect(found?.actions).toEqual([
+      {
+        kind: 'link',
+        label: message('intervention.action.openIssue', { issueKey: 'claude-cockpit#68' }),
+        url: 'https://github.com/code-my-life/claude-cockpit/issues/68',
+      },
+    ]);
   });
 
   it('un blocage de dépendance n’est pas une intervention (reprise automatique)', () => {

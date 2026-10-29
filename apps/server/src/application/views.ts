@@ -1,3 +1,4 @@
+import { msg } from '@factory-live/contracts';
 import type {
   CardView,
   HistoryStats,
@@ -174,7 +175,7 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
       title: task.title,
       kind: cardKindOf(task),
       status: task.status,
-      assignee: task.assignee ?? 'non assignée',
+      assignee: task.assignee,
       station: cardStation(
         task,
         task.status === 'review' || (task.status === 'running' && current?.role === 'reviewer'),
@@ -232,7 +233,7 @@ export function transcripts(deps: ViewDeps, runId: number): TranscriptView[] | n
     {
       runId,
       source: 'hermes',
-      title: `Session Hermès de ${run.profile}${session ? ` (${session.id})` : ''}`,
+      title: msg('transcript.hermes', { profile: run.profile, session: session?.id ?? null }),
       entries: session
         ? deps.sessions
             .transcript(run.profile, session.id)
@@ -248,7 +249,7 @@ export function transcripts(deps: ViewDeps, runId: number): TranscriptView[] | n
       views.push({
         runId,
         source: 'claude-code',
-        title: `Lane Claude Code${lane.costUsd === null ? '' : ` (${lane.costUsd.toFixed(2)} $)`}`,
+        title: msg('transcript.claudeCode', { costUsd: lane.costUsd }),
         entries: lane.entries.map((entry) => ({ ...entry, at: iso(entry.at) })),
         terminal: [],
       });
@@ -264,7 +265,8 @@ export function profileViews(deps: ViewDeps, periodDays = 30): ProfileView[] {
   const verdicts = gateVerdicts(board, since);
   const refusals = new Map<string, number>();
   for (const event of deps.store.recentActivity(5_000)) {
-    if (event.kind !== 'guard' || !event.detail) continue;
+    // Le refus d'une garde est le message du plugin, tel quel : « coder-guard : PR absente… ».
+    if (event.kind !== 'guard' || typeof event.detail !== 'string') continue;
     const plugin = /^([\w-]+)\s*:/.exec(event.detail)?.[1];
     if (plugin) refusals.set(plugin, (refusals.get(plugin) ?? 0) + 1);
   }
@@ -278,7 +280,7 @@ export function profileViews(deps: ViewDeps, periodDays = 30): ProfileView[] {
     const chain = live ? [...(live.model ? [live.model] : []), ...live.fallbacks] : [];
     return {
       name,
-      role: (manifest.profiles[name]?.skills ?? []).join(', ') || 'agent Hermès',
+      role: (manifest.profiles[name]?.skills ?? []).join(', ') || msg('agent.role.default'),
       station: profileStation(name),
       modelChain: chain.map((link) => ({ ...link, source: 'config' as const })),
       effort: live?.effort ?? null,
@@ -385,8 +387,7 @@ export function usageReport(deps: ViewDeps, periodDays: number): UsageReport {
     daily: [...daily]
       .map(([day, value]) => ({ day, ...value }))
       .sort((left, right) => left.day.localeCompare(right.day)),
-    claudeSubscriptionNote:
-      'Le solde de l’abonnement Claude n’a pas de source fiable : factory-live n’affiche une limite que si une transcription Claude Code la signale.',
+    claudeSubscriptionNote: msg('usage.claudeNote'),
   };
 }
 
@@ -406,11 +407,12 @@ export function historyStats(deps: ViewDeps, periodDays: number): HistoryStats {
   const verdicts = gateVerdicts(board, since);
   const groups = new Map<
     string,
-    { harness: string; model: string; runs: number; passed: number }
+    { harness: string; model: string | null; runs: number; passed: number }
   >();
   for (const verdict of verdicts) {
-    const model = verdict.claudeModel ?? 'modèle de l’agent';
-    const key = `${verdict.harness}|${model}`;
+    // Sans lane Claude, le modèle est celui de l'agent : `null`, que le client nomme.
+    const model = verdict.claudeModel;
+    const key = `${verdict.harness}|${model ?? ''}`;
     const group = groups.get(key) ?? { harness: verdict.harness, model, runs: 0, passed: 0 };
     group.runs += 1;
     if (verdict.passed) group.passed += 1;

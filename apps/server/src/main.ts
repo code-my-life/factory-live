@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { msg } from '@factory-live/contracts';
 import { serve } from '@hono/node-server';
 import { GitHubAppAuth } from './adapters/github/app.ts';
 import { GitHubCache } from './adapters/github/cache.ts';
@@ -57,12 +58,12 @@ const github = new GitHubCache(
   log.child({ component: 'github' }),
   () => {
     const access = githubAuth.status();
-    if (access.mode !== 'app') return 'Jeton fine-grained de repli';
-    if (access.user)
-      return `App ${access.app?.slug ?? ''}, connecté en tant que ${access.user.login}`;
+    if (access.mode !== 'app') return msg('health.github.token');
+    const slug = access.app?.slug ?? '';
+    if (access.user) return msg('health.github.app.user', { slug, login: access.user.login });
     return githubAuth.canWrite()
-      ? `App ${access.app?.slug ?? ''}, déblocage par le jeton de repli`
-      : `App ${access.app?.slug ?? ''}, connexion GitHub requise pour débloquer`;
+      ? msg('health.github.app.fallback', { slug })
+      : msg('health.github.app.loginNeeded', { slug });
   },
 );
 
@@ -93,9 +94,7 @@ const pollKanban = () => {
     kanban ??= new KanbanReader(config.kanbanDb);
     if (kanban.changed()) hub.applyKanban(kanban.read(), now());
   } catch (error) {
-    hub.kanbanFailed(
-      `kanban.db illisible : ${String(error instanceof Error ? error.message : error)}`,
-    );
+    hub.kanbanFailed(String(error instanceof Error ? error.message : error));
     log.error(
       { component: 'kanban', path: config.kanbanDb, error: String(error) },
       'lecture du kanban en échec',

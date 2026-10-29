@@ -6,6 +6,8 @@
  * (api_request_error), `hermes_cli/kanban_db.py` et `kanban_db_dispatch.py` (événements kanban).
  */
 import type { Task } from './hermes.ts';
+import { message } from './messages.ts';
+import type { Message, Text } from './messages.ts';
 
 export interface HookEvent {
   event: string;
@@ -22,6 +24,30 @@ export interface HookEvent {
 
 export type LiveState = 'thinking' | 'tool' | 'cli' | 'blocked';
 
+/** Ce que le fil d'activité écrit lui-même ; le reste (outils, modèles, raisons) reste tel quel. */
+export type ActivityMessage =
+  | Message<'activity.tool.unknown'>
+  | Message<'activity.action.llm'>
+  | Message<'activity.llm.tokens', { input: number; output: number }>
+  | Message<
+      'activity.llm.rateLimited',
+      { model: string; attempt: number | null; attempts: number | null }
+    >
+  | Message<
+      'activity.llm.error',
+      { status: number | null; model: string; attempt: number | null; attempts: number | null }
+    >
+  | Message<'activity.skill', { action: string }>
+  | Message<'activity.session.end', { outcome: 'completed' | 'failed' | 'interrupted' }>
+  | Message<'activity.kanban.claimed', { profile: string }>
+  | Message<'activity.worker.spawned'>
+  | Message<'activity.worker.exited'>
+  | Message<'activity.worker.stale'>
+  | Message<'activity.subagent.start'>
+  | Message<'activity.subagent.stop'>;
+
+export type ActivityText = Text<ActivityMessage>;
+
 export interface LiveModel {
   model: string;
   provider: string;
@@ -30,7 +56,7 @@ export interface LiveModel {
 
 export interface LiveAction {
   kind: 'llm' | 'tool' | 'cli';
-  label: string;
+  label: ActivityText;
   detail: string | null;
   startedAt: number;
 }
@@ -54,15 +80,16 @@ export interface ActivityLine {
   kind: 'tool' | 'llm' | 'kanban' | 'skill' | 'guard' | 'system';
   profile: string;
   cardId: string | null;
-  label: string;
-  detail: string | null;
+  label: ActivityText;
+  detail: ActivityText | null;
   status: 'ok' | 'running' | 'error' | 'blocked' | null;
   durationMs: number | null;
   model: string | null;
 }
 
 export interface ToolCallSummary {
-  label: string;
+  /** Le nom de l'outil (tel quel), ou « outil » s'il manque. */
+  label: ActivityText;
   detail: string | null;
   lane: 'claude-code' | 'opencode' | null;
   laneModel: string | null;
@@ -79,13 +106,6 @@ const KANBAN_EVENTS = new Set([
   'on_kanban_worker_exited',
   'on_kanban_worker_stale_claim',
 ]);
-const SKILL_ACTIONS: Readonly<Record<string, string>> = {
-  loaded: 'Skill chargée',
-  created: 'Skill créée',
-  edited: 'Skill modifiée',
-  patched: 'Skill modifiée',
-  installed: 'Skill installée',
-};
 
 export function taskIdFromCwd(cwd: string): string | null {
   return WORKSPACE.exec(cwd)?.[1] ?? null;
@@ -160,10 +180,9 @@ export function describeToolCall(
   toolName: string | null,
   input: Readonly<Record<string, unknown>> | null,
 ): ToolCallSummary {
-  const name = toolName ?? 'outil';
   const args = input ?? {};
   const command = str(args['command']);
-  if (name === 'terminal' && command) {
+  if (toolName === 'terminal' && command) {
     const claude = /(?:^|[\s;&|(])claude\s+-p\b/.test(command);
     const opencode = /(?:^|[\s;&|(])opencode\s+run\b/.test(command);
     if (claude || opencode) {
@@ -185,7 +204,12 @@ export function describeToolCall(
     str(args['task_id']) ??
     str(args['url']) ??
     null;
-  return { label: name, detail: clip(detail), lane: null, laneModel: null };
+  return {
+    label: toolName ?? message('activity.tool.unknown'),
+    detail: clip(detail),
+    lane: null,
+    laneModel: null,
+  };
 }
 
 function line(
@@ -276,12 +300,12 @@ export function applyHook(
     case 'post_tool_call': {
       const call = describeToolCall(event.toolName, event.toolInput);
       const status = str(extra['status']) ?? 'ok';
-      const message = clip(str(extra['error_message']));
+      const failure = clip(str(extra['error_message']));
       put({
         state: 'thinking',
         action: {
           kind: 'llm',
-          label: 'Appel au modèle',
+          label: message('activity.action.llm'),
           detail: current?.model?.model ?? null,
           startedAt: event.at,
         },
@@ -290,7 +314,7 @@ export function applyHook(
       push({
         kind: status === 'blocked' ? 'guard' : 'tool',
         label: call.label,
-        detail: status === 'ok' ? call.detail : (message ?? call.detail),
+        detail: status === 'ok' ? call.detail : (failure ?? call.detail),
         status: status === 'blocked' ? 'blocked' : status === 'ok' ? 'ok' : 'error',
         durationMs: num(extra['duration_ms']),
       });
@@ -309,7 +333,10 @@ export function applyHook(
         label: model,
         detail:
           input !== null
-            ? `${input} jetons en entrée, ${num(usage['output_tokens']) ?? 0} en sortie`
+            ? message('activity.llm.tokens', {
+                input,
+                output: num(usage['output_tokens']) ?? 0,
+              })
             : provider,
         status: 'ok',
         durationMs: seconds !== null ? Math.round(seconds * 1000) : null,
@@ -322,26 +349,26 @@ export function applyHook(
       const code = num(extra['status_code']);
       const retry = num(extra['retry_count']);
       const max = num(extra['max_retries']);
-      const message = clip(str(record(extra['error'])['message']) ?? str(extra['reason']));
-      const attempt = retry !== null && max !== null ? ` (essai ${retry + 1} sur ${max + 1})` : '';
+      const reason = clip(str(record(extra['error'])['message']) ?? str(extra['reason']));
+      const known = retry !== null && max !== null;
+      const attempt = { attempt: known ? retry + 1 : null, attempts: known ? max + 1 : null };
       if (current) put({});
       push({
         kind: 'llm',
         label:
           code === 429
-            ? `429 sur ${model}${attempt}`
-            : `Erreur${code ? ` ${code}` : ''} sur ${model}${attempt}`,
-        detail: message,
+            ? message('activity.llm.rateLimited', { model, ...attempt })
+            : message('activity.llm.error', { status: code, model, ...attempt }),
+        detail: reason,
         status: 'error',
         model,
       });
       break;
     }
     case 'on_skill_lifecycle': {
-      const action = str(extra['action']) ?? 'loaded';
       push({
         kind: 'skill',
-        label: SKILL_ACTIONS[action] ?? `Skill : ${action}`,
+        label: message('activity.skill', { action: str(extra['action']) ?? 'loaded' }),
         detail: str(extra['skill_name']),
         status: 'ok',
       });
@@ -356,11 +383,9 @@ export function applyHook(
       const interrupted = extra['interrupted'] === true;
       push({
         kind: 'system',
-        label: failed
-          ? 'Session en échec'
-          : interrupted
-            ? 'Session interrompue'
-            : 'Session terminée',
+        label: message('activity.session.end', {
+          outcome: failed ? 'failed' : interrupted ? 'interrupted' : 'completed',
+        }),
         detail: str(extra['turn_exit_reason']),
         status: failed || interrupted ? 'error' : 'ok',
       });
@@ -371,7 +396,7 @@ export function applyHook(
       push({
         kind: 'kanban',
         label: 'claimed',
-        detail: `Le dispatcher lance ${profile}`,
+        detail: message('activity.kanban.claimed', { profile }),
         status: 'ok',
       });
       break;
@@ -379,7 +404,7 @@ export function applyHook(
       put({});
       push({
         kind: 'kanban',
-        label: 'Worker lancé',
+        label: message('activity.worker.spawned'),
         detail: num(extra['worker_pid']) !== null ? `pid ${num(extra['worker_pid'])}` : null,
         status: 'ok',
       });
@@ -388,7 +413,7 @@ export function applyHook(
       next.delete(key);
       push({
         kind: 'kanban',
-        label: 'Worker arrêté',
+        label: message('activity.worker.exited'),
         detail: [str(extra['exit_kind']), str(extra['outcome'])].filter(Boolean).join(', ') || null,
         status: 'error',
       });
@@ -397,7 +422,7 @@ export function applyHook(
       next.delete(key);
       push({
         kind: 'kanban',
-        label: 'Carte reprise au worker muet',
+        label: message('activity.worker.stale'),
         detail: str(extra['retry_status']),
         status: 'error',
       });
@@ -422,7 +447,7 @@ export function applyHook(
     case 'subagent_start':
       push({
         kind: 'system',
-        label: 'Sous-agent lancé',
+        label: message('activity.subagent.start'),
         detail: clip(str(extra['child_goal'])),
         status: 'running',
       });
@@ -430,7 +455,7 @@ export function applyHook(
     case 'subagent_stop':
       push({
         kind: 'system',
-        label: 'Sous-agent terminé',
+        label: message('activity.subagent.stop'),
         detail: clip(str(extra['child_summary'])),
         status: str(extra['child_status']) === 'error' ? 'error' : 'ok',
         durationMs: num(extra['duration_ms']),

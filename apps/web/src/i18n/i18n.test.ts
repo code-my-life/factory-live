@@ -1,3 +1,5 @@
+import { Message, msg } from '@factory-live/contracts';
+import type { Text as TextValue } from '@factory-live/contracts';
 import { describe, expect, it } from 'vitest';
 import { en } from './en.ts';
 import { fr } from './fr.ts';
@@ -77,5 +79,81 @@ describe('pluriels et nombres dans les textes', () => {
     expect(i18nOf('fr').fmt.duration(252_000)).toBe('4 min 12 s');
     expect(i18nOf('en').fmt.duration(252_000)).toBe('4m 12s');
     expect(i18nOf('en').fmt.integer(1234)).toBe('1,234');
+  });
+});
+
+/** Des paramètres d'exemple pour un code du catalogue, d'après son schéma (nombre, texte, énuméré...). */
+function sample(schema: unknown): unknown {
+  const def = (schema as { _zod: { def: Record<string, unknown> } })._zod.def;
+  switch (def['type']) {
+    case 'number':
+      return 3;
+    case 'string':
+      return 'x';
+    case 'nullable':
+      return sample(def['innerType']);
+    case 'enum':
+      return Object.values(def['entries'] as Record<string, string>)[0];
+    case 'object':
+      return Object.fromEntries(
+        Object.entries(def['shape'] as Record<string, unknown>).map(([key, value]) => [
+          key,
+          sample(value),
+        ]),
+      );
+    default:
+      throw new Error(`schéma sans exemple : ${String(def['type'])}`);
+  }
+}
+
+describe('textes fabriqués par le serveur', () => {
+  const catalog = Message.options.map((option) => ({
+    code: option.shape.code.value,
+    params: sample(option.shape.params),
+  }));
+
+  it('chaque code du catalogue s’écrit dans les deux langues, sans français dans l’anglais', () => {
+    expect(Object.keys(fr.server).sort()).toEqual(catalog.map(({ code }) => code).sort());
+    expect(Object.keys(en.server).sort()).toEqual(catalog.map(({ code }) => code).sort());
+    for (const value of catalog) {
+      const french = i18nOf('fr').text(value as TextValue);
+      const english = i18nOf('en').text(value as TextValue);
+      expect(french.trim(), value.code).not.toBe('');
+      expect(english.trim(), value.code).not.toBe('');
+      expect(english, value.code).not.toBe(value.code);
+      expect(`${french}${english}`, value.code).not.toContain(EM_DASH);
+      expect(english.replaceAll('Hermès', ''), value.code).not.toMatch(FRENCH_LETTERS);
+    }
+  });
+
+  it('montre tel quel un texte venu d’ailleurs, écrit dans la langue un texte de factory-live', () => {
+    expect(i18nOf('en').text('Quelle base de données ?')).toBe('Quelle base de données ?');
+    expect(
+      i18nOf('fr').text(
+        msg('activity.llm.rateLimited', { model: 'agnes', attempt: 1, attempts: 3 }),
+      ),
+    ).toBe('429 sur agnes (essai 1 sur 3)');
+    expect(
+      i18nOf('en').text(
+        msg('activity.llm.rateLimited', { model: 'agnes', attempt: 1, attempts: 3 }),
+      ),
+    ).toBe('429 on agnes (attempt 1 of 3)');
+    expect(i18nOf('fr').text(msg('timeline.status', { status: 'ready' }))).toBe('Statut : Prête');
+    expect(i18nOf('en').text(msg('timeline.blocked', { kind: 'needs_input' }))).toBe(
+      'Card blocked: decision needed',
+    );
+    expect(i18nOf('fr').text(msg('health.gateway.running', { seconds: 9 }))).toBe(
+      'En marche, sonde reçue il y a 9 s',
+    );
+    expect(i18nOf('en').text(msg('health.gateway.silent', { seconds: 300 }))).toBe('Silent for 5m');
+    expect(i18nOf('en').text(msg('timeline.gaveUp', { failures: 1 }))).toBe(
+      'Gave up after 1 failure',
+    );
+  });
+
+  it('garde lisible un code qu’elle ne connaît pas encore (serveur plus récent que la page)', () => {
+    expect(i18nOf('en').text({ code: 'health.demain', params: {} } as unknown as TextValue)).toBe(
+      'health.demain',
+    );
   });
 });

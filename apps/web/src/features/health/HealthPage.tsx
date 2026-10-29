@@ -25,7 +25,7 @@ const TONE: Record<ServiceHealth['status'], DotTone> = {
 };
 
 export function HealthPage() {
-  const { t } = useI18n();
+  const { t, text } = useI18n();
   const snapshot = useSnapshot();
   const problems = snapshot.health.filter((service) => needsWatch(service.status));
   return (
@@ -40,7 +40,7 @@ export function HealthPage() {
               ? t.health.allGood
               : t.health.toWatch(
                   problems.length,
-                  problems.map((service) => service.label).join(', '),
+                  problems.map((service) => text(service.label)).join(', '),
                 )}{' '}
             {t.health.probeNote}
           </p>
@@ -60,16 +60,16 @@ export function HealthPage() {
                 <li key={service.id} className={styles.tile} data-status={service.status}>
                   <p className={styles.tileHead}>
                     <LiveDot tone={TONE[service.status]} />
-                    <span className={styles.tileLabel}>{service.label}</span>
+                    <span className={styles.tileLabel}>{text(service.label)}</span>
                     <span className={styles.tileStatus}>{t.healthStatus[service.status]}</span>
                   </p>
-                  <p className={styles.tileDetail}>{service.detail}</p>
+                  <p className={styles.tileDetail}>{text(service.detail)}</p>
                   {service.metrics.length > 0 ? (
                     <dl className={styles.metrics}>
                       {service.metrics.map((metric) => (
-                        <div key={metric.label}>
-                          <dt className={styles.metricTerm}>{metric.label}</dt>
-                          <dd className={styles.metricValue}>{metric.value}</dd>
+                        <div key={text(metric.label)}>
+                          <dt className={styles.metricTerm}>{text(metric.label)}</dt>
+                          <dd className={styles.metricValue}>{text(metric.value)}</dd>
                         </div>
                       ))}
                     </dl>

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ModelRef } from './agents.ts';
 import { BlockKind, IssueKey, KanbanStatus, StationId, Timestamp } from './common.ts';
+import { Text } from './messages.ts';
 
 export const ChecksState = z.enum(['none', 'pending', 'success', 'failure']);
 export type ChecksState = z.infer<typeof ChecksState>;
@@ -91,7 +92,8 @@ export const CardView = z.object({
   title: z.string(),
   kind: CardKind,
   status: KanbanStatus,
-  assignee: z.string(),
+  /** `null` : carte sans assigné. */
+  assignee: z.string().nullable(),
   station: StationId,
   blockKind: BlockKind.nullable(),
   blockReason: z.string().nullable(),
@@ -111,9 +113,11 @@ export const TimelineEntry = z.object({
   source: z.enum(['kanban', 'hermes', 'github', 'comment', 'factory-live']),
   profile: z.string().nullable(),
   cardId: z.string().nullable(),
-  label: z.string(),
-  detail: z.string().nullable(),
+  label: Text,
+  detail: Text.nullable(),
   tone: z.enum(['neutral', 'success', 'attention', 'danger', 'done']),
+  /** Événement répété à chaque tick, fusionné en une ligne : combien de fois (2 ou plus). */
+  repeats: z.number().int().min(2).optional(),
 });
 export type TimelineEntry = z.infer<typeof TimelineEntry>;
 

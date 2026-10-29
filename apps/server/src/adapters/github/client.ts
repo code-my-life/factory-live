@@ -7,10 +7,13 @@ export type { IssueInfo };
 
 export class GitHubError extends Error {
   readonly status: number;
+  /** Refus décidé par factory-live avant d'appeler GitHub : aucun accès, ou connexion requise. */
+  readonly access: 'none' | 'login-required' | null;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, access: GitHubError['access'] = null) {
     super(message);
     this.status = status;
+    this.access = access;
     this.name = 'GitHubError';
   }
 }
@@ -89,6 +92,7 @@ export class GitHubClient implements GitHubWritePort {
         kind === 'read'
           ? 'Aucun accès GitHub : crée et installe l’App factory-live'
           : 'Connecte-toi à GitHub dans factory-live pour écrire en ton nom',
+        kind === 'read' ? 'none' : 'login-required',
       );
     }
     const cached = method === 'GET' ? this.cache.get(path) : undefined;

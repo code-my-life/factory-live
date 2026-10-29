@@ -58,7 +58,7 @@ export function HistoryPage() {
             title={t.history.stationTime}
             data={history.stationMinutes.map((row) => ({
               key: row.station,
-              label: row.station,
+              label: t.station[row.station],
               value: row.medianMinutes,
             }))}
             formatValue={fmt.minutes}
@@ -84,9 +84,11 @@ export function HistoryPage() {
               </Table.Head>
               <Table.Body>
                 {history.gatePassRate.map((row) => (
-                  <Table.Row key={`${row.harness}-${row.model}`}>
+                  <Table.Row key={`${row.harness}-${row.model ?? ''}`}>
                     <Table.Cell>{row.harness}</Table.Cell>
-                    <Table.Cell className="fl-mono">{row.model}</Table.Cell>
+                    <Table.Cell className={row.model ? 'fl-mono' : undefined}>
+                      {row.model ?? t.history.agentModel}
+                    </Table.Cell>
                     <Table.Cell align="end">{row.runs}</Table.Cell>
                     <Table.Cell align="end">
                       {row.runs >= 3 ? fmt.percent(row.rate) : t.history.tooFew}

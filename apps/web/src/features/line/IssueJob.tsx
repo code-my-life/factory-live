@@ -65,12 +65,12 @@ function IssueJobDetail({
   intervention: Intervention | null;
   maxInProgress: number;
 }) {
-  const { t } = useI18n();
+  const { t, text } = useI18n();
   if (issue.status === 'waiting_human' || issue.status === 'blocked') {
     const tone = issue.status === 'blocked' ? 'danger' : 'attention';
     return (
       <>
-        {intervention ? <JobDetail tone={tone}>{intervention.title}</JobDetail> : null}
+        {intervention ? <JobDetail tone={tone}>{text(intervention.title)}</JobDetail> : null}
         {intervention ? (
           <JobAction to={`/interventions/${encodeURIComponent(intervention.id)}`}>
             {t.interventionAction[intervention.kind]}
@@ -85,7 +85,7 @@ function IssueJobDetail({
   if (agent.action)
     return (
       <JobDetail code>
-        {agent.action.label}
+        {text(agent.action.label)}
         {agent.action.detail ? ` · ${agent.action.detail}` : ''}
       </JobDetail>
     );

@@ -1,6 +1,8 @@
 import { cardKindOf } from './cards.ts';
 import type { Board, Task, TaskEvent } from './hermes.ts';
 import { groupByIssue } from './issues.ts';
+import { message } from './messages.ts';
+import type { Message, Text } from './messages.ts';
 
 export type InterventionKind =
   | 'needs_input'
@@ -12,21 +14,52 @@ export type InterventionKind =
   | 'pr_approval'
   | 'main_red';
 
+/** Ce que les interventions écrivent elles-mêmes ; la raison donnée par l'agent reste telle quelle. */
+export type InterventionMessage =
+  | Message<'intervention.title.prReady'>
+  | Message<'intervention.title.mainRed'>
+  | Message<'intervention.title.gaveUp', { failures: number | null }>
+  | Message<'intervention.title.needsInput'>
+  | Message<'intervention.title.capability'>
+  | Message<'intervention.title.transient'>
+  | Message<'intervention.title.blocked'>
+  | Message<'intervention.title.triageLoop'>
+  | Message<'intervention.title.held', { minutes: number }>
+  | Message<'intervention.question.prReady'>
+  | Message<'intervention.question.gaveUp'>
+  | Message<'intervention.question.needsInput'>
+  | Message<'intervention.question.capability'>
+  | Message<'intervention.question.transient'>
+  | Message<'intervention.question.blocked'>
+  | Message<'intervention.question.triageLoop'>
+  | Message<'intervention.question.held'>
+  | Message<'intervention.action.openIssue', { issueKey: string }>
+  | Message<'intervention.action.showCard'>
+  | Message<'intervention.action.approvePr'>
+  | Message<'intervention.action.prWorkflows'>
+  | Message<'intervention.action.reassignCoder'>
+  | Message<'intervention.action.dashboard'>
+  | Message<'intervention.action.relay', { owner: string }>;
+
+export type InterventionText = Text<InterventionMessage>;
+
 export type InterventionAction =
   | { kind: 'unblock' }
-  | { kind: 'copy'; label: string; command: string }
-  | { kind: 'link'; label: string; url: string };
+  | { kind: 'copy'; label: InterventionText; command: string }
+  | { kind: 'link'; label: InterventionText; url: string };
 
 export interface Intervention {
   /** Stable d'un calcul à l'autre : `<type>:<carte>:<événement>`, la notification ne part qu'une fois. */
   id: string;
   kind: InterventionKind;
   severity: 'critical' | 'warning' | 'info';
-  title: string;
+  /** Première ligne de la raison de l'agent, sinon un titre de factory-live. */
+  title: InterventionText;
   issueKey: string | null;
   cardId: string;
   profile: string | null;
-  question: string;
+  /** La raison entière, telle que l'agent l'a écrite, sinon une explication de factory-live. */
+  question: InterventionText;
   /** Secondes epoch. */
   openedAt: number;
   push: boolean;
@@ -63,7 +96,7 @@ function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function firstLine(value: string, fallback: string): string {
+function firstLine(value: string, fallback: InterventionMessage): InterventionText {
   return value.split('\n')[0]?.trim() || fallback;
 }
 
@@ -92,8 +125,8 @@ function build(
   openedAt: number,
   parts: {
     severity: Intervention['severity'];
-    title: string;
-    question: string;
+    title: InterventionText;
+    question: InterventionText;
     actions: InterventionAction[];
     /** Dérogation : un blocage sans type n'est pas une décision demandée par l'agent. */
     push?: boolean;
@@ -124,13 +157,14 @@ function blockedIntervention(
   const gaveUp = lastOf(events, 'gave_up');
   const reason = text(blocked?.payload['reason']);
   const link = issueUrl(issueKey, ctx.owner);
-  const issueLink: InterventionAction[] = link
-    ? [{ kind: 'link', label: `Ouvrir l’issue ${issueKey}`, url: link }]
-    : [];
+  const issueLink: InterventionAction[] =
+    link && issueKey
+      ? [{ kind: 'link', label: message('intervention.action.openIssue', { issueKey }), url: link }]
+      : [];
   const unblock: InterventionAction[] = issueKey ? [{ kind: 'unblock' }] : [];
   const showCard: InterventionAction = {
     kind: 'copy',
-    label: 'Voir la carte en CLI',
+    label: message('intervention.action.showCard'),
     command: `hermes kanban --board ${ctx.board} show ${task.id}`,
   };
 
@@ -139,18 +173,21 @@ function blockedIntervention(
     if (task.blockKind === 'needs_input') {
       return build('pr_approval', task, issueKey, blocked, blocked?.createdAt ?? task.createdAt, {
         severity: 'info',
-        title: firstLine(reason, 'PR prête à approuver'),
-        question:
-          reason || 'La gate a approuvé la PR : ton approbation sur GitHub déclenche le merge.',
-        actions: pr ? [{ kind: 'link', label: 'Approuver la PR sur GitHub', url: pr }] : issueLink,
+        title: firstLine(reason, message('intervention.title.prReady')),
+        question: reason || message('intervention.question.prReady'),
+        actions: pr
+          ? [{ kind: 'link', label: message('intervention.action.approvePr'), url: pr }]
+          : issueLink,
       });
     }
     if (MAIN_RED.test(reason)) {
       return build('main_red', task, issueKey, blocked, blocked?.createdAt ?? task.createdAt, {
         severity: 'warning',
-        title: firstLine(reason, 'Main rouge après le merge'),
+        title: firstLine(reason, message('intervention.title.mainRed')),
         question: reason,
-        actions: pr ? [{ kind: 'link', label: 'Voir la PR et ses workflows', url: pr }] : issueLink,
+        actions: pr
+          ? [{ kind: 'link', label: message('intervention.action.prWorkflows'), url: pr }]
+          : issueLink,
       });
     }
   }
@@ -159,11 +196,8 @@ function blockedIntervention(
     const failures = Number(gaveUp.payload['failures'] ?? 0);
     return build('gave_up', task, issueKey, gaveUp, gaveUp.createdAt, {
       severity: 'critical',
-      title: `Abandon après ${failures || 'plusieurs'} échecs`,
-      question:
-        text(gaveUp.payload['error']) ||
-        reason ||
-        'Le disjoncteur du dispatcher a arrêté la carte.',
+      title: message('intervention.title.gaveUp', { failures: failures || null }),
+      question: text(gaveUp.payload['error']) || reason || message('intervention.question.gaveUp'),
       actions: [...unblock, showCard, ...issueLink],
     });
   }
@@ -173,27 +207,27 @@ function blockedIntervention(
     case 'needs_input':
       return build('needs_input', task, issueKey, blocked, opened, {
         severity: 'critical',
-        title: firstLine(reason, 'Décision attendue'),
-        question: reason || 'L’agent attend ta décision.',
+        title: firstLine(reason, message('intervention.title.needsInput')),
+        question: reason || message('intervention.question.needsInput'),
         actions: [...unblock, ...issueLink],
       });
     case 'capability':
       return build('capability', task, issueKey, blocked, opened, {
         severity: 'critical',
-        title: firstLine(reason, 'Outil ou accès manquant'),
-        question: reason || 'Un outil ou un accès manque à l’agent.',
+        title: firstLine(reason, message('intervention.title.capability')),
+        question: reason || message('intervention.question.capability'),
         actions: [...unblock, showCard, ...issueLink],
       });
     case 'transient':
       return build('transient', task, issueKey, blocked, opened, {
         severity: 'warning',
-        title: firstLine(reason, 'Échec passager'),
-        question: reason || 'Échec passager de la lane.',
+        title: firstLine(reason, message('intervention.title.transient')),
+        question: reason || message('intervention.question.transient'),
         actions: [
           ...unblock,
           {
             kind: 'copy',
-            label: 'Réassigner à coder (Hermès natif)',
+            label: message('intervention.action.reassignCoder'),
             command: `hermes kanban --board ${ctx.board} reassign ${task.id} coder --reason "échec passager de la lane" && hermes kanban --board ${ctx.board} unblock ${task.id}`,
           },
         ],
@@ -203,8 +237,8 @@ function blockedIntervention(
     default:
       return build('needs_input', task, issueKey, blocked, opened, {
         severity: 'warning',
-        title: firstLine(reason, 'Carte bloquée'),
-        question: reason || 'Carte bloquée sans raison donnée.',
+        title: firstLine(reason, message('intervention.title.blocked')),
+        question: reason || message('intervention.question.blocked'),
         actions: [...unblock, showCard, ...issueLink],
         push: false,
       });
@@ -250,14 +284,17 @@ export function interventionsOf(board: Board, ctx: InterventionContext): Interve
       found.push(
         build('triage_loop', task, issueKey, loop, loop?.createdAt ?? task.createdAt, {
           severity: 'critical',
-          title: 'Bloquée deux fois pour la même raison : carte passée en triage',
-          question:
-            '`/factory unblock` ne s’applique pas à une carte en triage. Sors-la par le tableau de bord d’Hermès (glisser vers Ready), jamais par specify ni decompose : un spécificateur pourrait réécrire le brief.',
+          title: message('intervention.title.triageLoop'),
+          question: message('intervention.question.triageLoop'),
           actions: [
-            { kind: 'link', label: 'Ouvrir le tableau de bord d’Hermès', url: ctx.dashboardUrl },
+            {
+              kind: 'link',
+              label: message('intervention.action.dashboard'),
+              url: ctx.dashboardUrl,
+            },
             {
               kind: 'copy',
-              label: 'Voir la carte en CLI',
+              label: message('intervention.action.showCard'),
               command: `hermes kanban --board ${ctx.board} show ${task.id}`,
             },
           ],
@@ -271,13 +308,12 @@ export function interventionsOf(board: Board, ctx: InterventionContext): Interve
         found.push(
           build('held_active_pr', task, issueKey, undefined, since, {
             severity: 'warning',
-            title: `Carte prête mais retenue depuis ${minutes} min`,
-            question:
-              'Le dispatcher retient la carte : un commentaire de moins de 24 h cite une URL de PR, sans relais depuis. C’est la garde `active_pr` d’Hermès contre les PR en double. La carte n’est pas bloquée, `/factory unblock` ne s’applique donc pas : il faut la relayer.',
+            title: message('intervention.title.held', { minutes }),
+            question: message('intervention.question.held'),
             actions: [
               {
                 kind: 'copy',
-                label: `Relancer par relais (scribe puis ${owner})`,
+                label: message('intervention.action.relay', { owner }),
                 command: `hermes kanban --board ${ctx.board} reassign ${task.id} scribe --reason "relais active_pr" && hermes kanban --board ${ctx.board} reassign ${task.id} ${owner} --reason "reprise sur la PR"`,
               },
             ],

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Timestamp } from './common.ts';
+import { Text } from './messages.ts';
 
 /** Abonnement Web Push d'un appareil (forme de `PushSubscription.toJSON()`). */
 export const PushSubscriptionInput = z.object({
@@ -11,6 +12,22 @@ export type PushSubscriptionInput = z.infer<typeof PushSubscriptionInput>;
 
 export const PushKey = z.object({ publicKey: z.string() });
 export type PushKey = z.infer<typeof PushKey>;
+
+/**
+ * Ce qu'un push porte jusqu'au service worker, qui l'écrit dans la langue choisie sur l'appareil :
+ * « <where> : <title> », puis `body`. Une notification par intervention (`tag`), et la pastille.
+ */
+export const PushPayload = z.object({
+  /** Issue ou carte concernée ; `null` pour un push de test. */
+  where: z.string().nullable(),
+  title: Text,
+  body: Text,
+  /** Page de factory-live ouverte au toucher. */
+  url: z.string(),
+  tag: z.string().nullable(),
+  badge: z.number().int().nonnegative().nullable(),
+});
+export type PushPayload = z.infer<typeof PushPayload>;
 
 /** Erreur remontée par la PWA, utile sur iPhone où la console n'est pas sous la main. */
 export const ClientLog = z.object({

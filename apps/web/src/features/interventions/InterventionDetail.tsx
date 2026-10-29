@@ -15,7 +15,7 @@ const SEVERITY_VARIANT = { critical: 'danger', warning: 'attention', info: 'acce
 const STEPS = ['sent', 'acknowledged', 'resumed'] as const;
 
 function CopyCommand({ action }: { action: Extract<InterventionAction, { kind: 'copy' }> }) {
-  const { t } = useI18n();
+  const { t, text } = useI18n();
   const [copied, setCopied] = useState(false);
   const commandId = useId();
   const copy = async () => {
@@ -30,7 +30,7 @@ function CopyCommand({ action }: { action: Extract<InterventionAction, { kind: '
   };
   return (
     <div className={styles.copy}>
-      <p className={styles.copyLabel}>{action.label}</p>
+      <p className={styles.copyLabel}>{text(action.label)}</p>
       <pre className={styles.command} id={commandId}>
         {action.command}
       </pre>
@@ -148,7 +148,7 @@ function UnblockForm({ intervention }: { intervention: Intervention }) {
 
 /** Une intervention : la question entière de l'agent, son contexte, et ce que tu peux faire d'ici. */
 export function InterventionDetail({ intervention }: { intervention: Intervention }) {
-  const { t, fmt } = useI18n();
+  const { t, fmt, text } = useI18n();
   const unblockable = intervention.actions.some((action) => action.kind === 'unblock');
   return (
     <article className={styles.card} aria-labelledby={`titre-${intervention.id}`}>
@@ -163,7 +163,7 @@ export function InterventionDetail({ intervention }: { intervention: Interventio
           ) : null}
         </div>
         <Heading as="h2" variant="small" id={`titre-${intervention.id}`}>
-          {intervention.title}
+          {text(intervention.title)}
         </Heading>
         <p className={styles.context}>
           {intervention.issueKey ? (
@@ -176,7 +176,7 @@ export function InterventionDetail({ intervention }: { intervention: Interventio
       </header>
 
       <section className={styles.question} aria-label={t.interventions.question}>
-        <Markdown>{intervention.question}</Markdown>
+        <Markdown>{text(intervention.question)}</Markdown>
       </section>
 
       {unblockable ? <UnblockForm intervention={intervention} /> : null}
@@ -194,7 +194,7 @@ export function InterventionDetail({ intervention }: { intervention: Interventio
             trailingVisual={LinkExternalIcon}
             variant={unblockable ? 'default' : 'primary'}
           >
-            {action.label}
+            {text(action.label)}
           </Button>
         ) : null,
       )}

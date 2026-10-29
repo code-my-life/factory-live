@@ -1,8 +1,207 @@
+import type { BlockKind } from '@factory-live/contracts';
 import { formatters } from '../ui/format.ts';
-import type { Messages } from './fr.ts';
+import type { Messages, ServerMessages } from './fr.ts';
 
 /** Le dictionnaire anglais : la forme du français, entière (vérifiée à la compilation). */
 const f = formatters('en');
+
+const cardStatus: Messages['cardStatus'] = {
+  triage: 'Triage',
+  todo: 'To do',
+  scheduled: 'Scheduled',
+  ready: 'Ready',
+  running: 'Running',
+  blocked: 'Blocked',
+  review: 'In review',
+  done: 'Done',
+  archived: 'Archived',
+};
+
+const blockKind = {
+  needs_input: 'decision needed',
+  capability: 'missing tool or access',
+  transient: 'transient failure',
+  dependency: 'dependency',
+} satisfies Record<BlockKind, string>;
+
+const SKILL_ACTIONS: Readonly<Record<string, string>> = {
+  loaded: 'Skill loaded',
+  created: 'Skill created',
+  edited: 'Skill edited',
+  patched: 'Skill edited',
+  installed: 'Skill installed',
+};
+
+const attempt = (current: number | null, total: number | null) =>
+  current !== null && total !== null ? ` (attempt ${current} of ${total})` : '';
+
+const statusLabel = (status: string) =>
+  (cardStatus as Readonly<Record<string, string>>)[status] ?? status;
+
+const gaveUp = (failures: number | null) =>
+  failures === null
+    ? 'Gave up after several failures'
+    : `Gave up after ${failures} ${f.plural(failures, 'failure', 'failures')}`;
+
+const server: ServerMessages = {
+  'activity.tool.unknown': () => 'tool',
+  'activity.action.llm': () => 'Calling the model',
+  'activity.llm.tokens': ({ input, output }) =>
+    `${f.integer(input)} tokens in, ${f.integer(output)} out`,
+  'activity.llm.rateLimited': ({ model, attempt: current, attempts }) =>
+    `429 on ${model}${attempt(current, attempts)}`,
+  'activity.llm.error': ({ status, model, attempt: current, attempts }) =>
+    `Error${status ? ` ${status}` : ''} on ${model}${attempt(current, attempts)}`,
+  'activity.skill': ({ action }) => SKILL_ACTIONS[action] ?? `Skill: ${action}`,
+  'activity.session.end': ({ outcome }) =>
+    outcome === 'failed'
+      ? 'Session failed'
+      : outcome === 'interrupted'
+        ? 'Session interrupted'
+        : 'Session ended',
+  'activity.kanban.claimed': ({ profile }) => `The dispatcher starts ${profile}`,
+  'activity.worker.spawned': () => 'Worker started',
+  'activity.worker.exited': () => 'Worker stopped',
+  'activity.worker.stale': () => 'Card taken back from a silent worker',
+  'activity.subagent.start': () => 'Subagent started',
+  'activity.subagent.stop': () => 'Subagent finished',
+
+  'timeline.created': () => 'Card created',
+  'timeline.created.for': ({ assignee }) => `for ${assignee}`,
+  'timeline.claimed': () => 'Card claimed',
+  'timeline.promoted': () => 'Card ready',
+  'timeline.promoted.detail': () => 'its dependencies are done',
+  'timeline.status': ({ status }) => `Status: ${statusLabel(status)}`,
+  'timeline.assigned': ({ assignee }) => `Reassigned to ${assignee ?? '?'}`,
+  'timeline.assigned.from': ({ from }) => `previously: ${from}`,
+  'timeline.edited': () => 'Card edited',
+  'timeline.attached': () => 'Attachment',
+  'timeline.scheduled': () => 'Card scheduled',
+  'timeline.reviewRequested': ({ reviewer }) => `Review requested from ${reviewer ?? 'the gate'}`,
+  'timeline.reviewReopened': () => 'Review reopened',
+  'timeline.changesRequested': ({ reviewer }) => `Changes requested by ${reviewer ?? 'the gate'}`,
+  'timeline.prChecks.passed': () => 'PR checks passed',
+  'timeline.prChecks.failed': () => 'PR checks failed',
+  'timeline.completed': () => 'Card completed',
+  'timeline.archived': () => 'Card archived',
+  'timeline.blocked': ({ kind }) => (kind ? `Card blocked: ${blockKind[kind]}` : 'Card blocked'),
+  'timeline.unblocked': () => 'Card unblocked',
+  'timeline.blockLoop': () => 'Block loop: card moved to triage',
+  'timeline.respawnGuarded': () => 'Restart held back',
+  'timeline.respawnGuarded.activePr': () =>
+    'A PR cited less than 24 h ago is waiting for a relay (active_pr guard)',
+  'timeline.dependencyWait': () => 'Waiting for the parent card',
+  'timeline.reclaimed': () => 'Card taken back from the worker',
+  'timeline.reclaimed.manual': () => 'by hand',
+  'timeline.crashed': () => 'Worker crashed',
+  'timeline.timedOut': () => 'Worker timed out',
+  'timeline.rateLimited': () => 'Worker stopped by a provider limit',
+  'timeline.protocolViolation': () => 'Worker exited without completing or blocking the card',
+  'timeline.spawnFailed': () => 'Worker failed to start',
+  'timeline.gaveUp': ({ failures }) => gaveUp(failures),
+  'timeline.workerReaped': () => 'Leftover worker stopped',
+  'timeline.modelOverride': ({ model }) => `Model overridden: ${model ?? '?'}`,
+  'timeline.reasoningEffort': ({ effort }) => `Reasoning effort: ${effort ?? '?'}`,
+  'timeline.comment': ({ author }) => `Comment from ${author}`,
+
+  'intervention.title.prReady': () => 'PR ready to approve',
+  'intervention.title.mainRed': () => 'Main is red after the merge',
+  'intervention.title.gaveUp': ({ failures }) => gaveUp(failures),
+  'intervention.title.needsInput': () => 'Decision needed',
+  'intervention.title.capability': () => 'Missing tool or access',
+  'intervention.title.transient': () => 'Transient failure',
+  'intervention.title.blocked': () => 'Card blocked',
+  'intervention.title.triageLoop': () => 'Blocked twice for the same reason: card moved to triage',
+  'intervention.title.held': ({ minutes }) => `Card ready but held for ${minutes} min`,
+  'intervention.question.prReady': () =>
+    'The gate approved the PR: your approval on GitHub triggers the merge.',
+  'intervention.question.gaveUp': () => 'The dispatcher’s circuit breaker stopped the card.',
+  'intervention.question.needsInput': () => 'The agent is waiting for your decision.',
+  'intervention.question.capability': () => 'The agent is missing a tool or an access.',
+  'intervention.question.transient': () => 'Transient failure of the lane.',
+  'intervention.question.blocked': () => 'Card blocked with no reason given.',
+  'intervention.question.triageLoop': () =>
+    '`/factory unblock` doesn’t apply to a card in triage. Take it out from the Hermès dashboard (drag it to Ready), never with specify or decompose: a specifier could rewrite the brief.',
+  'intervention.question.held': () =>
+    'The dispatcher is holding the card back: a comment less than 24 h old cites a PR URL, with no relay since. That’s Hermès’s `active_pr` guard against duplicate PRs. The card isn’t blocked, so `/factory unblock` doesn’t apply: it has to be relayed.',
+  'intervention.action.openIssue': ({ issueKey }) => `Open issue ${issueKey}`,
+  'intervention.action.showCard': () => 'Show the card in the CLI',
+  'intervention.action.approvePr': () => 'Approve the PR on GitHub',
+  'intervention.action.prWorkflows': () => 'View the PR and its workflows',
+  'intervention.action.reassignCoder': () => 'Reassign to coder (native Hermès)',
+  'intervention.action.dashboard': () => 'Open the Hermès dashboard',
+  'intervention.action.relay': ({ owner }) => `Restart through a relay (scribe, then ${owner})`,
+
+  'health.gateway': () => 'Hermès gateway',
+  'health.gateway.running': ({ seconds }) => `Running, probe received ${f.ago(seconds)}`,
+  'health.gateway.silent': ({ seconds }) => `Silent for ${f.span(seconds)}`,
+  'health.gateway.never': () => 'No word from the probe since factory-live started',
+  'health.dispatcher': () => 'Kanban dispatcher',
+  'health.dispatcher.noTick': () => 'No tick received (gateway webhooks not wired?)',
+  'health.dispatcher.paused': ({ seconds }) => `Paused, last tick ${f.ago(seconds)}`,
+  'health.dispatcher.lastTick': ({ seconds }) => `Last tick ${f.ago(seconds)}`,
+  'health.webhook': () => 'GitHub webhook listener',
+  'health.notReported': () => 'Not reported by the probe yet',
+  'health.provider': ({ provider }) => `${provider} provider`,
+  'health.nvidia': () => 'NVIDIA API',
+  'health.provider.lastOk': ({ seconds }) => `Last successful call ${f.ago(seconds)}`,
+  'health.provider.none': () => 'No successful call observed',
+  'health.claude': () => 'Claude Code (subscription)',
+  'health.claude.none': () => 'No Claude lane observed',
+  'health.claude.lastSession': ({ seconds }) => `Last session ${f.ago(seconds)}`,
+  'health.github': () => 'GitHub API',
+  'health.github.notYet': () => 'Not queried yet',
+  'health.github.ok': () => 'GitHub access valid',
+  'health.github.token': () => 'Fallback fine-grained token',
+  'health.github.app.user': ({ slug, login }) => `App ${slug}, signed in as ${login}`,
+  'health.github.app.fallback': ({ slug }) => `App ${slug}, unblocking with the fallback token`,
+  'health.github.app.loginNeeded': ({ slug }) => `App ${slug}, GitHub sign-in needed to unblock`,
+  'health.github.noAccess': () => 'No GitHub access: create and install the factory-live App',
+  'health.github.loginToWrite': () => 'Sign in to GitHub in factory-live to write in your name',
+  'health.github.unauthorized': () => 'Access denied (401): reconnect or reinstall the GitHub App',
+  'health.github.forbidden': () => 'Access denied or quota exhausted (403)',
+  'health.github.error': ({ status, issue }) =>
+    status === null ? `Network error on ${issue}` : `Error ${status} on ${issue}`,
+  'health.github.noToken': () =>
+    'No token in ~/.config/factory-live/github-token: read-only kanban',
+  'health.githubDeliveries': () => 'GitHub webhooks (as GitHub sees them)',
+  'health.githubDeliveries.last': ({ status, seconds }) =>
+    `Last delivery: HTTP ${status} ${f.ago(seconds)}`,
+  'health.probe': () => 'factory-live-probe',
+  'health.probe.last': ({ seconds }) => `Last report ${f.ago(seconds)}`,
+  'health.probe.none': () => 'No report received (probe not deployed yet?)',
+  'health.sources': () => 'factory-live sources',
+  'health.sources.detail': ({ kanban, cards, kanbanError, sessionsError }) => {
+    const read =
+      kanban === 'pending'
+        ? 'kanban.db not read yet'
+        : kanban === 'read'
+          ? `kanban.db read (${cards} ${f.plural(cards, 'card', 'cards')})`
+          : `kanban.db unreadable: ${kanbanError ?? '?'}`;
+    return `${read}; ${sessionsError ?? 'sessions readable on demand'}`;
+  },
+  'health.metric.running': () => 'In progress',
+  'health.metric.perAgent': () => 'Per agent',
+  'health.metric.rateLimited': () => '429s in 10 min',
+  'health.metric.quota': () => 'Remaining quota',
+  'health.metric.hooksPerMinute': () => 'Webhooks per minute',
+  'health.metric.lastHook': () => 'Last webhook',
+  'health.value.ofTotal': ({ value, total }) =>
+    `${f.integer(value)} of ${total === null ? '?' : f.integer(total)}`,
+  'health.value.atMost': ({ max }) => `at most ${max}`,
+  'health.value.none': () => 'none',
+  'health.value.ago': ({ seconds }) => f.ago(seconds),
+
+  'transcript.hermes': ({ profile, session }) =>
+    `Hermès session of ${profile}${session ? ` (${session})` : ''}`,
+  'transcript.claudeCode': ({ costUsd }) =>
+    `Claude Code lane${costUsd === null ? '' : ` (${f.usd(costUsd)})`}`,
+  'agent.role.default': () => 'Hermès agent',
+  'usage.claudeNote': () =>
+    'The Claude subscription balance has no reliable source: factory-live only shows a limit when a Claude Code transcript reports one.',
+  'push.test.title': () => 'factory-live: test',
+  'push.test.body': () => 'Notifications work on this device.',
+};
 
 export const en: Messages = {
   station: {
@@ -72,17 +271,7 @@ export const en: Messages = {
     onboarding: 'Onboarding',
     other: 'Other',
   },
-  cardStatus: {
-    triage: 'Triage',
-    todo: 'To do',
-    scheduled: 'Scheduled',
-    ready: 'Ready',
-    running: 'Running',
-    blocked: 'Blocked',
-    review: 'In review',
-    done: 'Done',
-    archived: 'Archived',
-  },
+  cardStatus,
   runRole: {
     coordinator: 'coordination',
     implementer: 'implementation',
@@ -201,6 +390,7 @@ export const en: Messages = {
     },
     refused: 'Refused',
     failed: (kind) => `${kind} failed`,
+    repeats: (count) => ` (${count} times)`,
   },
 
   model: {
@@ -393,6 +583,24 @@ export const en: Messages = {
     drift: 'Configuration drift',
     driftTitle: 'Live config differs from the factory repository',
     driftRepo: (repo) => ` (repository: ${repo})`,
+    field: {
+      model: 'model',
+      baseUrl: 'provider URL',
+      fallbacks: 'fallbacks',
+      effort: 'effort',
+      toolsets: 'toolsets',
+      plugins: 'plugins',
+      outboundHooks: 'outbound webhooks',
+    },
+    unset: {
+      model: 'none',
+      baseUrl: 'none',
+      fallbacks: 'none',
+      effort: 'default',
+      toolsets: 'none',
+      plugins: 'none',
+      outboundHooks: 'none',
+    },
     tools: 'Tools, skills and plugins',
     skills: 'Skills',
     plugins: 'Plugins and guard refusals (7 days)',
@@ -598,4 +806,7 @@ export const en: Messages = {
   notification: {
     fallbackBody: 'A blocker is waiting for you.',
   },
+
+  blockKind,
+  server,
 };

@@ -6,9 +6,9 @@ import { FactoryState, ServiceHealth } from './health.ts';
 import { Intervention } from './interventions.ts';
 import { CardKind, IssueSummary } from './issues.ts';
 
+/** Une station de la ligne et ses profils ; le client la nomme dans sa langue d'après son `id`. */
 export const StationView = z.object({
   id: StationId,
-  label: z.string(),
   profiles: z.array(z.string()),
 });
 export type StationView = z.infer<typeof StationView>;
@@ -19,7 +19,8 @@ export const SideCard = z.object({
   title: z.string(),
   kind: CardKind,
   status: KanbanStatus,
-  assignee: z.string(),
+  /** `null` : carte sans assigné. */
+  assignee: z.string().nullable(),
   openedAt: Timestamp,
   note: z.string().nullable(),
 });

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { IssueKey, Timestamp } from './common.ts';
+import { Text } from './messages.ts';
 
 /** Une ligne du fil d'activité : appel d'outil, appel au modèle, événement kanban, GitHub ou garde. */
 export const ActivityEvent = z.object({
@@ -9,8 +10,9 @@ export const ActivityEvent = z.object({
   profile: z.string().nullable(),
   issueKey: IssueKey.nullable(),
   cardId: z.string().nullable(),
-  label: z.string(),
-  detail: z.string().nullable(),
+  /** Nom d'outil ou de modèle, événement du kanban (tels quels), ou texte fabriqué par factory-live. */
+  label: Text,
+  detail: Text.nullable(),
   status: z.enum(['ok', 'running', 'error', 'blocked']).nullable(),
   durationMs: z.number().int().nonnegative().nullable(),
   model: z.string().nullable(),
@@ -36,7 +38,7 @@ export type TranscriptEntry = z.infer<typeof TranscriptEntry>;
 export const TranscriptView = z.object({
   runId: z.number().int().positive(),
   source: z.enum(['hermes', 'claude-code', 'opencode']),
-  title: z.string(),
+  title: Text,
   entries: z.array(TranscriptEntry),
   terminal: z.array(z.string()),
 });

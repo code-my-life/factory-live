@@ -36,7 +36,7 @@ function githubReturn(value: string | null, t: Messages): string | null {
 }
 
 export function SettingsPage() {
-  const { t, locale, setLocale } = useI18n();
+  const { t, locale, setLocale, text } = useI18n();
   const { preference, setPreference } = useColorMode();
   const source = useFactorySource();
   const snapshot = useSnapshot();
@@ -131,9 +131,9 @@ export function SettingsPage() {
             {sources.map((service) => (
               <li key={service.id}>
                 <LiveDot tone={service.status === 'ok' ? 'success' : 'attention'} />{' '}
-                <strong>{service.label}</strong>
+                <strong>{text(service.label)}</strong>
                 {t.common.colon}
-                {service.detail}
+                {text(service.detail)}
               </li>
             ))}
           </ul>

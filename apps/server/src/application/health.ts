@@ -1,8 +1,10 @@
+import { msg } from '@factory-live/contracts';
 import type {
   FactoryState,
   HealthStatus,
   ProbeReport,
   ServiceHealth,
+  Text,
 } from '@factory-live/contracts';
 import { iso } from './projection.ts';
 
@@ -13,12 +15,19 @@ export interface HealthSignals {
   lastTickAt: number | null;
   lastHookAt: number | null;
   hooksPerMinute: number;
-  kanban: { ok: boolean; detail: string; readAt: number | null };
-  sessions: { ok: boolean; detail: string };
+  /** Lecture de `kanban.db` : pas encore faite, faite (avec le nombre de cartes) ou en échec. */
+  kanban: {
+    state: 'pending' | 'read' | 'failed';
+    cards: number;
+    error: string | null;
+    readAt: number | null;
+  };
+  /** Sessions d'Hermès, lues à la demande ; `error` : la dernière lecture a échoué. */
+  sessions: { error: string | null };
   github: {
     configured: boolean;
     ok: boolean;
-    detail: string;
+    detail: Text;
     remaining: number | null;
     limit: number | null;
     checkedAt: number | null;
@@ -37,12 +46,9 @@ export interface HealthSignals {
 const PROBE_SILENT_MS = 90_000;
 const DISPATCHER_SILENT_MS = 3 * 60_000;
 
-function ago(now: number, at: number): string {
-  const seconds = Math.max(0, Math.round((now - at) / 1000));
-  if (seconds < 90) return `il y a ${seconds} s`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 90) return `il y a ${minutes} min`;
-  return `il y a ${Math.round(minutes / 60)} h`;
+/** Âge d'un fait en secondes ; le client l'écrit « il y a 9 s », « 9s ago »... */
+function age(now: number, at: number): { seconds: number } {
+  return { seconds: Math.max(0, Math.round((now - at) / 1000)) };
 }
 
 const GROUPS: Readonly<Record<string, ServiceHealth['group']>> = {
@@ -57,7 +63,8 @@ const GROUPS: Readonly<Record<string, ServiceHealth['group']>> = {
   cron: 'intake',
 };
 
-const LABELS: Readonly<Record<string, string>> = { webhook: 'Écouteur des webhooks GitHub' };
+/** Libellés que factory-live donne lui-même à certains contrôles de la sonde. */
+const LABELS: Readonly<Record<string, Text>> = { webhook: msg('health.webhook') };
 
 /** Santé de la factory : rapport de la sonde, complété par ce que factory-live observe lui-même. */
 export function buildHealth(signals: HealthSignals): {
@@ -79,14 +86,14 @@ export function buildHealth(signals: HealthSignals): {
 
   push({
     id: 'gateway',
-    label: 'Gateway Hermès',
+    label: msg('health.gateway'),
     group: 'hermes',
     status: probeFresh ? 'ok' : probe ? 'down' : 'unknown',
     detail: probeFresh
-      ? `En marche, sonde reçue ${ago(now, probe.receivedAt)}`
+      ? msg('health.gateway.running', age(now, probe.receivedAt))
       : probe
-        ? `Muet depuis ${ago(now, probe.receivedAt).replace('il y a ', '')}`
-        : 'Aucune nouvelle de la sonde depuis le démarrage de factory-live',
+        ? msg('health.gateway.silent', age(now, probe.receivedAt))
+        : msg('health.gateway.never'),
     checkedAt,
     metrics: probe ? [{ label: 'PID', value: String(probe.report.gatewayPid) }] : [],
   });
@@ -101,19 +108,28 @@ export function buildHealth(signals: HealthSignals): {
           : 'down';
   push({
     id: 'dispatcher',
-    label: 'Dispatcher kanban',
+    label: msg('health.dispatcher'),
     group: 'hermes',
     status: tickStatus,
     detail:
       signals.lastTickAt === null
-        ? 'Aucun tick reçu (webhooks du gateway non branchés ?)'
+        ? msg('health.dispatcher.noTick')
         : paused
-          ? `En pause, dernier tick ${ago(now, signals.lastTickAt)}`
-          : `Dernier tick ${ago(now, signals.lastTickAt)}`,
+          ? msg('health.dispatcher.paused', age(now, signals.lastTickAt))
+          : msg('health.dispatcher.lastTick', age(now, signals.lastTickAt)),
     checkedAt: signals.lastTickAt === null ? null : iso(signals.lastTickAt),
     metrics: [
-      { label: 'En cours', value: `${signals.running} sur ${signals.maxInProgress}` },
-      { label: 'Par agent', value: `${signals.maxInProgressPerProfile} au plus` },
+      {
+        label: msg('health.metric.running'),
+        value: msg('health.value.ofTotal', {
+          value: signals.running,
+          total: signals.maxInProgress,
+        }),
+      },
+      {
+        label: msg('health.metric.perAgent'),
+        value: msg('health.value.atMost', { max: signals.maxInProgressPerProfile }),
+      },
     ],
   });
 
@@ -125,12 +141,14 @@ export function buildHealth(signals: HealthSignals): {
         label: LABELS[id] ?? id,
         group,
         status: 'unknown',
-        detail: 'Pas encore rapporté par la sonde',
+        detail: msg('health.notReported'),
         checkedAt: null,
       });
       continue;
     }
-    const metrics = Object.entries(check.metrics).map(([label, value]) => ({ label, value }));
+    const metrics: ServiceHealth['metrics'] = Object.entries(check.metrics).map(
+      ([label, value]) => ({ label, value }),
+    );
     if (id === 'llamacpp') {
       const vram = checks.get('vram');
       if (vram) metrics.push({ label: 'VRAM', value: vram.detail });
@@ -152,40 +170,40 @@ export function buildHealth(signals: HealthSignals): {
       stats.lastErrorAt !== null && (stats.lastOkAt === null || stats.lastErrorAt > stats.lastOkAt);
     push({
       id: `provider:${provider}`,
-      label: provider === 'nvidia' ? 'API NVIDIA' : `Fournisseur ${provider}`,
+      label: provider === 'nvidia' ? msg('health.nvidia') : msg('health.provider', { provider }),
       group: 'models',
       status: failing ? 'degraded' : stats.lastOkAt !== null ? 'ok' : 'unknown',
       detail:
         stats.lastOkAt !== null
-          ? `Dernier appel réussi ${ago(now, stats.lastOkAt)}`
-          : 'Aucun appel réussi observé',
+          ? msg('health.provider.lastOk', age(now, stats.lastOkAt))
+          : msg('health.provider.none'),
       checkedAt: stats.lastOkAt === null ? null : iso(stats.lastOkAt),
-      metrics: [{ label: '429 sur 10 min', value: String(stats.rateLimited10m) }],
+      metrics: [{ label: msg('health.metric.rateLimited'), value: String(stats.rateLimited10m) }],
     });
   }
   const freellmapi = signals.providers.get('freellmapi');
   const freellmapiHealth = health.find((item) => item.id === 'freellmapi');
   if (freellmapi && freellmapiHealth)
     freellmapiHealth.metrics.push({
-      label: '429 sur 10 min',
+      label: msg('health.metric.rateLimited'),
       value: String(freellmapi.rateLimited10m),
     });
 
   push({
     id: 'claude',
-    label: 'Claude Code (abonnement)',
+    label: msg('health.claude'),
     group: 'models',
     status: signals.claudeLastSessionAt === null ? 'unknown' : 'ok',
     detail:
       signals.claudeLastSessionAt === null
-        ? 'Aucune lane Claude observée'
-        : `Dernière session ${ago(now, signals.claudeLastSessionAt)}`,
+        ? msg('health.claude.none')
+        : msg('health.claude.lastSession', age(now, signals.claudeLastSessionAt)),
     checkedAt: signals.claudeLastSessionAt === null ? null : iso(signals.claudeLastSessionAt),
   });
 
   push({
     id: 'github',
-    label: 'API GitHub',
+    label: msg('health.github'),
     group: 'tools',
     status: !signals.github.configured ? 'unknown' : signals.github.ok ? 'ok' : 'down',
     detail: signals.github.detail,
@@ -194,8 +212,11 @@ export function buildHealth(signals: HealthSignals): {
       signals.github.remaining !== null
         ? [
             {
-              label: 'Quota restant',
-              value: `${signals.github.remaining} sur ${signals.github.limit ?? '?'}`,
+              label: msg('health.metric.quota'),
+              value: msg('health.value.ofTotal', {
+                value: signals.github.remaining,
+                total: signals.github.limit,
+              }),
             },
           ]
         : [],
@@ -205,38 +226,47 @@ export function buildHealth(signals: HealthSignals): {
     const delivery = signals.webhookDeliveries;
     push({
       id: 'github-deliveries',
-      label: 'Webhooks GitHub (vus par GitHub)',
+      label: msg('health.githubDeliveries'),
       group: 'intake',
       status: delivery.status >= 200 && delivery.status < 300 ? 'ok' : 'degraded',
-      detail: `Dernière livraison : HTTP ${delivery.status} ${ago(now, delivery.at)}`,
+      detail: msg('health.githubDeliveries.last', {
+        status: delivery.status,
+        ...age(now, delivery.at),
+      }),
       checkedAt: iso(delivery.at),
     });
   }
 
   push({
     id: 'probe',
-    label: 'Sonde factory-live-probe',
+    label: msg('health.probe'),
     group: 'factory-live',
     status: probeFresh ? 'ok' : probe ? 'down' : 'unknown',
-    detail: probe
-      ? `Dernier rapport ${ago(now, probe.receivedAt)}`
-      : 'Aucun rapport reçu (sonde pas encore déployée ?)',
+    detail: probe ? msg('health.probe.last', age(now, probe.receivedAt)) : msg('health.probe.none'),
     checkedAt,
   });
 
-  const sourcesOk = signals.kanban.ok && signals.sessions.ok;
+  const sourcesOk = signals.kanban.state === 'read' && signals.sessions.error === null;
   push({
     id: 'sources',
-    label: 'Sources de factory-live',
+    label: msg('health.sources'),
     group: 'factory-live',
     status: sourcesOk ? 'ok' : 'down',
-    detail: `${signals.kanban.detail} ; ${signals.sessions.detail}`,
+    detail: msg('health.sources.detail', {
+      kanban: signals.kanban.state,
+      cards: signals.kanban.cards,
+      kanbanError: signals.kanban.error,
+      sessionsError: signals.sessions.error,
+    }),
     checkedAt: signals.kanban.readAt === null ? null : iso(signals.kanban.readAt),
     metrics: [
-      { label: 'Webhooks par minute', value: String(signals.hooksPerMinute) },
+      { label: msg('health.metric.hooksPerMinute'), value: String(signals.hooksPerMinute) },
       {
-        label: 'Dernier webhook',
-        value: signals.lastHookAt === null ? 'aucun' : ago(now, signals.lastHookAt),
+        label: msg('health.metric.lastHook'),
+        value:
+          signals.lastHookAt === null
+            ? msg('health.value.none')
+            : msg('health.value.ago', age(now, signals.lastHookAt)),
       },
     ],
   });

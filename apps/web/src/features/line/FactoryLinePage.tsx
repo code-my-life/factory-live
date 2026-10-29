@@ -43,7 +43,7 @@ function recentlyMoved(issue: IssueSummary, now: number): boolean {
 }
 
 export function FactoryLinePage() {
-  const { t } = useI18n();
+  const { t, text } = useI18n();
   const snapshot = useSnapshot();
   const navigate = useNavigate();
   const now = useNow();
@@ -140,7 +140,9 @@ export function FactoryLinePage() {
           variant="critical"
           title={t.line.blockersWaiting(pushable.length)}
           description={pushable
-            .map((intervention) => t.line.blockerItem(intervention.issueKey, intervention.title))
+            .map((intervention) =>
+              t.line.blockerItem(intervention.issueKey, text(intervention.title)),
+            )
             .join(' · ')}
           primaryAction={
             <Banner.PrimaryAction
@@ -188,11 +190,11 @@ export function FactoryLinePage() {
           <ul className={styles.sideList}>
             {snapshot.sideCards.map((card) => (
               <li key={card.id} className={styles.sideItem}>
-                <AgentAvatar profile={card.assignee} size={20} named />
+                {card.assignee ? <AgentAvatar profile={card.assignee} size={20} named /> : null}
                 <span className={styles.sideText}>
                   <span className={styles.sideTitle}>{card.title}</span>
                   <span className={styles.sideMeta}>
-                    {card.assignee} · {t.cardStatus[card.status]} ·{' '}
+                    {card.assignee ?? t.issue.unassigned} · {t.cardStatus[card.status]} ·{' '}
                     <Elapsed since={card.openedAt} mode="age" />
                   </span>
                   {card.note ? <span className={styles.sideNote}>{card.note}</span> : null}

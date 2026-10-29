@@ -2,8 +2,10 @@ import {
   ApiError,
   GitHubAccess,
   IssueDetail,
+  PushPayload,
   Snapshot,
   StreamEvent,
+  msg,
 } from '@factory-live/contracts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { trackUnblockReactions } from '../application/unblock.ts';
@@ -329,8 +331,8 @@ describe('détail d’une issue', () => {
       blockReason: 'Quelle base de données ?\nPostgreSQL ou SQLite ?',
       parents: ['t_b1ef0049'],
     });
-    expect(detail.timeline.map((entry) => entry.label)).toContain(
-      'Carte bloquée : décision attendue',
+    expect(detail.timeline.map((entry) => entry.label)).toContainEqual(
+      msg('timeline.blocked', { kind: 'needs_input' }),
     );
     expect(detail.issue.prUrl).toBeNull();
     expect((await h.app.request('/api/issues/cv-site/50')).status).toBe(404);
@@ -462,8 +464,10 @@ describe('notifications', () => {
       await h.app.request('/api/push/test', { method: 'POST', headers: LOCAL })
     ).json();
     expect(result).toMatchObject({ sent: 1 });
-    expect(JSON.parse(h.pushes[0]?.payload ?? '{}')).toMatchObject({
-      title: 'factory-live : test',
+    expect(PushPayload.parse(JSON.parse(h.pushes[0]?.payload ?? '{}'))).toMatchObject({
+      where: null,
+      title: msg('push.test.title'),
+      body: msg('push.test.body'),
     });
   });
 });

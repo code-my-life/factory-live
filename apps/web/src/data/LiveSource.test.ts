@@ -35,7 +35,7 @@ class FakeStream implements StreamLike {
 const SNAPSHOT: Snapshot = {
   generatedAt: '2026-10-28T18:00:00.000Z',
   factory: { live: true, paused: false, pauseReason: null, maxInProgress: 2, running: 1 },
-  stations: [{ id: 'implementation', label: 'Implémentation', profiles: ['coder'] }],
+  stations: [{ id: 'implementation', profiles: ['coder'] }],
   agents: [],
   issues: [],
   sideCards: [],

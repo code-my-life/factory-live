@@ -19,7 +19,7 @@ function AgentProfileCard({
   profile: ProfileView;
   activity: AgentActivity | undefined;
 }) {
-  const { t, fmt } = useI18n();
+  const { t, fmt, text } = useI18n();
   const working = activity && activity.state !== 'idle';
   return (
     <article
@@ -34,7 +34,7 @@ function AgentProfileCard({
         </h2>
         <Label variant="secondary">{t.station[profile.station]}</Label>
       </header>
-      <p className={styles.role}>{profile.role}</p>
+      <p className={styles.role}>{text(profile.role)}</p>
 
       <div className={styles.now}>
         <LiveDot tone={working ? 'success' : 'muted'} pulse={Boolean(working)} />
@@ -63,7 +63,7 @@ function AgentProfileCard({
       </div>
       {activity?.action ? (
         <p className={styles.action}>
-          {activity.action.label}
+          {text(activity.action.label)}
           {activity.action.detail ? ` · ${activity.action.detail}` : ''}
         </p>
       ) : null}
@@ -97,10 +97,14 @@ function AgentProfileCard({
           <ul className={styles.driftList}>
             {profile.drift.map((drift) => (
               <li key={drift.field}>
-                <code>{drift.field}</code>
+                <code>{t.agents.field[drift.field]}</code>
                 {t.common.colon}
-                <span className={styles.driftLive}>{drift.live}</span>
-                <span className={styles.muted}>{t.agents.driftRepo(drift.repo)}</span>
+                <span className={styles.driftLive}>
+                  {drift.live ?? t.agents.unset[drift.field]}
+                </span>
+                <span className={styles.muted}>
+                  {t.agents.driftRepo(drift.repo ?? t.agents.unset[drift.field])}
+                </span>
               </li>
             ))}
           </ul>

@@ -1,11 +1,19 @@
+import type { Text } from '@factory-live/contracts';
+import type { I18n } from '../i18n/i18n.ts';
+
 /**
  * Ce que le service worker fait d'un push de factory-live, sans dépendre du navigateur : lecture du
- * message (titre, texte, page à ouvrir, étiquette, pastille) et options de la notification.
- * Forme envoyée par le serveur : `apps/server/src/application/notify.ts`.
+ * message (issue, titre, texte, page à ouvrir, étiquette, pastille), puis la notification écrite dans
+ * la langue choisie sur l'appareil. Forme envoyée par le serveur : `PushPayload` des contrats
+ * (`apps/server/src/application/notify.ts`) ; l'ancienne forme (titre et texte déjà écrits) reste lue.
  */
 export interface PushMessage {
-  title: string;
-  body: string;
+  /** Issue ou carte concernée, devant le titre ; `null` pour un push de test. */
+  where: string | null;
+  /** Texte de l'agent ou code de factory-live ; `null` : le nom de l'app. */
+  title: Text | null;
+  /** `null` : le texte de secours (« Un blocage t'attend. »). */
+  body: Text | null;
   /** Page de factory-live ouverte au toucher (une intervention). */
   url: string;
   /** Une notification par intervention : la suivante remplace la précédente. */
@@ -15,15 +23,31 @@ export interface PushMessage {
 }
 
 const FALLBACK: PushMessage = {
-  title: 'factory-live',
-  body: 'Un blocage t’attend.',
+  where: null,
+  title: null,
+  body: null,
   url: '/interventions',
   tag: null,
   badge: null,
 };
 
-function text(value: unknown, fallback: string): string {
-  return typeof value === 'string' && value.trim() ? value : fallback;
+function nonEmpty(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+/** Un texte tel quel, ou un code de factory-live et ses paramètres (écrits par le dictionnaire). */
+function text(value: unknown): Text | null {
+  const plain = nonEmpty(value);
+  if (plain !== null) return plain;
+  if (typeof value !== 'object' || value === null) return null;
+  const { code, params } = value as { code?: unknown; params?: unknown };
+  return typeof code === 'string' && typeof params === 'object' && params !== null
+    ? (value as Text)
+    : null;
+}
+
+function clip(value: string, max: number): string {
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
 /** Une page de factory-live seulement : un push ne fait jamais quitter l'app. */
@@ -43,17 +67,30 @@ export function parsePush(raw: string | null | undefined): PushMessage {
   }
   const badge = Number(data['badge']);
   return {
-    title: text(data['title'], FALLBACK.title),
-    body: text(data['body'], ''),
+    where: nonEmpty(data['where']),
+    title: text(data['title']),
+    body: text(data['body']) ?? '',
     url: safeUrl(data['url']),
-    tag: typeof data['tag'] === 'string' && data['tag'] ? data['tag'] : null,
+    tag: nonEmpty(data['tag']),
     badge: Number.isInteger(badge) && badge >= 0 ? badge : null,
   };
 }
 
-export function notificationOptions(message: PushMessage): NotificationOptions {
+/** Le titre et le texte de la notification, dans la langue de l'appareil. */
+export function notificationContent(
+  message: PushMessage,
+  { t, text: write }: I18n,
+): { title: string; body: string } {
+  const title = message.title === null ? 'factory-live' : write(message.title);
   return {
-    body: message.body,
+    title: clip(message.where ? t.common.labelValue(message.where, title) : title, 90),
+    body: clip(message.body === null ? t.notification.fallbackBody : write(message.body), 180),
+  };
+}
+
+export function notificationOptions(message: PushMessage, body: string): NotificationOptions {
+  return {
+    body,
     icon: '/icons/icon-192.png',
     badge: '/icons/badge-96.png',
     data: { url: message.url },

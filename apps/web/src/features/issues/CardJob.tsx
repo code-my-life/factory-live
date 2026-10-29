@@ -44,7 +44,7 @@ export function CardJob({
   onSelect: () => void;
   now: number;
 }) {
-  const { t, fmt } = useI18n();
+  const { t, fmt, text } = useI18n();
   const run = card.runs.at(-1) ?? null;
   const running = card.status === 'running';
   const model = agent?.model ?? run?.model ?? null;
@@ -74,7 +74,7 @@ export function CardJob({
       ) : null}
       {agent?.action ? (
         <JobDetail code>
-          {agent.action.label}
+          {text(agent.action.label)}
           {agent.action.detail ? ` · ${agent.action.detail}` : ''}
         </JobDetail>
       ) : card.blockReason ? (

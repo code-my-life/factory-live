@@ -1,3 +1,4 @@
+import { msg } from '@factory-live/contracts';
 import type {
   ActivityEvent,
   Intervention,
@@ -77,14 +78,12 @@ export class Hub {
   private providers = new Map<string, ProviderStats>();
   private claudeLastSessionAt: number | null = null;
   private kanbanStatus: HealthSignals['kanban'] = {
-    ok: false,
-    detail: 'kanban.db pas encore lu',
+    state: 'pending',
+    cards: 0,
+    error: null,
     readAt: null,
   };
-  private sessionsStatus: HealthSignals['sessions'] = {
-    ok: true,
-    detail: 'sessions lisibles à la demande',
-  };
+  private sessionsStatus: HealthSignals['sessions'] = { error: null };
   private readonly stations: Map<string, StationRecord>;
   private issueOfCard = new Map<string, string>();
   private readonly listeners = new Set<(event: StreamEvent) => void>();
@@ -177,24 +176,19 @@ export class Hub {
       ],
     };
     this.issueOfCard = issueOfCards(this.board);
-    this.kanbanStatus = {
-      ok: true,
-      detail: `kanban.db lu (${this.board.tasks.length} cartes)`,
-      readAt,
-    };
+    this.kanbanStatus = { state: 'read', cards: this.board.tasks.length, error: null, readAt };
     this.trackUnblocks(delta, readAt);
     this.dirty.add('board').add('agents').add('health');
   }
 
-  kanbanFailed(detail: string): void {
-    this.kanbanStatus = { ...this.kanbanStatus, ok: false, detail };
+  /** La lecture de `kanban.db` échoue : `error`, le message de l'erreur, tel quel. */
+  kanbanFailed(error: string): void {
+    this.kanbanStatus = { ...this.kanbanStatus, state: 'failed', error };
     this.dirty.add('health');
   }
 
-  sessionsFailed(detail: string | null): void {
-    this.sessionsStatus = detail
-      ? { ok: false, detail }
-      : { ok: true, detail: 'sessions lisibles à la demande' };
+  sessionsFailed(error: string | null): void {
+    this.sessionsStatus = { error };
     this.dirty.add('health');
   }
 
@@ -370,8 +364,7 @@ export class Hub {
         : {
             configured: false,
             ok: false,
-            detail:
-              'Aucun jeton dans ~/.config/factory-live/github-token : lecture seule du kanban',
+            detail: msg('health.github.noToken'),
             remaining: null,
             limit: null,
             checkedAt: null,

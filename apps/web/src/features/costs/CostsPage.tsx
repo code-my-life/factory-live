@@ -12,7 +12,7 @@ import page from '../../ui/page.module.css';
 const PERIODS: readonly UsagePeriod[] = [1, 7, 30];
 
 export function CostsPage() {
-  const { t, fmt } = useI18n();
+  const { t, fmt, text } = useI18n();
   const source = useFactorySource();
   const [periodIndex, setPeriodIndex] = useState(1);
   const period = PERIODS[periodIndex] ?? 7;
@@ -140,7 +140,7 @@ export function CostsPage() {
             </Table.Body>
           </Table>
         </div>
-        <p className={page.muted}>{usage.claudeSubscriptionNote}</p>
+        <p className={page.muted}>{text(usage.claudeSubscriptionNote)}</p>
       </section>
 
       <section className={page.section}>

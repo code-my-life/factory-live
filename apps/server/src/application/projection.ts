@@ -56,13 +56,14 @@ export interface ProjectionInput {
   keepFinishedMs: number;
 }
 
-const STATION_LABELS: [StationId, string][] = [
-  ['intake', 'Intake'],
-  ['brief', 'Brief'],
-  ['implementation', 'Implémentation'],
-  ['gate', 'Gate'],
-  ['release', 'Release'],
-  ['done', 'Terminé'],
+/** Les stations de la ligne, dans l'ordre ; le client les nomme dans sa langue. */
+const LINE_STATIONS: readonly StationId[] = [
+  'intake',
+  'brief',
+  'implementation',
+  'gate',
+  'release',
+  'done',
 ];
 
 export const iso = (ms: number): string => new Date(ms).toISOString();
@@ -100,9 +101,8 @@ function text(value: unknown): string | null {
 }
 
 export function stationViews(profiles: readonly string[]): StationView[] {
-  return STATION_LABELS.map(([id, label]) => ({
+  return LINE_STATIONS.map((id) => ({
     id,
-    label,
     profiles: profiles.filter((profile) => profileStation(profile) === id),
   }));
 }
@@ -212,7 +212,7 @@ export function projectSideCards(input: ProjectionInput): SideCard[] {
       title: task.title,
       kind: cardKindOf(task),
       status: task.status,
-      assignee: task.assignee ?? 'non assignée',
+      assignee: task.assignee,
       openedAt: isoSeconds(task.createdAt),
       note: task.status === 'blocked' ? lastBlock.get(task.id) || null : null,
     }))

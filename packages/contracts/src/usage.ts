@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { StationId } from './common.ts';
+import { Text } from './messages.ts';
 
 /** Consommation agrégée par modèle et fournisseur, sur une période. */
 export const ModelUsage = z.object({
@@ -24,7 +26,7 @@ export const UsageReport = z.object({
       rateLimited: z.number().int().nonnegative(),
     }),
   ),
-  claudeSubscriptionNote: z.string(),
+  claudeSubscriptionNote: Text,
 });
 export type UsageReport = z.infer<typeof UsageReport>;
 
@@ -34,10 +36,16 @@ export const HistoryStats = z.object({
   issuesDone: z.number().int().nonnegative(),
   medianLeadTimeMinutes: z.number().nonnegative().nullable(),
   stationMinutes: z.array(
-    z.object({ station: z.string(), medianMinutes: z.number().nonnegative() }),
+    z.object({ station: StationId, medianMinutes: z.number().nonnegative() }),
   ),
+  /** `model` : le modèle Claude de la lane, `null` pour le modèle de l'agent lui-même. */
   gatePassRate: z.array(
-    z.object({ harness: z.string(), model: z.string(), runs: z.number().int(), rate: z.number() }),
+    z.object({
+      harness: z.string(),
+      model: z.string().nullable(),
+      runs: z.number().int(),
+      rate: z.number(),
+    }),
   ),
   blocks: z.number().int().nonnegative(),
   medianHumanResponseMinutes: z.number().nonnegative().nullable(),

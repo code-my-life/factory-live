@@ -1,4 +1,5 @@
-import type { PullRequestView } from '@factory-live/contracts';
+import { msg } from '@factory-live/contracts';
+import type { PullRequestView, Text } from '@factory-live/contracts';
 import type {
   GitHubReadPort,
   GitHubStatus,
@@ -31,19 +32,19 @@ export class GitHubCache implements GitHubReadPort {
   private readonly fetchedOnce = new Set<string>();
   /** Issues introuvables sur GitHub (cartes de test, dépôt supprimé) : relues une fois l'heure. */
   private readonly missing = new Map<string, number>();
-  status: GitHubStatus = { ok: false, detail: 'Pas encore interrogée', checkedAt: null };
+  status: GitHubStatus = { ok: false, detail: msg('health.github.notYet'), checkedAt: null };
   lastDelivery: { at: number; status: number } | null = null;
 
   readonly client: GitHubClient;
   private readonly owner: string;
   private readonly log: LoggerPort;
-  private readonly describe: () => string;
+  private readonly describe: () => Text;
 
   constructor(
     client: GitHubClient,
     owner: string,
     log: LoggerPort,
-    describe: () => string = () => 'Accès GitHub valide',
+    describe: () => Text = () => msg('health.github.ok'),
   ) {
     this.client = client;
     this.owner = owner;
@@ -100,18 +101,19 @@ export class GitHubCache implements GitHubReadPort {
           this.missing.set(issue.key, now);
           continue;
         }
-        // Nos propres messages (aucun accès, connexion requise) sont déjà lisibles.
-        const ours =
-          error instanceof GitHubError && /^(Aucun accès|Connecte-toi)/.test(error.message);
+        const access = error instanceof GitHubError ? error.access : null;
         this.status = {
           ok: false,
-          detail: ours
-            ? error.message
-            : status === 401
-              ? 'Accès refusé (401) : reconnecte ou réinstalle l’App GitHub'
-              : status === 403
-                ? 'Accès refusé ou quota épuisé (403)'
-                : `Erreur ${status || 'réseau'} sur ${issue.key}`,
+          detail:
+            access === 'none'
+              ? msg('health.github.noAccess')
+              : access === 'login-required'
+                ? msg('health.github.loginToWrite')
+                : status === 401
+                  ? msg('health.github.unauthorized')
+                  : status === 403
+                    ? msg('health.github.forbidden')
+                    : msg('health.github.error', { status: status || null, issue: issue.key }),
           checkedAt: now,
         };
         this.log.warn({ issue: issue.key, status }, 'lecture GitHub en échec');

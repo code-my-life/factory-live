@@ -6,7 +6,9 @@ import {
   precacheAndRoute,
 } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
-import { notificationOptions, parsePush, safeUrl } from './notification.ts';
+import { i18nOf } from '../i18n/i18n.ts';
+import { workerLocale } from '../i18n/workerLocale.ts';
+import { notificationContent, notificationOptions, parsePush, safeUrl } from './notification.ts';
 
 declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: (string | { url: string; revision: string | null })[];
@@ -15,7 +17,8 @@ declare const self: ServiceWorkerGlobalScope & {
 /*
  * Service worker de factory-live : la coque de l'app (HTML, JS, CSS, icônes) reste disponible hors
  * ligne, l'API ne passe jamais par le cache (le flux SSE et les écritures vont toujours au serveur),
- * et les push du serveur deviennent des notifications avec la pastille de l'icône.
+ * et les push du serveur deviennent des notifications avec la pastille de l'icône, écrites dans la
+ * langue choisie sur l'appareil (laissée par la page, sinon celle du navigateur).
  * Une nouvelle version prend la main tout de suite ; la page se recharge alors (`pwa/register.ts`).
  */
 void self.skipWaiting();
@@ -43,10 +46,14 @@ async function setBadge(count: number | null): Promise<void> {
 self.addEventListener('push', (event) => {
   const message = parsePush(event.data?.text());
   event.waitUntil(
-    Promise.all([
-      self.registration.showNotification(message.title, notificationOptions(message)),
-      setBadge(message.badge),
-    ]),
+    (async () => {
+      const i18n = i18nOf(await workerLocale(self.navigator.language));
+      const { title, body } = notificationContent(message, i18n);
+      await Promise.all([
+        self.registration.showNotification(title, notificationOptions(message, body)),
+        setBadge(message.badge),
+      ]);
+    })(),
   );
 });
 

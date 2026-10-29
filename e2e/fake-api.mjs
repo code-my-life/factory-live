@@ -9,17 +9,17 @@ const open = new Set();
 
 function snapshot() {
   const now = new Date().toISOString();
-  const station = (id, label, profiles) => ({ id, label, profiles });
+  const station = (id, profiles) => ({ id, profiles });
   return {
     generatedAt: now,
     factory: { live: true, paused: false, pauseReason: null, maxInProgress: 2, running: 1 },
     stations: [
-      station('intake', 'Intake', []),
-      station('brief', 'Brief', ['coordinator']),
-      station('implementation', 'Implémentation', ['coder']),
-      station('gate', 'Gate', ['gate']),
-      station('release', 'Release', ['release']),
-      station('done', 'Terminé', []),
+      station('intake', []),
+      station('brief', ['coordinator']),
+      station('implementation', ['coder']),
+      station('gate', ['gate']),
+      station('release', ['release']),
+      station('done', []),
     ],
     agents: [
       {

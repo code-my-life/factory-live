@@ -49,7 +49,7 @@ const KIND_ICON: Record<ActivityEvent['kind'], Icon> = {
 
 const FREQUENT = new Set<ActivityEvent['kind']>(['tool', 'llm', 'skill']);
 
-export function fromActivity(event: ActivityEvent, { t }: I18n): TimelineRow {
+export function fromActivity(event: ActivityEvent, { t, text }: I18n): TimelineRow {
   const kindIcon = KIND_ICON[event.kind];
   const kindLabel = t.activity.kind[event.kind];
   const failed = event.status === 'error';
@@ -71,8 +71,8 @@ export function fromActivity(event: ActivityEvent, { t }: I18n): TimelineRow {
     iconLabel: blocked ? t.activity.refused : failed ? t.activity.failed(kindLabel) : kindLabel,
     condensed: FREQUENT.has(event.kind) && !failed && !blocked,
     agent: event.profile,
-    title: event.label,
-    detail: event.detail,
+    title: text(event.label),
+    detail: event.detail === null ? null : text(event.detail),
     issueKey: event.issueKey,
     model: event.model,
     durationMs: event.durationMs,
@@ -96,7 +96,7 @@ const TONE: Record<TimelineEntry['tone'], RowTone> = {
   done: 'done',
 };
 
-export function fromTimelineEntry(entry: TimelineEntry, { t }: I18n): TimelineRow {
+export function fromTimelineEntry(entry: TimelineEntry, { t, text }: I18n): TimelineRow {
   const sourceIcon = SOURCE_ICON[entry.source];
   const sourceLabel = t.activity.source[entry.source];
   return {
@@ -108,8 +108,8 @@ export function fromTimelineEntry(entry: TimelineEntry, { t }: I18n): TimelineRo
     condensed:
       entry.source === 'comment' || (entry.source === 'hermes' && entry.tone === 'neutral'),
     agent: entry.profile,
-    title: entry.label,
-    detail: entry.detail,
+    title: `${text(entry.label)}${entry.repeats ? t.activity.repeats(entry.repeats) : ''}`,
+    detail: entry.detail === null ? null : text(entry.detail),
     issueKey: null,
     model: null,
     durationMs: null,

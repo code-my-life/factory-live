@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { agentKey, applyHook, cardOfCwd, describeToolCall, taskIdFromCwd } from './activity.ts';
+import { message } from './messages.ts';
 import type { ActivityLine, HookEvent, LiveAgent, RunningCard } from './activity.ts';
 
 const CARD = 't_5e21c0d9';
@@ -184,7 +185,7 @@ describe('applyHook', () => {
     );
     expect(state.agents.get(KEY)).toMatchObject({
       state: 'thinking',
-      action: { kind: 'llm' },
+      action: { kind: 'llm', label: message('activity.action.llm') },
       lastHeartbeatAt: 1_008_400,
       runStartedAt: 1_000_000,
     });
@@ -237,7 +238,7 @@ describe('applyHook', () => {
       kind: 'llm',
       durationMs: 3_200,
       model: 'agnes-2.5-flash',
-      detail: '1200 jetons en entrée, 80 en sortie',
+      detail: message('activity.llm.tokens', { input: 1200, output: 80 }),
     });
     state = run(
       [
@@ -267,7 +268,11 @@ describe('applyHook', () => {
     expect(lines[0]).toMatchObject({
       kind: 'llm',
       status: 'error',
-      label: '429 sur agnes-2.5-flash (essai 1 sur 3)',
+      label: message('activity.llm.rateLimited', {
+        model: 'agnes-2.5-flash',
+        attempt: 1,
+        attempts: 3,
+      }),
       detail: 'Too Many Requests',
     });
   });
@@ -374,7 +379,10 @@ describe('applyHook', () => {
       hook('on_skill_lifecycle', { extra: { action: 'loaded', skill_name: 'factory-brief' } }),
       hook('on_skill_lifecycle', { extra: { action: 'patched', skill_name: 'factory-brief' } }),
     ]);
-    expect(lines.map((entry) => entry.label)).toEqual(['Skill chargée', 'Skill modifiée']);
+    expect(lines.map((entry) => entry.label)).toEqual([
+      message('activity.skill', { action: 'loaded' }),
+      message('activity.skill', { action: 'patched' }),
+    ]);
   });
 
   it('retire l’agent à la fin de sa session, et le signale si elle a échoué', () => {
@@ -388,7 +396,7 @@ describe('applyHook', () => {
     expect(agents.has(KEY)).toBe(false);
     expect(lines.at(-1)).toMatchObject({
       kind: 'system',
-      label: 'Session en échec',
+      label: message('activity.session.end', { outcome: 'failed' }),
       detail: 'max_iterations',
       status: 'error',
     });
@@ -413,7 +421,7 @@ describe('applyHook', () => {
     ]);
     expect(exited.agents.size).toBe(0);
     expect(exited.lines.at(-1)).toMatchObject({
-      label: 'Worker arrêté',
+      label: message('activity.worker.exited'),
       detail: 'crashed, crashed',
       status: 'error',
     });
@@ -425,6 +433,7 @@ describe('applyHook', () => {
       }),
     ]);
     expect(stale.agents.size).toBe(0);
+    expect(stale.lines.at(-1)?.label).toEqual(message('activity.worker.stale'));
   });
 
   it('une carte bloquée laisse l’agent visible en état bloqué', () => {
@@ -473,10 +482,10 @@ describe('applyHook', () => {
     ]);
     expect(agents.get(KEY)).toMatchObject({ cardId: CARD });
     expect(lines.map((entry) => [entry.label, entry.detail, entry.status])).toEqual([
-      ['Worker lancé', 'pid 4242', 'ok'],
-      ['Sous-agent lancé', 'Lire la doc de Primer', 'running'],
-      ['Sous-agent terminé', 'Doc lue', 'ok'],
-      ['Sous-agent terminé', null, 'error'],
+      [message('activity.worker.spawned'), 'pid 4242', 'ok'],
+      [message('activity.subagent.start'), 'Lire la doc de Primer', 'running'],
+      [message('activity.subagent.stop'), 'Doc lue', 'ok'],
+      [message('activity.subagent.stop'), null, 'error'],
       ['completed', 'PR #52 ouverte', 'ok'],
     ]);
   });
@@ -487,6 +496,32 @@ describe('applyHook', () => {
         extra: { model: 'dots3', status_code: 500, reason: 'upstream' },
       }),
     ]);
-    expect(lines[0]).toMatchObject({ label: 'Erreur 500 sur dots3', detail: 'upstream' });
+    expect(lines[0]).toMatchObject({
+      label: message('activity.llm.error', {
+        status: 500,
+        model: 'dots3',
+        attempt: null,
+        attempts: null,
+      }),
+      detail: 'upstream',
+    });
+  });
+
+  it('les textes que factory-live écrit lui-même sont des codes, pas du français', () => {
+    const { lines } = run([
+      hook('kanban_task_claimed', {
+        profile: 'default',
+        extra: { task_id: CARD, assignee: 'coder-claude' },
+      }),
+      hook('on_session_end', { extra: { interrupted: true } }),
+      hook('on_session_end', { extra: {} }),
+      hook('pre_tool_call', { toolName: null, toolInput: null }),
+    ]);
+    expect(lines.map((entry) => [entry.label, entry.detail])).toEqual([
+      ['claimed', message('activity.kanban.claimed', { profile: 'coder-claude' })],
+      [message('activity.session.end', { outcome: 'interrupted' }), null],
+      [message('activity.session.end', { outcome: 'completed' }), null],
+      [message('activity.tool.unknown'), null],
+    ]);
   });
 });

@@ -1,27 +1,21 @@
+import type { ConfigDrift, ConfigField } from '@factory-live/contracts';
 import type { ModelLink, ProfileConfig } from './ports.ts';
 
-/** Écarts entre la config en service et celle du dépôt, champ par champ, en texte lisible. */
-export function configDrift(
-  live: ProfileConfig,
-  repo: ProfileConfig,
-): { field: string; live: string; repo: string }[] {
-  const show = (link: ModelLink | null) => (link ? `${link.model} (${link.provider})` : 'aucun');
-  const fields: [string, string, string][] = [
-    ['modèle', show(live.model), show(repo.model)],
-    ['url du fournisseur', live.baseUrl ?? 'aucune', repo.baseUrl ?? 'aucune'],
-    [
-      'fallbacks',
-      live.fallbacks.map(show).join(', ') || 'aucun',
-      repo.fallbacks.map(show).join(', ') || 'aucun',
-    ],
-    ['effort', live.effort ?? 'défaut', repo.effort ?? 'défaut'],
-    ['toolsets', live.toolsets.join(', '), repo.toolsets.join(', ')],
-    ['plugins', [...live.plugins].sort().join(', '), [...repo.plugins].sort().join(', ')],
-    [
-      'webhooks sortants',
-      live.outboundHooks.join(', ') || 'aucun',
-      repo.outboundHooks.join(', ') || 'aucun',
-    ],
+/**
+ * Écarts entre la config en service et celle du dépôt, champ par champ. Les valeurs sont celles de la
+ * config (modèles, URL, noms) ; `null` quand rien n'est réglé, et le client nomme champ et absence.
+ */
+export function configDrift(live: ProfileConfig, repo: ProfileConfig): ConfigDrift[] {
+  const show = (link: ModelLink) => `${link.model} (${link.provider})`;
+  const list = (values: readonly string[]) => (values.length > 0 ? values.join(', ') : null);
+  const fields: [ConfigField, string | null, string | null][] = [
+    ['model', live.model && show(live.model), repo.model && show(repo.model)],
+    ['baseUrl', live.baseUrl, repo.baseUrl],
+    ['fallbacks', list(live.fallbacks.map(show)), list(repo.fallbacks.map(show))],
+    ['effort', live.effort, repo.effort],
+    ['toolsets', list(live.toolsets), list(repo.toolsets)],
+    ['plugins', list([...live.plugins].sort()), list([...repo.plugins].sort())],
+    ['outboundHooks', list(live.outboundHooks), list(repo.outboundHooks)],
   ];
   return fields
     .filter(([, left, right]) => left !== right)

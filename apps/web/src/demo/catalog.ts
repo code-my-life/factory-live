@@ -1,4 +1,5 @@
 import type {
+  ConfigDrift,
   HistoryStats,
   ModelRef,
   ModelUsage,
@@ -21,7 +22,13 @@ export const model = (
   source: ModelRef['source'] = 'config',
 ): ModelRef => ({ provider, model: name, source });
 
-const DRIFT_AUTO = { field: 'model.default', live: 'auto', repo: 'agnes-2.5-flash' };
+/** Écart de modèle, écrit comme le serveur l'écrit : « modèle (fournisseur) ». */
+const driftModel = (live: string, repo = 'agnes-2.5-flash (freellmapi)'): ConfigDrift => ({
+  field: 'model',
+  live,
+  repo,
+});
+const DRIFT_AUTO = driftModel('auto (freellmapi)');
 
 /** Profils de la factory tels qu'ils tournent aujourd'hui (config en service, 18/10). */
 export function buildProfiles(): ProfileView[] {
@@ -140,10 +147,7 @@ export function buildProfiles(): ProfileView[] {
         { name: 'factory-notify', refusals: 0 },
       ],
       mcp: [],
-      drift: [
-        { field: 'model.default', live: QWEN_LOCAL, repo: 'agnes-2.5-flash' },
-        { field: 'model.provider', live: 'llamacpp', repo: 'freellmapi' },
-      ],
+      drift: [driftModel(`${QWEN_LOCAL} (llamacpp)`)],
       stats: { runs: 21, gatePassRate: 0.81, medianRunMinutes: 31, costUsd: 18.62 },
     },
     {
@@ -163,10 +167,7 @@ export function buildProfiles(): ProfileView[] {
         { name: 'factory-notify', refusals: 0 },
       ],
       mcp: [],
-      drift: [
-        { field: 'model.default', live: NEMOTRON_ULTRA, repo: 'agnes-2.5-flash' },
-        { field: 'model.provider', live: 'nvidia', repo: 'freellmapi' },
-      ],
+      drift: [driftModel(`${NEMOTRON_ULTRA} (nvidia)`)],
       stats: { runs: 1, gatePassRate: null, medianRunMinutes: null, costUsd: null },
     },
     {
@@ -369,11 +370,11 @@ export function buildHistory(now: number): HistoryStats {
     issuesDone: 9,
     medianLeadTimeMinutes: 212,
     stationMinutes: [
-      { station: 'Intake', medianMinutes: 1 },
-      { station: 'Brief', medianMinutes: 8 },
-      { station: 'Implémentation', medianMinutes: 74 },
-      { station: 'Gate', medianMinutes: 26 },
-      { station: 'Release', medianMinutes: 95 },
+      { station: 'intake', medianMinutes: 1 },
+      { station: 'brief', medianMinutes: 8 },
+      { station: 'implementation', medianMinutes: 74 },
+      { station: 'gate', medianMinutes: 26 },
+      { station: 'release', medianMinutes: 95 },
     ],
     gatePassRate: [
       { harness: 'coder-claude', model: 'claude-opus-5-5', runs: 16, rate: 0.81 },

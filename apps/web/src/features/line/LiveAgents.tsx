@@ -29,7 +29,7 @@ export function LiveAgents({
   agents: readonly AgentActivity[];
   maxInProgress: number;
 }) {
-  const { t } = useI18n();
+  const { t, text } = useI18n();
   const busy = agents
     .filter((agent) => agent.state !== 'idle')
     .sort((left, right) => ORDER[left.state] - ORDER[right.state]);
@@ -67,11 +67,11 @@ export function LiveAgents({
               {agent.action && ActionIcon ? (
                 <p
                   className={styles.liveAction}
-                  key={`${agent.action.label}-${agent.action.startedAt}`}
+                  key={`${text(agent.action.label)}-${agent.action.startedAt}`}
                 >
                   <ActionIcon size={14} aria-hidden="true" />
                   <span className={styles.liveActionText}>
-                    {agent.action.label}
+                    {text(agent.action.label)}
                     {agent.action.detail ? (
                       <span className={styles.liveActionDetail}> {agent.action.detail}</span>
                     ) : null}

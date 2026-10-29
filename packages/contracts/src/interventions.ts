@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { IssueKey, Severity, Timestamp } from './common.ts';
+import { Text } from './messages.ts';
 
 export const InterventionKind = z.enum([
   'needs_input',
@@ -17,8 +18,8 @@ export type InterventionKind = z.infer<typeof InterventionKind>;
 /** Ce que l'outil propose pour répondre : débloquer, copier une commande, ou ouvrir un lien. */
 export const InterventionAction = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('unblock') }),
-  z.object({ kind: z.literal('copy'), label: z.string(), command: z.string() }),
-  z.object({ kind: z.literal('link'), label: z.string(), url: z.url() }),
+  z.object({ kind: z.literal('copy'), label: Text, command: z.string() }),
+  z.object({ kind: z.literal('link'), label: Text, url: z.url() }),
 ]);
 export type InterventionAction = z.infer<typeof InterventionAction>;
 
@@ -35,11 +36,13 @@ export const Intervention = z.object({
   id: z.string(),
   kind: InterventionKind,
   severity: Severity,
-  title: z.string(),
+  /** Première ligne de la raison donnée par l'agent, sinon un titre de factory-live. */
+  title: Text,
   issueKey: IssueKey.nullable(),
   cardId: z.string().nullable(),
   profile: z.string().nullable(),
-  question: z.string(),
+  /** La raison entière, telle que l'agent l'a écrite, sinon une explication de factory-live. */
+  question: Text,
   openedAt: Timestamp,
   push: z.boolean(),
   actions: z.array(InterventionAction),

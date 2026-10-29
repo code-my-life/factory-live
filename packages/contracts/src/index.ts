@@ -1,4 +1,5 @@
 export * from './common.ts';
+export * from './messages.ts';
 export * from './agents.ts';
 export * from './issues.ts';
 export * from './interventions.ts';

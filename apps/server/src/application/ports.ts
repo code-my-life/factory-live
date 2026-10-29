@@ -1,4 +1,4 @@
-import type { ActivityEvent, PullRequestView } from '@factory-live/contracts';
+import type { ActivityEvent, PullRequestView, PushPayload, Text } from '@factory-live/contracts';
 import type { Board, Comment, Link, Run, Task, TaskEvent } from '@factory-live/domain';
 
 /**
@@ -142,7 +142,8 @@ export interface TrackedIssue {
 
 export interface GitHubStatus {
   ok: boolean;
-  detail: string;
+  /** Ce que la santé dit de l'accès à GitHub, écrit par le client dans sa langue. */
+  detail: Text;
   checkedAt: number | null;
 }
 
@@ -224,16 +225,8 @@ export interface HistoryPort {
 
 // --- Notifications -------------------------------------------------------------------------------
 
-export interface PushMessage {
-  title: string;
-  body: string;
-  /** Écran à ouvrir au toucher de la notification. */
-  url: string;
-  /** Regroupe les notifications d'une même intervention. */
-  tag: string;
-  /** Interventions ouvertes, pour le badge de l'icône. */
-  badge: number;
-}
+/** Un push, écrit par le service worker de chaque appareil dans la langue qui y est choisie. */
+export type PushMessage = PushPayload;
 
 export interface PushPort {
   notify(message: PushMessage): Promise<{ sent: number; removed: number; failed: number }>;

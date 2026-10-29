@@ -23,7 +23,7 @@ function sortInterventions(interventions: readonly Intervention[]): Intervention
 }
 
 export function InterventionsPage() {
-  const { t } = useI18n();
+  const { t, text } = useI18n();
   const { id } = useParams();
   const snapshot = useSnapshot();
   const interventions = sortInterventions(snapshot.interventions);
@@ -65,7 +65,7 @@ export function InterventionsPage() {
                       ) : null}
                       {t.intervention[intervention.kind]}
                     </span>
-                    <span className={styles.itemTitle}>{intervention.title}</span>
+                    <span className={styles.itemTitle}>{text(intervention.title)}</span>
                     <span className={styles.itemMeta}>
                       {intervention.issueKey ?? intervention.cardId} · {t.interventions.opened}{' '}
                       <Elapsed since={intervention.openedAt} mode="age" />

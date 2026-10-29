@@ -20,6 +20,7 @@ import {
   UnblockProgress,
   UnblockRequest,
   UsageReport,
+  msg,
 } from '@factory-live/contracts';
 import { bodyLimit } from 'hono/body-limit';
 import { streamSSE } from 'hono/streaming';
@@ -431,8 +432,9 @@ export function createApp(deps: AppDeps) {
     if (!deps.notifier)
       return c.json({ error: 'Notifications indisponibles', code: 'push_unavailable' }, 503);
     const result = await deps.notifier.notify({
-      title: 'factory-live : test',
-      body: 'Les notifications de cet appareil fonctionnent.',
+      where: null,
+      title: msg('push.test.title'),
+      body: msg('push.test.body'),
       url: '/settings',
       tag: 'test',
       badge: deps.hub.openInterventions.length,

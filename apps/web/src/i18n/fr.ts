@@ -1,17 +1,24 @@
 import type {
   AgentState,
   ApiErrorCode,
+  BlockKind,
   CardKind,
+  ConfigField,
   HealthStatus,
   InterventionKind,
   IssueStatus,
   KanbanStatus,
+  MessageCode,
+  MessageParams,
   ModelRef,
   RunRole,
   ServiceHealth,
   StationId,
 } from '@factory-live/contracts';
 import { formatters } from '../ui/format.ts';
+
+/** Chaque texte fabriqué par le serveur (catalogue `Message` des contrats), écrit avec ses paramètres. */
+export type ServerMessages = { [C in MessageCode]: (params: MessageParams<C>) => string };
 
 /**
  * Le dictionnaire français, langue source de l'interface : sa forme fait le type `Messages`, que le
@@ -55,6 +62,197 @@ const cardStatus = {
   done: 'Terminée',
   archived: 'Archivée',
 } satisfies Record<KanbanStatus, string>;
+
+const blockKind = {
+  needs_input: 'décision attendue',
+  capability: 'outil ou accès manquant',
+  transient: 'échec passager',
+  dependency: 'dépendance',
+} satisfies Record<BlockKind, string>;
+
+const SKILL_ACTIONS: Readonly<Record<string, string>> = {
+  loaded: 'Skill chargée',
+  created: 'Skill créée',
+  edited: 'Skill modifiée',
+  patched: 'Skill modifiée',
+  installed: 'Skill installée',
+};
+
+const attempt = (current: number | null, total: number | null) =>
+  current !== null && total !== null ? ` (essai ${current} sur ${total})` : '';
+
+const statusLabel = (status: string) =>
+  (cardStatus as Readonly<Record<string, string>>)[status] ?? status;
+
+/** Ce que le serveur et le domaine fabriquent : fil d'activité, timeline, interventions, santé... */
+const server: ServerMessages = {
+  'activity.tool.unknown': () => 'outil',
+  'activity.action.llm': () => 'Appel au modèle',
+  'activity.llm.tokens': ({ input, output }) =>
+    `${f.integer(input)} jetons en entrée, ${f.integer(output)} en sortie`,
+  'activity.llm.rateLimited': ({ model, attempt: current, attempts }) =>
+    `429 sur ${model}${attempt(current, attempts)}`,
+  'activity.llm.error': ({ status, model, attempt: current, attempts }) =>
+    `Erreur${status ? ` ${status}` : ''} sur ${model}${attempt(current, attempts)}`,
+  'activity.skill': ({ action }) => SKILL_ACTIONS[action] ?? `Skill : ${action}`,
+  'activity.session.end': ({ outcome }) =>
+    outcome === 'failed'
+      ? 'Session en échec'
+      : outcome === 'interrupted'
+        ? 'Session interrompue'
+        : 'Session terminée',
+  'activity.kanban.claimed': ({ profile }) => `Le dispatcher lance ${profile}`,
+  'activity.worker.spawned': () => 'Worker lancé',
+  'activity.worker.exited': () => 'Worker arrêté',
+  'activity.worker.stale': () => 'Carte reprise au worker muet',
+  'activity.subagent.start': () => 'Sous-agent lancé',
+  'activity.subagent.stop': () => 'Sous-agent terminé',
+
+  'timeline.created': () => 'Carte créée',
+  'timeline.created.for': ({ assignee }) => `pour ${assignee}`,
+  'timeline.claimed': () => 'Carte prise',
+  'timeline.promoted': () => 'Carte prête',
+  'timeline.promoted.detail': () => 'ses dépendances sont terminées',
+  'timeline.status': ({ status }) => `Statut : ${statusLabel(status)}`,
+  'timeline.assigned': ({ assignee }) => `Réassignée à ${assignee ?? '?'}`,
+  'timeline.assigned.from': ({ from }) => `avant : ${from}`,
+  'timeline.edited': () => 'Carte modifiée',
+  'timeline.attached': () => 'Pièce jointe',
+  'timeline.scheduled': () => 'Carte planifiée',
+  'timeline.reviewRequested': ({ reviewer }) => `Revue demandée à ${reviewer ?? 'la gate'}`,
+  'timeline.reviewReopened': () => 'Revue rouverte',
+  'timeline.changesRequested': ({ reviewer }) =>
+    `Changements demandés par ${reviewer ?? 'la gate'}`,
+  'timeline.prChecks.passed': () => 'Contrôles de la PR au vert',
+  'timeline.prChecks.failed': () => 'Contrôles de la PR en échec',
+  'timeline.completed': () => 'Carte terminée',
+  'timeline.archived': () => 'Carte archivée',
+  'timeline.blocked': ({ kind }) => (kind ? `Carte bloquée : ${blockKind[kind]}` : 'Carte bloquée'),
+  'timeline.unblocked': () => 'Carte débloquée',
+  'timeline.blockLoop': () => 'Boucle de blocage : carte passée en triage',
+  'timeline.respawnGuarded': () => 'Relance retenue',
+  'timeline.respawnGuarded.activePr': () =>
+    'Une PR citée il y a moins de 24 h attend un relais (garde active_pr)',
+  'timeline.dependencyWait': () => 'En attente de la carte parente',
+  'timeline.reclaimed': () => 'Carte reprise au worker',
+  'timeline.reclaimed.manual': () => 'à la main',
+  'timeline.crashed': () => 'Worker planté',
+  'timeline.timedOut': () => 'Délai du worker dépassé',
+  'timeline.rateLimited': () => 'Worker arrêté par une limite du fournisseur',
+  'timeline.protocolViolation': () => 'Worker sorti sans terminer ni bloquer la carte',
+  'timeline.spawnFailed': () => 'Lancement du worker en échec',
+  'timeline.gaveUp': ({ failures }) =>
+    failures === null
+      ? 'Abandon après plusieurs échecs'
+      : `Abandon après ${failures} ${f.plural(failures, 'échec', 'échecs')}`,
+  'timeline.workerReaped': () => 'Worker résiduel arrêté',
+  'timeline.modelOverride': ({ model }) => `Modèle forcé : ${model ?? '?'}`,
+  'timeline.reasoningEffort': ({ effort }) => `Effort de raisonnement : ${effort ?? '?'}`,
+  'timeline.comment': ({ author }) => `Commentaire de ${author}`,
+
+  'intervention.title.prReady': () => 'PR prête à approuver',
+  'intervention.title.mainRed': () => 'Main rouge après le merge',
+  'intervention.title.gaveUp': ({ failures }) =>
+    failures === null
+      ? 'Abandon après plusieurs échecs'
+      : `Abandon après ${failures} ${f.plural(failures, 'échec', 'échecs')}`,
+  'intervention.title.needsInput': () => 'Décision attendue',
+  'intervention.title.capability': () => 'Outil ou accès manquant',
+  'intervention.title.transient': () => 'Échec passager',
+  'intervention.title.blocked': () => 'Carte bloquée',
+  'intervention.title.triageLoop': () =>
+    'Bloquée deux fois pour la même raison : carte passée en triage',
+  'intervention.title.held': ({ minutes }) => `Carte prête mais retenue depuis ${minutes} min`,
+  'intervention.question.prReady': () =>
+    'La gate a approuvé la PR : ton approbation sur GitHub déclenche le merge.',
+  'intervention.question.gaveUp': () => 'Le disjoncteur du dispatcher a arrêté la carte.',
+  'intervention.question.needsInput': () => 'L’agent attend ta décision.',
+  'intervention.question.capability': () => 'Un outil ou un accès manque à l’agent.',
+  'intervention.question.transient': () => 'Échec passager de la lane.',
+  'intervention.question.blocked': () => 'Carte bloquée sans raison donnée.',
+  'intervention.question.triageLoop': () =>
+    '`/factory unblock` ne s’applique pas à une carte en triage. Sors-la par le tableau de bord d’Hermès (glisser vers Ready), jamais par specify ni decompose : un spécificateur pourrait réécrire le brief.',
+  'intervention.question.held': () =>
+    'Le dispatcher retient la carte : un commentaire de moins de 24 h cite une URL de PR, sans relais depuis. C’est la garde `active_pr` d’Hermès contre les PR en double. La carte n’est pas bloquée, `/factory unblock` ne s’applique donc pas : il faut la relayer.',
+  'intervention.action.openIssue': ({ issueKey }) => `Ouvrir l’issue ${issueKey}`,
+  'intervention.action.showCard': () => 'Voir la carte en CLI',
+  'intervention.action.approvePr': () => 'Approuver la PR sur GitHub',
+  'intervention.action.prWorkflows': () => 'Voir la PR et ses workflows',
+  'intervention.action.reassignCoder': () => 'Réassigner à coder (Hermès natif)',
+  'intervention.action.dashboard': () => 'Ouvrir le tableau de bord d’Hermès',
+  'intervention.action.relay': ({ owner }) => `Relancer par relais (scribe puis ${owner})`,
+
+  'health.gateway': () => 'Gateway Hermès',
+  'health.gateway.running': ({ seconds }) => `En marche, sonde reçue ${f.ago(seconds)}`,
+  'health.gateway.silent': ({ seconds }) => `Muet depuis ${f.span(seconds)}`,
+  'health.gateway.never': () => 'Aucune nouvelle de la sonde depuis le démarrage de factory-live',
+  'health.dispatcher': () => 'Dispatcher kanban',
+  'health.dispatcher.noTick': () => 'Aucun tick reçu (webhooks du gateway non branchés ?)',
+  'health.dispatcher.paused': ({ seconds }) => `En pause, dernier tick ${f.ago(seconds)}`,
+  'health.dispatcher.lastTick': ({ seconds }) => `Dernier tick ${f.ago(seconds)}`,
+  'health.webhook': () => 'Écouteur des webhooks GitHub',
+  'health.notReported': () => 'Pas encore rapporté par la sonde',
+  'health.provider': ({ provider }) => `Fournisseur ${provider}`,
+  'health.nvidia': () => 'API NVIDIA',
+  'health.provider.lastOk': ({ seconds }) => `Dernier appel réussi ${f.ago(seconds)}`,
+  'health.provider.none': () => 'Aucun appel réussi observé',
+  'health.claude': () => 'Claude Code (abonnement)',
+  'health.claude.none': () => 'Aucune lane Claude observée',
+  'health.claude.lastSession': ({ seconds }) => `Dernière session ${f.ago(seconds)}`,
+  'health.github': () => 'API GitHub',
+  'health.github.notYet': () => 'Pas encore interrogée',
+  'health.github.ok': () => 'Accès GitHub valide',
+  'health.github.token': () => 'Jeton fine-grained de repli',
+  'health.github.app.user': ({ slug, login }) => `App ${slug}, connecté en tant que ${login}`,
+  'health.github.app.fallback': ({ slug }) => `App ${slug}, déblocage par le jeton de repli`,
+  'health.github.app.loginNeeded': ({ slug }) =>
+    `App ${slug}, connexion GitHub requise pour débloquer`,
+  'health.github.noAccess': () => 'Aucun accès GitHub : crée et installe l’App factory-live',
+  'health.github.loginToWrite': () =>
+    'Connecte-toi à GitHub dans factory-live pour écrire en ton nom',
+  'health.github.unauthorized': () => 'Accès refusé (401) : reconnecte ou réinstalle l’App GitHub',
+  'health.github.forbidden': () => 'Accès refusé ou quota épuisé (403)',
+  'health.github.error': ({ status, issue }) => `Erreur ${status ?? 'réseau'} sur ${issue}`,
+  'health.github.noToken': () =>
+    'Aucun jeton dans ~/.config/factory-live/github-token : lecture seule du kanban',
+  'health.githubDeliveries': () => 'Webhooks GitHub (vus par GitHub)',
+  'health.githubDeliveries.last': ({ status, seconds }) =>
+    `Dernière livraison : HTTP ${status} ${f.ago(seconds)}`,
+  'health.probe': () => 'Sonde factory-live-probe',
+  'health.probe.last': ({ seconds }) => `Dernier rapport ${f.ago(seconds)}`,
+  'health.probe.none': () => 'Aucun rapport reçu (sonde pas encore déployée ?)',
+  'health.sources': () => 'Sources de factory-live',
+  'health.sources.detail': ({ kanban, cards, kanbanError, sessionsError }) => {
+    const read =
+      kanban === 'pending'
+        ? 'kanban.db pas encore lu'
+        : kanban === 'read'
+          ? `kanban.db lu (${cards} ${f.plural(cards, 'carte', 'cartes')})`
+          : `kanban.db illisible : ${kanbanError ?? '?'}`;
+    return `${read} ; ${sessionsError ?? 'sessions lisibles à la demande'}`;
+  },
+  'health.metric.running': () => 'En cours',
+  'health.metric.perAgent': () => 'Par agent',
+  'health.metric.rateLimited': () => '429 sur 10 min',
+  'health.metric.quota': () => 'Quota restant',
+  'health.metric.hooksPerMinute': () => 'Webhooks par minute',
+  'health.metric.lastHook': () => 'Dernier webhook',
+  'health.value.ofTotal': ({ value, total }) =>
+    `${f.integer(value)} sur ${total === null ? '?' : f.integer(total)}`,
+  'health.value.atMost': ({ max }) => `${max} au plus`,
+  'health.value.none': () => 'aucun',
+  'health.value.ago': ({ seconds }) => f.ago(seconds),
+
+  'transcript.hermes': ({ profile, session }) =>
+    `Session Hermès de ${profile}${session ? ` (${session})` : ''}`,
+  'transcript.claudeCode': ({ costUsd }) =>
+    `Lane Claude Code${costUsd === null ? '' : ` (${f.usd(costUsd)})`}`,
+  'agent.role.default': () => 'agent Hermès',
+  'usage.claudeNote': () =>
+    'Le solde de l’abonnement Claude n’a pas de source fiable : factory-live n’affiche une limite que si une transcription Claude Code la signale.',
+  'push.test.title': () => 'factory-live : test',
+  'push.test.body': () => 'Les notifications de cet appareil fonctionnent.',
+};
 
 export const fr = {
   station,
@@ -237,6 +435,8 @@ export const fr = {
     },
     refused: 'Refus',
     failed: (kind: string) => `${kind} en échec`,
+    /** Un événement répété à chaque tick, fusionné en une ligne. */
+    repeats: (count: number) => ` (${count} fois)`,
   },
 
   model: {
@@ -431,6 +631,25 @@ export const fr = {
     drift: 'Dérive de configuration',
     driftTitle: 'En service, différent du dépôt de la factory',
     driftRepo: (repo: string) => ` (dépôt : ${repo})`,
+    field: {
+      model: 'modèle',
+      baseUrl: 'url du fournisseur',
+      fallbacks: 'fallbacks',
+      effort: 'effort',
+      toolsets: 'toolsets',
+      plugins: 'plugins',
+      outboundHooks: 'webhooks sortants',
+    } satisfies Record<ConfigField, string>,
+    /** Un champ que rien ne règle, côté service ou côté dépôt. */
+    unset: {
+      model: 'aucun',
+      baseUrl: 'aucune',
+      fallbacks: 'aucun',
+      effort: 'défaut',
+      toolsets: 'aucun',
+      plugins: 'aucun',
+      outboundHooks: 'aucun',
+    } satisfies Record<ConfigField, string>,
     tools: 'Outils, skills et plugins',
     skills: 'Skills',
     plugins: 'Plugins et refus des gardes (7 jours)',
@@ -643,6 +862,9 @@ export const fr = {
   notification: {
     fallbackBody: 'Un blocage t’attend.',
   },
+
+  blockKind,
+  server,
 };
 
 /** Les textes sont des chaînes quelconques : seule compte la forme (clés, paramètres des fonctions). */

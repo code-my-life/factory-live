@@ -8,7 +8,11 @@ export const LOCALE_TAG: Readonly<Record<Locale, string>> = { fr: 'fr-FR', en: '
 
 const STORAGE_KEY = 'factory-live:locale';
 
-type Storage = Pick<globalThis.Storage, 'getItem' | 'setItem'>;
+/** Ce qu'on lit de `localStorage` ; écrit sans les types du DOM, que le service worker n'a pas. */
+interface Storage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
 
 export function isLocale(value: unknown): value is Locale {
   return value === 'fr' || value === 'en';
@@ -21,7 +25,7 @@ export function browserLocale(language: string | undefined): Locale {
 
 function defaultStorage(): Storage | null {
   try {
-    return typeof localStorage === 'undefined' ? null : localStorage;
+    return (globalThis as { localStorage?: Storage }).localStorage ?? null;
   } catch {
     return null;
   }

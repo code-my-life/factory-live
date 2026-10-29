@@ -174,7 +174,7 @@ const EVIDENCE: Record<string, string[]> = {
 
 export function IssuePage() {
   const i18n = useI18n();
-  const { t, fmt } = i18n;
+  const { t, fmt, text } = i18n;
   const params = useParams();
   const navigate = useNavigate();
   const key = issueKeyFromParams(params.repo, params.number);
@@ -308,7 +308,7 @@ export function IssuePage() {
         <Banner
           key={intervention.id}
           variant={intervention.push ? 'critical' : 'info'}
-          title={t.common.labelValue(t.intervention[intervention.kind], intervention.title)}
+          title={t.common.labelValue(t.intervention[intervention.kind], text(intervention.title))}
           description={t.issue.bannerDescription}
           primaryAction={
             <Banner.PrimaryAction
@@ -352,7 +352,8 @@ export function IssuePage() {
               {shortCardTitle(selectedCard, t)}
               <span className={styles.muted}>
                 {' '}
-                · {selectedCard.id} · {t.cardStatus[selectedCard.status]} · {selectedCard.assignee}
+                · {selectedCard.id} · {t.cardStatus[selectedCard.status]} ·{' '}
+                {selectedCard.assignee ?? t.issue.unassigned}
               </span>
             </h3>
             {selectedCard.skills.length > 0 ? (
