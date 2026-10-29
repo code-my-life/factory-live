@@ -40,6 +40,7 @@ import {
 import { setAppBadge } from '../pwa/badge.ts';
 import { Elapsed } from '../ui/Elapsed.tsx';
 import { LiveDot } from '../ui/LiveDot.tsx';
+import { needsWatch } from '../ui/vocabulary.ts';
 import styles from './AppShell.module.css';
 
 interface Destination {
@@ -122,7 +123,7 @@ export function AppShell() {
   useEffect(() => {
     if (source.kind === 'live' && connection === 'open') setAppBadge(waiting);
   }, [source.kind, connection, waiting]);
-  const unhealthy = snapshot.health.filter((service) => service.status !== 'ok').length;
+  const unhealthy = snapshot.health.filter((service) => needsWatch(service.status)).length;
   const activeIssues = snapshot.issues.filter(
     (issue) => !['done', 'stopped'].includes(issue.status),
   ).length;

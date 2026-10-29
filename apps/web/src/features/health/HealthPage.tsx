@@ -5,6 +5,7 @@ import { Elapsed } from '../../ui/Elapsed.tsx';
 import { LiveDot } from '../../ui/LiveDot.tsx';
 import type { DotTone } from '../../ui/LiveDot.tsx';
 import page from '../../ui/page.module.css';
+import { needsWatch } from '../../ui/vocabulary.ts';
 import styles from './health.module.css';
 
 const GROUPS: { id: ServiceHealth['group']; label: string; hint: string }[] = [
@@ -24,7 +25,7 @@ const STATUS: Record<ServiceHealth['status'], { tone: DotTone; label: string }> 
 
 export function HealthPage() {
   const snapshot = useSnapshot();
-  const problems = snapshot.health.filter((service) => service.status !== 'ok');
+  const problems = snapshot.health.filter((service) => needsWatch(service.status));
   return (
     <section className={page.page} aria-labelledby="health-title">
       <header className={page.head}>

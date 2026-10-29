@@ -1,6 +1,7 @@
 import type {
   AgentState,
   CardKind,
+  HealthStatus,
   InterventionKind,
   IssueStatus,
   KanbanStatus,
@@ -125,3 +126,8 @@ export const RUN_ROLE_LABEL: Record<RunRole, string> = {
   release: 'release',
   other: 'autre',
 };
+
+/** À surveiller : un service dégradé ou en panne. « Inconnu » (rien observé) reste neutre, comme sa pastille grise. */
+export function needsWatch(status: HealthStatus): boolean {
+  return status === 'degraded' || status === 'down';
+}

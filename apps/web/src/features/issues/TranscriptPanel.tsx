@@ -127,11 +127,19 @@ export function TranscriptPanel({ runId }: { runId: number }) {
       ) : current ? (
         <>
           <p className={styles.muted}>{current.choice.view.title}</p>
-          <ol className={styles.entries}>
-            {current.choice.view.entries.map((entry) => (
-              <Entry key={entry.id} entry={entry} />
-            ))}
-          </ol>
+          {/* Le plus récent en haut, dans une boîte qui défile seule : la page ne s'allonge plus avec le run. */}
+          <div
+            className={styles.entriesFrame}
+            role="region"
+            aria-label={current.choice.view.title}
+            tabIndex={0}
+          >
+            <ol className={styles.entries} reversed>
+              {[...current.choice.view.entries].reverse().map((entry) => (
+                <Entry key={entry.id} entry={entry} />
+              ))}
+            </ol>
+          </div>
         </>
       ) : null}
       <p className={styles.redaction}>

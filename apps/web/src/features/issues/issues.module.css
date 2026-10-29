@@ -251,14 +251,25 @@
   min-width: 0;
 }
 
+.entriesFrame {
+  max-height: 60dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+}
+
+.entriesFrame:focus-visible {
+  outline: 2px solid var(--fgColor-accent);
+  outline-offset: 2px;
+}
+
 .entries {
   display: flex;
   flex-direction: column;
   margin: 0;
   padding: 0;
   list-style: none;
-  border: var(--borderWidth-thin) solid var(--borderColor-default);
-  border-radius: var(--borderRadius-medium);
 }
 
 .entry {

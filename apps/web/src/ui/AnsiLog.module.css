@@ -1,6 +1,7 @@
 .frame {
   max-width: 100%;
-  overflow-x: auto;
+  max-height: 60dvh;
+  overflow: auto;
   overscroll-behavior: contain;
   border: var(--borderWidth-thin) solid var(--borderColor-default);
   border-radius: var(--borderRadius-medium);
