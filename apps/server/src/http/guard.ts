@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
+import { PAGE_TEXTS, pageLocale } from './pages.ts';
 
 export interface GuardOptions {
   /** Origines de la PWA autorisées (localhost et nom tailnet). */
@@ -86,7 +87,7 @@ export function navigationGuard(options: GuardOptions): MiddlewareHandler {
       !c.req.header('x-forwarded-for') &&
       !c.req.header('x-forwarded-proto');
     if (login ? !options.tailscaleLogins.includes(login) : !local) {
-      return c.text('Réservé à ce PC et à ton login Tailscale.', 403);
+      return c.text(PAGE_TEXTS[pageLocale(c)].reserved, 403);
     }
     await next();
     return undefined;

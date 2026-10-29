@@ -67,12 +67,30 @@ export class StaticTokenSource implements TokenSource {
   }
 }
 
+/** Pourquoi la création de l'App ou la connexion échoue : la page le dit dans la langue de Clément. */
+export type GitHubAuthFailure =
+  | { reason: 'manifest_unknown' }
+  | { reason: 'manifest_refused'; status: number }
+  | { reason: 'manifest_incomplete' }
+  | { reason: 'app_missing' }
+  | { reason: 'origin_unknown' }
+  | { reason: 'login_unknown' }
+  | { reason: 'login_denied'; detail: string }
+  | { reason: 'account_refused'; login: string }
+  | { reason: 'token_refused'; detail: string }
+  | { reason: 'account_unreadable'; status: number }
+  | { reason: 'installation_unreadable'; status: number }
+  | { reason: 'installation_token_refused'; status: number };
+
 export class GitHubAuthError extends Error {
   readonly status: number;
+  readonly failure: GitHubAuthFailure;
 
-  constructor(status: number, message: string) {
+  /** `message` reste en français, pour les journaux ; la page s'écrit d'après `failure`. */
+  constructor(status: number, failure: GitHubAuthFailure, message: string) {
     super(message);
     this.status = status;
+    this.failure = failure;
     this.name = 'GitHubAuthError';
   }
 }
@@ -183,6 +201,7 @@ export class GitHubAppAuth implements TokenSource {
     if (startedAt === undefined || this.options.now() - startedAt > MANIFEST_TTL_MS) {
       throw new GitHubAuthError(
         400,
+        { reason: 'manifest_unknown' },
         'Demande de création inconnue ou expirée : relance la création de l’App',
       );
     }
@@ -201,6 +220,7 @@ export class GitHubAppAuth implements TokenSource {
     if (!response.ok)
       throw new GitHubAuthError(
         502,
+        { reason: 'manifest_refused', status: response.status },
         `GitHub a refusé la création de l’App (HTTP ${response.status})`,
       );
     const data = (await response.json()) as Json;
@@ -214,7 +234,11 @@ export class GitHubAppAuth implements TokenSource {
       createdAt: this.options.now(),
     };
     if (!app.slug || !app.clientId || !app.clientSecret || !app.pem)
-      throw new GitHubAuthError(502, 'Réponse de GitHub incomplète pour la nouvelle App');
+      throw new GitHubAuthError(
+        502,
+        { reason: 'manifest_incomplete' },
+        'Réponse de GitHub incomplète pour la nouvelle App',
+      );
     this.options.store.saveGitHubApp(app);
     this.installation = null;
     this.installed = null;
@@ -232,9 +256,18 @@ export class GitHubAppAuth implements TokenSource {
 
   authorizeUrl(origin: string): string {
     const app = this.options.store.githubApp();
-    if (!app) throw new GitHubAuthError(409, 'L’App GitHub n’existe pas encore : crée-la d’abord');
+    if (!app)
+      throw new GitHubAuthError(
+        409,
+        { reason: 'app_missing' },
+        'L’App GitHub n’existe pas encore : crée-la d’abord',
+      );
     if (!this.options.origins.includes(origin))
-      throw new GitHubAuthError(400, 'Origine inconnue pour le retour de connexion');
+      throw new GitHubAuthError(
+        400,
+        { reason: 'origin_unknown' },
+        'Origine inconnue pour le retour de connexion',
+      );
     const state = base64url(randomBytes(24));
     const verifier = base64url(randomBytes(32));
     const redirectUri = `${origin}/api/github/oauth/callback`;
@@ -256,7 +289,11 @@ export class GitHubAppAuth implements TokenSource {
     const pending = this.loginStates.get(state);
     this.loginStates.delete(state);
     if (!app || !pending || this.options.now() - pending.createdAt > LOGIN_TTL_MS) {
-      throw new GitHubAuthError(400, 'Connexion inconnue ou expirée : recommence la connexion');
+      throw new GitHubAuthError(
+        400,
+        { reason: 'login_unknown' },
+        'Connexion inconnue ou expirée : recommence la connexion',
+      );
     }
     const tokens = await this.tokenRequest({
       client_id: app.clientId,
@@ -273,6 +310,7 @@ export class GitHubAppAuth implements TokenSource {
     ) {
       throw new GitHubAuthError(
         403,
+        { reason: 'account_refused', login: this.options.login },
         `Seul le compte ${this.options.login} peut se connecter à factory-live`,
       );
     }
@@ -306,9 +344,12 @@ export class GitHubAppAuth implements TokenSource {
     const data = (await response.json().catch(() => ({}))) as Json;
     const accessToken = str(data['access_token']);
     if (!response.ok || !accessToken) {
+      const detail =
+        str(data['error_description']) ?? str(data['error']) ?? `HTTP ${response.status}`;
       throw new GitHubAuthError(
         502,
-        `GitHub a refusé le jeton : ${str(data['error_description']) ?? str(data['error']) ?? `HTTP ${response.status}`}`,
+        { reason: 'token_refused', detail },
+        `GitHub a refusé le jeton : ${detail}`,
       );
     }
     const now = this.options.now();
@@ -336,7 +377,11 @@ export class GitHubAppAuth implements TokenSource {
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok)
-      throw new GitHubAuthError(502, `Compte GitHub illisible (HTTP ${response.status})`);
+      throw new GitHubAuthError(
+        502,
+        { reason: 'account_unreadable', status: response.status },
+        `Compte GitHub illisible (HTTP ${response.status})`,
+      );
     const data = (await response.json()) as Json;
     return {
       login: str(data['login']) ?? '',
@@ -409,6 +454,7 @@ export class GitHubAppAuth implements TokenSource {
     if (!found.ok)
       throw new GitHubAuthError(
         found.status,
+        { reason: 'installation_unreadable', status: found.status },
         `Installation de l’App illisible (HTTP ${found.status})`,
       );
     const id = Number(((await found.json()) as Json)['id']);
@@ -419,6 +465,7 @@ export class GitHubAppAuth implements TokenSource {
     if (!created.ok)
       throw new GitHubAuthError(
         created.status,
+        { reason: 'installation_token_refused', status: created.status },
         `Jeton d’installation refusé (HTTP ${created.status})`,
       );
     const data = (await created.json()) as Json;

@@ -592,6 +592,48 @@ describe('GitHub App et connexion de Clément', () => {
     );
   });
 
+  it('écrit ses pages dans la langue de la PWA, retenue pour le retour de GitHub', async () => {
+    const setup = await h.app.request('/api/github/setup?lang=en', { headers: NAV });
+    const page = await setup.text();
+    expect(page).toContain('<html lang="en">');
+    expect(page).toContain('Create the factory-live GitHub App');
+    expect(page).toContain('Continue on GitHub');
+    const cookie = setup.headers.get('set-cookie') ?? '';
+    expect(cookie).toMatch(/^factory-live-lang=en;/);
+    expect(cookie).toContain('Path=/api/github');
+    expect(cookie).toContain('SameSite=Lax');
+
+    // GitHub ramène Clément sans `lang` : la langue retenue vaut pour la page d'échec.
+    const back = await h.app.request('/api/github/manifest/callback?code=abc&state=inconnu', {
+      headers: { ...NAV, cookie: 'factory-live-lang=en' },
+    });
+    expect(back.status).toBe(400);
+    const failure = await back.text();
+    expect(failure).toContain('Unknown or expired creation request: start the App creation again');
+    expect(failure).toContain('Back to factory-live');
+
+    const login = await h.app.request('/api/github/login?lang=fr', { headers: NAV });
+    expect(login.status).toBe(409);
+    expect(login.headers.get('set-cookie')).toMatch(/^factory-live-lang=fr;/);
+    expect(await login.text()).toContain('L’App GitHub n’existe pas encore : crée-la d’abord');
+  });
+
+  it('suit la langue du navigateur quand la PWA n’en dit rien', async () => {
+    const english = await h.app.request('/api/github/setup', {
+      headers: { ...NAV, 'accept-language': 'de-DE,de;q=0.9,en;q=0.8' },
+    });
+    expect(await english.text()).toContain('Create the factory-live GitHub App');
+    const french = await h.app.request('/api/github/setup', {
+      headers: { ...NAV, 'accept-language': 'fr-FR,fr;q=0.9' },
+    });
+    expect(await french.text()).toContain('Créer l’App GitHub de factory-live');
+    const refused = await h.app.request('/api/github/setup', {
+      headers: { 'accept-language': 'en-US' },
+    });
+    expect(refused.status).toBe(403);
+    expect(await refused.text()).toBe('Restricted to this PC and your Tailscale login.');
+  });
+
   it('explique un refus sur GitHub sans recopier son texte en HTML', async () => {
     const response = await h.app.request(
       `/api/github/oauth/callback?error=access_denied&error_description=${encodeURIComponent('<b>non</b>')}`,

@@ -31,7 +31,7 @@ describe('LiveGitHubSection', () => {
     expect(screen.getByText('Lecture de l’accès GitHub…')).toBeInTheDocument();
   });
 
-  it('mène aux pages du serveur pour créer l’App, l’installer et se connecter', () => {
+  it('mène aux pages du serveur pour créer l’App, l’installer et se connecter, dans sa langue', () => {
     render(
       <FactoryProvider
         source={liveSource({
@@ -51,7 +51,7 @@ describe('LiveGitHubSection', () => {
     );
     expect(screen.getByRole('link', { name: 'Se connecter à GitHub' })).toHaveAttribute(
       'href',
-      '/api/github/login',
+      '/api/github/login?lang=fr',
     );
     expect(screen.queryByText(/Démo/)).toBeNull();
   });

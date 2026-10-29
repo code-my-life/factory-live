@@ -22,6 +22,7 @@ import {
   UsageReport,
   msg,
 } from '@factory-live/contracts';
+import type { Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
@@ -44,6 +45,8 @@ import type { Logger } from '../logger.ts';
 import { UnblockError, unblockIntervention } from '../application/unblock.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
 import { navigationGuard, requestOrigin, writeGuard } from './guard.ts';
+import { PAGE_TEXTS, localeCookie, pageLocale } from './pages.ts';
+import type { PageLocale } from './pages.ts';
 import type { StreamBuffer } from './stream.ts';
 
 export interface AppDeps {
@@ -462,9 +465,17 @@ export function createApp(deps: AppDeps) {
     origins: deps.origins,
     tailscaleLogins: deps.tailscaleLogins,
   });
-  const githubPage = (title: string, body: string, status: 200 | 400 | 403 | 409 | 502 = 200) =>
-    new Response(
-      `<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title>` +
+  /** Une page du parcours GitHub, dans la langue de Clément (`pages.ts`), qu'elle retient pour le retour. */
+  const githubPage = (
+    c: Context,
+    locale: PageLocale,
+    title: string,
+    body: string,
+    status: 200 | 400 | 403 | 409 | 502 = 200,
+  ) => {
+    const cookie = localeCookie(c);
+    return new Response(
+      `<!doctype html><html lang="${locale}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title>` +
         `<body style="margin:0;background:#0d1117;color:#f0f6fc;font:16px/1.5 system-ui,sans-serif"><main style="max-width:36rem;margin:10vh auto;padding:0 16px">` +
         `<h1 style="font-size:24px">${title}</h1>${body}</main></body></html>`,
       {
@@ -473,23 +484,36 @@ export function createApp(deps: AppDeps) {
           'Content-Type': 'text/html; charset=utf-8',
           'Content-Security-Policy':
             "default-src 'none'; style-src 'unsafe-inline'; form-action https://github.com; base-uri 'none'; frame-ancestors 'none'",
+          ...(cookie ? { 'Set-Cookie': cookie } : {}),
         },
       },
     );
+  };
   const escapeHtml = (text: string) =>
     text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
-  const authFailure = (error: unknown) => {
+  const authFailure = (c: Context, error: unknown) => {
+    const locale = pageLocale(c);
+    const texts = PAGE_TEXTS[locale];
     const status =
       error instanceof GitHubAuthError && [400, 403, 409, 502].includes(error.status)
         ? (error.status as 400 | 403 | 409 | 502)
         : 502;
     deps.log.warn({ component: 'github', error: String(error) }, 'parcours GitHub en échec');
+    const message =
+      error instanceof GitHubAuthError
+        ? texts.failure(error.failure)
+        : error instanceof Error
+          ? error.message
+          : String(error);
     return githubPage(
-      'GitHub',
-      `<p>${escapeHtml(error instanceof Error ? error.message : String(error))}</p><p><a style="color:#4493f8" href="/">Revenir à factory-live</a></p>`,
+      c,
+      locale,
+      texts.failureTitle,
+      `<p>${escapeHtml(message)}</p><p><a style="color:#4493f8" href="/">${escapeHtml(texts.back)}</a></p>`,
       status,
     );
   };
+  const unavailable = (c: Context) => c.text(PAGE_TEXTS[pageLocale(c)].unavailable, 503);
 
   app.openapi(
     createRoute({
@@ -514,27 +538,30 @@ export function createApp(deps: AppDeps) {
   );
 
   app.get('/api/github/setup', navigation, (c) => {
-    if (!deps.githubAuth) return c.text('Intégration GitHub indisponible', 503);
+    if (!deps.githubAuth) return unavailable(c);
+    const locale = pageLocale(c);
+    const texts = PAGE_TEXTS[locale];
     const { action, manifest } = deps.githubAuth.manifestRequest(
       requestOrigin(deps.origins, c.req.header('host')),
     );
     return githubPage(
-      'Créer l’App GitHub de factory-live',
-      `<p>GitHub va créer une App privée pour l’organisation, avec ces droits : issues en écriture (pour « /factory unblock »), PR, CI, contenu et webhooks des dépôts en lecture. Aucun webhook n’est activé.</p>` +
-        `<p>Sur GitHub, garde le nom proposé ou change-le, puis clique « Create GitHub App ». Tu reviendras ici pour l’installer : choisis alors « All repositories ».</p>` +
+      c,
+      locale,
+      texts.setupTitle,
+      `<p>${escapeHtml(texts.setupRights)}</p><p>${escapeHtml(texts.setupSteps)}</p>` +
         `<form method="post" action="${escapeHtml(action)}"><input type="hidden" name="manifest" value="${escapeHtml(JSON.stringify(manifest))}">` +
-        `<button style="font:inherit;padding:8px 16px;border-radius:6px;border:0;background:#238636;color:#fff;cursor:pointer">Continuer sur GitHub</button></form>`,
+        `<button style="font:inherit;padding:8px 16px;border-radius:6px;border:0;background:#238636;color:#fff;cursor:pointer">${escapeHtml(texts.setupContinue)}</button></form>`,
     );
   });
 
   app.get('/api/github/manifest/callback', navigation, async (c) => {
-    if (!deps.githubAuth) return c.text('Intégration GitHub indisponible', 503);
+    if (!deps.githubAuth) return unavailable(c);
     try {
       await deps.githubAuth.completeManifest(c.req.query('code') ?? '', c.req.query('state') ?? '');
       deps.store.audit('github', 'app-created', null, deps.now());
       return c.redirect(deps.githubAuth.installUrl() ?? '/', 303);
     } catch (error) {
-      return authFailure(error);
+      return authFailure(c, error);
     }
   });
 
@@ -543,26 +570,33 @@ export function createApp(deps: AppDeps) {
   );
 
   app.get('/api/github/login', navigation, (c) => {
-    if (!deps.githubAuth) return c.text('Intégration GitHub indisponible', 503);
+    if (!deps.githubAuth) return unavailable(c);
     try {
-      return c.redirect(
-        deps.githubAuth.authorizeUrl(requestOrigin(deps.origins, c.req.header('host'))),
-        303,
+      const target = deps.githubAuth.authorizeUrl(
+        requestOrigin(deps.origins, c.req.header('host')),
       );
+      // La langue passée par la PWA vaut pour la page d'échec, au retour de GitHub.
+      const cookie = localeCookie(c);
+      if (cookie) c.header('Set-Cookie', cookie);
+      return c.redirect(target, 303);
     } catch (error) {
-      return authFailure(error);
+      return authFailure(c, error);
     }
   });
 
   app.get('/api/github/oauth/callback', navigation, async (c) => {
-    if (!deps.githubAuth) return c.text('Intégration GitHub indisponible', 503);
-    if (c.req.query('error'))
+    if (!deps.githubAuth) return unavailable(c);
+    if (c.req.query('error')) {
+      const detail = c.req.query('error_description') ?? c.req.query('error') ?? '';
       return authFailure(
+        c,
         new GitHubAuthError(
           400,
-          `Connexion refusée sur GitHub : ${c.req.query('error_description') ?? c.req.query('error') ?? ''}`,
+          { reason: 'login_denied', detail },
+          `Connexion refusée sur GitHub : ${detail}`,
         ),
       );
+    }
     try {
       const user = await deps.githubAuth.completeLogin(
         c.req.query('code') ?? '',
@@ -571,7 +605,7 @@ export function createApp(deps: AppDeps) {
       deps.store.audit(`github:${user.login}`, 'github-login', null, deps.now());
       return c.redirect('/settings?github=connected', 303);
     } catch (error) {
-      return authFailure(error);
+      return authFailure(c, error);
     }
   });
 

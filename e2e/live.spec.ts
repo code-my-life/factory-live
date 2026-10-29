@@ -31,9 +31,10 @@ test('l’app branchée suit le flux : en direct, hors ligne sur le dernier éta
 
 test('Réglages : la section GitHub lit le serveur et mène à ses pages', async ({ page }) => {
   await page.goto('/settings');
+  // La page de création s'écrit dans la langue de la PWA, que le lien lui passe.
   await expect(page.getByRole('link', { name: 'Créer l’App sur GitHub' })).toHaveAttribute(
     'href',
-    '/api/github/setup',
+    '/api/github/setup?lang=fr',
   );
   // La vraie section, pas la démo : elle dit l'état réel de ce navigateur (le Chromium sans
   // interface des tests refuse les notifications ; un vrai navigateur propose de les activer).

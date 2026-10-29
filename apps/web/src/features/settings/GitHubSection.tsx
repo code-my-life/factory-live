@@ -60,12 +60,17 @@ export function DemoGitHubSection() {
   );
 }
 
+/** Une page du serveur, écrite dans la langue de la PWA (le serveur la retient pour le retour de GitHub). */
+function inLanguage(url: string, locale: string): string {
+  return `${url}${url.includes('?') ? '&' : '?'}lang=${locale}`;
+}
+
 /**
  * L'accès réel : l'état vient du serveur (`/api/github/status`) ; créer l'App, l'installer et se
  * connecter mènent aux pages du serveur puis à GitHub, qui ramène ici ; la déconnexion est une écriture.
  */
 export function LiveGitHubSection() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const source = useFactorySource();
   const access = useGitHubAccess();
   const [error, setError] = useState<{ cause: unknown } | null>(null);
@@ -89,9 +94,9 @@ export function LiveGitHubSection() {
       demo={false}
       error={error ? describeError(error.cause, t) : null}
       actions={{
-        create: { href: access.setupUrl },
-        install: { href: access.app?.installUrl ?? access.setupUrl },
-        login: { href: access.loginUrl },
+        create: { href: inLanguage(access.setupUrl, locale) },
+        install: { href: access.app?.installUrl ?? inLanguage(access.setupUrl, locale) },
+        login: { href: inLanguage(access.loginUrl, locale) },
         logout: {
           onClick: () => {
             setError(null);
