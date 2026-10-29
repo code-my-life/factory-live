@@ -2,6 +2,8 @@ import type { ServiceHealth } from '@factory-live/contracts';
 import { Heading } from '@primer/react';
 import { useSnapshot } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
+import { serviceMark } from '../../ui/badge/marks.ts';
+import { MarkIcon } from '../../ui/badge/MarkIcon.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { LiveDot } from '../../ui/LiveDot.tsx';
 import type { DotTone } from '../../ui/LiveDot.tsx';
@@ -60,6 +62,12 @@ export function HealthPage() {
                 <li key={service.id} className={styles.tile} data-status={service.status}>
                   <p className={styles.tileHead}>
                     <LiveDot tone={TONE[service.status]} />
+                    {/* Le logo du service (GitHub, Tailscale, NVIDIA…), le même que dans les badges. */}
+                    <MarkIcon
+                      mark={serviceMark(service.id)}
+                      className={styles.tileIcon}
+                      size={16}
+                    />
                     <span className={styles.tileLabel}>{text(service.label)}</span>
                     <span className={styles.tileStatus}>{t.healthStatus[service.status]}</span>
                   </p>

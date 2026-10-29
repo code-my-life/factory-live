@@ -41,6 +41,12 @@
   margin: 0;
 }
 
+/* L'icône du service : une octicon en gris, ou un logo à la couleur de sa marque là où il se voit. */
+.tileIcon {
+  flex: none;
+  color: var(--fgColor-muted);
+}
+
 .tileLabel {
   min-width: 0;
   font-weight: var(--base-text-weight-semibold);

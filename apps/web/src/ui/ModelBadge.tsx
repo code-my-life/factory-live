@@ -16,7 +16,7 @@ export interface ModelName {
  * Le modèle, partout le même badge : le fournisseur en étiquette (« lane » pour le CLI délégué), avec
  * son icône, peinte aux couleurs de la marque quand c'en est une (API NVIDIA, Claude) ; le nom du
  * modèle en valeur, avec le logo de son éditeur (Qwen, Mistral…), teinté quand il est observé sur le
- * dernier appel. Le nom complet reste dans l'infobulle et pour les lecteurs d'écran : certains noms de
+ * dernier appel (sauf pour une lane, déjà aux couleurs de son outil). Le nom complet reste dans l'infobulle et pour les lecteurs d'écran : certains noms de
  * modèles locaux dépassent 70 caractères.
  */
 export function ModelBadge({
@@ -55,7 +55,8 @@ export function ModelBadge({
       // Le logo de l'éditeur, sauf s'il vient d'être peint en étiquette (Nemotron sur l'API NVIDIA).
       icon={editor && editor !== brand ? editor : null}
       code
-      tone={lane ? 'done' : model.source === 'live' ? 'accent' : 'neutral'}
+      // La lane a déjà son code couleur, celui de son outil sur l'étiquette : sa valeur reste neutre.
+      tone={!lane && model.source === 'live' ? 'accent' : 'neutral'}
       description={description}
       overflow={overflow}
     />

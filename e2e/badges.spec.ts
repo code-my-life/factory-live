@@ -3,6 +3,7 @@ import {
   expectCleanBadges,
   expectNoHorizontalOverflow,
   expectReadablePaint,
+  expectVisibleMarks,
   issueJob,
 } from './helpers.ts';
 
@@ -229,4 +230,47 @@ test('une issue porte l’icône de GitHub à la couleur de son état', async ({
   // Sur la ligne, la tête de la boîte montre déjà l'état : le badge de l'issue s'en passe.
   await page.goto('/');
   await expect(issueJob(page, 'cv-site#49').locator('[data-segment="label"] svg')).toHaveCount(0);
+});
+
+for (const scheme of ['dark', 'light'] as const) {
+  test(`page Santé : chaque service a son icône, logos visibles, thème ${scheme === 'dark' ? 'sombre' : 'clair'}`, async ({
+    page,
+  }) => {
+    await page.addInitScript((value) => {
+      localStorage.setItem('factory-live:color-mode', value);
+    }, scheme);
+    await page.goto('/health');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    const main = page.getByRole('main');
+    const tiles = main.getByRole('listitem').filter({ has: page.locator('p svg') });
+    const all = main.getByRole('listitem');
+    await expect(all.first()).toBeVisible();
+    expect(await tiles.count(), 'une icône sur chaque tuile').toBe(await all.count());
+    expect(await expectVisibleMarks(page), 'des logos de marque').toBeGreaterThan(3);
+    await expectNoHorizontalOverflow(page);
+  });
+}
+
+test('un même service a la même image partout : GitHub et ses webhooks, NVIDIA', async ({
+  page,
+}) => {
+  await page.goto('/health');
+  const logo = (name: string) =>
+    page
+      .getByRole('main')
+      .getByRole('listitem')
+      .filter({ hasText: name })
+      .locator('svg[data-mark="brand"] path');
+  const github = await logo('API GitHub').getAttribute('d');
+  expect(github).toBeTruthy();
+  await expect(logo('Webhooks GitHub')).toHaveAttribute('d', github ?? '');
+  const nvidia = await logo('API NVIDIA').getAttribute('d');
+  await page.goto('/');
+  await expect(
+    page
+      .getByRole('region', { name: 'En ce moment' })
+      .locator('[data-brand="NVIDIA"] svg path')
+      .first(),
+  ).toHaveAttribute('d', nvidia ?? '');
+  expect(await expectVisibleMarks(page)).toBeGreaterThan(0);
 });

@@ -1,6 +1,20 @@
-import { CpuIcon, ServerIcon, StackIcon, TerminalIcon } from '@primer/octicons-react';
+import {
+  BroadcastIcon,
+  ClockIcon,
+  CpuIcon,
+  DashboardIcon,
+  DatabaseIcon,
+  GraphIcon,
+  PlugIcon,
+  PulseIcon,
+  ServerIcon,
+  StackIcon,
+  StopIcon,
+  TasklistIcon,
+  TerminalIcon,
+} from '@primer/octicons-react';
 import { describe, expect, it } from 'vitest';
-import { BRAND_MARKS, isBrand, laneMark, modelEditor, providerMark } from './marks.ts';
+import { BRAND_MARKS, isBrand, laneMark, modelEditor, providerMark, serviceMark } from './marks.ts';
 
 const editorOf = (model: string) => modelEditor(model)?.title ?? null;
 
@@ -52,6 +66,39 @@ describe('providerMark', () => {
     const opencode = laneMark('opencode');
     expect(isBrand(opencode) && opencode.title).toBe('OpenCode');
     expect(laneMark(null)).toBe(TerminalIcon);
+  });
+});
+
+describe('serviceMark', () => {
+  const titleOf = (id: string) => {
+    const mark = serviceMark(id);
+    return isBrand(mark) ? mark.title : null;
+  };
+
+  it('donne à un service de marque son logo, le même que dans les badges', () => {
+    expect(titleOf('github')).toBe('GitHub');
+    expect(serviceMark('webhook')).toBe(serviceMark('github'));
+    expect(serviceMark('github-deliveries')).toBe(serviceMark('github'));
+    expect(titleOf('funnel')).toBe('Tailscale');
+    expect(serviceMark('claude')).toBe(providerMark('anthropic'));
+    expect(serviceMark('nvidia')).toBe(providerMark('nvidia'));
+    expect(serviceMark('provider:nvidia')).toBe(providerMark('nvidia'));
+    expect(serviceMark('provider:moa')).toBe(providerMark('moa'));
+  });
+
+  it('marque les autres d’une octicon, sans logo inventé', () => {
+    expect(serviceMark('freellmapi')).toBe(ServerIcon);
+    expect(serviceMark('llamacpp')).toBe(CpuIcon);
+    expect(serviceMark('gateway')).toBe(BroadcastIcon);
+    expect(serviceMark('dispatcher')).toBe(TasklistIcon);
+    expect(serviceMark('pause')).toBe(StopIcon);
+    expect(serviceMark('dashboard')).toBe(DashboardIcon);
+    expect(serviceMark('disk')).toBe(DatabaseIcon);
+    expect(serviceMark('graphify')).toBe(GraphIcon);
+    expect(serviceMark('cron')).toBe(ClockIcon);
+    expect(serviceMark('probe')).toBe(PulseIcon);
+    expect(serviceMark('sources')).toBe(PlugIcon);
+    expect(serviceMark('service-inconnu')).toBe(ServerIcon);
   });
 });
 

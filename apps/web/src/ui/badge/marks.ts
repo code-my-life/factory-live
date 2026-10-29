@@ -1,8 +1,23 @@
-import { CpuIcon, ServerIcon, StackIcon, TerminalIcon } from '@primer/octicons-react';
+import {
+  BroadcastIcon,
+  ClockIcon,
+  CpuIcon,
+  DashboardIcon,
+  DatabaseIcon,
+  GraphIcon,
+  PlugIcon,
+  PulseIcon,
+  ServerIcon,
+  StackIcon,
+  StopIcon,
+  TasklistIcon,
+  TerminalIcon,
+} from '@primer/octicons-react';
 import type { Icon } from '@primer/octicons-react';
 import {
   siClaude,
   siDeepseek,
+  siGithub,
   siGithubactions,
   siGoogle,
   siGooglegemini,
@@ -12,6 +27,7 @@ import {
   siNvidia,
   siOpencode,
   siQwen,
+  siTailscale,
 } from 'simple-icons';
 
 /**
@@ -49,6 +65,8 @@ const DEEPSEEK = brand(siDeepseek);
 const MOONSHOT = brand(siMoonshotai);
 const OPENCODE = brand(siOpencode);
 const GITHUB_ACTIONS = brand(siGithubactions);
+const GITHUB = brand(siGithub);
+const TAILSCALE = brand(siTailscale);
 
 /** Toutes les marques affichées : le test de contraste les passe en revue. */
 export const BRAND_MARKS: readonly BrandMark[] = [
@@ -63,6 +81,8 @@ export const BRAND_MARKS: readonly BrandMark[] = [
   MOONSHOT,
   OPENCODE,
   GITHUB_ACTIONS,
+  GITHUB,
+  TAILSCALE,
 ];
 
 /**
@@ -113,3 +133,30 @@ export function laneMark(provider: string | null): BadgeMark {
 
 /** La CI des PR tourne sur GitHub Actions. */
 export const CHECKS_MARK: BrandMark = GITHUB_ACTIONS;
+
+/**
+ * Un service de la page Santé : son logo s'il est une marque (GitHub et ses webhooks, Tailscale pour le
+ * Funnel, NVIDIA et Claude, les mêmes que dans les badges), sinon une octicon qui dit ce qu'il fait.
+ * Aucun logo inventé : un service inconnu prend le serveur, comme un fournisseur inconnu.
+ */
+const SERVICES: Readonly<Record<string, BadgeMark>> = {
+  gateway: BroadcastIcon,
+  dispatcher: TasklistIcon,
+  pause: StopIcon,
+  dashboard: DashboardIcon,
+  disk: DatabaseIcon,
+  claude: CLAUDE,
+  graphify: GraphIcon,
+  github: GITHUB,
+  webhook: GITHUB,
+  'github-deliveries': GITHUB,
+  funnel: TAILSCALE,
+  cron: ClockIcon,
+  probe: PulseIcon,
+  sources: PlugIcon,
+};
+
+export function serviceMark(id: string): BadgeMark {
+  const provider = id.startsWith('provider:') ? id.slice('provider:'.length) : id;
+  return SERVICES[id] ?? PROVIDERS[provider] ?? ServerIcon;
+}

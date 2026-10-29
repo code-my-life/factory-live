@@ -145,3 +145,58 @@ export async function expectReadablePaint(page: Page): Promise<number> {
   expect(defects, 'segments peints illisibles').toEqual([]);
   return count;
 }
+
+/**
+ * Les logos de marque (badges, tuiles de la page Santé) se voient : 3:1 au moins entre leur couleur et
+ * le fond réel sous eux (fonds translucides des tuiles et des teintes composés jusqu'au premier fond
+ * opaque), calculés par le navigateur dans le thème de la page. Rend le nombre de logos vérifiés.
+ */
+export async function expectVisibleMarks(page: Page): Promise<number> {
+  const { count, defects } = await page.evaluate(() => {
+    const parse = (value: string) => {
+      const [red = 0, green = 0, blue = 0, alpha = 1] = (value.match(/[\d.]+/g) ?? []).map(Number);
+      return { red, green, blue, alpha: value.startsWith('rgba') ? alpha : 1 };
+    };
+    const background = (element: Element): string => {
+      const layers: ReturnType<typeof parse>[] = [];
+      for (let node: Element | null = element; node; node = node.parentElement) {
+        const layer = parse(getComputedStyle(node).backgroundColor);
+        if (layer.alpha > 0) layers.push(layer);
+        if (layer.alpha >= 1) break;
+      }
+      let color = { red: 255, green: 255, blue: 255 };
+      for (const layer of layers.reverse())
+        color = {
+          red: layer.red * layer.alpha + color.red * (1 - layer.alpha),
+          green: layer.green * layer.alpha + color.green * (1 - layer.alpha),
+          blue: layer.blue * layer.alpha + color.blue * (1 - layer.alpha),
+        };
+      return `rgb(${color.red}, ${color.green}, ${color.blue})`;
+    };
+    const luminance = (value: string) => {
+      const { red, green, blue } = parse(value);
+      const [r, g, b] = [red, green, blue].map((channel) => {
+        const c = channel / 255;
+        return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0);
+    };
+    const contrast = (first: string, second: string) => {
+      const [light, dark] = [luminance(first), luminance(second)].sort((a, b) => b - a);
+      return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05);
+    };
+    const marks = [...document.querySelectorAll('svg[data-mark="brand"]')].filter((mark) =>
+      mark.checkVisibility(),
+    );
+    const found: string[] = [];
+    for (const mark of marks) {
+      const color = getComputedStyle(mark).color;
+      const under = background(mark.parentElement ?? mark);
+      const ratio = contrast(color, under);
+      if (ratio < 3) found.push(`${ratio.toFixed(2)}:1 (${color} sur ${under})`);
+    }
+    return { count: marks.length, defects: found };
+  });
+  expect(defects, 'logos de marque invisibles sur leur fond').toEqual([]);
+  return count;
+}

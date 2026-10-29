@@ -1,8 +1,8 @@
 import { Link } from 'react-router';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
-import { markStyle, textOn } from './contrast.ts';
-import { isBrand } from './marks.ts';
+import { textOn } from './contrast.ts';
 import type { BadgeMark, BrandMark } from './marks.ts';
+import { MarkIcon } from './MarkIcon.tsx';
 import styles from './Badge.module.css';
 
 /**
@@ -40,40 +40,6 @@ export interface BadgeProps {
   /** Page interne : tout le badge y mène. */
   to?: string;
   overflow?: BadgeOverflow;
-}
-
-/**
- * Une icône de badge, décorative : une octicon, ou le tracé d'un logo de Simple Icons en SVG inline.
- * Un logo garde sa couleur de marque là où elle se voit, sauf sur une étiquette déjà peinte de la
- * marque, où il prend la couleur du texte (blanc ou noir), comme le `logoColor` de shields.io.
- */
-function MarkIcon({
-  mark,
-  segment,
-  painted,
-}: {
-  mark: BadgeMark;
-  segment: 'label' | 'value';
-  painted: boolean;
-}) {
-  if (!isBrand(mark)) {
-    const Octicon = mark;
-    return <Octicon size={12} className={styles.icon} />;
-  }
-  return (
-    <svg
-      className={styles.icon}
-      viewBox="0 0 24 24"
-      width={12}
-      height={12}
-      fill="currentColor"
-      aria-hidden="true"
-      focusable="false"
-      style={painted ? undefined : markStyle(mark.hex, segment)}
-    >
-      <path d={mark.path} />
-    </svg>
-  );
 }
 
 /**
@@ -123,13 +89,18 @@ export function Badge({
           aria-hidden="true"
         >
           {labelIcon ? (
-            <MarkIcon mark={labelIcon} segment="label" painted={painted !== null} />
+            <MarkIcon
+              mark={labelIcon}
+              className={styles.icon}
+              background="label"
+              painted={painted !== null}
+            />
           ) : null}
           <span className={styles.text}>{label}</span>
         </span>
       ) : null}
       <span className={styles.value} data-segment="value" aria-hidden="true">
-        {icon ? <MarkIcon mark={icon} segment="value" painted={false} /> : null}
+        {icon ? <MarkIcon mark={icon} className={styles.icon} background="value" /> : null}
         <span className={styles.text}>{value}</span>
       </span>
       <span className="fl-visually-hidden">{text}</span>

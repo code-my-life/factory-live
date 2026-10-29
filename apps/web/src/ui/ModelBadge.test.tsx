@@ -28,7 +28,7 @@ describe('ModelBadge', () => {
     expect(badgeOf(container)).toHaveAttribute('data-tone', 'accent');
   });
 
-  it('nomme la lane CLI en étiquette, à sa couleur, et garde le fournisseur dans la description', () => {
+  it('nomme la lane CLI en étiquette, valeur neutre : un seul code couleur, celui de l’outil', () => {
     const { container } = render(
       <ModelBadge
         model={{ model: 'claude-opus-5-5', provider: 'anthropic', source: 'live' }}
@@ -38,7 +38,7 @@ describe('ModelBadge', () => {
     expect(screen.getByText('lane')).toBeInTheDocument();
     expect(screen.queryByText('Claude')).toBeNull();
     const badge = badgeOf(container);
-    expect(badge).toHaveAttribute('data-tone', 'done');
+    expect(badge).toHaveAttribute('data-tone', 'neutral');
     expect(badge).toHaveAttribute(
       'title',
       'lane : claude-opus-5-5 via Claude, observé sur le dernier appel',
