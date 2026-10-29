@@ -162,6 +162,47 @@
   gap: var(--base-size-4);
 }
 
+/* Une garde qui peut dépasser le délai de son hook : en jaune, avec les deux durées. */
+.risk {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--base-size-4);
+  margin: 0;
+  color: var(--fgColor-attention);
+  font-size: var(--base-text-size-xs);
+  overflow-wrap: anywhere;
+}
+
+.riskIcon {
+  flex: none;
+  margin-top: var(--base-size-2);
+}
+
+.limits {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--base-size-6) var(--base-size-12);
+  margin: 0;
+}
+
+.limit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-2);
+  min-width: 0;
+}
+
+.limitTerm {
+  color: var(--fgColor-muted);
+  font-size: var(--base-text-size-xs);
+}
+
+.limitData {
+  margin: 0;
+  font-size: var(--text-body-size-small);
+  font-variant-numeric: tabular-nums;
+}
+
 .toolsets {
   margin: 0;
   color: var(--fgColor-default);

@@ -21,6 +21,9 @@ function intervention(patch: Partial<Intervention> = {}): Intervention {
     push: true,
     actions: [{ kind: 'unblock' }],
     unblock: null,
+    diagnosis: null,
+    resolvedAt: null,
+    followUp: null,
     ...patch,
   };
 }

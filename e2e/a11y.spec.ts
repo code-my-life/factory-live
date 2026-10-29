@@ -6,6 +6,8 @@ const ROUTES = [
   '/issues',
   '/issues/claude-cockpit/71',
   '/interventions/iv-projects',
+  '/interventions/iv-hook',
+  '/issues/factory-live/2',
   '/agents',
   '/health',
   '/costs',

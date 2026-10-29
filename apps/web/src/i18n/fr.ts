@@ -9,6 +9,7 @@ import type {
   InterventionKind,
   IssueStatus,
   KanbanStatus,
+  LimitKey,
   MessageCode,
   MessageParams,
   ModelRef,
@@ -84,6 +85,27 @@ const attempt = (current: number | null, total: number | null) =>
 
 const statusLabel = (status: string) =>
   (cardStatus as Readonly<Record<string, string>>)[status] ?? status;
+
+/** Les issues d'un run (`task_runs.outcome`) telles qu'Hermès les écrit ; une inconnue reste brute. */
+const runOutcome: Readonly<Record<string, string>> = {
+  completed: 'terminé',
+  review_requested: 'revue demandée',
+  changes_requested: 'changements demandés',
+  blocked: 'bloqué',
+  crashed: 'planté',
+  gave_up: 'abandonné',
+  timed_out: 'délai dépassé',
+  rate_limited: 'limite du fournisseur',
+  reclaimed: 'repris',
+  spawn_failed: 'lancement en échec',
+  scheduled: 'planifié',
+  discarded: 'écarté',
+};
+
+const outcomeLabel = (outcome: string) => runOutcome[outcome] ?? outcome;
+
+/** Un délai en secondes, écrit comme les autres durées : « 30 s », « 10 min », « 7 min ». */
+const secs = (seconds: number) => f.duration(seconds * 1000);
 
 /** Ce que le serveur et le domaine fabriquent : fil d'activité, timeline, interventions, santé... */
 const server: ServerMessages = {
@@ -183,6 +205,151 @@ const server: ServerMessages = {
   'intervention.action.dashboard': () => 'Ouvrir le tableau de bord d’Hermès',
   'intervention.action.relay': ({ owner }) => `Relancer par relais (scribe puis ${owner})`,
 
+  'diagnosis.summary.guardHookTimeout': ({ plugin, seconds }) =>
+    `${plugin ? `Le contrôle de ${plugin}` : 'Un contrôle'} dépasse le délai des hooks d’Hermès (${secs(seconds)})`,
+  'diagnosis.summary.guardHookHung': ({ plugin }) =>
+    `${plugin ?? 'Une garde'} ne répond plus : Hermès refuse les outils de l’agent`,
+  'diagnosis.summary.guardHookRaised': ({ plugin }) =>
+    `${plugin ?? 'Une garde'} plante à chaque appel : Hermès refuse l’outil`,
+  'diagnosis.summary.pluginLoadFailed': ({ plugin }) =>
+    `Le plugin ${plugin} ne se charge pas : ses contrôles ne tournent plus`,
+  'diagnosis.summary.stoppedAfterRefusals': () => 'L’agent s’est arrêté après des outils refusés',
+  'diagnosis.summary.stoppedWithoutKanbanCall': ({ count }) =>
+    count > 1
+      ? `Le modèle s’arrête sans rendre la carte (${count} fois)`
+      : 'Le modèle s’est arrêté sans rendre la carte',
+  'diagnosis.summary.protocolBreaker': ({ count }) =>
+    `Hermès a arrêté la carte après ${count} sorties sans appel kanban`,
+  'diagnosis.summary.iterationBudget': ({ max }) => `L’agent a épuisé ses ${max} tours`,
+  'diagnosis.summary.runtimeLimit': ({ seconds }) =>
+    `Le run a dépassé sa durée maximale (${secs(seconds)})`,
+  'diagnosis.summary.toolDeadline': ({ tool, seconds }) =>
+    `L’outil ${tool} a dépassé le plafond d’Hermès (${secs(seconds)})`,
+  'diagnosis.summary.commandTimeout': ({ seconds }) =>
+    `Une commande a dépassé le délai du terminal (${secs(seconds)})`,
+  'diagnosis.summary.guardRefusal': ({ plugin }) => `${plugin} refuse l’action de l’agent`,
+  'diagnosis.summary.refusalLoop': ({ plugin, count }) =>
+    `L’agent bute ${count} fois sur le même refus de ${plugin}`,
+  'diagnosis.summary.providerQuota': ({ provider }) =>
+    `Quota de ${provider ?? 'son fournisseur'} atteint : la carte attend`,
+  'diagnosis.summary.providerTerminal': ({ provider }) =>
+    `${provider ?? 'Le fournisseur'} refuse la clé ou le modèle de l’agent`,
+  'diagnosis.summary.prAcceptanceInfra': () => 'Hermès n’a pas pu vérifier la PR sur GitHub',
+  'diagnosis.summary.heldActivePr': ({ minutes }) =>
+    `Carte prête mais retenue depuis ${minutes} min (garde active_pr)`,
+  'diagnosis.summary.triageLoop': () => 'Deux blocages identiques : la carte est passée en triage',
+  'diagnosis.summary.question': () => 'L’agent attend ta décision',
+  'diagnosis.summary.unexplained': () => 'Blocage sans cause reconnue',
+  'diagnosis.why.guardHookTimeout': ({ plugin, trigger, seconds }) =>
+    `${plugin ?? 'Une garde'} fait tourner ses contrôles dans un hook pre_tool_call${trigger ? `, à chaque ${trigger}` : ''}. Hermès coupe ce hook après ${secs(seconds)}, refuse l’outil, puis refuse tous les outils de l’agent pendant 60 s : il ne peut plus ni commiter ni rendre la carte. Les contrôles coupés continuent de tourner et ralentissent le suivant.`,
+  'diagnosis.why.guardHookHung': ({ plugin, workers }) =>
+    `${plugin ?? 'La garde'} ne rend plus la main${workers ? ` : ${workers} ${f.plural(workers, 'appel abandonné tourne', 'appels abandonnés tournent')} encore` : ''}. Hermès refuse tous les outils de l’agent tant qu’un de ces appels n’a pas fini.`,
+  'diagnosis.why.guardHookRaised': ({ plugin }) =>
+    `Le hook pre_tool_call de ${plugin ?? 'la garde'} lève une exception à chaque appel. Une garde qui plante ne décide rien : Hermès refuse l’outil par prudence.`,
+  'diagnosis.why.pluginLoadFailed': ({ plugin }) =>
+    `Hermès n’a pas pu charger ${plugin} au démarrage de l’agent : ses contrôles et ses notifications ne tournent pas.`,
+  'diagnosis.why.stoppedAfterRefusals': () =>
+    'Ses derniers appels ont été refusés, y compris ceux qui rendent la carte (kanban_complete, kanban_request_review) : l’agent est sorti sans terminer ni bloquer la carte.',
+  'diagnosis.why.stoppedWithoutKanbanCall': ({ nudges }) =>
+    `Le modèle a fini son tour sans appeler kanban_complete, kanban_request_review ni kanban_block${nudges ? `, malgré ${nudges} ${f.plural(nudges, 'relance', 'relances')} d’Hermès` : ''}. Aucun outil ne lui a été refusé : la cause est le modèle, pas la factory.`,
+  'diagnosis.why.protocolBreaker': ({ count }) =>
+    `Après ${count} sorties sans appel kanban d’affilée, le disjoncteur d’Hermès bloque la carte, sans type ni question.`,
+  'diagnosis.why.iterationBudget': ({ used, max }) =>
+    `Le run a utilisé ${used} tours sur ${max} sans finir : Hermès l’a arrêté.`,
+  'diagnosis.why.runtimeLimit': ({ seconds, limit }) =>
+    `Le run a tourné ${secs(seconds)} pour une limite de ${secs(limit)} : Hermès l’a arrêté.`,
+  'diagnosis.why.toolDeadline': ({ tool, seconds }) =>
+    `Hermès plafonne chaque appel d’outil, hooks compris, à ${secs(seconds)} : l’appel ${tool} a été coupé.`,
+  'diagnosis.why.commandTimeout': ({ seconds }) =>
+    `Une commande du terminal a dépassé ${secs(seconds)} et a été arrêtée.`,
+  'diagnosis.why.guardRefusal': ({ plugin }) =>
+    `${plugin} est une garde de la factory : elle refuse ce qui ne respecte pas ses règles, et l’agent doit corriger avant de recommencer. C’est le fonctionnement normal.`,
+  'diagnosis.why.refusalLoop': ({ plugin, count }) =>
+    `L’agent a reçu ${count} fois le même refus de ${plugin} sans changer d’approche : il tourne en rond.`,
+  'diagnosis.why.providerQuota': ({ provider }) =>
+    `${provider ?? 'Le fournisseur'} répond 429 : Hermès met la carte en attente, puis la relance seul.`,
+  'diagnosis.why.providerTerminal': ({ provider }) =>
+    `${provider ?? 'Le fournisseur'} rejette la clé ou le modèle configuré : relancer ne sert à rien tant que ce n’est pas corrigé.`,
+  'diagnosis.why.prAcceptanceInfra': () =>
+    'Le contrôle de PR du noyau kanban n’a pas pu interroger GitHub (gh trop ancien, ou authentification).',
+  'diagnosis.why.heldActivePr': () =>
+    'Hermès retient une carte qui a cité une PR il y a moins de 24 h, pour éviter les PR en double. Il faut un relais : scribe, puis l’agent d’origine.',
+  'diagnosis.why.triageLoop': () =>
+    'Deux blocages du même type de suite : Hermès met la carte en triage, où « Débloquer » ne s’applique plus.',
+  'diagnosis.why.question': () =>
+    'L’agent pose une question et aucune cause technique n’apparaît dans ses derniers appels : il attend ta réponse.',
+  'diagnosis.why.unexplained': () =>
+    'Aucune règle ne reconnaît ce blocage. Voici les derniers signaux bruts, et ce que l’agent a écrit.',
+  'diagnosis.step.setValue': ({ key, value, profile }) =>
+    `Passer ${key} à ${value} pour ${profile}`,
+  'diagnosis.step.reportInRepo': ({ path }) =>
+    `Reporter la valeur dans ${path} du dépôt de la factory, sinon le prochain ./install.sh l’efface`,
+  'diagnosis.step.verifyValue': ({ key }) => `Vérifier la valeur en service de ${key}`,
+  'diagnosis.step.unblockWithTemplate': () => 'Débloquer avec la réponse préremplie ci-dessous',
+  'diagnosis.step.answer': () => 'Répondre à la question de l’agent, ci-dessous',
+  'diagnosis.step.fixPlugin': ({ plugin }) => `Corriger ${plugin} dans le dépôt de la factory`,
+  'diagnosis.step.reinstall': () => 'Lancer ./install.sh quand aucune carte ne tourne',
+  'diagnosis.step.chooseModel': () =>
+    'Donner un autre modèle à la carte : un label claude:… sur l’issue',
+  'diagnosis.step.giveCommand': () =>
+    'Dans ta réponse, donner à l’agent la commande exacte qui respecte la garde',
+  'diagnosis.step.wait': ({ minutes }) =>
+    `Rien à faire : la carte repart seule dans ${minutes} min`,
+  'diagnosis.step.checkProvider': ({ provider }) =>
+    `Vérifier la clé et le modèle de ${provider ?? 'son fournisseur'}`,
+  'diagnosis.step.relay': ({ owner }) => `Relancer par relais : scribe, puis ${owner}`,
+  'diagnosis.step.leaveTriage': () =>
+    'Sortir la carte du triage depuis le tableau de bord d’Hermès',
+  'diagnosis.step.raiseLimit': ({ key, profile }) =>
+    `Relever ${key} pour ${profile}, ou découper la carte`,
+  'diagnosis.evidence.toolRefusals': ({ count, tools }) =>
+    `${count} ${f.plural(count, 'outil refusé', 'outils refusés')} (${tools})`,
+  'diagnosis.evidence.hookTimedOut': ({ callback, seconds }) =>
+    `hook ${callback} coupé après ${secs(seconds)}`,
+  'diagnosis.evidence.trigger': ({ tool }) => `premier appel coupé : ${tool}`,
+  'diagnosis.evidence.settingMissing': ({ key, seconds }) =>
+    `${key} absent de la config : ${secs(seconds)} par défaut`,
+  'diagnosis.evidence.settingValue': ({ key, value }) => `${key} : ${value}`,
+  'diagnosis.evidence.settingChanged': ({ key, value }) => `${key} passé à ${value}`,
+  'diagnosis.evidence.toolDeadlineCap': ({ seconds }) =>
+    `plafond des outils d’Hermès : ${secs(seconds)}, hook compris`,
+  'diagnosis.evidence.pluginHook': ({ plugin, callback, hook }) =>
+    `${plugin} branche ${callback} sur ${hook}`,
+  'diagnosis.evidence.workerExited': () => 'sortie du worker sans appel kanban',
+  'diagnosis.evidence.stopNudges': ({ count }) =>
+    `${count} ${f.plural(count, 'relance', 'relances')} d’Hermès pour rendre la carte`,
+  'diagnosis.evidence.guardMessage': ({ plugin, count }) =>
+    `refus de ${plugin}${count > 1 ? ` (${count} fois)` : ''}`,
+  'diagnosis.evidence.commitPassed': ({ seconds }) => `commit contrôlé passé en ${secs(seconds)}`,
+  'diagnosis.evidence.breaker': ({ count }) =>
+    `disjoncteur après ${count} sorties sans appel kanban`,
+  'diagnosis.evidence.apiErrors': ({ count, provider }) =>
+    `${count} ${f.plural(count, 'erreur', 'erreurs')} d’API${provider ? ` chez ${provider}` : ''}`,
+  'diagnosis.evidence.lastSignals': ({ count }) =>
+    `${count} ${f.plural(count, 'dernier signal', 'derniers signaux')}`,
+  'diagnosis.run.modelStopped': () => 'arrêté sans appel kanban (le modèle)',
+  'diagnosis.run.refusedThenStopped': ({ count }) =>
+    `${count} ${f.plural(count, 'outil refusé', 'outils refusés')}, puis sortie sans appel kanban`,
+  'diagnosis.run.blockedAfterRefusals': ({ count }) =>
+    `bloqué après ${count} ${f.plural(count, 'outil refusé', 'outils refusés')}`,
+  'diagnosis.run.breaker': () => 'arrêté par le disjoncteur d’Hermès',
+  'diagnosis.run.timedOut': () => 'arrêté par une limite d’Hermès',
+  'diagnosis.run.quota': () => 'mis en attente par le fournisseur',
+  'diagnosis.run.refusalLoop': ({ count }) => `${count} fois le même refus`,
+  'diagnosis.run.unexplained': ({ outcome }) => `${outcomeLabel(outcome)}, sans cause reconnue`,
+  'diagnosis.unblock.hookTimeoutFixed': ({ plugin, seconds, value, branch, committed, evidence }) =>
+    [
+      `Le blocage ne venait pas de ton travail : ${plugin ?? 'une garde'} dépassait le délai de ${secs(seconds)} des hooks d’Hermès, d’où les outils refusés. Ce délai est maintenant de ${secs(value)}.`,
+      `Ne refais pas l’implémentation : elle est dans ton worktree${branch ? `, sur ${branch}` : ''}${committed ? '' : ', non commitée'}${evidence ? `, et tes ${evidence} ${f.plural(evidence, 'preuve est', 'preuves sont')} dans evidence/` : ''}. Relis le diff, puis termine le parcours : git add fichier par fichier, puis git commit dans une commande séparée (le contrôle prend plusieurs minutes : attends sa réponse sans relancer), push, PR en brouillon, puis kanban_request_review.`,
+      'Si un outil se bloque encore, appelle kanban_block avec le message d’erreur exact au lieu de finir le run sans appel kanban.',
+    ].join('\n\n'),
+  'diagnosis.unblock.causeFixed': ({ branch }) =>
+    `La cause du blocage est corrigée côté factory. Reprends où tu en étais${branch ? `, sur ${branch}` : ''}, sans refaire ce qui est déjà fait, et termine par kanban_request_review, ou par kanban_block avec le message exact si ça coince encore.`,
+  'diagnosis.unblock.refusalLoop': ({ plugin, refusal }) =>
+    `Tu reçois toujours le même refus de ${plugin} : « ${refusal} ». Fais exactement ce qu’il demande avant de recommencer, sans chercher à le contourner. Si tu ne vois pas comment, appelle kanban_block en citant ce refus.`,
+  'diagnosis.unblock.finishWithKanbanCall': () =>
+    'Reprends la carte où tu en étais, et termine toujours ton run par un appel kanban : kanban_request_review si le travail est prêt, kanban_block avec la raison exacte sinon. Ne t’arrête jamais sur un simple message.',
+
   'health.gateway': () => 'Gateway Hermès',
   'health.gateway.running': ({ seconds }) => `En marche, sonde reçue ${f.ago(seconds)}`,
   'health.gateway.silent': ({ seconds }) => `Muet depuis ${f.span(seconds)}`,
@@ -243,6 +410,15 @@ const server: ServerMessages = {
   'health.value.atMost': ({ max }) => `${max} au plus`,
   'health.value.none': () => 'aucun',
   'health.value.ago': ({ seconds }) => f.ago(seconds),
+  'health.guards': () => 'Délais des gardes',
+  'health.guards.ok': () => 'Chaque garde finit dans le délai de son hook',
+  'health.guards.risk': ({ count }) =>
+    count > 1
+      ? `${count} gardes peuvent dépasser le délai de leur hook`
+      : 'Une garde peut dépasser le délai de son hook',
+  'health.guards.riskItem': ({ profile, plugin }) => `${plugin} sur ${profile}`,
+  'health.guards.limits': ({ longest, limit }) =>
+    `commandes jusqu’à ${secs(longest)}, hook coupé à ${secs(limit)}`,
 
   'github.labeled': ({ label, actor }) => `Label ${label} posé par ${actor}`,
   'github.prOpened': ({ pr, draft }) => `PR #${pr} ouverte${draft ? ' en brouillon' : ''}`,
@@ -317,6 +493,7 @@ export const fr = {
     other: 'Autre',
   } satisfies Record<CardKind, string>,
   cardStatus,
+  runOutcome,
   runRole: {
     coordinator: 'coordination',
     implementer: 'implémentation',
@@ -492,6 +669,8 @@ export const fr = {
     },
     bannerDescription: 'Ta réponse ou ton action est attendue pour que la carte reparte.',
     reply: 'Répondre',
+    seeDiagnosis: 'Voir le diagnostic',
+    cardCause: 'Pourquoi elle bloque',
     cardsTitle: 'Cartes de l’issue',
     cardsHint: 'Choisis une carte pour voir ses runs.',
     forcedSkills: 'Skills forcées :',
@@ -527,7 +706,15 @@ export const fr = {
       cost: 'Coût',
     },
     evidence: (cardId: string | null) =>
-      `Fichiers de preuve de la carte sélectionnée (${cardId ?? 'aucune'}), lus dans son worktree ou dans les preuves archivées par la gate.`,
+      `Fichiers de preuve de la carte sélectionnée (${cardId ?? 'aucune'}), tels qu’ils sont dans evidence/ de son worktree.`,
+    evidenceEmpty: 'Aucun fichier dans evidence/ pour cette carte.',
+    evidenceFile: (size: string, time: string) => `${size}, ${time}`,
+    bytes: (bytes: number) =>
+      bytes < 1024
+        ? `${bytes} o`
+        : bytes < 1024 * 1024
+          ? `${f.integer(Math.round(bytes / 1024))} Ko`
+          : `${f.integer(Math.round(bytes / (1024 * 1024)))} Mo`,
     graph: 'Graphe des cartes de l’issue',
     cardsOf: (title: string) => `Cartes : ${title}`,
     releaseTitle: 'Merge, tag et surveillance de main',
@@ -639,6 +826,102 @@ export const fr = {
     caption: (issueKey: string | null) =>
       `Postée sur ${issueKey ?? ''} en commentaire « /factory unblock », exactement comme si tu répondais depuis l’issue. Elle débloque toutes les cartes bloquées de l’issue.`,
     unblock: 'Débloquer',
+    prefilled:
+      'Réponse préremplie à partir du diagnostic : relis-la et modifie-la si besoin avant de l’envoyer.',
+    unblockAnyway: 'Débloquer quand même',
+    confirmAnyway: 'Confirmer le déblocage',
+    cancel: 'Annuler',
+    anywayWarning: (triage: boolean) =>
+      `La cause est toujours là : l’agent va retomber dans le même échec.${triage ? ' S’il rebloque pour la même raison, la carte part en triage, où « Débloquer » ne s’applique plus.' : ''}`,
+    causeFixed: (time: string) => `Cause corrigée à ${time} : tu peux débloquer.`,
+    rejected: {
+      label: 'Réponse refusée par le bot',
+      hint: 'Le bot a réagi « confused » : plus aucune carte bloquée sur l’issue, ou commande non reconnue.',
+    },
+    recent: 'Récemment débloquées',
+    resolvedLabel: 'Débloquée',
+    resolvedAt: (time: string) => `débloquée à ${time}`,
+    runAfter: 'Run suivant',
+  },
+
+  diagnosis: {
+    label: 'Diagnostic du blocage',
+    why: 'Pourquoi',
+    who: 'Qui agit',
+    enough: 'Débloquer suffit ?',
+    todo: 'Que faire',
+    evidence: 'Preuves',
+    evidenceCount: (count: number) => `${count} ${f.plural(count, 'fait', 'faits')}`,
+    runs: 'Runs de l’épisode',
+    work: 'Travail de la carte',
+    others: 'Autres constats',
+    agentText: 'Ce que l’agent a écrit',
+    actor: {
+      you_factory: 'À toi, côté factory',
+      you_answer: 'À toi, une réponse',
+      agent: 'À l’agent',
+      wait: 'Personne : attendre',
+    },
+    confidence: { certain: 'certain', likely: 'probable' },
+    cause: {
+      present: 'Cause toujours là',
+      fixed: (time: string) => `Cause corrigée à ${time}`,
+      verified: 'vérifiée',
+      notDurable: 'pas encore dans le dépôt de la factory',
+      durable: 'reportée dans le dépôt',
+      unknown: 'État de la cause inconnu',
+      none: 'Rien à corriger côté factory',
+    },
+    advice: {
+      now: 'Oui : débloque avec la réponse préremplie.',
+      after_fix: 'Non : corrige d’abord la cause, sinon la carte retombera dans le même échec.',
+      answer: 'Oui : ta réponse est ce que l’agent attend.',
+      wait: 'Inutile : la carte repart seule.',
+      not_unblockable: 'Non : cette carte ne se débloque pas depuis l’app, utilise les commandes.',
+    },
+    nextTriage: 'Si elle rebloque pour la même raison, elle part en triage.',
+    setting: {
+      observed: 'à l’incident',
+      current: 'en service',
+      effective: 'effectif',
+      repo: 'dépôt',
+      unset: (value: string) => `absent (${value} par défaut)`,
+      none: 'absent',
+    },
+    source: {
+      kanban: 'Kanban',
+      transcript: 'Session',
+      webhook: 'Webhook',
+      agent_log: 'Journal d’Hermès',
+      config: 'Config',
+      plugin: 'Plugin',
+      workspace: 'Worktree',
+    },
+    between: (from: string, to: string) => `de ${from} à ${to}`,
+    primaryCause: 'cause principale',
+    otherFinding: 'autre constat',
+    run: (id: number) => `Run #${id}`,
+    branch: 'Branche',
+    noBranch: 'inconnue',
+    commits: { none: 'aucun commit', some: 'commits faits', unknown: 'commits inconnus' },
+    commitsRefused: (count: number) => `${count} ${f.plural(count, 'refusé', 'refusés')}`,
+    pushed: { yes: 'poussée', no: 'pas poussée', unknown: 'push inconnu' },
+    pr: 'PR',
+    noPr: 'pas de PR',
+    editedFiles: (count: number) =>
+      `${count} ${f.plural(count, 'fichier modifié', 'fichiers modifiés')} par l’agent`,
+    evidenceFiles: (count: number) =>
+      `${count} ${f.plural(count, 'fichier de preuve', 'fichiers de preuve')}`,
+    missingSources: (sources: string) =>
+      `Sources illisibles : ${sources}. Certaines conclusions ne sont que probables.`,
+    sourceName: {
+      transcript: 'sessions',
+      agentLog: 'journal d’Hermès',
+      config: 'config des agents',
+      workspace: 'worktree',
+    },
+    copyCommand: 'Copier',
+    copied: 'Copiée',
   },
 
   agents: {
@@ -682,6 +965,20 @@ export const fr = {
     skills: 'Skills',
     plugins: 'Plugins et refus des gardes (7 jours)',
     refusals: (name: string, count: number) => `${name} · ${count} refus`,
+    timeouts: (count: number) =>
+      `${count} ${f.plural(count, 'dépassement', 'dépassements')} du hook`,
+    risk: (longest: string, limit: string) =>
+      `peut lancer des commandes de ${longest}, hook coupé à ${limit}`,
+    limits: 'Délais d’Hermès',
+    limit: {
+      hook_callback_timeout: 'Hook d’un plugin',
+      tool_deadline: 'Appel d’outil, hook compris',
+      terminal_timeout: 'Commande du terminal',
+      max_turns: 'Tours d’un run',
+    } satisfies Record<LimitKey, string>,
+    limitValue: (value: string, isDefault: boolean) => (isDefault ? `${value} (défaut)` : value),
+    turns: (count: number) => `${count} ${f.plural(count, 'tour', 'tours')}`,
+    unlimited: 'sans limite',
     toolsets: (mcp: boolean) => (mcp ? 'Toolsets et MCP' : 'Toolsets'),
     runs: 'Runs',
     gatePass: 'Passage en gate',
@@ -883,6 +1180,8 @@ export const fr = {
       not_found: 'Introuvable',
       internal: 'Erreur interne de factory-live',
       intervention_unknown: 'Intervention inconnue ou déjà résolue',
+      cause_present:
+        'La cause du blocage est toujours là : confirme « Débloquer quand même » pour passer outre',
       unblock_not_available:
         'Cette intervention ne se débloque pas depuis l’app : utilise les commandes proposées',
       github_login_required:

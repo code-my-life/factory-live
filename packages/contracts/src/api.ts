@@ -50,6 +50,7 @@ export const ApiErrorCode = z.enum([
   'internal',
   'intervention_unknown',
   'unblock_not_available',
+  'cause_present',
   'github_login_required',
   'github_refused',
   'push_unavailable',

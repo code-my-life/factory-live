@@ -20,6 +20,13 @@ import {
   buildUsage,
   model,
 } from './catalog.ts';
+import {
+  HOOK_INCIDENT,
+  heldDiagnosis,
+  hookTimeoutDiagnosis,
+  incidentEvidenceFiles,
+  questionDiagnosis,
+} from './diagnoses.ts';
 import { iso, nextId } from './state.ts';
 import type { DemoState } from './state.ts';
 
@@ -31,6 +38,7 @@ export const KEYS = {
   projects: 'cv-site#49',
   tags: 'claude-cockpit#68',
   footer: 'cv-site#44',
+  hook: HOOK_INCIDENT.key,
   e2e: 'claude-cockpit#42',
   overlap: 'claude-cockpit#52',
   codeowners: 'cv-site#46',
@@ -59,6 +67,9 @@ export const CARDS = {
   overlapImpl: 't_d6702099',
   overlapRelease: 't_b7c03d7b',
   codeownersImpl: 't_70e1b2c9',
+  hookBrief: HOOK_INCIDENT.brief,
+  hookImpl: HOOK_INCIDENT.impl,
+  hookRelease: HOOK_INCIDENT.release,
 } as const;
 
 export const RUNS = { teamBrief: 181, contactImpl: 179, contactGate: 183, teamImpl: 184 } as const;
@@ -66,6 +77,7 @@ export const RUNS = { teamBrief: 181, contactImpl: 179, contactGate: 183, teamIm
 const REPOS: Record<string, string> = {
   'claude-cockpit': 'https://github.com/code-my-life/claude-cockpit',
   'cv-site': 'https://github.com/code-my-life/cv-site',
+  'factory-live': 'https://github.com/code-my-life/factory-live',
 };
 
 function issueUrl(key: string): string {
@@ -79,6 +91,10 @@ export function prUrl(repo: string, number: number): string {
 
 /** Le label qui fait entrer une issue dans la factory, posé par cddev. */
 const LABELED = msg('github.labeled', { label: 'factory', actor: 'cddev' });
+
+/** La raison écrite par l'agent quand il a bloqué factory-live#2 (run 191), telle quelle. */
+const HOOK_REASON =
+  "Terminal et tous les outils bloqués par 'pre_tool_call plugin callback timed out' - impossible de committer, push, créer PR ou appeler kanban_request_review. Travail d'implémentation terminé et vérifié (evidence/01-07 créés, 426 tests passent, typecheck/build/e2e OK), mais workflow git inachevé.";
 
 /** La lane Claude Code de coder-claude, telle que le terminal d'Hermès la lance. */
 export const LANE_COMMAND =
@@ -119,6 +135,7 @@ function card(
     changedFiles: [],
     testsPassed: null,
     testsTotal: null,
+    evidence: [],
     ...patch,
   };
 }
@@ -138,6 +155,7 @@ function run(
     summary: null,
     tokens: null,
     costUsd: null,
+    verdict: null,
     ...patch,
   };
 }
@@ -331,6 +349,25 @@ export function createInitialState(now: number): DemoState {
       interventionIds: [],
       startedAt: ago(2 * 60 * min),
       updatedAt: ago(42 * min),
+    },
+    {
+      key: KEYS.hook,
+      repo: 'factory-live',
+      number: 2,
+      title: 'Réglages : la version de factory-live est écrite en dur au lieu de celle du serveur',
+      url: issueUrl(KEYS.hook),
+      labels: ['factory'],
+      station: 'implementation',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'blocked',
+      claudeModel: null,
+      harness: 'coder',
+      pr: null,
+      activeProfiles: [],
+      interventionIds: [],
+      startedAt: ago(80 * min),
+      updatedAt: ago(22 * min),
     },
     {
       key: KEYS.e2e,
@@ -816,6 +853,105 @@ export function createInitialState(now: number): DemoState {
     ],
   };
 
+  // Réplique de l'incident du 2026-10-29 (voir diagnoses.ts) : la carte impl bloquée et ses trois runs.
+  const clock = { ago };
+  const hookDiagnosis = hookTimeoutDiagnosis(clock);
+  const verdictOf = (runId: number) =>
+    hookDiagnosis.runs.find((verdict) => verdict.runId === runId) ?? null;
+  const coderModel = model('freellmapi', 'auto', 'session');
+  details[KEYS.hook] = {
+    issue: find(KEYS.hook),
+    tokens: 5_060_000,
+    costUsd: 0,
+    cards: [
+      card(
+        CARDS.hookBrief,
+        `${KEYS.hook} : Réglages : la version de factory-live est écrite en dur`,
+        {
+          kind: 'brief',
+          status: 'done',
+          assignee: 'coordinator',
+          station: 'brief',
+        },
+      ),
+      card(CARDS.hookImpl, `impl ${KEYS.hook}`, {
+        kind: 'impl',
+        status: 'blocked',
+        assignee: 'coder',
+        station: 'implementation',
+        blockKind: 'capability',
+        blockReason: HOOK_REASON,
+        parents: [CARDS.hookBrief],
+        skills: ['factory-author-proof'],
+        runs: [
+          run(HOOK_INCIDENT.runs.model, 'coder', {
+            role: 'implementer',
+            status: 'crashed',
+            outcome: 'crashed',
+            startedAt: ago(73 * min),
+            endedAt: ago(56 * min),
+            model: coderModel,
+            verdict: verdictOf(HOOK_INCIDENT.runs.model),
+          }),
+          run(HOOK_INCIDENT.runs.refused, 'coder', {
+            role: 'implementer',
+            status: 'crashed',
+            outcome: 'crashed',
+            startedAt: ago(56 * min),
+            endedAt: ago(33 * min),
+            model: coderModel,
+            verdict: verdictOf(HOOK_INCIDENT.runs.refused),
+          }),
+          run(HOOK_INCIDENT.runs.blocked, 'coder', {
+            role: 'implementer',
+            status: 'blocked',
+            outcome: 'blocked',
+            startedAt: ago(33 * min),
+            endedAt: ago(22 * min),
+            model: coderModel,
+            verdict: verdictOf(HOOK_INCIDENT.runs.blocked),
+          }),
+        ],
+        evidence: incidentEvidenceFiles(clock),
+      }),
+      card(CARDS.hookRelease, `release ${KEYS.hook}`, {
+        kind: 'release',
+        status: 'todo',
+        assignee: 'coordinator',
+        station: 'release',
+        parents: [CARDS.hookImpl],
+      }),
+    ],
+    timeline: [
+      timeline(ago(80 * min), LABELED, { source: 'github' }),
+      timeline(ago(74 * min), msg('timeline.completed'), {
+        profile: 'coordinator',
+        cardId: CARDS.hookBrief,
+        tone: 'success',
+      }),
+      timeline(ago(73 * min), msg('timeline.claimed'), {
+        profile: 'coder',
+        cardId: CARDS.hookImpl,
+      }),
+      timeline(ago(56 * min), msg('timeline.protocolViolation'), {
+        profile: 'coder',
+        cardId: CARDS.hookImpl,
+        tone: 'danger',
+      }),
+      timeline(ago(33 * min), msg('timeline.protocolViolation'), {
+        profile: 'coder',
+        cardId: CARDS.hookImpl,
+        tone: 'danger',
+      }),
+      timeline(ago(22 * min), msg('timeline.blocked', { kind: 'capability' }), {
+        profile: 'coder',
+        cardId: CARDS.hookImpl,
+        tone: 'danger',
+        detail: HOOK_REASON,
+      }),
+    ],
+  };
+
   const doneDetail = (key: string, cards: CardView[], tokens: number, costUsd: number) => {
     details[key] = {
       issue: find(key),
@@ -939,6 +1075,35 @@ export function createInitialState(now: number): DemoState {
 
   const interventions: Intervention[] = [
     {
+      id: 'iv-hook',
+      kind: 'capability',
+      severity: 'critical',
+      title: HOOK_REASON,
+      issueKey: KEYS.hook,
+      cardId: CARDS.hookImpl,
+      profile: 'coder',
+      question: HOOK_REASON,
+      openedAt: ago(22 * min),
+      push: true,
+      actions: [
+        { kind: 'unblock' },
+        {
+          kind: 'copy',
+          label: msg('intervention.action.showCard'),
+          command: `hermes kanban --board factory show ${CARDS.hookImpl}`,
+        },
+        {
+          kind: 'link',
+          label: msg('intervention.action.openIssue', { issueKey: KEYS.hook }),
+          url: issueUrl(KEYS.hook),
+        },
+      ],
+      unblock: null,
+      diagnosis: hookDiagnosis,
+      resolvedAt: null,
+      followUp: null,
+    },
+    {
       id: 'iv-projects',
       kind: 'needs_input',
       severity: 'critical',
@@ -967,6 +1132,9 @@ export function createInitialState(now: number): DemoState {
         },
       ],
       unblock: null,
+      diagnosis: questionDiagnosis(clock, 14 * min),
+      resolvedAt: null,
+      followUp: null,
     },
     {
       id: 'iv-footer',
@@ -992,6 +1160,14 @@ export function createInitialState(now: number): DemoState {
         },
       ],
       unblock: null,
+      diagnosis: heldDiagnosis(
+        clock,
+        CARDS.footerImpl,
+        42,
+        `hermes kanban --board factory reassign ${CARDS.footerImpl} scribe --reason "relais active_pr" && hermes kanban --board factory reassign ${CARDS.footerImpl} coder --reason "reprise sur la PR"`,
+      ),
+      resolvedAt: null,
+      followUp: null,
     },
     {
       id: 'iv-tags',
@@ -1013,6 +1189,9 @@ export function createInitialState(now: number): DemoState {
         },
       ],
       unblock: null,
+      diagnosis: null,
+      resolvedAt: null,
+      followUp: null,
     },
   ];
   for (const intervention of interventions) {

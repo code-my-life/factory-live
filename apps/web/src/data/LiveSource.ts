@@ -12,7 +12,7 @@ import type {
 } from '@factory-live/contracts';
 import { STREAM_PING, STREAM_PING_EVERY_MS } from '@factory-live/contracts';
 import { refusal } from './errors.ts';
-import type { Connection, FactoryDataSource, UsagePeriod } from './source.ts';
+import type { Connection, FactoryDataSource, UnblockOptions, UsagePeriod } from './source.ts';
 
 type Fetch = typeof fetch;
 
@@ -478,13 +478,13 @@ export class LiveSource implements FactoryDataSource {
 
   private serverVersion: Cached<string | null> | null = null;
 
-  async unblock(interventionId: string, text: string): Promise<void> {
+  async unblock(interventionId: string, text: string, options: UnblockOptions = {}): Promise<void> {
     const response = await this.fetchImpl(
       `${this.base}/api/interventions/${encodeURIComponent(interventionId)}/unblock`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Factory-Live': '1' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, acknowledgeCause: options.acknowledgeCause ?? false }),
       },
     );
     if (!response.ok) throw await refusal(response, 'unblock');

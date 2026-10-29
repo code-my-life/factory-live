@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ModelRef } from './agents.ts';
 import { BlockKind, IssueKey, KanbanStatus, StationId, Timestamp } from './common.ts';
+import { EvidenceFile, RunVerdict } from './diagnosis.ts';
 import { Text } from './messages.ts';
 
 export const ChecksState = z.enum(['none', 'pending', 'success', 'failure']);
@@ -83,6 +84,8 @@ export const RunView = z.object({
   summary: z.string().nullable(),
   tokens: z.number().int().nonnegative().nullable(),
   costUsd: z.number().nonnegative().nullable(),
+  /** Ce qu'il s'est passé dans ce run quand il a échoué ou bloqué ; `null` sinon. */
+  verdict: RunVerdict.nullable().default(null),
 });
 export type RunView = z.infer<typeof RunView>;
 
@@ -103,6 +106,8 @@ export const CardView = z.object({
   changedFiles: z.array(z.object({ path: z.string(), edits: z.number().int().positive() })),
   testsPassed: z.number().int().nonnegative().nullable(),
   testsTotal: z.number().int().nonnegative().nullable(),
+  /** Les fichiers de `evidence/` du worktree de la carte, tels qu'ils sont sur le disque. */
+  evidence: z.array(EvidenceFile).default([]),
 });
 export type CardView = z.infer<typeof CardView>;
 

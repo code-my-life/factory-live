@@ -4,6 +4,7 @@ import type {
   HistoryStats,
   ModelRef,
   ModelUsage,
+  ProfileLimit,
   ProfileView,
   ServiceHealth,
   UsageReport,
@@ -35,8 +36,41 @@ const DRIFT_AUTO = driftModel('auto (freellmapi)');
  * Profils de la factory tels qu'ils tournent aujourd'hui (config en service, 18/10). Le rôle est
  * écrit comme le serveur l'écrit : la liste des skills du profil.
  */
+/** Délais réglés dans la config de chaque agent ; absents, les valeurs par défaut d'Hermès s'appliquent. */
+const TERMINAL_TIMEOUT: Readonly<Record<string, number>> = {
+  coder: 900,
+  'coder-claude': 1800,
+  'coder-opencode': 1800,
+  scribe: 900,
+  gate: 900,
+  release: 600,
+};
+const MAX_TURNS: Readonly<Record<string, number>> = { coder: 400, 'coder-claude': 150 };
+
+/** Le plus long que le code d'une garde peut attendre (subprocess `timeout=`), relevé dans ses sources. */
+const GUARD_LONGEST: Readonly<Record<string, number>> = { 'coder-guard': 900, 'merge-guard': 30 };
+
+/** Dépassements du hook vus pendant l'incident de factory-live#2 (runs 190 et 191 de coder). */
+const HOOK_TIMEOUTS: Readonly<Record<string, number>> = { coder: 2 };
+
+export function limitsOf(name: string, hookTimeout: number | null = null): ProfileLimit[] {
+  return [
+    { key: 'hook_callback_timeout', value: hookTimeout, defaultValue: 30, unit: 'seconds' },
+    { key: 'tool_deadline', value: null, defaultValue: 420, unit: 'seconds' },
+    {
+      key: 'terminal_timeout',
+      value: TERMINAL_TIMEOUT[name] ?? null,
+      defaultValue: 180,
+      unit: 'seconds',
+    },
+    { key: 'max_turns', value: MAX_TURNS[name] ?? null, defaultValue: null, unit: 'turns' },
+  ];
+}
+
 export function buildProfiles(): ProfileView[] {
-  const profiles: Omit<ProfileView, 'role'>[] = [
+  const profiles: (Omit<ProfileView, 'role' | 'plugins' | 'limits'> & {
+    plugins: { name: string; refusals: number }[];
+  })[] = [
     {
       name: 'coordinator',
       station: 'brief',
@@ -276,6 +310,12 @@ export function buildProfiles(): ProfileView[] {
   return profiles.map((profile) => ({
     ...profile,
     role: profile.skills.join(', ') || msg('agent.role.default'),
+    plugins: profile.plugins.map((plugin) => ({
+      ...plugin,
+      timeouts: plugin.name === 'coder-guard' ? (HOOK_TIMEOUTS[profile.name] ?? 0) : 0,
+      longestSeconds: GUARD_LONGEST[plugin.name] ?? null,
+    })),
+    limits: limitsOf(profile.name),
   }));
 }
 
@@ -531,6 +571,30 @@ export function buildHealth(now: number): ServiceHealth[] {
       detail: 'Répond',
       checkedAt: ago(8),
       metrics: [],
+    },
+    {
+      id: 'guards',
+      label: msg('health.guards'),
+      group: 'hermes',
+      status: 'degraded',
+      detail: msg('health.guards.risk', { count: 2 }),
+      checkedAt: ago(15),
+      metrics: [
+        {
+          label: msg('health.guards.riskItem', {
+            profile: 'coder, coder-claude, coder-opencode, scribe',
+            plugin: 'coder-guard',
+          }),
+          value: msg('health.guards.limits', { longest: 900, limit: 30 }),
+        },
+        {
+          label: msg('health.guards.riskItem', {
+            profile: 'coordinator, coordinator-claude, release',
+            plugin: 'merge-guard',
+          }),
+          value: msg('health.guards.limits', { longest: 30, limit: 30 }),
+        },
+      ],
     },
     {
       id: 'github',

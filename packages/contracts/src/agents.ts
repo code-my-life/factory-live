@@ -61,6 +61,39 @@ export const ConfigDrift = z.object({
 });
 export type ConfigDrift = z.infer<typeof ConfigDrift>;
 
+/**
+ * Les délais d'Hermès qui coupent le travail d'un agent : hook d'un plugin (`hook_callback_timeout`),
+ * plafond d'un outil, hook compris (`tool_deadline`), commande du terminal, tours d'un run.
+ * `value` : réglé dans la config de l'agent ; `null`, la valeur par défaut d'Hermès s'applique.
+ */
+export const LimitKey = z.enum([
+  'hook_callback_timeout',
+  'tool_deadline',
+  'terminal_timeout',
+  'max_turns',
+]);
+export type LimitKey = z.infer<typeof LimitKey>;
+
+export const ProfileLimit = z.object({
+  key: LimitKey,
+  value: z.number().nonnegative().nullable(),
+  defaultValue: z.number().nonnegative().nullable(),
+  unit: z.enum(['seconds', 'turns']),
+});
+export type ProfileLimit = z.infer<typeof ProfileLimit>;
+
+/**
+ * Un plugin de l'agent : ses refus (l'agent a reçu « <plugin> : ... »), les dépassements de son hook,
+ * et la plus longue commande que son code peut lancer, quand elle dépasse le délai du hook (risque).
+ */
+export const ProfilePlugin = z.object({
+  name: z.string(),
+  refusals: z.number().int().nonnegative(),
+  timeouts: z.number().int().nonnegative().default(0),
+  longestSeconds: z.number().nonnegative().nullable().default(null),
+});
+export type ProfilePlugin = z.infer<typeof ProfilePlugin>;
+
 /** Configuration d'un profil et ses statistiques, pour l'écran Agents. */
 export const ProfileView = z.object({
   name: z.string(),
@@ -70,7 +103,8 @@ export const ProfileView = z.object({
   effort: z.string().nullable(),
   toolsets: z.array(z.string()),
   skills: z.array(z.string()),
-  plugins: z.array(z.object({ name: z.string(), refusals: z.number().int().nonnegative() })),
+  plugins: z.array(ProfilePlugin),
+  limits: z.array(ProfileLimit).default([]),
   mcp: z.array(z.string()),
   drift: z.array(ConfigDrift),
   stats: z.object({

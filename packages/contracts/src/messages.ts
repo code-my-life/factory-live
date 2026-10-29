@@ -102,6 +102,115 @@ export const Message = z.discriminatedUnion('code', [
   message('intervention.action.dashboard', none),
   message('intervention.action.relay', { owner: z.string() }),
 
+  // Diagnostic d'un blocage (contrat `Diagnosis`) : la cause en une ligne, son mécanisme, les faits
+  // qui la fondent, les étapes, le verdict de chaque run et la réponse préremplie.
+  message('diagnosis.summary.guardHookTimeout', { plugin: z.string().nullable(), ...seconds }),
+  message('diagnosis.summary.guardHookHung', { plugin: z.string().nullable() }),
+  message('diagnosis.summary.guardHookRaised', { plugin: z.string().nullable() }),
+  message('diagnosis.summary.pluginLoadFailed', { plugin: z.string() }),
+  message('diagnosis.summary.stoppedAfterRefusals', none),
+  message('diagnosis.summary.stoppedWithoutKanbanCall', { count }),
+  message('diagnosis.summary.protocolBreaker', { count }),
+  message('diagnosis.summary.iterationBudget', { max: count }),
+  message('diagnosis.summary.runtimeLimit', seconds),
+  message('diagnosis.summary.toolDeadline', { tool: z.string(), ...seconds }),
+  message('diagnosis.summary.commandTimeout', seconds),
+  message('diagnosis.summary.guardRefusal', { plugin: z.string() }),
+  message('diagnosis.summary.refusalLoop', { plugin: z.string(), count }),
+  message('diagnosis.summary.providerQuota', { provider: z.string().nullable() }),
+  message('diagnosis.summary.providerTerminal', { provider: z.string().nullable() }),
+  message('diagnosis.summary.prAcceptanceInfra', none),
+  message('diagnosis.summary.heldActivePr', { minutes: count }),
+  message('diagnosis.summary.triageLoop', none),
+  message('diagnosis.summary.question', none),
+  message('diagnosis.summary.unexplained', none),
+  message('diagnosis.why.guardHookTimeout', {
+    plugin: z.string().nullable(),
+    trigger: z.string().nullable(),
+    ...seconds,
+  }),
+  message('diagnosis.why.guardHookHung', {
+    plugin: z.string().nullable(),
+    workers: count.nullable(),
+  }),
+  message('diagnosis.why.guardHookRaised', { plugin: z.string().nullable() }),
+  message('diagnosis.why.pluginLoadFailed', { plugin: z.string() }),
+  message('diagnosis.why.stoppedAfterRefusals', none),
+  message('diagnosis.why.stoppedWithoutKanbanCall', { nudges: count.nullable() }),
+  message('diagnosis.why.protocolBreaker', { count }),
+  message('diagnosis.why.iterationBudget', { used: count, max: count }),
+  message('diagnosis.why.runtimeLimit', { ...seconds, limit: z.number().nonnegative() }),
+  message('diagnosis.why.toolDeadline', { tool: z.string(), ...seconds }),
+  message('diagnosis.why.commandTimeout', seconds),
+  message('diagnosis.why.guardRefusal', { plugin: z.string() }),
+  message('diagnosis.why.refusalLoop', { plugin: z.string(), count }),
+  message('diagnosis.why.providerQuota', { provider: z.string().nullable() }),
+  message('diagnosis.why.providerTerminal', { provider: z.string().nullable() }),
+  message('diagnosis.why.prAcceptanceInfra', none),
+  message('diagnosis.why.heldActivePr', none),
+  message('diagnosis.why.triageLoop', none),
+  message('diagnosis.why.question', none),
+  message('diagnosis.why.unexplained', none),
+  message('diagnosis.step.setValue', {
+    key: z.string(),
+    value: z.number().nonnegative(),
+    profile: z.string(),
+  }),
+  message('diagnosis.step.reportInRepo', { path: z.string() }),
+  message('diagnosis.step.verifyValue', { key: z.string() }),
+  message('diagnosis.step.unblockWithTemplate', none),
+  message('diagnosis.step.answer', none),
+  message('diagnosis.step.fixPlugin', { plugin: z.string() }),
+  message('diagnosis.step.reinstall', none),
+  message('diagnosis.step.chooseModel', none),
+  message('diagnosis.step.giveCommand', none),
+  message('diagnosis.step.wait', { minutes: count }),
+  message('diagnosis.step.checkProvider', { provider: z.string().nullable() }),
+  message('diagnosis.step.relay', { owner: z.string() }),
+  message('diagnosis.step.leaveTriage', none),
+  message('diagnosis.step.raiseLimit', { key: z.string(), profile: z.string() }),
+  message('diagnosis.evidence.toolRefusals', { count, tools: z.string() }),
+  message('diagnosis.evidence.hookTimedOut', { callback: z.string(), ...seconds }),
+  message('diagnosis.evidence.trigger', { tool: z.string() }),
+  message('diagnosis.evidence.settingMissing', { key: z.string(), ...seconds }),
+  message('diagnosis.evidence.settingValue', { key: z.string(), value: z.number().nonnegative() }),
+  message('diagnosis.evidence.settingChanged', {
+    key: z.string(),
+    value: z.number().nonnegative(),
+  }),
+  message('diagnosis.evidence.toolDeadlineCap', seconds),
+  message('diagnosis.evidence.pluginHook', {
+    plugin: z.string(),
+    callback: z.string(),
+    hook: z.string(),
+  }),
+  message('diagnosis.evidence.workerExited', none),
+  message('diagnosis.evidence.stopNudges', { count }),
+  message('diagnosis.evidence.guardMessage', { plugin: z.string(), count }),
+  message('diagnosis.evidence.commitPassed', seconds),
+  message('diagnosis.evidence.breaker', { count }),
+  message('diagnosis.evidence.apiErrors', { count, provider: z.string().nullable() }),
+  message('diagnosis.evidence.lastSignals', { count }),
+  message('diagnosis.run.modelStopped', none),
+  message('diagnosis.run.refusedThenStopped', { count }),
+  message('diagnosis.run.blockedAfterRefusals', { count }),
+  message('diagnosis.run.breaker', none),
+  message('diagnosis.run.timedOut', none),
+  message('diagnosis.run.quota', none),
+  message('diagnosis.run.refusalLoop', { count }),
+  message('diagnosis.run.unexplained', { outcome: z.string() }),
+  message('diagnosis.unblock.hookTimeoutFixed', {
+    plugin: z.string().nullable(),
+    ...seconds,
+    value: z.number().nonnegative(),
+    branch: z.string().nullable(),
+    committed: z.boolean(),
+    evidence: count.nullable(),
+  }),
+  message('diagnosis.unblock.causeFixed', { branch: z.string().nullable() }),
+  message('diagnosis.unblock.refusalLoop', { plugin: z.string(), refusal: z.string() }),
+  message('diagnosis.unblock.finishWithKanbanCall', none),
+
   // Santé : les services que factory-live observe lui-même et ses propres sources.
   message('health.gateway', none),
   message('health.gateway.running', seconds),
@@ -155,6 +264,14 @@ export const Message = z.discriminatedUnion('code', [
   message('health.value.atMost', { max: count }),
   message('health.value.none', none),
   message('health.value.ago', seconds),
+  message('health.guards', none),
+  message('health.guards.ok', none),
+  message('health.guards.risk', { count }),
+  message('health.guards.riskItem', { profile: z.string(), plugin: z.string() }),
+  message('health.guards.limits', {
+    longest: z.number().nonnegative(),
+    limit: z.number().nonnegative(),
+  }),
 
   // Événements GitHub et suivi d'un déblocage, racontés par factory-live (sources `github` et
   // `factory-live` de la timeline, type `github` du fil) : la démo les montre, le serveur pas encore.
@@ -187,8 +304,10 @@ export type MessageParams<C extends MessageCode> = Extract<Message, { code: C }>
  * Un texte affiché : écrit ailleurs (agent, outil, kanban, sonde, GitHub) et montré tel quel, ou
  * fabriqué par factory-live (`Message`) et écrit par le client dans sa langue.
  */
-export const Text = z.union([z.string(), Message]);
-export type Text = z.infer<typeof Text>;
+export type Text = string | Message;
+// Type nommé : sans lui, chaque champ `Text` recopie tout le catalogue dans les types déclarés, et le
+// flux SSE (instantané, interventions, diagnostics) dépasse ce que le compilateur sait écrire.
+export const Text: z.ZodType<Text> = z.union([z.string(), Message]);
 
 type Args<C extends MessageCode> =
   Record<string, never> extends MessageParams<C>

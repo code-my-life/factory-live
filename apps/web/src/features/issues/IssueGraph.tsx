@@ -1,4 +1,4 @@
-import type { AgentActivity, CardView } from '@factory-live/contracts';
+import type { AgentActivity, CardView, Text } from '@factory-live/contracts';
 import { CounterLabel } from '@primer/react';
 import { LayoutGroup } from 'motion/react';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
@@ -50,11 +50,14 @@ export function IssueGraph({
   agents,
   selectedCardId,
   onSelectCard,
+  causes = new Map(),
 }: {
   cards: readonly CardView[];
   agents: readonly AgentActivity[];
   selectedCardId: string | null;
   onSelectCard: (cardId: string) => void;
+  /** La cause du blocage de chaque carte, quand un diagnostic l'a trouvée. */
+  causes?: ReadonlyMap<string, Text>;
 }) {
   const { t } = useI18n();
   const now = useNow();
@@ -87,6 +90,7 @@ export function IssueGraph({
               selected={card.id === selectedCardId}
               onSelect={() => onSelectCard(card.id)}
               now={now}
+              cause={causes.get(card.id) ?? null}
             />
           ))}
         </JobList>

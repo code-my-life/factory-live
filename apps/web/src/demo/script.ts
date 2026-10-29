@@ -1,6 +1,7 @@
 import { msg } from '@factory-live/contracts';
 import type { ActivityEvent } from '@factory-live/contracts';
-import { NEMOTRON_SUPER, QWEN_LOCAL, model } from './catalog.ts';
+import { NEMOTRON_SUPER, QWEN_LOCAL, limitsOf, model } from './catalog.ts';
+import { answered, hookTimeoutDiagnosis } from './diagnoses.ts';
 import { CARDS, KEYS, LANE_COMMAND, RUNS, prUrl } from './initial.ts';
 import {
   addCost,
@@ -12,6 +13,7 @@ import {
   patchAgent,
   patchCard,
   patchHealth,
+  patchIntervention,
   patchIssue,
   patchRun,
   pushActivity,
@@ -239,6 +241,58 @@ function gateTeamStep(state: DemoState, now: number, step: ToolStep): void {
 }
 
 /** Le déroulé de la démo, en secondes depuis le lancement. */
+/** Quand la config de coder est corrigée dans la démo, puis reportée dans le dépôt de la factory. */
+export const HOOK_FIX_AT = 72;
+const HOOK_REPO_AT = 84;
+
+/**
+ * factory-live#2 : la cause du blocage se corrige pendant la démo, comme le 2026-10-29 à 10:13
+ * (`hermes -p coder config set plugins.hook_callback_timeout 600`), puis passe dans le dépôt. Le
+ * diagnostic bascule en direct : « Cause corrigée », et « Débloquer » redevient le bouton principal.
+ */
+function hookTimeoutFix(): ScenarioStep[] {
+  const fix = (at: number, durable: boolean): ScenarioStep => ({
+    at,
+    run: (state, now) => {
+      const start = now - at * 1000;
+      const clock = { ago: (seconds: number) => iso(start - seconds * 1000) };
+      const fixedAt = iso(start + HOOK_FIX_AT * 1000);
+      const diagnosis = hookTimeoutDiagnosis(clock, { fixedAt, durable });
+      const current = state.snapshot.interventions.find((item) => item.id === 'iv-hook');
+      // Déjà débloquée (« quand même ») : l'étape « Débloquer » reste faite.
+      patchIntervention(state, 'iv-hook', {
+        diagnosis: current?.unblock ? answered(diagnosis) : diagnosis,
+      });
+      const coder = state.profiles.find((profile) => profile.name === 'coder');
+      if (coder) coder.limits = limitsOf('coder', 600);
+      if (!durable) {
+        // 600 s réglés, mais le plafond des outils (420 s, hook compris) reste en dessous des 900 s
+        // que coder-guard peut attendre : le risque demeure, avec sa nouvelle limite.
+        patchHealth(state, 'guards', {
+          checkedAt: iso(now),
+          metrics: [
+            {
+              label: msg('health.guards.riskItem', {
+                profile: 'coder, coder-claude, coder-opencode, scribe',
+                plugin: 'coder-guard',
+              }),
+              value: msg('health.guards.limits', { longest: 900, limit: 420 }),
+            },
+            {
+              label: msg('health.guards.riskItem', {
+                profile: 'coordinator, coordinator-claude, release',
+                plugin: 'merge-guard',
+              }),
+              value: msg('health.guards.limits', { longest: 30, limit: 30 }),
+            },
+          ],
+        });
+      }
+    },
+  });
+  return [fix(HOOK_FIX_AT, false), fix(HOOK_REPO_AT, true)];
+}
+
 export function buildScript(): ScenarioStep[] {
   const steps: ScenarioStep[] = [
     ...toolLoop(CLAUDE_LANE, 3, 4, 36, claudeLaneStep),
@@ -701,6 +755,7 @@ export function buildScript(): ScenarioStep[] {
             changedFiles: [],
             testsPassed: null,
             testsTotal: null,
+            evidence: [],
           },
           {
             id: CARDS.shortcutRelease,
@@ -717,6 +772,7 @@ export function buildScript(): ScenarioStep[] {
             changedFiles: [],
             testsPassed: null,
             testsTotal: null,
+            evidence: [],
           },
         );
         patchIssue(state, KEYS.shortcut, {
@@ -809,6 +865,7 @@ export function buildScript(): ScenarioStep[] {
     },
     ...toolLoop(CODER_SHORTCUT, 68, 5, 140, coderShortcutStep),
     ...toolLoop(GATE_TEAM, 70, 7, 140, gateTeamStep),
+    ...hookTimeoutFix(),
   ];
   return steps.sort((left, right) => left.at - right.at);
 }

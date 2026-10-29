@@ -30,8 +30,11 @@ export interface FactoryDataSource {
   getProfiles(): readonly ProfileView[];
   getUsage(periodDays: UsagePeriod): UsageReport;
   getHistory(): HistoryStats;
-  /** Poste la réponse sur l'issue (`/factory unblock`) ; le suivi arrive par le flux. */
-  unblock(interventionId: string, text: string): Promise<void>;
+  /**
+   * Poste la réponse sur l'issue (`/factory unblock`) ; le suivi arrive par le flux. Tant que le
+   * diagnostic voit une cause encore présente côté factory, il faut `acknowledgeCause`.
+   */
+  unblock(interventionId: string, text: string, options?: UnblockOptions): Promise<void>;
   /** Accès de factory-live à GitHub (App, connexion de Clément) ; `null` le temps de le lire. En direct seulement. */
   getGitHubAccess?(): GitHubAccess | null;
   /** Déconnecte Clément de GitHub dans factory-live. En direct seulement. */
@@ -43,3 +46,8 @@ export interface FactoryDataSource {
 }
 
 export type UsagePeriod = 1 | 7 | 30;
+
+export interface UnblockOptions {
+  /** Débloquer malgré une cause encore présente (« Débloquer quand même »). */
+  acknowledgeCause?: boolean;
+}

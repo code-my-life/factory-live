@@ -128,6 +128,9 @@ export function projectInterventions(input: ProjectionInput): Intervention[] {
               at: iso(unblock.updatedAt),
             }
           : null,
+      diagnosis: null,
+      resolvedAt: null,
+      followUp: null,
     };
   });
 }

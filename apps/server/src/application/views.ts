@@ -154,6 +154,7 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
           summary: run.summary,
           tokens: runTokens,
           costUsd: session?.costUsd ?? null,
+          verdict: null,
         };
       });
     const files = new Map<string, number>();
@@ -188,6 +189,7 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
       changedFiles: [...files].map(([path, edits]) => ({ path, edits })),
       testsPassed,
       testsTotal,
+      evidence: [],
     };
   });
 
@@ -289,7 +291,10 @@ export function profileViews(deps: ViewDeps, periodDays = 30): ProfileView[] {
       plugins: (live?.plugins ?? []).map((plugin) => ({
         name: plugin,
         refusals: refusals.get(plugin) ?? 0,
+        timeouts: 0,
+        longestSeconds: null,
       })),
+      limits: [],
       mcp: live?.mcp ?? [],
       drift: live && repo ? configDrift(live, repo) : [],
       stats: {
