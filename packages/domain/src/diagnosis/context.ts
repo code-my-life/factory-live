@@ -56,6 +56,8 @@ export class DiagnosisContext {
   readonly events: readonly TaskEvent[];
   /** Le run qui a produit l'événement raconté : celui que la cause principale doit toucher. */
   readonly blockingRunId: number | null;
+  /** L'événement raconté : le blocage, l'abandon ou la boucle, sinon le dernier échec. */
+  readonly anchor: TaskEvent | null;
   readonly observations: readonly Observation[];
   readonly logs: readonly LogFact[];
   /** Tout ce qui suit l'épisode : sert à vérifier qu'une cause est corrigée. */
@@ -64,6 +66,7 @@ export class DiagnosisContext {
   constructor(input: DiagnosisInput) {
     this.input = input;
     const anchor = input.anchor ?? lastFailure(input.events);
+    this.anchor = anchor;
     this.until = anchor?.createdAt ?? input.now;
     let from = input.task.createdAt;
     for (const event of input.events) {
@@ -99,6 +102,15 @@ export class DiagnosisContext {
 
   get profile(): string | null {
     return this.input.profile?.profile ?? this.runs.at(-1)?.profile ?? this.input.task.assignee;
+  }
+
+  /**
+   * Le type du blocage raconté, tel qu'Hermès l'a noté sur l'événement ; celui de la carte à défaut.
+   * Une carte débloquée depuis n'a plus de type : son ancien blocage garde le sien.
+   */
+  get blockKind(): string | null {
+    const noted = this.anchor?.kind === 'blocked' ? this.anchor.payload['kind'] : undefined;
+    return typeof noted === 'string' && noted ? noted : this.input.task.blockKind;
   }
 
   runOf(runId: number | null): Run | undefined {

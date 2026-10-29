@@ -56,7 +56,7 @@ const RUNS_READ = 8;
 /** Même sans changement visible, un diagnostic se recalcule à ce rythme (journal, durées). */
 const SLOT_MS = 15_000;
 /** Les épisodes relus pour les verdicts des runs d'une carte. */
-const EPISODES_READ = 3;
+const EPISODES_READ = 4;
 const VERDICTS_KEPT = 500;
 const FAILED = new Set([
   'crashed',
@@ -66,7 +66,16 @@ const FAILED = new Set([
   'rate_limited',
   'spawn_failed',
 ]);
-const EPISODE_ENDS = new Set(['blocked', 'gave_up', 'block_loop_detected']);
+/** Ce qui clôt l'échec d'un run : son propre événement, ou l'abandon noté juste après lui. */
+const FAILURE_EVENTS = new Set([
+  'blocked',
+  'gave_up',
+  'block_loop_detected',
+  'crashed',
+  'timed_out',
+  'protocol_violation',
+  'spawn_failed',
+]);
 
 const isoSeconds = (seconds: number) => new Date(Math.round(seconds * 1000)).toISOString();
 
@@ -132,6 +141,30 @@ function sameDiagnosis(left: DiagnosisView | null, right: DiagnosisView | null):
   return (
     JSON.stringify({ ...left, computedAt: null }) === JSON.stringify({ ...right, computedAt: null })
   );
+}
+
+/**
+ * L'événement qui raconte l'échec d'un run : le dernier des siens, ou celui qu'Hermès note sans run
+ * juste après lui (l'abandon du disjoncteur), avant que le run suivant ne commence.
+ */
+export function anchorOf(
+  events: readonly TaskEvent[],
+  runs: readonly Run[],
+  run: Run,
+): number | null {
+  const own = events.filter((event) => event.runId === run.id);
+  const last = own.at(-1)?.id ?? null;
+  const next = runs.find((item) => item.id > run.id);
+  const nextStart = next
+    ? (events.find((event) => event.runId === next.id)?.id ?? Number.POSITIVE_INFINITY)
+    : Number.POSITIVE_INFINITY;
+  const told = events.filter(
+    (event) =>
+      FAILURE_EVENTS.has(event.kind) &&
+      (event.runId === run.id ||
+        (event.runId === null && last !== null && event.id > last && event.id < nextStart)),
+  );
+  return told.at(-1)?.id ?? null;
 }
 
 export function runRefOf(run: Run): RunRef {
@@ -215,26 +248,24 @@ export class DiagnosisService {
   }
 
   /**
-   * Le verdict de chaque run en échec d'une carte, pour la page d'une issue : un diagnostic par
-   * épisode (les trois derniers), le plus récent faisant foi pour un run vu deux fois.
+   * Le verdict de chaque run en échec d'une carte, pour la page d'une issue : du plus récent au plus
+   * ancien, chaque run sans verdict fait relire son épisode, quatre au plus.
    */
   verdictsOf(board: Board, task: Task, nowMs: number): ReadonlyMap<number, RunVerdictView> {
-    const runs = board.runs.filter((run) => run.taskId === task.id);
-    if (!runs.some((run) => run.outcome !== null && FAILED.has(run.outcome))) return new Map();
+    const runs = this.runsOf(board, task);
+    const failed = runs.filter((run) => run.outcome !== null && FAILED.has(run.outcome));
+    if (failed.length === 0) return new Map();
     const fingerprint = this.cardFingerprint(board, task);
     const known = this.verdicts.get(task.id);
     if (known?.fingerprint === fingerprint) return known.runs;
     const events = this.eventsOf(board, task);
-    const ends = events.filter((event) => EPISODE_ENDS.has(event.kind)).slice(-EPISODES_READ);
-    const lastFailed = Math.max(
-      ...runs.filter((run) => run.outcome && FAILED.has(run.outcome)).map((run) => run.id),
-    );
-    const anchors: (number | null)[] = ends.map((event) => event.id);
-    // Des runs en échec après le dernier blocage (plantages sans blocage) : un épisode de plus.
-    if (!ends.some((event) => (event.runId ?? 0) >= lastFailed)) anchors.push(null);
     const found = new Map<number, RunVerdictView>();
-    for (const anchor of anchors.reverse()) {
-      const diagnosis = this.compute(board, task, anchor, nowMs);
+    let read = 0;
+    for (const run of failed.reverse()) {
+      if (found.has(run.id)) continue;
+      if (read >= EPISODES_READ) break;
+      read += 1;
+      const diagnosis = this.compute(board, task, anchorOf(events, runs, run), nowMs);
       for (const verdict of diagnosis?.runs ?? [])
         if (!found.has(verdict.runId)) found.set(verdict.runId, { ...verdict });
     }

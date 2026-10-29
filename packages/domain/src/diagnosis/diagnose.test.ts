@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { aTask } from '../fixtures.test-helpers.ts';
 import { diagnose } from './diagnose.ts';
 import { coderProfile, incidentInput } from './incidents.fixture-builder.test-helpers.ts';
 import { INCIDENTS } from './incidents.test-helpers.ts';
@@ -127,6 +128,8 @@ describe('factory-live#2 (2026-10-29) : le délai du hook de coder-guard', () =>
         { code: 'diagnosis.run.blockedAfterRefusals', params: { count: 12 } },
       ],
     ]);
+    // 189 a échoué de lui-même ; 190 et 191 ont subi les refus d'Hermès.
+    expect(runs.map((run) => run.role)).toEqual(['cause', 'consequence', 'consequence']);
     expect(runs.map((run) => run.sessionId)).toEqual([
       '20261029_085654_8bd48a',
       '20261029_091353_0a2b3f',
@@ -306,6 +309,13 @@ describe('les autres incidents réels du kanban', () => {
     expect(diagnosis.primary).toMatchObject({ code: 'question', actor: 'you_answer' });
     expect(diagnosis.unblock).toEqual({ when: 'answer', template: null, nextBlock: 'blocked' });
     expect(diagnosis.runs.map((run) => run.text.code)).toEqual(['diagnosis.run.question']);
+    // Débloquée depuis, la carte n'a plus de type : l'événement de blocage garde le sien.
+    const later = diagnose(
+      incidentInput('question', {
+        task: aTask({ ...INCIDENTS.question.task, status: 'done', blockKind: null }),
+      }),
+    );
+    expect(later.primary.code).toBe('question');
   });
 
   it('claude-cockpit#49 : 150 tours épuisés par coder-claude, à relever dans sa config', () => {

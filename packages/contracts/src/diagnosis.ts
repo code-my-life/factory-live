@@ -128,7 +128,11 @@ export const Finding = z.object({
 });
 export type Finding = z.infer<typeof Finding>;
 
-/** Ce qu'il s'est passé dans un run de l'épisode : cause ou conséquence d'un diagnostic. */
+/**
+ * Ce qu'il s'est passé dans un run de l'épisode. `role` : le run est la cause de son propre échec (le
+ * modèle s'est arrêté seul), ou il a subi la conséquence d'une cause (outils refusés par une garde ou
+ * par Hermès).
+ */
 export const RunVerdict = z.object({
   runId: z.number().int().positive(),
   finding: FindingCode.nullable(),

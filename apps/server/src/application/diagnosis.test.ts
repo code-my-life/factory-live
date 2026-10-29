@@ -9,7 +9,7 @@ import type {
   TaskEvent,
 } from '@factory-live/domain';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DiagnosisService, diagnosisView, runRefOf } from './diagnosis.ts';
+import { DiagnosisService, anchorOf, diagnosisView, runRefOf } from './diagnosis.ts';
 import type { DiagnosisDeps } from './diagnosis.ts';
 
 /*
@@ -249,7 +249,10 @@ describe('DiagnosisService', () => {
     });
     const verdicts = service.verdictsOf(done, done.tasks[0] as Task, NOW_MS);
     expect([...verdicts.keys()]).toEqual([191]);
-    expect(verdicts.get(191)).toMatchObject({ finding: 'guard_hook_timeout', role: 'cause' });
+    expect(verdicts.get(191)).toMatchObject({
+      finding: 'guard_hook_timeout',
+      role: 'consequence',
+    });
     // Même carte, mêmes faits : le cache répond.
     expect(service.verdictsOf(done, done.tasks[0] as Task, NOW_MS)).toBe(verdicts);
     expect(deps.sessions.runFacts).toHaveBeenCalledTimes(1);
@@ -259,6 +262,32 @@ describe('DiagnosisService', () => {
     const clean = board({ runs: [run(191, T0, { outcome: 'completed' })] });
     expect(service.verdictsOf(clean, clean.tasks[0] as Task, NOW_MS).size).toBe(0);
     expect(deps.sessions.runFacts).not.toHaveBeenCalled();
+  });
+});
+
+describe('anchorOf', () => {
+  // t_03d9d40d : deux runs de coder sortis sans appel kanban, une revue, puis trois runs de la gate
+  // sortis de même, et l'abandon du disjoncteur noté sans run avant la relance.
+  const runs = [180, 181, 182, 183, 184, 185, 186].map((id) => run(id, T0 + id));
+  const events = [
+    event(2894, 'claimed', T0, { runId: 180 }),
+    event(2904, 'protocol_violation', T0, { runId: 180 }),
+    event(2905, 'claimed', T0, { runId: 181 }),
+    event(2974, 'protocol_violation', T0, { runId: 181 }),
+    event(2975, 'claimed', T0, { runId: 182 }),
+    event(2984, 'review_requested', T0, { runId: 182 }),
+    event(2985, 'claimed', T0, { runId: 183 }),
+    event(2989, 'protocol_violation', T0, { runId: 183 }),
+    event(2998, 'protocol_violation', T0, { runId: 185 }),
+    event(2999, 'gave_up', T0),
+    event(3002, 'unblocked', T0),
+    event(3003, 'claimed', T0, { runId: 186 }),
+  ];
+
+  it('raconte l’échec d’un run par son événement, ou par l’abandon noté juste après lui', () => {
+    expect(anchorOf(events, runs, runs[1] as Run)).toBe(2974);
+    expect(anchorOf(events, runs, runs[5] as Run)).toBe(2999);
+    expect(anchorOf(events, runs, runs[2] as Run)).toBeNull();
   });
 });
 

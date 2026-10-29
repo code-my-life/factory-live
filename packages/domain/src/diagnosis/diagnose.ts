@@ -111,7 +111,7 @@ function compare(left: readonly number[], right: readonly number[]): number {
 /** Une vraie question de l'agent : bloqué en `needs_input`, sans cause technique trouvée. */
 function question(ctx: DiagnosisContext): Finding | null {
   const task = ctx.input.task;
-  if (task.blockKind !== 'needs_input') return null;
+  if (ctx.blockKind !== 'needs_input') return null;
   const blocking = ctx.blockingRunId;
   return {
     code: 'question',
@@ -181,6 +181,23 @@ function refusalsOfVerdict(ctx: DiagnosisContext, code: FindingCode, runId: numb
   return code === 'stopped_after_refusals'
     ? endedOnRefusals(ctx, runId).length
     : refusedBy(ctx, code, runId);
+}
+
+/** Les causes qui font échouer un run en refusant ses outils : le run les subit. */
+const SUFFERED: ReadonlySet<FindingCode> = new Set([
+  'guard_hook_timeout',
+  'guard_hook_hung',
+  'guard_hook_raised',
+  'stopped_after_refusals',
+  'guard_refusal',
+]);
+
+/**
+ * Le run est-il la cause de son propre échec (le modèle s'est arrêté seul, son budget est épuisé), ou
+ * en a-t-il subi la conséquence (outils refusés par une garde ou par Hermès, cause expliquée par une autre) ?
+ */
+function roleOf(finding: Finding, all: readonly Finding[]): 'cause' | 'consequence' {
+  return SUFFERED.has(finding.code) || explainedBy(finding, all) ? 'consequence' : 'cause';
 }
 
 function verdictText(
@@ -385,7 +402,7 @@ export function diagnose(input: DiagnosisInput): Diagnosis {
     return {
       runId: run.id,
       finding: finding?.code ?? null,
-      role: finding ? (explainedBy(finding, all) ? 'consequence' : 'cause') : null,
+      role: finding ? roleOf(finding, all) : null,
       text: verdictText(ctx, finding, run.id, run.outcome ?? '?'),
       sessionId: sessionOfRun(input, run.id),
     };
