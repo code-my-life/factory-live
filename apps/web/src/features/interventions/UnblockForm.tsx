@@ -25,16 +25,47 @@ function rowsFor(answer: string): number {
   return Math.min(16, Math.max(4, lines));
 }
 
-/** Où en est la réponse postée : envoyée, prise en compte par le bot, carte repartie, ou refusée. */
-function Tracking({ intervention }: { intervention: Intervention }) {
+/** Le run lancé après le déblocage : en cours, puis son issue, et s'il rebloque pour la même cause. */
+function FollowUp({ intervention }: { intervention: Intervention }) {
   const { t, text } = useI18n();
+  const followUp = intervention.followUp;
+  if (!followUp) return null;
+  return (
+    <p className={styles.followUp} data-tone={followUp.sameCause ? 'danger' : undefined}>
+      <strong>{t.interventions.runAfter}</strong> #{followUp.runId} ·{' '}
+      {followUp.outcome
+        ? (t.runOutcome[followUp.outcome] ?? followUp.outcome)
+        : t.issue.runs.running}
+      {followUp.sameCause && intervention.diagnosis ? (
+        <span className={styles.stepHint}>{text(intervention.diagnosis.primary.summary)}</span>
+      ) : null}
+    </p>
+  );
+}
+
+/**
+ * Où en est la réponse postée : envoyée, prise en compte par le bot, carte repartie, ou refusée.
+ * Débloquée sans réponse de l'app (Telegram, terminal) : le suivi le dit, sans rien à envoyer.
+ */
+function Tracking({ intervention }: { intervention: Intervention }) {
+  const { t } = useI18n();
   const unblock = intervention.unblock;
-  if (!unblock) return null;
+  const titleId = `suivi-${intervention.id}`;
+  if (!unblock) {
+    if (!intervention.resolvedAt) return null;
+    return (
+      <section className={styles.progress} aria-live="polite" aria-labelledby={titleId}>
+        <h3 id={titleId} className={styles.subTitle}>
+          {t.interventions.tracking}
+        </h3>
+        <p className={styles.stepHint}>{t.interventions.resolvedElsewhere}</p>
+        <FollowUp intervention={intervention} />
+      </section>
+    );
+  }
   const rejected = unblock.state === 'rejected';
   // Refusée : la réponse a bien été postée, le bot ne l'a pas appliquée.
   const reached = rejected ? 0 : STEPS.findIndex((step) => step === unblock.state);
-  const followUp = intervention.followUp;
-  const titleId = `suivi-${intervention.id}`;
   return (
     <section className={styles.progress} aria-live="polite" aria-labelledby={titleId}>
       <h3 id={titleId} className={styles.subTitle}>
@@ -63,17 +94,7 @@ function Tracking({ intervention }: { intervention: Intervention }) {
           </span>
         </p>
       ) : null}
-      {followUp ? (
-        <p className={styles.followUp} data-tone={followUp.sameCause ? 'danger' : undefined}>
-          <strong>{t.interventions.runAfter}</strong> #{followUp.runId} ·{' '}
-          {followUp.outcome
-            ? (t.runOutcome[followUp.outcome] ?? followUp.outcome)
-            : t.issue.runs.running}
-          {followUp.sameCause && intervention.diagnosis ? (
-            <span className={styles.stepHint}>{text(intervention.diagnosis.primary.summary)}</span>
-          ) : null}
-        </p>
-      ) : null}
+      <FollowUp intervention={intervention} />
       {unblock.commentUrl ? (
         <a href={unblock.commentUrl} target="_blank" rel="noreferrer" className={styles.inlineLink}>
           {t.interventions.viewComment} <LinkExternalIcon size={12} />
@@ -111,7 +132,12 @@ export function UnblockForm({ intervention }: { intervention: Intervention }) {
           ? describeError(failure.cause, t)
           : t.interventions.sendFailed;
 
-  if (intervention.unblock && intervention.unblock.state !== 'rejected') {
+  // Repartie (par l'app ou ailleurs), la carte n'a plus rien à débloquer : le suivi seulement. Une
+  // réponse refusée sur une carte encore bloquée se renvoie, corrigée.
+  if (
+    intervention.resolvedAt ||
+    (intervention.unblock && intervention.unblock.state !== 'rejected')
+  ) {
     return <Tracking intervention={intervention} />;
   }
 

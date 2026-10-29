@@ -809,6 +809,8 @@ export const en: Messages = {
       hint: 'The bot reacted "confused": no blocked card left on the issue, or command not recognized.',
     },
     recent: 'Recently unblocked',
+    resolvedElsewhere:
+      'Unblocked outside the app (Telegram or terminal): nothing to send from here.',
     resolvedLabel: 'Unblocked',
     resolvedAt: (time) => `unblocked at ${time}`,
     runAfter: 'Next run',

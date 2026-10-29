@@ -876,6 +876,7 @@ export const fr = {
       hint: 'Le bot a réagi « confused » : plus aucune carte bloquée sur l’issue, ou commande non reconnue.',
     },
     recent: 'Récemment débloquées',
+    resolvedElsewhere: 'Débloquée hors de l’app (Telegram ou terminal) : rien à envoyer d’ici.',
     resolvedLabel: 'Débloquée',
     resolvedAt: (time: string) => `débloquée à ${time}`,
     runAfter: 'Run suivant',
