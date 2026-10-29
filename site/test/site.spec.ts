@@ -105,12 +105,14 @@ async function centerOffset(page: Page, inner: string, frame: string) {
 
 for (const site of PAGES) {
   test.describe(`site ${site.lang}`, () => {
-    test('les captures iPad, iPhone et bureau sont centrées dans leur cadre', async ({ page }) => {
+    test('les captures d’ordinateur, de tablette et de smartphone sont centrées dans leur cadre', async ({
+      page,
+    }) => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
       for (const viewport of VIEWPORTS) {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
         await page.goto(site.path);
-        for (const id of ['desktop', 'ipad', 'iphone']) {
+        for (const id of ['desktop', 'tablet', 'phone']) {
           await page.locator(`#screen-tab-${id}`).click();
           const image = page.locator(`#screen-${id} img`);
           await expect(image).toBeVisible();
@@ -124,11 +126,11 @@ for (const site of PAGES) {
           expect(offset.inside, `${where} : la capture sort de son cadre`).toBe(true);
         }
         if (viewport.width < 768) {
-          // Sur téléphone, le héros montre la capture de l'iPhone, centrée sur sa scène.
+          // Sur téléphone, le héros montre la capture du smartphone, centrée sur sa scène.
           const hero = page.locator('.hero-image');
           await expect
             .poll(() => hero.evaluate((element: HTMLImageElement) => element.currentSrc))
-            .toContain('line-iphone');
+            .toContain('line-phone');
           const offset = await centerOffset(page, '.hero-image', '.hero-stage');
           expect(
             Math.abs(offset.x),
@@ -198,17 +200,17 @@ for (const site of PAGES) {
       await expect(tabs).toHaveCount(3);
       await tabs.nth(2).click();
       await expect(tabs.nth(2)).toHaveAttribute('aria-selected', 'true');
-      const iphone = page.locator('#screen-iphone img');
-      await expect(iphone).toBeVisible();
+      const phone = page.locator('#screen-phone img');
+      await expect(phone).toBeVisible();
       await expect
-        .poll(() => iphone.evaluate((image: HTMLImageElement) => image.naturalWidth))
+        .poll(() => phone.evaluate((image: HTMLImageElement) => image.naturalWidth))
         .toBeGreaterThan(0);
       await expect(page.locator('#screen-desktop')).toBeHidden();
       await tabs.nth(2).focus();
       await page.keyboard.press('ArrowLeft');
       await expect(tabs.nth(1)).toBeFocused();
       await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
-      await expect(page.locator('#screen-ipad img')).toBeVisible();
+      await expect(page.locator('#screen-tablet img')).toBeVisible();
     });
 
     test('la glissière parcourt les quatre étapes et le schéma suit', async ({ page }) => {
@@ -275,7 +277,7 @@ test.describe('sans script', () => {
 
   test('tout reste lisible : écrans, étapes du schéma, étapes d’installation', async ({ page }) => {
     await page.goto('');
-    for (const id of ['desktop', 'ipad', 'iphone']) {
+    for (const id of ['desktop', 'tablet', 'phone']) {
       await expect(page.locator(`#screen-${id} img`)).toBeVisible();
     }
     await expect(page.locator('#how .stage')).toHaveCount(4);

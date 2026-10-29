@@ -4,7 +4,7 @@ export default {
   meta: {
     title: 'factory-live : ta factory d’agents Hermès, en direct',
     description:
-      'La factory Hermès en temps réel : la ligne d’usine, chaque carte de chaque issue, les agents et leurs modèles, et les interventions auxquelles tu réponds depuis ton téléphone.',
+      'La factory Hermès en temps réel : la ligne d’usine, chaque carte de chaque issue, les agents et leurs modèles, et les interventions auxquelles tu réponds depuis ton smartphone. Une Progressive Web App, installée depuis le navigateur.',
     ogAlt:
       'La ligne d’usine de factory-live : six stations, une boîte par issue, son état et son agent.',
   },
@@ -22,10 +22,10 @@ export default {
   },
   hero: {
     title: 'Ta factory d’agents, en direct',
-    lede: 'factory-live montre quelle issue est à quelle station, quel agent la tient, avec quel modèle, et ce qui attend ta décision.',
+    lede: 'factory-live est une Progressive Web App qui montre quelle issue est à quelle station, quel agent la tient, avec quel modèle, et ce qui attend ta décision.',
     cta: 'Essayer la démo',
     source: 'Le code sur GitHub',
-    note: 'La démo rejoue un après-midi de la factory dans ton navigateur, sans serveur.',
+    note: 'Elle s’installe depuis le navigateur sur ordinateur, tablette ou smartphone, sans store. La démo rejoue un après-midi de la factory dans ton navigateur, sans serveur.',
     alt: 'La ligne d’usine de factory-live : six stations de l’intake à terminé, une boîte par issue avec son état et son agent, et deux blocages qui attendent une décision.',
   },
   screens: {
@@ -38,17 +38,23 @@ export default {
         alt: 'factory-live sur un écran d’ordinateur : la navigation à gauche, la ligne d’usine, ce que fait chaque agent et l’activité en direct.',
       },
       {
-        id: 'ipad',
-        label: 'iPad',
-        alt: 'factory-live sur un iPad en portrait : la ligne d’usine descend l’écran, les boîtes des issues côte à côte.',
+        id: 'tablet',
+        label: 'Tablette',
+        alt: 'factory-live sur une tablette en portrait : la ligne d’usine descend l’écran, les boîtes des issues côte à côte.',
       },
       {
-        id: 'iphone',
-        label: 'iPhone',
-        alt: 'factory-live sur un iPhone : la ligne d’usine descend l’écran, la barre d’onglets en bas.',
+        id: 'phone',
+        label: 'Smartphone',
+        alt: 'factory-live sur un smartphone : la ligne d’usine descend l’écran, la barre d’onglets en bas.',
       },
     ],
-    text: 'factory-live est une app web installable. Pose-la sur l’écran d’accueil de l’iPhone, installe-la depuis Edge ou Chrome sous Windows, ou depuis Safari sur le Mac. Les notifications ne te sonnent que pour les blocages qui t’attendent. Hors ligne, l’app s’ouvre sur le dernier état reçu et dit son âge.',
+    text: 'factory-live est une Progressive Web App : elle s’installe depuis le navigateur, sans store. Installée, elle a son icône sur l’écran d’accueil, s’ouvre en plein écran, t’envoie une notification push quand un blocage t’attend, et s’ouvre hors ligne sur le dernier état reçu.',
+    installs: [
+      ['Ordinateur', 'Chrome ou Edge : l’icône d’installation dans la barre d’adresse.'],
+      ['Android', 'Chrome : le menu, puis «&nbsp;Installer l’application&nbsp;».'],
+      ['iPhone, iPad', 'Safari : Partager, puis «&nbsp;Sur l’écran d’accueil&nbsp;».'],
+    ],
+    note: 'Sur iPhone et iPad, les notifications push ne marchent qu’une fois l’app installée (iOS&nbsp;16.4 ou plus)&nbsp;; sur Android, dès le navigateur.',
     open: 'Ouvrir la démo',
     install: 'L’installer',
   },
@@ -129,7 +135,7 @@ export default {
         id: 'stream',
         label: 'Diffuser',
         title: 'Un seul flux pour tous les écrans',
-        text: 'Le serveur tient l’état en direct et envoie chaque changement par Server-Sent Events à l’app de ton bureau et de ta poche. Un blocage qui t’attend envoie aussi un Web Push sur l’iPhone.',
+        text: 'Le serveur tient l’état en direct et envoie chaque changement par Server-Sent Events à l’app de ton ordinateur et de ton smartphone. Un blocage qui t’attend envoie aussi une notification push sur ton smartphone.',
       },
       {
         id: 'unblock',
@@ -171,9 +177,9 @@ export default {
           title: 'Tes écrans',
           sub: 'sur ton tailnet',
           items: [
-            ['stream unblock', 'iPhone'],
+            ['stream unblock', 'Smartphone'],
+            ['stream', 'Tablette'],
             ['stream', 'Ordinateur'],
-            ['stream', 'Mac'],
           ],
         },
         {
@@ -259,7 +265,7 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
         rows: [
           {
             title: 'Publier sur ton tailnet',
-            text: 'Ton téléphone et ton Mac joignent l’app par Tailscale, en HTTPS.',
+            text: 'Tes autres appareils joignent l’app par Tailscale, en HTTPS, ce qu’exige son installation.',
             code: 'tailscale serve --bg --https=8446 http://127.0.0.1:8446',
           },
           {
@@ -275,23 +281,23 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
       {
         id: 'devices',
         label: 'Appareils',
-        hint: 'iPhone, PC, Mac',
+        hint: 'Ordinateur, tablette, smartphone',
         rows: [
           {
+            title: 'Ordinateur',
+            text: 'Chrome ou Edge, sous Windows, macOS ou Linux : <code>http://localhost:8446</code> sur cette machine, l’adresse du tailnet ailleurs, puis l’icône d’installation de la barre d’adresse. Sur le Mac, Safari marche aussi : Fichier, «&nbsp;Ajouter au Dock&nbsp;».',
+          },
+          {
+            title: 'Android',
+            text: 'Chrome : ouvre l’adresse du tailnet, puis le menu, «&nbsp;Installer l’application&nbsp;».',
+          },
+          {
             title: 'iPhone et iPad',
-            text: 'L’adresse du tailnet dans Safari, puis Partager, «&nbsp;Sur l’écran d’accueil&nbsp;», et ouvre factory-live depuis l’écran d’accueil.',
-          },
-          {
-            title: 'Windows',
-            text: '<code>http://localhost:8446</code> dans Edge ou Chrome, puis l’icône d’installation de la barre d’adresse.',
-          },
-          {
-            title: 'Mac',
-            text: 'L’adresse du tailnet dans Safari, puis Fichier, «&nbsp;Ajouter au Dock&nbsp;». Chrome marche aussi.',
+            text: 'Safari : ouvre l’adresse du tailnet, puis Partager, «&nbsp;Sur l’écran d’accueil&nbsp;», et ouvre factory-live depuis l’écran d’accueil.',
           },
           {
             title: 'Notifications',
-            text: 'Dans les réglages de l’app&nbsp;: «&nbsp;Activer les notifications&nbsp;», puis «&nbsp;Envoyer un test&nbsp;».',
+            text: 'Dans les réglages de l’app&nbsp;: «&nbsp;Activer les notifications&nbsp;», puis «&nbsp;Envoyer un test&nbsp;». Sur Android, elles marchent aussi dans le navigateur&nbsp;; sur iPhone et iPad, seulement dans l’app installée (iOS&nbsp;16.4 ou plus).',
           },
         ],
       },
@@ -389,7 +395,7 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
         state: 'done',
         icon: 'DeviceMobileIcon',
         title: 'App installable',
-        text: 'PWA, dernier état hors ligne, Web Push sur l’iPhone.',
+        text: 'Une Progressive Web App pour ordinateur, tablette et smartphone, dernier état hors ligne, notifications push.',
       },
       {
         state: 'done',
@@ -407,7 +413,7 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
         state: 'next',
         icon: 'ChecklistIcon',
         title: 'Recette',
-        text: 'Installation et notifications sur l’iPhone, le flux à travers tailscale serve.',
+        text: 'Installation et notifications sur smartphone et tablette, le flux à travers tailscale serve.',
       },
       {
         state: 'next',

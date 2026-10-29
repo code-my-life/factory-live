@@ -2,7 +2,7 @@
 
 # factory-live
 
-**La factory Hermès en temps réel, et son déblocage depuis ton téléphone.**
+**La factory Hermès en temps réel, et son déblocage depuis ton smartphone.**
 
 [English](README.md) | Français
 
@@ -61,9 +61,11 @@
 [issues-badge]: https://img.shields.io/github/issues/code-my-life/factory-live?style=flat
 [issues]: https://github.com/code-my-life/factory-live/issues
 
-factory-live est la fenêtre d’une software factory autonome bâtie sur [Hermès Agent](https://github.com/NousResearch/hermes-agent). Les agents d’Hermès prennent les issues GitHub labellisées `factory` et les font avancer carte par carte sur une ligne d’usine : brief, implémentation, gate, release. factory-live montre cette ligne en direct : quelle issue est à quelle station, quel agent la tient, quel modèle a vraiment répondu, ce qu’il fait à la seconde près, et ce qui attend ta décision. Quand un agent bloque, tu réponds depuis l’app, à ton bureau ou sur ton iPhone, et la carte repart.
+factory-live est la fenêtre d’une software factory autonome bâtie sur [Hermès Agent](https://github.com/NousResearch/hermes-agent). Les agents d’Hermès prennent les issues GitHub labellisées `factory` et les font avancer carte par carte sur une ligne d’usine : brief, implémentation, gate, release. factory-live montre cette ligne en direct : quelle issue est à quelle station, quel agent la tient, quel modèle a vraiment répondu, ce qu’il fait à la seconde près, et ce qui attend ta décision. Quand un agent bloque, tu réponds depuis l’app, sur ton ordinateur ou ton smartphone, et la carte repart.
 
 Il tourne à côté de la factory, dans un seul conteneur Docker sur la même machine, et rejoint tes autres appareils par ton tailnet. Tout ce qu’il montre vient d’Hermès lui-même : ses webhooks natifs signés pour le direct, ses propres bases, en lecture seule, pour le reste. Rien n’est écrit pour lui.
+
+factory-live est une **Progressive Web App** : elle s’installe depuis le navigateur, sans store, sur ordinateur (Chrome, Edge), sur Android (Chrome : « Installer l’application ») et sur iPhone ou iPad (Safari : Partager, « Sur l’écran d’accueil »). Installée, elle a son icône sur l’écran d’accueil, s’ouvre en plein écran, t’envoie une notification push pour les blocages qui t’attendent, et s’ouvre hors ligne sur le dernier état reçu. Sur iPhone et iPad, les notifications push ne marchent qu’une fois l’app installée (iOS 16.4 ou plus) ; sur Android, dès le navigateur.
 
 L’interface est en français ; le code est en anglais. Le design suit [Primer](https://primer.style), le design system de GitHub. La [démo](https://code-my-life.github.io/factory-live/demo/) rejoue un après-midi de la factory dans ton navigateur, sans serveur.
 
@@ -77,7 +79,7 @@ Il a été construit pour la factory de Code My Life, qui développe ses propres
 
 - **La ligne d’usine.** Six stations : Intake, Brief, Implémentation, Gate, Release, Terminé. Une boîte par issue avec son état (en cours, attend ta décision, bloquée, en file), l’agent qui la tient et ce qu’il fait en ce moment ; la ligne coule vers les stations au travail et une boîte glisse quand son issue change de station. En dessous, ce que fait chaque agent et l’activité en direct, une entrée par appel d’outil, réponse de modèle ou événement du kanban.
 - **Une issue et son graphe de cartes.** Les cartes de l’issue (brief, implémentation, release) dessinées comme la même ligne, les runs de chaque carte avec le modèle réellement servi, la transcription intégrale (session Hermès, lane Claude Code ou OpenCode, log brut du terminal), la PR et sa CI, les jetons et le coût.
-- **Interventions et déblocage.** La question entière de l’agent, et une zone de réponse. Ta réponse est postée sur l’issue en `/factory unblock <réponse>`, à ton nom sur GitHub ; le bot de la factory réagit, la carte repart, et l’app suit chaque étape. Une carte retenue pour une autre raison vient avec les commandes exactes à copier. Les blocages qui t’attendent arrivent aussi sur l’iPhone en notification, avec une pastille sur l’icône de l’app.
+- **Interventions et déblocage.** La question entière de l’agent, et une zone de réponse. Ta réponse est postée sur l’issue en `/factory unblock <réponse>`, à ton nom sur GitHub ; le bot de la factory réagit, la carte repart, et l’app suit chaque étape. Une carte retenue pour une autre raison vient avec les commandes exactes à copier. Les blocages qui t’attendent arrivent aussi sur ton smartphone en notification push, avec une pastille sur l’icône de l’app.
 - **Agents et modèles.** Chaque agent avec son rôle, sa chaîne de modèles dans l’ordre des fallbacks, son effort, ses skills et ses plugins, les refus de ses gardes sur 7 jours, son taux de passage en gate et sa durée médiane de run, et la dérive entre la configuration en service et celle du dépôt.
 - **Santé.** Gateway, dispatcher, pause, dashboard, fournisseurs de modèles (freellmapi, NVIDIA, llama.cpp et sa VRAM, Claude Code), serveurs MCP, API et webhooks GitHub, tâches cron, et les sources de factory-live lui-même.
 - **Coûts et quotas.** Jetons, appels et réponses 429 par jour, par modèle et par agent, et le coût estimé des runs Claude, sur 24 heures, 7 ou 30 jours.
@@ -99,7 +101,7 @@ flowchart LR
     S["État en direct et historique<br/>volume SQLite"]
     A["Hono : REST, SSE, Web Push"]
   end
-  P["La PWA<br/>ordinateur, iPhone, Mac"]
+  P["La PWA<br/>ordinateur, tablette, smartphone"]
   GH["GitHub<br/>issues, PR, CI"]
   W -- "webhooks sortants" --> I
   G -- "santé toutes les 30 s" --> I
@@ -115,7 +117,7 @@ flowchart LR
 - **Une sonde de santé.** Le plugin `factory-live-probe` tourne dans le gateway, vérifie les services toutes les 30 secondes et poste un rapport signé vers `/api/ingest/health`. Après 90 secondes sans rapport, la sonde est dite muette.
 - **Le kanban et les sessions, en lecture seule.** `kanban.db` (suivie par `PRAGMA data_version` toutes les 300 ms), la `state.db` de chaque agent, les logs des cartes et les transcriptions de Claude Code sont ouverts en lecture seule, par des requêtes courtes ; une règle de lint interdit toute écriture dans les adaptateurs Hermès. Après un redémarrage, factory-live s’y recale. La base d’OpenCode porte des jetons OAuth : elle n’est jamais montée.
 - **Un seul flux pour tous les écrans.** Le serveur tient l’état en direct et envoie chaque changement par Server-Sent Events. Un `ping` après 15 secondes de silence garde le lien honnête ; un flux muet 45 secondes est relancé, et l’app dit quand elle est hors ligne.
-- **Une app web installable.** Sur l’écran d’accueil de l’iPhone, sous Windows et sur le Mac ; un service worker garde la coque disponible hors ligne, et l’app s’ouvre sur le dernier état reçu, gardé sur l’appareil. L’API ne passe jamais par le cache.
+- **Une Progressive Web App.** Installée depuis le navigateur, sans store, sur ordinateur, Android, iPhone ou iPad ; un service worker garde la coque disponible hors ligne, et l’app s’ouvre sur le dernier état reçu, gardé sur l’appareil. L’API ne passe jamais par le cache.
 - **Push.** Web Push avec des clés VAPID générées au premier démarrage, seulement pour les blocages qui t’attendent. Le contact envoyé aux services de push est l’adresse du dépôt, jamais un e-mail.
 - **Déblocage.** Une GitHub App dédiée, créée en un clic depuis factory-live, lit issues, PR et CI avec son jeton d’installation ; le commentaire part avec ton jeton utilisateur, et le bot de la factory le prend donc pour le tien.
 
@@ -125,7 +127,7 @@ Si factory-live s’arrête, la factory ne le remarque pas : les envois échouen
 
 ## Démarrer
 
-Il te faut Linux ou WSL avec Docker, Hermès Agent avec un kanban, Tailscale pour ton téléphone et ton Mac, et un compte GitHub.
+Il te faut Linux ou WSL avec Docker, Hermès Agent avec un kanban, Tailscale pour tes autres appareils, et un compte GitHub.
 
 ### 1. Côté Hermès
 
@@ -159,17 +161,17 @@ L’app est alors sur `http://localhost:8446` depuis cette machine.
 tailscale serve --bg --https=8446 http://127.0.0.1:8446
 ```
 
-Ton téléphone et ton Mac joignent l’app sur `https://<machine>.<tailnet>.ts.net:8446`. Le tailnet seulement, jamais Funnel.
+Tes autres appareils joignent l’app sur `https://<machine>.<tailnet>.ts.net:8446`, en HTTPS, ce qu’exige son installation. Le tailnet seulement, jamais Funnel.
 
 ### 4. Tes appareils
 
-| Appareil     | Installer                                                                                                                | Notifications                                                                       |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| iPhone, iPad | L’adresse du tailnet dans Safari, Partager, « Sur l’écran d’accueil », puis ouvrir factory-live depuis l’écran d’accueil | Dans les réglages de l’app, « Activer les notifications », puis « Envoyer un test » |
-| Windows      | `http://localhost:8446` dans Edge ou Chrome, puis l’icône d’installation de la barre d’adresse                           | Idem ; Windows doit autoriser les notifications d’Edge ou de Chrome                 |
-| Mac          | L’adresse du tailnet dans Safari (Fichier, « Ajouter au Dock ») ou Chrome                                                | Idem                                                                                |
+factory-live est une Progressive Web App : elle s’installe depuis le navigateur, sans store.
 
-Sur l’iPhone, les notifications n’arrivent qu’à l’app posée sur l’écran d’accueil, comme iOS l’exige.
+| Appareil                           | Installer                                                                                                                                                                                                    | Notifications                                                                                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ordinateur (Windows, macOS, Linux) | Chrome ou Edge : `http://localhost:8446` sur cette machine, l’adresse du tailnet ailleurs, puis l’icône d’installation de la barre d’adresse. Sur le Mac, Safari marche aussi : Fichier, « Ajouter au Dock » | Dans les réglages de l’app, « Activer les notifications », puis « Envoyer un test » ; Windows doit autoriser les notifications de Chrome ou d’Edge |
+| Android                            | Chrome : l’adresse du tailnet, puis le menu, « Installer l’application »                                                                                                                                     | Idem, dans l’app installée ou dans le navigateur                                                                                                   |
+| iPhone, iPad                       | Safari : l’adresse du tailnet, puis Partager, « Sur l’écran d’accueil », et ouvrir factory-live depuis l’écran d’accueil                                                                                     | Idem, seulement dans l’app installée (iOS 16.4 ou plus)                                                                                            |
 
 ### 5. GitHub
 
@@ -200,11 +202,11 @@ npm ci
 npm run dev:web       # l’app sur les données de démo, http://127.0.0.1:5173
 npm run dev:server    # le serveur sur ton ~/.hermes, en lecture seule, port 8446
 npm run verify        # format, lint (ESLint, Stylelint avec les règles de Primer), types, texte, architecture, tests, build
-npm run e2e           # Playwright : la démo sur ordinateur et iPhone, l’app live sur un faux serveur d’API
+npm run e2e           # Playwright : la démo sur écrans d’ordinateur et de smartphone, l’app live sur un faux serveur d’API
 ```
 
 - **Mode démo.** `VITE_DATA_SOURCE=demo`, par défaut en développement et pour les tests de bout en bout, rejoue un scénario réaliste de la factory sans serveur (`apps/web/src/demo/`) ; `live` branche l’app sur l’API. Le site publie la même démo.
-- **Tests de bout en bout.** Chromium en local ; WebKit (Safari, iPhone) et les captures de référence tournent dans l’image officielle de Playwright, comme en CI. La commande est dans [docs/RUNBOOK.md](docs/RUNBOOK.md).
+- **Tests de bout en bout.** Chromium en local ; WebKit (le moteur de Safari) et les captures de référence tournent dans l’image officielle de Playwright, comme en CI. La commande est dans [docs/RUNBOOK.md](docs/RUNBOOK.md).
 - **Le site.** `npm run site:build` construit les pages et la démo dans `site/dist`, `npm run site:preview` les sert sur `http://127.0.0.1:4195/factory-live/`, `npm run site:test` les vérifie, et `npm run site:captures` refait les captures.
 - **Règles.** Le test d’abord, un mot par concept à l’écran, composants et jetons de Primer, aucune écriture dans Hermès : [AGENTS.md](AGENTS.md).
 

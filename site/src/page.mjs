@@ -109,7 +109,7 @@ function hero(t, page) {
 <span class="stage-stop" aria-hidden="true">${logo('stage-logo')}</span>
 <div class="hero-shot" data-ui>
 <picture>
-<source media="(max-width: 47.99rem)" srcset="${page.root}assets/img/line-iphone.webp 3x" width="${Math.round(page.images['line-iphone.webp'].width / 3)}" height="${Math.round(page.images['line-iphone.webp'].height / 3)}">
+<source media="(max-width: 47.99rem)" srcset="${page.root}assets/img/line-phone.webp 3x" width="${Math.round(page.images['line-phone.webp'].width / 3)}" height="${Math.round(page.images['line-phone.webp'].height / 3)}">
 ${img(page, 'line-hero.webp', 2, t.hero.alt, ' class="hero-image" fetchpriority="high"')}
 </picture>
 </div>
@@ -119,8 +119,8 @@ ${img(page, 'line-hero.webp', 2, t.hero.alt, ' class="hero-image" fetchpriority=
 
 const SCREEN_IMAGES = {
   desktop: { file: 'line-desktop.webp', density: 2 },
-  ipad: { file: 'line-ipad.webp', density: 2 },
-  iphone: { file: 'line-iphone.webp', density: 3 },
+  tablet: { file: 'line-tablet.webp', density: 2 },
+  phone: { file: 'line-phone.webp', density: 3 },
 };
 
 function screens(t, page) {
@@ -148,6 +148,10 @@ ${panels}
 <div class="screens-body">
 <h2 class="section-title" id="screens-title">${t.screens.title}</h2>
 <p class="screens-text">${t.screens.text}</p>
+<ul class="installs" role="list">
+${t.screens.installs.map(([name, how]) => `<li class="install"><span class="install-name">${name}</span><span class="install-how">${how}</span></li>`).join('\n')}
+</ul>
+<p class="screens-note">${t.screens.note}</p>
 </div>
 <div class="screens-actions">
 <a class="cell cell-ink" href="${page.root}demo/">${t.screens.open}</a>

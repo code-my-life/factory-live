@@ -594,6 +594,48 @@
   text-wrap: pretty;
 }
 
+/* Les trois façons d'installer la PWA, chacune après un arrêt de la ligne, à la taille du texte. */
+.installs {
+  display: grid;
+  gap: var(--base-size-8);
+  max-width: 34rem;
+}
+
+.install {
+  position: relative;
+  display: grid;
+  gap: 0 var(--base-size-16);
+  padding-inline-start: var(--base-size-28);
+}
+
+.install::before {
+  position: absolute;
+  top: var(--base-size-6);
+  left: 0;
+  width: var(--base-size-12);
+  height: var(--base-size-12);
+  border: var(--borderWidth-thick) solid var(--borderColor-accent-emphasis);
+  border-radius: var(--borderRadius-full);
+  content: '';
+}
+
+.install-name {
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.screens-note {
+  max-width: 34rem;
+  color: var(--fgColor-muted);
+  font: var(--text-body-shorthand-medium);
+  text-wrap: pretty;
+}
+
+@media (min-width: 34rem) {
+  .install {
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+  }
+}
+
 .screens-actions {
   display: grid;
   gap: var(--base-size-8);

@@ -4,7 +4,7 @@ export default {
   meta: {
     title: 'factory-live: your Hermes agent factory, live',
     description:
-      'A real-time window on a software factory run by Hermes Agent: the factory line, every card of every issue, agents and models, and the interventions you answer from your phone.',
+      'A real-time window on a software factory run by Hermes Agent: the factory line, every card of every issue, agents and models, and the interventions you answer from your smartphone. A Progressive Web App, installed from the browser.',
     ogAlt:
       'The factory line of factory-live: six stations, a box for each issue, its state and its agent.',
   },
@@ -22,10 +22,10 @@ export default {
   },
   hero: {
     title: 'Your agent factory, live',
-    lede: 'factory-live shows which issue is at which station, which agent holds it, with which model, and what waits for your decision.',
+    lede: 'factory-live is a Progressive Web App that shows which issue is at which station, which agent holds it, with which model, and what waits for your decision.',
     cta: 'Try the live demo',
     source: 'Source on GitHub',
-    note: 'The demo replays an afternoon of the factory in your browser, without a server. The interface is in French.',
+    note: 'It installs from the browser on a computer, a tablet or a smartphone, with no store. The demo replays an afternoon of the factory in your browser; the interface is in French.',
     alt: 'The factory line in factory-live: six stations from intake to done, a box for each issue with its state and its agent, and two blockers waiting for a decision.',
   },
   screens: {
@@ -34,21 +34,27 @@ export default {
     tabs: [
       {
         id: 'desktop',
-        label: 'Desktop',
-        alt: 'factory-live on a desktop screen: the navigation on the left, the factory line, what each agent is doing now and the live activity.',
+        label: 'Computer',
+        alt: 'factory-live on a computer screen: the navigation on the left, the factory line, what each agent is doing now and the live activity.',
       },
       {
-        id: 'ipad',
-        label: 'iPad',
-        alt: 'factory-live on an iPad in portrait: the factory line runs from top to bottom, with the issue boxes side by side.',
+        id: 'tablet',
+        label: 'Tablet',
+        alt: 'factory-live on a tablet in portrait: the factory line runs from top to bottom, with the issue boxes side by side.',
       },
       {
-        id: 'iphone',
-        label: 'iPhone',
-        alt: 'factory-live on an iPhone: the factory line runs down the screen, with the tab bar at the bottom.',
+        id: 'phone',
+        label: 'Smartphone',
+        alt: 'factory-live on a smartphone: the factory line runs down the screen, with the tab bar at the bottom.',
       },
     ],
-    text: 'factory-live is a progressive web app. Install it on the iPhone home screen, from Edge or Chrome on Windows, or from Safari on the Mac. Notifications reach your phone only for the blockers that wait for you. Offline, the app opens on the last state it received and says how old it is.',
+    text: 'factory-live is a Progressive Web App: it installs from the browser, with no store. Installed, it has its icon on the home screen, opens full screen, sends a push notification when a blocker waits for you, and opens offline on the last state it received.',
+    installs: [
+      ['Computer', 'Chrome or Edge: the install icon in the address bar.'],
+      ['Android', 'Chrome: the menu, then Install app.'],
+      ['iPhone, iPad', 'Safari: Share, then Add to Home Screen.'],
+    ],
+    note: 'On iPhone and iPad, push notifications work once the app is installed (iOS&nbsp;16.4 or later); on Android, in the browser too.',
     open: 'Open the demo',
     install: 'Install it',
   },
@@ -129,7 +135,7 @@ export default {
         id: 'stream',
         label: 'Stream',
         title: 'One stream feeds every screen',
-        text: 'The server keeps the live state and sends each change over Server-Sent Events to the app on your desk and in your pocket. A blocker that waits for you also sends a Web Push to the iPhone.',
+        text: 'The server keeps the live state and sends each change over Server-Sent Events to the app on your computer and on your smartphone. A blocker that waits for you also sends a push notification to your smartphone.',
       },
       {
         id: 'unblock',
@@ -171,9 +177,9 @@ export default {
           title: 'Your screens',
           sub: 'on your tailnet',
           items: [
-            ['stream unblock', 'iPhone'],
-            ['stream', 'Desktop'],
-            ['stream', 'Mac'],
+            ['stream unblock', 'Smartphone'],
+            ['stream', 'Tablet'],
+            ['stream', 'Computer'],
           ],
         },
         {
@@ -262,7 +268,7 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
         rows: [
           {
             title: 'Publish on your tailnet',
-            text: 'Your phone and your Mac reach the app through Tailscale, with HTTPS.',
+            text: 'Your other devices reach the app through Tailscale, with HTTPS, which installing the app requires.',
             code: 'tailscale serve --bg --https=8446 http://127.0.0.1:8446',
           },
           {
@@ -278,23 +284,23 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
       {
         id: 'devices',
         label: 'Devices',
-        hint: 'iPhone, PC, Mac',
+        hint: 'Computer, tablet, smartphone',
         rows: [
           {
+            title: 'Computer',
+            text: 'Chrome or Edge, on Windows, macOS or Linux: <code>http://localhost:8446</code> on this machine, the tailnet address elsewhere, then the install icon in the address bar. On the Mac, Safari works too: File, Add to Dock.',
+          },
+          {
+            title: 'Android',
+            text: 'Chrome: open the tailnet address, then the menu, Install app.',
+          },
+          {
             title: 'iPhone and iPad',
-            text: 'Open the tailnet address in Safari, then Share, Add to Home Screen, and open factory-live from the home screen.',
-          },
-          {
-            title: 'Windows',
-            text: '<code>http://localhost:8446</code> in Edge or Chrome, then the install icon in the address bar.',
-          },
-          {
-            title: 'Mac',
-            text: 'The tailnet address in Safari, then File, Add to Dock. Chrome works too.',
+            text: 'Safari: open the tailnet address, then Share, Add to Home Screen, and open factory-live from the home screen.',
           },
           {
             title: 'Notifications',
-            text: 'In the settings of the app (Réglages): Activer les notifications, then Envoyer un test.',
+            text: 'In the settings of the app (Réglages): Activer les notifications, then Envoyer un test. On Android they also work in the browser; on iPhone and iPad, only in the installed app (iOS&nbsp;16.4 or later).',
           },
         ],
       },
@@ -392,7 +398,7 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
         state: 'done',
         icon: 'DeviceMobileIcon',
         title: 'Installable app',
-        text: 'PWA, offline state, Web Push on the iPhone.',
+        text: 'A Progressive Web App for computer, tablet and smartphone, offline state, push notifications.',
       },
       {
         state: 'done',
@@ -410,7 +416,7 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
         state: 'next',
         icon: 'ChecklistIcon',
         title: 'Acceptance',
-        text: 'Install and notifications on the iPhone, the stream through tailscale serve.',
+        text: 'Install and notifications on smartphone and tablet, the stream through tailscale serve.',
       },
       {
         state: 'next',

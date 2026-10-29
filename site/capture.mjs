@@ -17,13 +17,13 @@ const NOW = new Date('2026-10-28T18:00:00Z');
 const require = createRequire(import.meta.url);
 
 const DESKTOP = { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 };
-const IPAD = {
+const TABLET = {
   viewport: { width: 820, height: 1180 },
   deviceScaleFactor: 2,
   isMobile: true,
   hasTouch: true,
 };
-const IPHONE = {
+const PHONE = {
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 3,
   isMobile: true,
@@ -42,8 +42,8 @@ const SHOTS = [
     route: '/',
     clip: async (page) => onScreen(page, await box(page, ['main'], 0)),
   },
-  { name: 'line-ipad', device: IPAD, route: '/' },
-  { name: 'line-iphone', device: IPHONE, route: '/' },
+  { name: 'line-tablet', device: TABLET, route: '/' },
+  { name: 'line-phone', device: PHONE, route: '/' },
   {
     name: 'live',
     device: DESKTOP,

@@ -160,6 +160,42 @@ test('ni tiret cadratin ni nom d’hôte de tailnet réel dans le site et les RE
   }
 });
 
+/** Le HTML d'une section de la page, de sa balise ouvrante à la suivante. */
+function section(html, id) {
+  const start = html.indexOf(`id="${id}"`);
+  assert.notEqual(start, -1, `section #${id}`);
+  const end = html.indexOf('<section', start + 1);
+  return html.slice(start, end === -1 ? undefined : end);
+}
+
+for (const page of PAGES) {
+  test(`${page.file} : la PWA est annoncée dès le héros, installable sur les trois familles d’appareils`, () => {
+    const html = read(page.file);
+    assert.match(section(html, 'top'), /Progressive Web App/, 'la PWA dans le héros');
+    const screens = section(html, 'screens');
+    assert.match(screens, /Progressive Web App/);
+    // Les onglets parlent d'appareils, pas de marques : une PWA vaut aussi pour Android.
+    const tabs = [...screens.matchAll(/role="tab"[^>]*>([^<]+)</g)].map((match) => match[1]);
+    assert.equal(tabs.length, 3);
+    for (const tab of tabs) assert.doesNotMatch(tab, /iPhone|iPad|Mac|Windows|Android/, tab);
+    const devices = section(html, 'step-devices');
+    for (const place of [screens, devices]) {
+      for (const word of ['Chrome', 'Edge', 'Android', 'Safari', 'iPhone', 'iOS']) {
+        assert.ok(place.includes(word), `${word} absent des façons d’installer`);
+      }
+    }
+  });
+}
+
+test('les README présentent la PWA et ses trois installations', () => {
+  for (const readme of ['README.md', 'README.fr.md']) {
+    const text = readFileSync(join(ROOT, readme), 'utf8');
+    for (const word of ['Progressive Web App', 'Android', 'Chrome', 'Edge', 'Safari', 'iOS 16.4']) {
+      assert.ok(text.includes(word), `${readme} : ${word}`);
+    }
+  }
+});
+
 test('les styles sont embarqués : aucune @import, aucune adresse externe', () => {
   const css = read('assets/site.css');
   assert.doesNotMatch(css, /@import/);
