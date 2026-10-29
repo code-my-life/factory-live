@@ -6,6 +6,7 @@ import {
   HistoryIcon,
   IssueOpenedIcon,
   KebabHorizontalIcon,
+  ProjectIcon,
   PulseIcon,
   UndoIcon,
   WorkflowIcon,
@@ -254,7 +255,7 @@ export function AppShell() {
             </NavList>
             <p className={styles.sidebarFoot}>
               <VersionBadge of="Hermès" version="0.22.2" />
-              <Badge label={t.shell.board} value="factory" code />
+              <Badge label={t.shell.board} labelIcon={ProjectIcon} value="factory" code />
             </p>
           </div>
         </nav>
