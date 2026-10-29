@@ -400,6 +400,7 @@
   }
 }
 
+/* Téléphone : la capture de l'iPhone, centrée sur la scène, une marge bleue de chaque côté. */
 @media (max-width: 47.99rem) {
   .hero-stage {
     min-height: 32rem;
@@ -407,7 +408,14 @@
 
   .hero-shot {
     top: var(--base-size-24);
+    right: var(--base-size-16);
     left: var(--base-size-16);
+    display: flex;
+    justify-content: center;
+  }
+
+  .hero-image {
+    max-width: 100%;
   }
 }
 
@@ -516,16 +524,23 @@
   border-radius: var(--borderRadius-medium);
 }
 
-/* Avec le script, un écran à la fois, entier, au centre de la plaque carrée. */
+/*
+ * Avec le script, un écran à la fois, entier, au centre de la plaque. Une boîte flexible et non une
+ * grille : la hauteur maximale de la capture s'y calcule sur le cadre, et une capture en portrait
+ * (iPad, iPhone) rétrécit pour tenir au lieu de déborder par le bas.
+ */
 .js .screen {
   position: absolute;
   inset: clamp(var(--base-size-16), 4vw, var(--base-size-48));
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .js .screen-image {
+  flex: none;
   width: auto;
+  height: auto;
   max-width: 100%;
   max-height: 100%;
 }

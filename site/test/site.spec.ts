@@ -71,8 +71,73 @@ async function sideOverflow(page: Page): Promise<string[]> {
   });
 }
 
+/** Bureau, tablette et téléphone : les tailles où une capture doit rester centrée. */
+const VIEWPORTS = [
+  { name: 'bureau', width: 1440, height: 900 },
+  { name: 'tablette', width: 820, height: 1180 },
+  { name: 'téléphone', width: 390, height: 844 },
+] as const;
+
+/** Écart entre le centre d'un élément et celui de son cadre, en pixels CSS. */
+async function centerOffset(page: Page, inner: string, frame: string) {
+  return page.evaluate(
+    ([innerSelector, frameSelector]) => {
+      const box = (selector: string) => {
+        const element = document.querySelector(selector);
+        if (!element) throw new Error(`${selector} introuvable`);
+        return element.getBoundingClientRect();
+      };
+      const image = box(innerSelector);
+      const outer = box(frameSelector);
+      return {
+        x: image.left + image.width / 2 - (outer.left + outer.width / 2),
+        y: image.top + image.height / 2 - (outer.top + outer.height / 2),
+        inside:
+          image.left >= outer.left - 1 &&
+          image.right <= outer.right + 1 &&
+          image.top >= outer.top - 1 &&
+          image.bottom <= outer.bottom + 1,
+      };
+    },
+    [inner, frame] as const,
+  );
+}
+
 for (const site of PAGES) {
   test.describe(`site ${site.lang}`, () => {
+    test('les captures iPad, iPhone et bureau sont centrées dans leur cadre', async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      for (const viewport of VIEWPORTS) {
+        await page.setViewportSize({ width: viewport.width, height: viewport.height });
+        await page.goto(site.path);
+        for (const id of ['desktop', 'ipad', 'iphone']) {
+          await page.locator(`#screen-tab-${id}`).click();
+          const image = page.locator(`#screen-${id} img`);
+          await expect(image).toBeVisible();
+          await expect
+            .poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth))
+            .toBeGreaterThan(0);
+          const offset = await centerOffset(page, `#screen-${id} img`, '.screens-plate');
+          const where = `${viewport.name}, onglet ${id}`;
+          expect(Math.abs(offset.x), `${where} : écart horizontal (px)`).toBeLessThanOrEqual(1);
+          expect(Math.abs(offset.y), `${where} : écart vertical (px)`).toBeLessThanOrEqual(1);
+          expect(offset.inside, `${where} : la capture sort de son cadre`).toBe(true);
+        }
+        if (viewport.width < 768) {
+          // Sur téléphone, le héros montre la capture de l'iPhone, centrée sur sa scène.
+          const hero = page.locator('.hero-image');
+          await expect
+            .poll(() => hero.evaluate((element: HTMLImageElement) => element.currentSrc))
+            .toContain('line-iphone');
+          const offset = await centerOffset(page, '.hero-image', '.hero-stage');
+          expect(
+            Math.abs(offset.x),
+            'téléphone, héros : écart horizontal (px)',
+          ).toBeLessThanOrEqual(1);
+        }
+      }
+    });
+
     test('se charge sans erreur, sans débordement, toutes ses images chargées', async ({
       page,
     }) => {
