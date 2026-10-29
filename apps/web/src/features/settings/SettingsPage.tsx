@@ -25,11 +25,18 @@ const LANGUAGES: readonly { value: Locale; label: string }[] = [
   { value: 'en', label: 'English' },
 ];
 
+/** factory-live est une PWA : elle s'installe depuis le navigateur de chaque appareil, sans store. */
 const INSTALL = [
-  { device: 'iphone', icon: DeviceMobileIcon },
-  { device: 'pc', icon: DeviceDesktopIcon },
-  { device: 'mac', icon: DeviceDesktopIcon },
+  { device: 'computer', icon: DeviceDesktopIcon },
+  { device: 'android', icon: DeviceMobileIcon },
+  { device: 'ios', icon: DeviceMobileIcon },
 ] as const;
+
+/** Adresses de l'app : sur ce PC, puis depuis les autres appareils du tailnet. */
+const ADDRESSES = {
+  local: 'http://localhost:8446',
+  tailnet: 'https://desktop-gja56n4.tail40220c.ts.net:8446',
+} as const;
 
 /** Retours de GitHub après une étape faite chez lui (`/api/github/installed`, `/api/github/oauth/callback`). */
 function githubReturn(value: string | null, t: Messages): string | null {
@@ -109,6 +116,10 @@ export function SettingsPage() {
           <h2 id="install-title" className={page.sectionTitle}>
             {t.settings.install}
           </h2>
+          <p className={page.muted}>{t.settings.installIntro}</p>
+          <p className={styles.installOpen}>
+            {t.settings.installOpen(ADDRESSES.local, ADDRESSES.tailnet)}
+          </p>
           <ul className={styles.install}>
             {INSTALL.map(({ device, icon: DeviceIcon }) => (
               <li key={device} className={styles.installItem}>

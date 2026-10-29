@@ -43,7 +43,7 @@ const Env = z.object({
   GITHUB_API: z.url().default('https://api.github.com'),
   /** Logins Tailscale autorisés à écrire (en-tête `Tailscale-User-Login` posé par `tailscale serve`). */
   TAILSCALE_LOGINS: list(),
-  /** Origines de la PWA : localhost sur ce PC, nom tailnet pour l'iPhone et le Mac. */
+  /** Origines de la PWA : localhost sur ce PC, nom tailnet pour les autres appareils. */
   PUBLIC_ORIGINS: list('http://localhost:8446,https://desktop-gja56n4.tail40220c.ts.net:8446'),
   DASHBOARD_URL: z.url().default('https://desktop-gja56n4.tail40220c.ts.net:8443'),
   FREELLMAPI_URL: z.string().default(''),

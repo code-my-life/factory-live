@@ -1,5 +1,5 @@
 import type { Snapshot } from '@factory-live/contracts';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -79,5 +79,51 @@ describe('Réglages, langue', () => {
     renderSettings();
     expect(screen.getByRole('button', { name: 'Français' })).toHaveAttribute('lang', 'fr');
     expect(screen.getByRole('button', { name: 'English' })).toHaveAttribute('lang', 'en');
+  });
+});
+
+describe('Réglages, installer l’app', () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
+
+  const steps = (section: HTMLElement) =>
+    within(section)
+      .getAllByRole('listitem')
+      .map((item) => item.textContent);
+
+  it('présente une PWA qui s’installe depuis le navigateur, sans store, sur tout appareil', () => {
+    browserLanguage('fr-FR');
+    renderSettings();
+    const section = screen.getByRole('region', { name: 'Installer l’app' });
+    expect(section).toHaveTextContent(
+      'factory-live est une PWA : elle s’installe depuis le navigateur, sans passer par un store.',
+    );
+    expect(section).toHaveTextContent('http://localhost:8446 sur ce PC');
+    expect(section).toHaveTextContent(
+      'https://desktop-gja56n4.tail40220c.ts.net:8446 sur tes autres appareils',
+    );
+    expect(steps(section)).toEqual([
+      'Ordinateur : dans Chrome ou Edge, Installer l’application.',
+      'Android : dans Chrome, menu, Installer l’application. Les notifications marchent dès le navigateur.',
+      'iPhone ou iPad : dans Safari, Partager, Sur l’écran d’accueil, puis ouvre l’app pour activer les notifications (iOS 16.4 ou plus).',
+    ]);
+  });
+
+  it('dit la même chose en anglais', () => {
+    browserLanguage('en-US');
+    renderSettings();
+    const section = screen.getByRole('region', { name: 'Install the app' });
+    expect(section).toHaveTextContent(
+      'factory-live is a PWA: you install it from the browser, no app store needed.',
+    );
+    expect(section).toHaveTextContent('http://localhost:8446 on this PC');
+    expect(section).toHaveTextContent(
+      'https://desktop-gja56n4.tail40220c.ts.net:8446 on your other devices',
+    );
+    expect(steps(section)).toEqual([
+      'Computer: in Chrome or Edge, Install app.',
+      'Android: in Chrome, menu, Install app. Notifications work right in the browser.',
+      'iPhone or iPad: in Safari, Share, Add to Home Screen, then open the app to turn on notifications (iOS 16.4 or later).',
+    ]);
   });
 });

@@ -61,6 +61,13 @@
   font-size: var(--text-body-size-small);
 }
 
+/* Les adresses de l'app sont longues : elles passent à la ligne sur un téléphone. */
+.installOpen {
+  margin: 0;
+  font-size: var(--text-body-size-small);
+  overflow-wrap: anywhere;
+}
+
 .installItem {
   display: flex;
   align-items: flex-start;

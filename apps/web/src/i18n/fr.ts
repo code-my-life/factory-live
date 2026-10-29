@@ -769,18 +769,23 @@ export const fr = {
       connected: 'Connecté à GitHub : tes réponses partiront à ton nom.',
     },
     install: 'Installer l’app',
+    installIntro:
+      'factory-live est une PWA : elle s’installe depuis le navigateur, sans passer par un store.',
+    /** Les deux adresses de l'app : `local` sur ce PC, `tailnet` depuis les autres appareils. */
+    installOpen: (local: string, tailnet: string) =>
+      `Ouvre ${local} sur ce PC, ${tailnet} sur tes autres appareils du tailnet, puis :`,
     installSteps: {
-      iphone: {
-        device: 'iPhone',
-        text: ' : Safari sur https://desktop-gja56n4.tail40220c.ts.net:8446, Partager, Sur l’écran d’accueil, puis ouvre l’app et active les notifications.',
+      computer: {
+        device: 'Ordinateur',
+        text: ' : dans Chrome ou Edge, Installer l’application.',
       },
-      pc: {
-        device: 'Ce PC',
-        text: ' : http://localhost:8446 dans Edge ou Chrome, puis Installer l’application.',
+      android: {
+        device: 'Android',
+        text: ' : dans Chrome, menu, Installer l’application. Les notifications marchent dès le navigateur.',
       },
-      mac: {
-        device: 'Mac ou autre PC du tailnet',
-        text: ' : la même adresse que l’iPhone, dans Chrome, Edge ou Safari.',
+      ios: {
+        device: 'iPhone ou iPad',
+        text: ' : dans Safari, Partager, Sur l’écran d’accueil, puis ouvre l’app pour activer les notifications (iOS 16.4 ou plus).',
       },
     },
     sources: 'Sources',
@@ -839,7 +844,7 @@ export const fr = {
     notSignedIn: 'Pas connecté : connecte-toi pour débloquer depuis l’app',
     login: 'Se connecter à GitHub',
     loginHelp:
-      'Depuis ce PC comme depuis l’iPhone : GitHub te ramène ici. Seul le compte cddev est accepté.',
+      'Depuis ce PC comme depuis ton smartphone ou ta tablette : GitHub te ramène ici. Seul le compte cddev est accepté.',
   },
 
   charts: {
