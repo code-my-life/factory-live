@@ -41,9 +41,11 @@ export function LiveActivity({
         <h2 id="activity-title" className={styles.panelTitle}>
           {t.activity.title}
         </h2>
+        {/* Sur téléphone, les cinq filtres ne tiennent pas en largeur : Primer en fait un menu. */}
         <SegmentedControl
           aria-label={t.activity.filterLabel}
           size="small"
+          variant={{ narrow: 'dropdown', regular: 'default' }}
           onChange={(index) => setFilterIndex(index)}
         >
           {FILTERS.map((filter, index) => (

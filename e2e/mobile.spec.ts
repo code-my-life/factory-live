@@ -84,3 +84,51 @@ test('les coûts d’une issue s’affichent aussi sur téléphone, sans colonne
   }
   await expectNoHorizontalOverflow(page);
 });
+
+/** Les deux langues de l'interface : les libellés anglais sont parfois plus longs. */
+const LANGUAGES = [
+  { locale: 'fr-FR', name: 'français' },
+  { locale: 'en-US', name: 'anglais' },
+];
+
+for (const { locale, name } of LANGUAGES) {
+  test.describe(`en ${name}`, () => {
+    test.use({ locale });
+
+    test('aucun libellé de la barre d’onglets n’est tronqué, même sur un petit écran', async ({
+      page,
+    }) => {
+      for (const width of [320, 360, 390]) {
+        await page.setViewportSize({ width, height: 740 });
+        await page.goto('/');
+        const labels = page
+          .getByRole('navigation', { name: 'Navigation', exact: true })
+          .locator('[class*="tabLabel"]');
+        await expect(labels).toHaveCount(5);
+        for (const label of await labels.all()) {
+          const cut = await label.evaluate((element) => element.scrollWidth - element.clientWidth);
+          expect(cut, `${width} px : « ${await label.innerText()} » tronqué`).toBeLessThanOrEqual(
+            0,
+          );
+        }
+        await expectNoHorizontalOverflow(page);
+      }
+    });
+
+    test('la valeur au sommet d’un graphique ne chevauche jamais son titre', async ({ page }) => {
+      await page.goto('/costs');
+      const charts = page.locator('figure').filter({ has: page.locator('[class*="peakLabel"]') });
+      await expect(charts.first()).toBeVisible();
+      for (const chart of await charts.all()) {
+        const caption = await chart.locator('figcaption').boundingBox();
+        const peak = await chart.locator('[class*="peakLabel"]').boundingBox();
+        expect(caption && peak, 'titre et valeur dessinés').toBeTruthy();
+        if (!caption || !peak) continue;
+        expect(
+          peak.y,
+          `« ${await chart.locator('figcaption').innerText()} » : la valeur monte sur le titre`,
+        ).toBeGreaterThanOrEqual(caption.y + caption.height);
+      }
+    });
+  });
+}

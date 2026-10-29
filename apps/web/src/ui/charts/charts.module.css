@@ -17,11 +17,16 @@
   font-weight: var(--base-text-weight-semibold);
 }
 
+/*
+ * Au-dessus de l'échelle, la place de la valeur de la plus haute colonne : quand elle touche le haut
+ * de l'échelle, sa valeur reste sous le titre au lieu de le chevaucher.
+ */
 .plotArea {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--base-size-8);
   height: 168px;
+  margin-top: var(--base-size-16);
 }
 
 .yAxis {
