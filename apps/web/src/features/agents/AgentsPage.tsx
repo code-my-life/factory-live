@@ -8,8 +8,22 @@ import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { LiveDot } from '../../ui/LiveDot.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
+import type { ModelName } from '../../ui/ModelBadge.tsx';
+import { actionModel, parseModelLinks } from '../../ui/modelText.ts';
 import page from '../../ui/page.module.css';
 import styles from './agents.module.css';
+
+/** Les modèles d'un côté d'un écart (en service ou dans le dépôt), en badges ; sinon le texte tel quel. */
+function DriftModels({ models, fallback }: { models: ModelName[] | null; fallback: string }) {
+  if (!models) return <span className={styles.driftLive}>{fallback}</span>;
+  return (
+    <>
+      {models.map((model, index) => (
+        <ModelBadge key={`${model.model}-${index}`} model={model} overflow="wrap" />
+      ))}
+    </>
+  );
+}
 
 function AgentProfileCard({
   profile,
@@ -43,7 +57,7 @@ function AgentProfileCard({
             {activity.issueKey ? (
               <>
                 {' '}
-                {t.agents.on} <IssueBadge issueKey={activity.issueKey} link />
+                {t.agents.on} <IssueBadge issueKey={activity.issueKey} state="open" link />
               </>
             ) : null}
             {activity.runStartedAt ? (
@@ -62,7 +76,7 @@ function AgentProfileCard({
       {activity?.action ? (
         <p className={styles.action}>
           {text(activity.action.label)}
-          {activity.action.detail ? ` · ${activity.action.detail}` : ''}
+          {activity.action.detail && !actionModel(activity) ? ` · ${activity.action.detail}` : ''}
         </p>
       ) : null}
 
@@ -94,18 +108,49 @@ function AgentProfileCard({
             <AlertIcon size={14} aria-hidden="true" /> {t.agents.driftTitle}
           </p>
           <ul className={styles.driftList}>
-            {profile.drift.map((drift) => (
-              <li key={drift.field}>
-                <code>{t.agents.field[drift.field]}</code>
-                {t.common.colon}
-                <span className={styles.driftLive}>
-                  {drift.live ?? t.agents.unset[drift.field]}
-                </span>
-                <span className={styles.muted}>
-                  {t.agents.driftRepo(drift.repo ?? t.agents.unset[drift.field])}
-                </span>
-              </li>
-            ))}
+            {profile.drift.map((drift) => {
+              // Un écart de modèle ou de fallbacks : des badges de modèle, comme partout ailleurs.
+              const models = (value: string | null) =>
+                (drift.field === 'model' || drift.field === 'fallbacks') && value
+                  ? parseModelLinks(value)
+                  : null;
+              const [live, repo] = [models(drift.live), models(drift.repo)];
+              if (live || repo)
+                return (
+                  <li key={drift.field}>
+                    <span className={styles.driftModels}>
+                      <code>{t.agents.field[drift.field]}</code>
+                      {t.common.colon}
+                      <DriftModels
+                        models={live}
+                        fallback={drift.live ?? t.agents.unset[drift.field]}
+                      />
+                      <span className={styles.driftRepoModels}>
+                        <span className={styles.muted}>
+                          {t.agents.driftRepoLabel}
+                          {t.common.colon}
+                        </span>
+                        <DriftModels
+                          models={repo}
+                          fallback={drift.repo ?? t.agents.unset[drift.field]}
+                        />
+                      </span>
+                    </span>
+                  </li>
+                );
+              return (
+                <li key={drift.field}>
+                  <code>{t.agents.field[drift.field]}</code>
+                  {t.common.colon}
+                  <span className={styles.driftLive}>
+                    {drift.live ?? t.agents.unset[drift.field]}
+                  </span>
+                  <span className={styles.muted}>
+                    {t.agents.driftRepo(drift.repo ?? t.agents.unset[drift.field])}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}

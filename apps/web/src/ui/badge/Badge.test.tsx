@@ -1,8 +1,12 @@
-import { CheckIcon } from '@primer/octicons-react';
+import { CheckIcon, ServerIcon } from '@primer/octicons-react';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { Badge } from './Badge.tsx';
+import { providerMark } from './marks.ts';
+import type { BrandMark } from './marks.ts';
+
+const NVIDIA = providerMark('nvidia') as BrandMark;
 
 const badgeOf = (container: HTMLElement) => container.querySelector('[data-badge]');
 
@@ -76,5 +80,41 @@ describe('Badge', () => {
     const icon = container.querySelector('svg');
     expect(icon).not.toBeNull();
     expect(icon?.closest('[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('pose une icône sur l’étiquette : une octicon pour un concept, le tracé d’un logo pour une marque', () => {
+    const { container, rerender } = render(
+      <Badge label="freellmapi" labelIcon={ServerIcon} value="auto" />,
+    );
+    const label = () => container.querySelector('[data-segment="label"]');
+    expect(label()?.querySelector('svg')).not.toBeNull();
+    rerender(<Badge label="NVIDIA" labelIcon={NVIDIA} value="nemotron" />);
+    expect(label()?.querySelector('svg path')).toHaveAttribute('d', NVIDIA.path);
+    expect(label()?.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('colore l’icône de l’étiquette selon son état (issue ouverte, fermée)', () => {
+    const { container } = render(
+      <Badge label="cv-site" labelIcon={ServerIcon} labelIconTone="success" value="#49" />,
+    );
+    expect(container.querySelector('[data-segment="label"]')).toHaveAttribute(
+      'data-icon-tone',
+      'success',
+    );
+  });
+
+  it('peint l’étiquette de la couleur de la marque, texte blanc ou noir selon sa luminance', () => {
+    const { container } = render(
+      <Badge label="NVIDIA" labelIcon={NVIDIA} brand={NVIDIA} value="nemotron" />,
+    );
+    const label = container.querySelector('[data-segment="label"]');
+    expect(label).toHaveAttribute('data-brand', 'NVIDIA');
+    expect(label).toHaveStyle({ backgroundColor: 'rgb(118, 185, 0)', color: 'rgb(0, 0, 0)' });
+  });
+
+  it('peint la valeur d’un état de la couleur franche de son rôle', () => {
+    const { container } = render(<Badge label="CI" value="en échec" tone="danger" solid />);
+    expect(badgeOf(container)).toHaveAttribute('data-solid');
+    expect(badgeOf(container)).toHaveAttribute('data-tone', 'danger');
   });
 });

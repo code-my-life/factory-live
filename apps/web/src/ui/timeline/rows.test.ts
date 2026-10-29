@@ -62,3 +62,19 @@ describe('lignes de timeline', () => {
     ).toMatchObject({ title: 'Skill chargée', detail: null });
   });
 });
+
+describe('fromActivity, appel au modèle', () => {
+  it('ne répète pas le nom du modèle en titre : il est déjà le badge de la ligne', () => {
+    const call: ActivityEvent = {
+      ...event,
+      label: 'agnes-2.5-flash',
+      detail: '1 234 jetons',
+      status: 'ok',
+    };
+    expect(fromActivity(call, i18nOf('fr'))).toMatchObject({
+      title: 'Appel au modèle',
+      model: 'agnes-2.5-flash',
+    });
+    expect(fromActivity(call, i18nOf('en')).title).toBe('Calling the model');
+  });
+});

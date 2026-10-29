@@ -379,8 +379,9 @@ export function buildHistory(now: number): HistoryStats {
     gatePassRate: [
       { harness: 'coder-claude', model: 'claude-opus-5-5', runs: 16, rate: 0.81 },
       { harness: 'coder-claude', model: 'claude-sonnet-5-5', runs: 4, rate: 0.75 },
-      { harness: 'coder', model: 'agnes-2.5-flash', runs: 24, rate: 0.58 },
-      { harness: 'coder-opencode', model: 'agnes-2.5-flash', runs: 1, rate: 0 },
+      // Sans lane Claude, le serveur n'a pas de modèle à donner : c'est celui de l'agent (`null`).
+      { harness: 'coder', model: null, runs: 24, rate: 0.58 },
+      { harness: 'coder-opencode', model: null, runs: 1, rate: 0 },
     ],
     blocks: 7,
     medianHumanResponseMinutes: 18,

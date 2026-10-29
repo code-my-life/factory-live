@@ -106,3 +106,42 @@ export async function expectCleanBadges(page: Page): Promise<number> {
   expect(defects, 'badges mal rendus').toEqual([]);
   return count;
 }
+
+/**
+ * Les segments peints d'une couleur pleine (étiquette aux couleurs d'une marque, état en couleur
+ * franche) gardent un texte lisible : 4,5:1 au moins entre la couleur du texte et celle du fond,
+ * calculées par le navigateur dans le thème de la page. Rend le nombre de segments vérifiés.
+ */
+export async function expectReadablePaint(page: Page): Promise<number> {
+  const { count, defects } = await page.evaluate(() => {
+    const rgb = (value: string) =>
+      (value.match(/[\d.]+/g) ?? []).slice(0, 3).map((channel) => Number(channel) / 255);
+    const luminance = (value: string) => {
+      const [red = 0, green = 0, blue = 0] = rgb(value).map((channel) =>
+        channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
+      );
+      return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    };
+    const contrast = (first: string, second: string) => {
+      const [light, dark] = [luminance(first), luminance(second)].sort((a, b) => b - a);
+      return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05);
+    };
+    const painted = [
+      ...document.querySelectorAll(
+        '[data-badge] [data-brand], [data-badge][data-solid] [data-segment="value"], [data-solid]:not([data-badge])',
+      ),
+    ].filter((element) => element.checkVisibility());
+    const found: string[] = [];
+    for (const element of painted) {
+      const style = getComputedStyle(element);
+      const ratio = contrast(style.color, style.backgroundColor);
+      if (ratio < 4.5)
+        found.push(
+          `${element.textContent?.trim() ?? ''} : ${ratio.toFixed(2)}:1 (${style.color} sur ${style.backgroundColor})`,
+        );
+    }
+    return { count: painted.length, defects: found };
+  });
+  expect(defects, 'segments peints illisibles').toEqual([]);
+  return count;
+}

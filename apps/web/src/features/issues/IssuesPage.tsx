@@ -7,7 +7,7 @@ import { useSnapshot } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { Messages } from '../../i18n/fr.ts';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
-import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
+import { IssueBadge, issueState } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { issuePath } from '../../ui/paths.ts';
 import { WorkStateLabel, issueWorkState } from '../../ui/work/workState.tsx';
@@ -54,7 +54,7 @@ export function IssuesPage() {
           <li key={issue.key} className={styles.issueListItem}>
             <Link to={issuePath(issue.key)} className={styles.issueRow}>
               <span className={styles.issueRowMain}>
-                <IssueBadge issueKey={issue.key} />
+                <IssueBadge issueKey={issue.key} state={issueState(issue.status)} />
                 <span className={styles.issueRowTitle}>{issue.title}</span>
               </span>
               <span className={styles.issueRowMeta}>

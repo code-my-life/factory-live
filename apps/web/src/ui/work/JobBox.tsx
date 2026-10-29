@@ -88,7 +88,7 @@ export function JobBox({
       )}
       {compact ? null : (
         <span className={styles.jobWho}>
-          <WorkStateLabel state={state} />
+          <WorkStateLabel state={state} icon={false} />
           {agent ? (
             <span className={styles.jobAgent}>
               <AgentAvatar profile={agent} size={16} named />

@@ -90,7 +90,17 @@ export function WorkStateIcon({ state }: { state: WorkState }) {
   );
 }
 
-/** Le badge d'état, un `Label` de Primer à la couleur de l'état. */
-export function WorkStateLabel({ state }: { state: WorkState }) {
-  return <Label variant={state.tone}>{state.label}</Label>;
+/**
+ * Le badge d'état : un `Label` de Primer peint de la couleur franche de l'état (jetons « emphasis »,
+ * texte blanc), avec son icône, comme les `StateLabel` d'une issue ou d'une PR. Dans une boîte de job,
+ * l'icône est déjà en tête de la boîte : le badge s'en passe.
+ */
+export function WorkStateLabel({ state, icon = true }: { state: WorkState; icon?: boolean }) {
+  const StateIcon = state.icon;
+  return (
+    <Label variant={state.tone} className={styles.state} data-solid="">
+      {icon ? <StateIcon size={12} aria-hidden="true" /> : null}
+      {state.label}
+    </Label>
+  );
 }

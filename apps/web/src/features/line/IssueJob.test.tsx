@@ -120,4 +120,19 @@ describe('IssueJob', () => {
     expect(screen.queryByText('coder-claude')).toBeNull();
     expect(screen.queryByText(/min$/)).toBeNull();
   });
+
+  it('montre en badge le modèle qu’appelle l’agent, plutôt que son nom en texte', () => {
+    const calling = {
+      profile: 'coder',
+      state: 'thinking',
+      model: { model: 'agnes-2.5-flash', provider: 'freellmapi', source: 'live' },
+      action: { kind: 'llm', label: 'Appel au modèle', detail: 'agnes-2.5-flash', startedAt: '' },
+    } as unknown as AgentActivity;
+    const { container } = renderJob({}, calling);
+    expect(screen.getByText('Appel au modèle')).toBeInTheDocument();
+    expect(screen.queryByText(/· agnes-2.5-flash/)).toBeNull();
+    expect(
+      container.querySelector('[data-badge][title^="agnes-2.5-flash via freellmapi"]'),
+    ).not.toBeNull();
+  });
 });

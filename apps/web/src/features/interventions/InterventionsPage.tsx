@@ -70,7 +70,7 @@ export function InterventionsPage() {
                     <span className={styles.itemTitle}>{text(intervention.title)}</span>
                     <span className={styles.itemMeta}>
                       {intervention.issueKey ? (
-                        <IssueBadge issueKey={intervention.issueKey} />
+                        <IssueBadge issueKey={intervention.issueKey} state="open" />
                       ) : intervention.cardId ? (
                         <CardBadge id={intervention.cardId} />
                       ) : null}

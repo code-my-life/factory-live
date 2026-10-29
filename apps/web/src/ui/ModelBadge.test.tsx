@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { I18nProvider } from '../i18n/I18nProvider.tsx';
+import { modelEditor, providerMark } from './badge/marks.ts';
+import type { BrandMark } from './badge/marks.ts';
 import { ModelBadge } from './ModelBadge.tsx';
 
 const QWEN = 'Qwen3.5-9B-The-Defiant-Fable-Uncnr-Heretic-plusIQ-TOOLS-NEO-MAX-MTP-Q8_0';
@@ -48,6 +50,66 @@ describe('ModelBadge', () => {
     const badge = badgeOf(container);
     expect(badge?.querySelectorAll('[data-segment]')).toHaveLength(1);
     expect(badge).toHaveAttribute('title', 'agnes-2.5-flash');
+  });
+});
+
+describe('ModelBadge, icônes et couleurs', () => {
+  const segment = (container: HTMLElement, name: 'label' | 'value') =>
+    container.querySelector(`[data-segment="${name}"]`);
+  const logo = (mark: BrandMark | null) => mark?.path ?? 'aucun';
+
+  it('peint l’étiquette d’un fournisseur de marque, sans répéter son logo sur un modèle maison', () => {
+    const { container } = render(
+      <ModelBadge
+        model={{ model: 'nvidia/nemotron-3-super-120b-a12b', provider: 'nvidia', source: 'live' }}
+      />,
+    );
+    expect(segment(container, 'label')).toHaveAttribute('data-brand', 'NVIDIA');
+    expect(segment(container, 'label')?.querySelector('path')).toHaveAttribute(
+      'd',
+      logo(providerMark('nvidia') as BrandMark),
+    );
+    expect(segment(container, 'value')?.querySelector('svg')).toBeNull();
+  });
+
+  it('marque une passerelle d’une octicon et pose le logo de l’éditeur sur le modèle', () => {
+    const { container } = render(
+      <ModelBadge
+        model={{
+          model: 'nvidia/nemotron-3-super-120b-a12b',
+          provider: 'freellmapi',
+          source: 'config',
+        }}
+      />,
+    );
+    expect(segment(container, 'label')).not.toHaveAttribute('data-brand');
+    expect(segment(container, 'label')?.querySelector('svg path')).not.toHaveAttribute(
+      'd',
+      logo(modelEditor('nemotron')),
+    );
+    expect(segment(container, 'value')?.querySelector('path')).toHaveAttribute(
+      'd',
+      logo(modelEditor('nemotron')),
+    );
+  });
+
+  it('peint la lane aux couleurs de son CLI (Claude Code)', () => {
+    const { container } = render(
+      <ModelBadge
+        model={{ model: 'claude-opus-5-5', provider: 'anthropic', source: 'live' }}
+        lane
+      />,
+    );
+    expect(segment(container, 'label')).toHaveAttribute('data-brand', 'Claude');
+    expect(segment(container, 'value')?.querySelector('svg')).toBeNull();
+  });
+
+  it('pose le logo de l’éditeur même sans fournisseur connu (fil d’activité, transcription)', () => {
+    const { container } = render(<ModelBadge model={{ model: 'Qwen3.5-9B-Q4_K_M' }} />);
+    expect(segment(container, 'value')?.querySelector('path')).toHaveAttribute(
+      'd',
+      logo(modelEditor('qwen')),
+    );
   });
 });
 

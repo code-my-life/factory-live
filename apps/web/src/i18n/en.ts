@@ -585,6 +585,7 @@ export const en: Messages = {
     drift: 'Configuration drift',
     driftTitle: 'Live config differs from the factory repository',
     driftRepo: (repo) => ` (repository: ${repo})`,
+    driftRepoLabel: 'repository',
     field: {
       model: 'model',
       baseUrl: 'provider URL',

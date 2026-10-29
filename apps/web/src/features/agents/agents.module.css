@@ -130,6 +130,20 @@
   font-family: var(--fontStack-monospace);
 }
 
+/* Un écart de modèle : les badges en service, puis ceux du dépôt, chacun à la ligne si la place manque. */
+.driftModels,
+.driftRepoModels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-4);
+  min-width: 0;
+}
+
+.driftModels {
+  margin-bottom: var(--base-size-4);
+}
+
 .tokens {
   display: flex;
   flex-wrap: wrap;

@@ -646,6 +646,8 @@ export const fr = {
     drift: 'Dérive de configuration',
     driftTitle: 'En service, différent du dépôt de la factory',
     driftRepo: (repo: string) => ` (dépôt : ${repo})`,
+    /** Devant les modèles du dépôt, quand ils s'affichent en badges. */
+    driftRepoLabel: 'dépôt',
     field: {
       model: 'modèle',
       baseUrl: 'url du fournisseur',

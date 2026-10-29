@@ -167,7 +167,9 @@ export function InterventionDetail({ intervention }: { intervention: Interventio
           {text(intervention.title)}
         </Heading>
         <p className={styles.context}>
-          {intervention.issueKey ? <IssueBadge issueKey={intervention.issueKey} link /> : null}
+          {intervention.issueKey ? (
+            <IssueBadge issueKey={intervention.issueKey} state="open" link />
+          ) : null}
           {intervention.cardId ? <CardBadge id={intervention.cardId} /> : null}
           {intervention.profile ? (
             <span className={styles.agent}>

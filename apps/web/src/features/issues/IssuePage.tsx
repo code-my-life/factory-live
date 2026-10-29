@@ -19,7 +19,7 @@ import type { Messages } from '../../i18n/fr.ts';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import { CardBadge } from '../../ui/badge/CardBadge.tsx';
 import { ChecksBadge } from '../../ui/badge/ChecksBadge.tsx';
-import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
+import { IssueBadge, issueState } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import { useMotion } from '../../ui/motion.tsx';
@@ -224,7 +224,7 @@ export function IssuePage() {
 
       <header className={styles.issueHead}>
         <p className={styles.issueKey}>
-          <IssueBadge issueKey={issue.key} />
+          <IssueBadge issueKey={issue.key} state={issueState(issue.status)} />
         </p>
         <Heading as="h1" variant="medium" className={styles.issueTitle}>
           {issue.title}

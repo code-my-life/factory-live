@@ -201,3 +201,37 @@
   font: var(--text-body-shorthand-small);
   font-weight: var(--base-text-weight-semibold);
 }
+
+/*
+ * Badge d'état (`WorkStateLabel`) : le `Label` de Primer peint de la couleur franche de l'état, texte
+ * blanc, comme un `StateLabel`. 4,5:1 au moins dans les deux thèmes (test de contraste des badges).
+ */
+.state {
+  gap: var(--base-size-4);
+  border-color: transparent;
+  color: var(--fgColor-onEmphasis);
+}
+
+.state[data-variant='accent'] {
+  background-color: var(--bgColor-accent-emphasis);
+}
+
+.state[data-variant='attention'] {
+  background-color: var(--bgColor-attention-emphasis);
+}
+
+.state[data-variant='danger'] {
+  background-color: var(--bgColor-danger-emphasis);
+}
+
+.state[data-variant='done'] {
+  background-color: var(--bgColor-done-emphasis);
+}
+
+.state[data-variant='success'] {
+  background-color: var(--bgColor-success-emphasis);
+}
+
+.state[data-variant='secondary'] {
+  background-color: var(--bgColor-neutral-emphasis);
+}

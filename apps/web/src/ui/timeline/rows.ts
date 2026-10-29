@@ -1,3 +1,4 @@
+import { msg } from '@factory-live/contracts';
 import type { ActivityEvent, TimelineEntry } from '@factory-live/contracts';
 import {
   BlockedIcon,
@@ -71,7 +72,12 @@ export function fromActivity(event: ActivityEvent, { t, text }: I18n): TimelineR
     iconLabel: blocked ? t.activity.refused : failed ? t.activity.failed(kindLabel) : kindLabel,
     condensed: FREQUENT.has(event.kind) && !failed && !blocked,
     agent: event.profile,
-    title: text(event.label),
+    // Un appel au modèle a ce modèle pour titre : il s'affiche déjà en badge, le titre dit l'action.
+    title: text(
+      event.kind === 'llm' && event.model !== null && event.label === event.model
+        ? msg('activity.action.llm')
+        : event.label,
+    ),
     detail: event.detail === null ? null : text(event.detail),
     issueKey: event.issueKey,
     model: event.model,

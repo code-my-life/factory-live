@@ -30,7 +30,7 @@
   background-color: var(--bgColor-accent-muted);
 }
 
-.badge[data-tone='accent'] .icon {
+.badge[data-tone='accent'] .value .icon {
   color: var(--fgColor-accent);
 }
 
@@ -42,7 +42,7 @@
   background-color: var(--bgColor-success-muted);
 }
 
-.badge[data-tone='success'] .icon {
+.badge[data-tone='success'] .value .icon {
   color: var(--fgColor-success);
 }
 
@@ -54,7 +54,7 @@
   background-color: var(--bgColor-attention-muted);
 }
 
-.badge[data-tone='attention'] .icon {
+.badge[data-tone='attention'] .value .icon {
   color: var(--fgColor-attention);
 }
 
@@ -66,7 +66,7 @@
   background-color: var(--bgColor-severe-muted);
 }
 
-.badge[data-tone='severe'] .icon {
+.badge[data-tone='severe'] .value .icon {
   color: var(--fgColor-severe);
 }
 
@@ -78,7 +78,7 @@
   background-color: var(--bgColor-danger-muted);
 }
 
-.badge[data-tone='danger'] .icon {
+.badge[data-tone='danger'] .value .icon {
   color: var(--fgColor-danger);
 }
 
@@ -90,8 +90,74 @@
   background-color: var(--bgColor-done-muted);
 }
 
-.badge[data-tone='done'] .icon {
+.badge[data-tone='done'] .value .icon {
   color: var(--fgColor-done);
+}
+
+/*
+ * Un état (CI) : la valeur peinte de la couleur franche de son rôle (jetons « emphasis »), texte et
+ * icône blancs (`--fgColor-onEmphasis`), comme les `StateLabel` de Primer. 4,5:1 au moins dans les deux
+ * thèmes (test de contraste).
+ */
+.badge[data-solid] .value,
+.badge[data-solid] .value .icon {
+  color: var(--fgColor-onEmphasis);
+}
+
+.badge[data-solid][data-tone='neutral'] {
+  --fl-badge-border: var(--borderColor-neutral-emphasis);
+}
+
+.badge[data-solid][data-tone='neutral'] .value {
+  background-color: var(--bgColor-neutral-emphasis);
+}
+
+.badge[data-solid][data-tone='accent'] {
+  --fl-badge-border: var(--borderColor-accent-emphasis);
+}
+
+.badge[data-solid][data-tone='accent'] .value {
+  background-color: var(--bgColor-accent-emphasis);
+}
+
+.badge[data-solid][data-tone='success'] {
+  --fl-badge-border: var(--borderColor-success-emphasis);
+}
+
+.badge[data-solid][data-tone='success'] .value {
+  background-color: var(--bgColor-success-emphasis);
+}
+
+.badge[data-solid][data-tone='attention'] {
+  --fl-badge-border: var(--borderColor-attention-emphasis);
+}
+
+.badge[data-solid][data-tone='attention'] .value {
+  background-color: var(--bgColor-attention-emphasis);
+}
+
+.badge[data-solid][data-tone='severe'] {
+  --fl-badge-border: var(--borderColor-severe-emphasis);
+}
+
+.badge[data-solid][data-tone='severe'] .value {
+  background-color: var(--bgColor-severe-emphasis);
+}
+
+.badge[data-solid][data-tone='danger'] {
+  --fl-badge-border: var(--borderColor-danger-emphasis);
+}
+
+.badge[data-solid][data-tone='danger'] .value {
+  background-color: var(--bgColor-danger-emphasis);
+}
+
+.badge[data-solid][data-tone='done'] {
+  --fl-badge-border: var(--borderColor-done-emphasis);
+}
+
+.badge[data-solid][data-tone='done'] .value {
+  background-color: var(--bgColor-done-emphasis);
 }
 
 .label,
@@ -167,6 +233,36 @@
 .icon {
   flex: none;
   color: var(--fgColor-muted);
+}
+
+/* Une octicon d'étiquette qui dit un état : l'issue ouverte en vert, fermée en violet, comme GitHub. */
+.label[data-icon-tone='accent'] .icon {
+  color: var(--fgColor-accent);
+}
+
+.label[data-icon-tone='success'] .icon {
+  color: var(--fgColor-success);
+}
+
+.label[data-icon-tone='attention'] .icon {
+  color: var(--fgColor-attention);
+}
+
+.label[data-icon-tone='severe'] .icon {
+  color: var(--fgColor-severe);
+}
+
+.label[data-icon-tone='danger'] .icon {
+  color: var(--fgColor-danger);
+}
+
+.label[data-icon-tone='done'] .icon {
+  color: var(--fgColor-done);
+}
+
+/* Étiquette peinte de la couleur d'une marque : le logo prend la couleur du texte, blanc ou noir. */
+.label[data-brand] .icon {
+  color: inherit;
 }
 
 .badge:focus-visible {

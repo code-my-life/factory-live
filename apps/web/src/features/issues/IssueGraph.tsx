@@ -7,7 +7,8 @@ import type { LineStep } from '../../ui/flow/FlowLine.tsx';
 import type { FlowTone } from '../../ui/flow/FlowStop.tsx';
 import { useNow } from '../../ui/useNow.ts';
 import { JobList } from '../../ui/work/JobBox.tsx';
-import { CardJob, KIND_ICON } from './CardJob.tsx';
+import { KIND_ICON } from '../../ui/badge/CardBadge.tsx';
+import { CardJob } from './CardJob.tsx';
 
 /**
  * Les étapes d'une issue : ses cartes rangées par profondeur (une carte vient après ses parents),

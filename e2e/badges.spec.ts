@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { expectCleanBadges, expectNoHorizontalOverflow, issueJob } from './helpers.ts';
+import {
+  expectCleanBadges,
+  expectNoHorizontalOverflow,
+  expectReadablePaint,
+  issueJob,
+} from './helpers.ts';
 
 const QWEN = 'Qwen3.5-9B-The-Defiant-Fable-Uncnr-Heretic-plusIQ-TOOLS-NEO-MAX-MTP-Q8_0';
 
@@ -152,4 +157,76 @@ test.describe('en anglais', () => {
     );
     await expect(facts).not.toContainText(/réussie|Ouverte/);
   });
+});
+
+for (const scheme of ['dark', 'light'] as const) {
+  test(`les segments peints restent lisibles, thème ${scheme === 'dark' ? 'sombre' : 'clair'}`, async ({
+    page,
+  }) => {
+    await page.addInitScript((value) => {
+      localStorage.setItem('factory-live:color-mode', value);
+    }, scheme);
+    let count = 0;
+    for (const route of ['/', '/issues', '/issues/claude-cockpit/68', '/agents', '/history']) {
+      await page.goto(route);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      count += await expectReadablePaint(page);
+    }
+    expect(count, 'des étiquettes de marque et des états peints').toBeGreaterThan(5);
+  });
+}
+
+test('un modèle porte le logo de son éditeur et les couleurs de son fournisseur', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const now = page.getByRole('region', { name: 'En ce moment' });
+  const qwen = now.locator('[data-badge]', { hasText: QWEN });
+  await expect(qwen.locator('[data-segment="label"] svg')).toBeVisible();
+  await expect(qwen.locator('[data-segment="value"] svg')).toBeVisible();
+  await expect(
+    now.locator('[data-badge]', { hasText: 'claude-opus-5-5' }).locator('[data-segment="label"]'),
+  ).toHaveAttribute('data-brand', 'Claude');
+  await expect(
+    now.locator('[data-badge]', { hasText: 'nemotron-3-super' }).locator('[data-segment="label"]'),
+  ).toHaveAttribute('data-brand', 'NVIDIA');
+});
+
+test('un modèle a son badge partout : écarts de configuration, historique', async ({ page }) => {
+  await page.goto('/agents');
+  const drift = page
+    .getByRole('article', { name: 'coder-claude' })
+    .getByRole('region', { name: 'Dérive de configuration' });
+  await expect(drift.locator('[data-badge]', { hasText: QWEN })).toBeVisible();
+  await expect(drift.locator('[data-badge]', { hasText: 'agnes-2.5-flash' })).toBeVisible();
+  await page.goto('/history');
+  const gate = page.getByRole('table', { name: 'Passage en gate du premier coup' });
+  const rows = gate.getByRole('row').filter({ has: page.getByRole('cell') });
+  await expect(rows.first()).toBeVisible();
+  for (const row of await rows.all())
+    await expect(row.getByRole('cell').nth(1).locator('[data-badge]')).toBeVisible();
+});
+
+test('la CI se peint de sa couleur franche, avec le logo de GitHub Actions', async ({ page }) => {
+  await page.goto('/issues/claude-cockpit/68');
+  const ci = page.locator('dl').first().locator('[data-badge]', { hasText: 'réussie' });
+  await expect(ci).toHaveAttribute('data-solid', '');
+  await expect(ci.locator('[data-segment="label"] svg')).toBeVisible();
+});
+
+test('une issue porte l’icône de GitHub à la couleur de son état', async ({ page }) => {
+  await page.goto('/issues');
+  await expect(
+    page.getByRole('link', { name: /Page Projets/ }).locator('[data-segment="label"]'),
+  ).toHaveAttribute('data-icon-tone', 'success');
+  await page.goto('/history');
+  await expect(
+    page
+      .getByRole('table', { name: 'Dernières issues terminées' })
+      .locator('[data-segment="label"][data-icon-tone="done"]')
+      .first(),
+  ).toBeVisible();
+  // Sur la ligne, la tête de la boîte montre déjà l'état : le badge de l'issue s'en passe.
+  await page.goto('/');
+  await expect(issueJob(page, 'cv-site#49').locator('[data-segment="label"] svg')).toHaveCount(0);
 });

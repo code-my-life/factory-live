@@ -2,7 +2,7 @@ import type { AgentActivity, CardView, IssueSummary } from '@factory-live/contra
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { fr } from '../../i18n/fr.ts';
-import { WorkStateIcon, cardWorkState, issueWorkState } from './workState.tsx';
+import { WorkStateIcon, WorkStateLabel, cardWorkState, issueWorkState } from './workState.tsx';
 
 const issue = (status: IssueSummary['status']) => ({ status }) as IssueSummary;
 const card = (status: CardView['status']) => ({ status }) as CardView;
@@ -64,5 +64,23 @@ describe('WorkStateIcon', () => {
     expect(container.querySelector('[data-component="Spinner"]')).toBeNull();
     expect(container.firstElementChild).toHaveAttribute('aria-hidden', 'true');
     expect(container.firstElementChild).toHaveAttribute('data-tone', 'danger');
+  });
+});
+
+describe('WorkStateLabel', () => {
+  it('peint l’état de la couleur franche de son rôle, avec son icône', () => {
+    const { getByText } = render(
+      <WorkStateLabel state={issueWorkState(issue('blocked'), null, fr)} />,
+    );
+    const label = getByText('Bloquée').closest('[data-solid]');
+    expect(label).toHaveAttribute('data-variant', 'danger');
+    expect(label?.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('se passe de l’icône quand la boîte du job la montre déjà', () => {
+    const { getByText } = render(
+      <WorkStateLabel state={cardWorkState(card('running'), null, fr)} icon={false} />,
+    );
+    expect(getByText('En cours').closest('[data-solid]')?.querySelector('svg')).toBeNull();
   });
 });

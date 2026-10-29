@@ -2,9 +2,10 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider.tsx';
-import { CardBadge } from './CardBadge.tsx';
+import { CardBadge, KIND_ICON } from './CardBadge.tsx';
 import { ChecksBadge } from './ChecksBadge.tsx';
 import { IssueBadge } from './IssueBadge.tsx';
+import { CHECKS_MARK } from './marks.ts';
 import { VersionBadge } from './VersionBadge.tsx';
 
 const badgeOf = (container: HTMLElement) => container.querySelector('[data-badge]');
@@ -78,6 +79,38 @@ describe('VersionBadge', () => {
     const { container } = render(<VersionBadge version="v0.12.0" />);
     expect(badgeOf(container)?.querySelectorAll('[data-segment]')).toHaveLength(1);
     expect(badgeOf(container)).toHaveAttribute('title', 'v0.12.0');
+  });
+});
+
+describe('icônes et couleurs des badges de concept', () => {
+  const label = (container: HTMLElement) => container.querySelector('[data-segment="label"]');
+
+  it('marque une issue de l’icône de GitHub, à la couleur de son état quand on le connaît', () => {
+    const { container, rerender } = render(<IssueBadge issueKey="cv-site#49" state="open" />);
+    expect(label(container)?.querySelector('svg')).not.toBeNull();
+    expect(label(container)).toHaveAttribute('data-icon-tone', 'success');
+    rerender(<IssueBadge issueKey="cv-site#49" state="closed" />);
+    expect(label(container)).toHaveAttribute('data-icon-tone', 'done');
+    rerender(<IssueBadge issueKey="cv-site#49" />);
+    expect(label(container)).not.toHaveAttribute('data-icon-tone');
+  });
+
+  it('marque une carte de l’icône de son type, la même que l’étape du graphe', () => {
+    expect(KIND_ICON.impl).toBeDefined();
+    const { container } = render(<CardBadge kind="impl" id="t_5e21c0d9" />);
+    expect(label(container)?.querySelector('svg')).not.toBeNull();
+  });
+
+  it('peint la CI en couleur franche, avec le logo de GitHub Actions', () => {
+    const { container } = render(<ChecksBadge checks="failure" />);
+    expect(badgeOf(container)).toHaveAttribute('data-solid');
+    expect(label(container)?.querySelector('path')).toHaveAttribute('d', CHECKS_MARK.path);
+    expect(container.querySelector('[data-segment="value"] svg')).not.toBeNull();
+  });
+
+  it('marque une version d’une étiquette', () => {
+    const { container } = render(<VersionBadge of="Hermès" version="0.22.2" />);
+    expect(label(container)?.querySelector('svg')).not.toBeNull();
   });
 });
 

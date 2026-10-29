@@ -1,6 +1,8 @@
 import type { AgentActivity, Intervention, IssueSummary } from '@factory-live/contracts';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
-import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
+import { IssueBadge, issueState } from '../../ui/badge/IssueBadge.tsx';
+import { ModelBadge } from '../../ui/ModelBadge.tsx';
+import { actionModel } from '../../ui/modelText.ts';
 import { issuePath } from '../../ui/paths.ts';
 import { JobAction, JobBox, JobDetail } from '../../ui/work/JobBox.tsx';
 import { issueWorkState } from '../../ui/work/workState.tsx';
@@ -36,7 +38,7 @@ export function IssueJob({
       {...(finished ? {} : { since })}
       id={issue.key}
       state={state}
-      badge={<IssueBadge issueKey={issue.key} />}
+      badge={<IssueBadge issueKey={issue.key} state={issueState(issue.status)} icon={false} />}
       title={issue.title}
       to={issuePath(issue.key)}
       compact={compact}
@@ -82,6 +84,14 @@ function IssueJobDetail({
   if (issue.status === 'queued')
     return <JobDetail>{t.common.waitingForSlot(maxInProgress)}</JobDetail>;
   if (!agent) return null;
+  const called = actionModel(agent);
+  if (agent.action && called)
+    return (
+      <>
+        <JobDetail code>{text(agent.action.label)}</JobDetail>
+        <ModelBadge model={called} />
+      </>
+    );
   if (agent.action)
     return (
       <JobDetail code>

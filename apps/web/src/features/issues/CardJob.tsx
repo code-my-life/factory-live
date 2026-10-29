@@ -1,31 +1,13 @@
 import type { AgentActivity, CardView } from '@factory-live/contracts';
-import {
-  BugIcon,
-  CodeIcon,
-  EyeIcon,
-  RocketIcon,
-  ToolsIcon,
-  WorkflowIcon,
-} from '@primer/octicons-react';
-import type { Icon } from '@primer/octicons-react';
 import { ProgressBar } from '@primer/react';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { CardBadge } from '../../ui/badge/CardBadge.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
+import { actionModel } from '../../ui/modelText.ts';
 import { JobBox, JobDetail } from '../../ui/work/JobBox.tsx';
 import { cardWorkState } from '../../ui/work/workState.tsx';
 import { shortCardTitle } from './cardText.ts';
 import styles from './IssueGraph.module.css';
-
-export const KIND_ICON: Record<CardView['kind'], Icon> = {
-  brief: WorkflowIcon,
-  impl: CodeIcon,
-  release: RocketIcon,
-  diagnostic: BugIcon,
-  watch: EyeIcon,
-  onboarding: ToolsIcon,
-  other: ToolsIcon,
-};
 
 /**
  * Une carte de l'issue, dans la même boîte qu'une issue de la ligne d'usine : son état, l'agent qui
@@ -72,7 +54,7 @@ export function CardJob({
       {agent?.action ? (
         <JobDetail code>
           {text(agent.action.label)}
-          {agent.action.detail ? ` · ${agent.action.detail}` : ''}
+          {agent.action.detail && !actionModel(agent) ? ` · ${agent.action.detail}` : ''}
         </JobDetail>
       ) : card.blockReason ? (
         <JobDetail tone="danger">{card.blockReason}</JobDetail>

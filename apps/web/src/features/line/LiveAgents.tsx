@@ -5,6 +5,7 @@ import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
+import { actionModel } from '../../ui/modelText.ts';
 import styles from './line.module.css';
 
 const ACTION_ICON = { llm: CommentDiscussionIcon, tool: ToolsIcon, cli: TerminalIcon } as const;
@@ -47,7 +48,7 @@ export function LiveAgents({
                 <span className={styles.liveName}>{agent.profile}</span>
                 <span className={styles.liveState}>{t.agentState[agent.state]}</span>
                 <span className={styles.liveWhere}>{t.station[agent.station]}</span>
-                {agent.issueKey ? <IssueBadge issueKey={agent.issueKey} link /> : null}
+                {agent.issueKey ? <IssueBadge issueKey={agent.issueKey} state="open" link /> : null}
                 {agent.runStartedAt ? (
                   <span className={styles.liveElapsed}>
                     <Elapsed since={agent.runStartedAt} />
@@ -62,7 +63,7 @@ export function LiveAgents({
                   <ActionIcon size={14} aria-hidden="true" />
                   <span className={styles.liveActionText}>
                     {text(agent.action.label)}
-                    {agent.action.detail ? (
+                    {agent.action.detail && !actionModel(agent) ? (
                       <span className={styles.liveActionDetail}> {agent.action.detail}</span>
                     ) : null}
                   </span>
