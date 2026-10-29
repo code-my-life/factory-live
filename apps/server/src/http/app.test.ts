@@ -616,6 +616,13 @@ describe('GitHub App et connexion de Clément', () => {
     expect(login.status).toBe(409);
     expect(login.headers.get('set-cookie')).toMatch(/^factory-live-lang=fr;/);
     expect(await login.text()).toContain('L’App GitHub n’existe pas encore : crée-la d’abord');
+
+    // App créée : la connexion part vers GitHub en retenant la langue pour la page du retour.
+    await createAndConnect();
+    const toGitHub = await h.app.request('/api/github/login?lang=en', { headers: NAV });
+    expect(toGitHub.status).toBe(303);
+    expect(toGitHub.headers.get('location')).toMatch(/\/login\/oauth\/authorize\?/);
+    expect(toGitHub.headers.get('set-cookie')).toMatch(/^factory-live-lang=en;/);
   });
 
   it('suit la langue du navigateur quand la PWA n’en dit rien', async () => {
