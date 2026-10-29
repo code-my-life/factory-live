@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { expectNoHorizontalOverflow } from './helpers.ts';
 
 test('les réglages de la démo rejouent les notifications et le parcours GitHub', async ({
   page,
@@ -66,5 +67,24 @@ test.describe('navigateur dans une autre langue que le français', () => {
       'aria-pressed',
       'true',
     );
+  });
+
+  test('aucun écran ne déborde de côté en anglais', async ({ page }) => {
+    for (const route of [
+      '/',
+      '/issues',
+      '/issues/claude-cockpit/71',
+      '/interventions',
+      '/agents',
+      '/health',
+      '/costs',
+      '/history',
+      '/settings',
+    ]) {
+      await page.goto(route);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+      await expectNoHorizontalOverflow(page);
+    }
   });
 });
