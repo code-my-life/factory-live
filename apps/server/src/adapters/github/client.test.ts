@@ -105,6 +105,21 @@ describe('GitHubClient', () => {
     expect(client.rateLimit).toMatchObject({ remaining: 4812, limit: 5000 });
   });
 
+  it('retrouve la PR d’une branche du dépôt, ou rien', async () => {
+    const { impl, calls } = fakeFetch({
+      'head=code-my-life%3Afix%2F2-server-version-in-settings&state=all&sort=created&direction=desc&per_page=1':
+        () => json([{ number: 3, head: { ref: 'fix/2-server-version-in-settings' } }]),
+      'head=code-my-life%3Afix%2F9-absente&state=all&sort=created&direction=desc&per_page=1': () =>
+        json([]),
+    });
+    const client = new GitHubClient('jeton', 'code-my-life', 'https://api.github.com', impl);
+    expect(
+      await client.pullRequestOfBranch('factory-live', 'fix/2-server-version-in-settings'),
+    ).toBe(3);
+    expect(await client.pullRequestOfBranch('factory-live', 'fix/9-absente')).toBeNull();
+    expect(calls[0]?.url).toContain('/repos/code-my-life/factory-live/pulls?');
+  });
+
   it('poste le commentaire de déblocage sur l’issue', async () => {
     const { impl, calls } = fakeFetch({
       '/repos/code-my-life/cv-site/issues/49/comments': () =>

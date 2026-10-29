@@ -6,6 +6,7 @@ import type {
   ServiceHealth,
   Text,
 } from '@factory-live/contracts';
+import type { GuardRisk } from '@factory-live/domain';
 import { iso } from './projection.ts';
 
 /** Signaux passifs relevés par le hub, en millisecondes epoch. */
@@ -38,6 +39,8 @@ export interface HealthSignals {
     { lastOkAt: number | null; lastErrorAt: number | null; rateLimited10m: number }
   >;
   claudeLastSessionAt: number | null;
+  /** Les gardes dont le code peut attendre au moins le délai de leur hook ; `null` : pas encore lues. */
+  guards: { risks: readonly GuardRisk[]; checkedAt: number } | null;
   running: number;
   maxInProgress: number;
   maxInProgressPerProfile: number;
@@ -234,6 +237,28 @@ export function buildHealth(signals: HealthSignals): {
         ...age(now, delivery.at),
       }),
       checkedAt: iso(delivery.at),
+    });
+  }
+
+  if (signals.guards) {
+    const { risks } = signals.guards;
+    push({
+      id: 'guards',
+      label: msg('health.guards'),
+      group: 'hermes',
+      status: risks.length > 0 ? 'degraded' : 'ok',
+      detail:
+        risks.length > 0
+          ? msg('health.guards.risk', { count: risks.length })
+          : msg('health.guards.ok'),
+      checkedAt: iso(signals.guards.checkedAt),
+      metrics: risks.map((risk) => ({
+        label: msg('health.guards.riskItem', {
+          profile: risk.profiles.join(', '),
+          plugin: risk.plugin,
+        }),
+        value: msg('health.guards.limits', { longest: risk.longest, limit: risk.limit }),
+      })),
     });
   }
 

@@ -1011,3 +1011,103 @@ describe('diagnostic des blocages', () => {
     expect(detail.cards.find((item) => item.id === 't_b1ef0049')?.blockKind).toBeNull();
   });
 });
+
+describe('délais des gardes', () => {
+  const coder = () => join(h.dir.path, 'hermes', 'profiles', 'coder');
+
+  /** coder-guard tel qu'il est dans la factory : ses contrôles peuvent durer 900 s, son hook en a 30. */
+  function coderGuard() {
+    mkdirSync(join(coder(), 'plugins', 'coder-guard'), { recursive: true });
+    writeFileSync(
+      join(coder(), 'plugins', 'coder-guard', '__init__.py'),
+      [
+        'def _run(cmd: str, cwd: Path, timeout: int = 900) -> tuple[int, str]:',
+        '    r = subprocess.run(["bash", "-lc", cmd], cwd=cwd, timeout=timeout)',
+        'def register(ctx):',
+        '    ctx.register_hook("pre_tool_call", pre_tool)',
+        '',
+      ].join('\n'),
+    );
+    writeFileSync(
+      join(coder(), 'config.yaml'),
+      'model:\n  default: auto\n  provider: freellmapi\nplugins:\n  enabled: [coder-guard]\n',
+    );
+    mkdirSync(join(coder(), 'logs'), { recursive: true });
+    writeFileSync(
+      join(coder(), 'logs', 'agent.log'),
+      "2026-10-28 18:43:51,000 WARNING [20261028_163000_abcdef] hermes_cli.plugins: Hook 'pre_tool_call' callback pre_tool timed out after 30s \\u2014 skipping\n",
+    );
+  }
+
+  it('signale la garde qui peut dépasser son hook, dans la santé et sur l’écran Agents', async () => {
+    coderGuard();
+    h.hub.refreshDiagnoses();
+    const guards = (await snapshot()).health.find((item) => item.id === 'guards');
+    expect(guards).toMatchObject({
+      status: 'degraded',
+      detail: msg('health.guards.risk', { count: 1 }),
+      metrics: [
+        {
+          label: msg('health.guards.riskItem', { profile: 'coder', plugin: 'coder-guard' }),
+          value: msg('health.guards.limits', { longest: 900, limit: 30 }),
+        },
+      ],
+    });
+    const profiles = (await (
+      await h.app.request('/api/profiles', { headers: THIS_PC })
+    ).json()) as {
+      name: string;
+      plugins: { name: string; timeouts: number; longestSeconds: number | null }[];
+    }[];
+    expect(profiles.find((profile) => profile.name === 'coder')?.plugins).toEqual([
+      expect.objectContaining({ name: 'coder-guard', timeouts: 1, longestSeconds: 900 }),
+    ]);
+  });
+
+  it('suit en direct la config et le code de la garde', async () => {
+    coderGuard();
+    h.hub.refreshDiagnoses();
+    const guards = async () => (await snapshot()).health.find((item) => item.id === 'guards');
+    // 600 s, le maximum d'Hermès : le plafond des outils (420 s) coupe encore avant les 900 s.
+    const config = join(coder(), 'config.yaml');
+    writeFileSync(
+      config,
+      'model:\n  default: auto\n  provider: freellmapi\nplugins:\n  enabled: [coder-guard]\n  hook_callback_timeout: 600\n',
+    );
+    utimesSync(config, new Date(), new Date(Date.now() + 5_000));
+    h.hub.refreshDiagnoses();
+    expect((await guards())?.metrics).toEqual([
+      expect.objectContaining({ value: msg('health.guards.limits', { longest: 900, limit: 420 }) }),
+    ]);
+    // La garde ne lance plus rien de plus long que 300 s : plus de risque.
+    const plugin = join(coder(), 'plugins', 'coder-guard', '__init__.py');
+    writeFileSync(
+      plugin,
+      'def register(ctx):\n    ctx.register_hook("pre_tool_call", pre_tool)\nrun(timeout=300)\n',
+    );
+    utimesSync(plugin, new Date(), new Date(Date.now() + 10_000));
+    h.hub.refreshDiagnoses();
+    expect(await guards()).toMatchObject({ status: 'ok', detail: msg('health.guards.ok') });
+  });
+});
+
+describe('erreurs d’API classées par Hermès', () => {
+  it('compte une limite de débit d’après le type d’erreur, même sans code 429', async () => {
+    const error = (extra: Record<string, unknown>) =>
+      postHook(
+        hook('api_request_error', {
+          extra: { model: 'nemotron-3-ultra', provider: 'nvidia', ...extra },
+        }),
+      );
+    expect(
+      (await error({ error: { type: 'rate_limit', message: 'Too many requests' } })).status,
+    ).toBe(202);
+    expect(
+      (await error({ error: { type: 'server_error', message: 'Bad gateway' }, status_code: 502 }))
+        .status,
+    ).toBe(202);
+    h.hub.flush();
+    const nvidia = (await snapshot()).health.find((item) => item.id === 'provider:nvidia');
+    expect(nvidia?.metrics).toEqual([{ label: msg('health.metric.rateLimited'), value: '1' }]);
+  });
+});

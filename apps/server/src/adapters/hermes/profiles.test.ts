@@ -4,10 +4,21 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { tempDir } from '../../test/hermes-fixtures.ts';
 import type { TempDir } from '../../test/hermes-fixtures.ts';
 import { HermesPaths } from './paths.ts';
-import { ProfileConfigReader, pluginHooksOf, profileFactsOf } from './profiles.ts';
+import {
+  ProfileConfigReader,
+  longestTimeoutOf,
+  pluginHooksOf,
+  profileFactsOf,
+} from './profiles.ts';
 
-/** Le bloc `register()` de coder-guard, tel qu'il est dans la factory. */
-const CODER_GUARD = `def register(ctx):
+/** Le code de coder-guard, réduit à ses délais et à son bloc `register()`, tel qu'il est dans la factory. */
+const CODER_GUARD = `def _git(root: Path, *args, timeout: int = 60):
+    return subprocess.run(["git", *args], cwd=root, timeout=timeout)
+def _run(cmd: str, cwd: Path, timeout: int = 900) -> tuple[int, str]:
+    r = subprocess.run(["bash", "-lc", cmd], cwd=cwd, timeout=timeout)
+f = _git(root, "fetch", "--quiet", "origin", timeout=120)
+r = subprocess.run(["python3", str(script)], input=diff, timeout=600)
+def register(ctx):
     ctx.register_hook("pre_tool_call", pre_tool)
     ctx.register_hook("post_tool_call", post_tool)
     ctx.register_hook("pre_llm_call", inject)
@@ -68,6 +79,8 @@ describe('ProfileConfigReader.facts', () => {
       plugins: ['coder-guard', 'comment-guard'],
     });
     expect(facts?.changedAt).toBeGreaterThan(0);
+    // coder-guard peut lancer une commande de 900 s (`_run`) ; comment-guard n'a aucun délai écrit.
+    expect(facts?.longestCommands).toEqual({ 'coder-guard': 900 });
     expect(
       facts?.hooks.map((hook) => [hook.plugin, hook.hook, hook.callback, hook.source]),
     ).toEqual([
@@ -146,5 +159,16 @@ describe('profileFactsOf', () => {
 
   it('ne retient que les enregistrements de hooks', () => {
     expect(pluginHooksOf('x', '# register_hook est appelé plus bas\nregister(ctx)')).toEqual([]);
+  });
+});
+
+describe('longestTimeoutOf', () => {
+  it('lit le plus grand délai écrit en dur, passé ou par défaut, et rien d’autre', () => {
+    expect(
+      longestTimeoutOf('subprocess.run(cmd, capture_output=True, text=True, timeout=30)'),
+    ).toBe(30);
+    expect(longestTimeoutOf('def f(timeout: float = 12.5):\n  run(timeout=timeout)')).toBe(12.5);
+    expect(longestTimeoutOf('run(timeout=TIMEOUT)\nrequests.get(url)')).toBeNull();
+    expect(longestTimeoutOf('# timeout_seconds = 9000\nmy_timeout=99')).toBeNull();
   });
 });

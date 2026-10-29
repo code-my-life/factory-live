@@ -344,6 +344,8 @@ export interface ProfileFacts {
   readonly repoHookTimeout?: number | null;
   readonly plugins: readonly string[];
   readonly hooks: readonly PluginHook[];
+  /** La plus longue commande que le code de chaque plugin peut lancer (`timeout=` littéraux, secondes). */
+  readonly longestCommands?: Readonly<Record<string, number>>;
 }
 
 export interface DiagnosisInput {

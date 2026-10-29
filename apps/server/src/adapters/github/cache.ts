@@ -78,7 +78,10 @@ export class GitHubCache implements GitHubReadPort {
           this.issues.set(issue.key, info);
           changed = true;
         }
-        const pr = parsePrUrl(issue.prUrl);
+        // Sans lien noté par un run, la PR se retrouve par sa branche (celle du brief, par exemple).
+        const pr =
+          parsePrUrl(issue.prUrl) ??
+          (issue.branch ? await this.pullRequestOfBranch(repo, issue.branch) : null);
         if (pr && pr.owner === this.owner) {
           const { headSha, ...view } = await this.client.pullRequest(pr.repo, pr.number);
           if (JSON.stringify(view) !== JSON.stringify(this.prs.get(issue.key))) {
@@ -121,6 +124,14 @@ export class GitHubCache implements GitHubReadPort {
       }
     }
     return changed;
+  }
+
+  private async pullRequestOfBranch(
+    repo: string,
+    branch: string,
+  ): Promise<{ owner: string; repo: string; number: number } | null> {
+    const number = await this.client.pullRequestOfBranch(repo, branch);
+    return number === null ? null : { owner: this.owner, repo, number };
   }
 
   /** Livraisons des webhooks GitHub des dépôts de la factory (intake vu depuis GitHub). */

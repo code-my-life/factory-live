@@ -18,6 +18,7 @@ import {
   TOOL_DEADLINE_DEFAULT,
   cardKindOf,
   finishedIssues,
+  hookTimeoutsByPlugin,
   gateVerdicts,
   groupByIssue,
   humanResponseMinutes,
@@ -31,6 +32,7 @@ import type { ProfileFacts, Run, Task } from '@factory-live/domain';
 import { configDrift } from './drift.ts';
 import type { Hub } from './hub.ts';
 import type {
+  AgentLogPort,
   CardFilesPort,
   GitHubReadPort,
   HistoryPort,
@@ -47,6 +49,8 @@ export interface ViewDeps {
   profiles: ProfilesPort;
   github: GitHubReadPort | null;
   files: CardFilesPort;
+  /** Le journal d'Hermès des agents : les dépassements de hook, garde par garde. */
+  agentLog: AgentLogPort | null;
   owner: string;
   boardName: string;
   dashboardUrl: string | null;
@@ -320,6 +324,10 @@ export function profileViews(deps: ViewDeps, periodDays = 30): ProfileView[] {
     );
     const passes = verdicts.filter((verdict) => verdict.implementer === name);
     const chain = live ? [...(live.model ? [live.model] : []), ...live.fallbacks] : [];
+    const facts = safeFacts(deps, name);
+    const timeouts = facts
+      ? hookTimeoutsByPlugin(safeLogs(deps, name, since, deps.now() / 1000), facts)
+      : new Map<string, number>();
     return {
       name,
       role: (manifest.profiles[name]?.skills ?? []).join(', ') || msg('agent.role.default'),
@@ -331,10 +339,10 @@ export function profileViews(deps: ViewDeps, periodDays = 30): ProfileView[] {
       plugins: (live?.plugins ?? []).map((plugin) => ({
         name: plugin,
         refusals: refusals.get(`${name}|${plugin}`) ?? 0,
-        timeouts: 0,
-        longestSeconds: null,
+        timeouts: timeouts.get(plugin) ?? 0,
+        longestSeconds: facts?.longestCommands?.[plugin] ?? null,
       })),
-      limits: limitsOf(safeFacts(deps, name)),
+      limits: limitsOf(facts),
       mcp: live?.mcp ?? [],
       drift: live && repo ? configDrift(live, repo, manifest.profiles[name]?.plugins ?? null) : [],
       stats: {
@@ -441,6 +449,14 @@ function safeFacts(deps: ViewDeps, profile: string): ProfileFacts | null {
     return deps.profiles.facts(profile);
   } catch {
     return null;
+  }
+}
+
+function safeLogs(deps: ViewDeps, profile: string, from: number, to: number) {
+  try {
+    return deps.agentLog?.facts(profile, from, to) ?? [];
+  } catch {
+    return [];
   }
 }
 

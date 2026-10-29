@@ -71,6 +71,8 @@ describe('toHookEvent', () => {
       sessionId: '20261028_160211_ab12cd',
     });
     expect(pre?.at).toBe(Date.parse('2026-10-28T17:41:53.546969Z'));
+    // L'identifiant de l'appel, le même que dans state.db, est gardé ; le tour, non.
+    expect(pre?.extra).toEqual({ task_id: 'uuid-du-tour', tool_call_id: 'call_1' });
     expect(api?.extra).toMatchObject({
       response_model: 'agnes-2.5-flash',
       provider: 'freellmapi',

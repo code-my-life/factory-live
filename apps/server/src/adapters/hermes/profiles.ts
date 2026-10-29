@@ -100,6 +100,18 @@ export function pluginHooksOf(plugin: string, source: string): PluginHook[] {
   });
 }
 
+/** Un délai écrit en dur dans le code Python d'un plugin : `timeout=120`, `timeout: int = 900`. */
+const TIMEOUT_LITERAL = /\btimeout\s*(?::\s*(?:int|float)\s*)?=\s*(\d{1,6}(?:\.\d{1,3})?)\b/g;
+
+/**
+ * La plus longue commande que le code d'un plugin peut lancer : le plus grand délai littéral qu'il
+ * passe (`subprocess.run(..., timeout=600)`) ou qu'il donne par défaut à une fonction ; `null` sans.
+ */
+export function longestTimeoutOf(source: string): number | null {
+  const values = [...source.matchAll(TIMEOUT_LITERAL)].map((match) => Number(match[1]));
+  return values.length > 0 ? Math.max(...values) : null;
+}
+
 /** Ce que le diagnostic retient d'une config d'agent : ses délais et ses plugins actifs. */
 export function profileFactsOf(
   profile: string,
@@ -107,6 +119,7 @@ export function profileFactsOf(
   repo: Yaml | null,
   changedAt: number | null,
   hooks: readonly PluginHook[],
+  longestCommands: Readonly<Record<string, number>> = {},
 ): ProfileFacts {
   const plugins = record(yaml['plugins']);
   const tools = record(record(yaml['timeouts'])['tools']);
@@ -121,6 +134,7 @@ export function profileFactsOf(
     ...(repo ? { repoHookTimeout: amount(record(repo['plugins'])['hook_callback_timeout']) } : {}),
     plugins: strings(plugins['enabled']),
     hooks,
+    longestCommands,
   };
 }
 
@@ -221,11 +235,14 @@ export class ProfileConfigReader implements ProfilesPort {
     if (!path || !yaml) return null;
     const repoPath = this.paths.repoConfig(profile);
     const read = [path, ...(repoPath ? [repoPath] : [])];
+    const longest: Record<string, number> = {};
     const hooks = strings(record(yaml['plugins'])['enabled']).flatMap((plugin) => {
       const source = this.paths.pluginSource(profile, plugin);
       const code = source ? readCapped(source, MAX_PLUGIN_BYTES) : null;
       if (!source || code === null) return [];
       read.push(source);
+      const seconds = longestTimeoutOf(code);
+      if (seconds !== null) longest[plugin] = seconds;
       return pluginHooksOf(plugin, code);
     });
     this.factsFiles.set(profile, read);
@@ -235,6 +252,7 @@ export class ProfileConfigReader implements ProfilesPort {
       repoPath ? parseCapped(repoPath, MAX_CONFIG_BYTES) : null,
       mtimeSeconds(path),
       hooks,
+      longest,
     );
   }
 

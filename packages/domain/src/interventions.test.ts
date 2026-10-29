@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { interventionsOf, pullRequestUrl } from './interventions.ts';
+import { branchOf, interventionsOf, pullRequestUrl } from './interventions.ts';
 import type { InterventionContext } from './interventions.ts';
 import { aRun, aTask, anEvent } from './fixtures.test-helpers.ts';
 import type { Board, Task, TaskEvent } from './hermes.ts';
@@ -340,5 +340,30 @@ describe('pullRequestUrl', () => {
     };
     expect(pullRequestUrl(tasks, board)).toBe('https://github.com/o/r/pull/2');
     expect(pullRequestUrl([aTask({ id: 't_seule' })], board)).toBeNull();
+  });
+});
+
+describe('branchOf', () => {
+  const card = (patch: Partial<Task> = {}) =>
+    aTask({
+      id: 't_665ba7d7',
+      body: 'Brief\n- base_commit : origin/main\n- branch_name : fix/2-server-version-in-settings\n- tests',
+      ...patch,
+    });
+
+  it('prend la branche déclarée, puis celle notée par le dernier run, puis celle du brief', () => {
+    const runs = [
+      aRun({ id: 191, taskId: 't_665ba7d7', metadata: {} }),
+      aRun({ id: 192, taskId: 't_665ba7d7', metadata: { branch: 'fix/2-autre' } }),
+    ];
+    expect(branchOf(card({ branchName: 'feat/3-x' }), runs)).toBe('feat/3-x');
+    expect(branchOf(card(), runs)).toBe('fix/2-autre');
+    expect(branchOf(card(), runs.slice(0, 1))).toBe('fix/2-server-version-in-settings');
+  });
+
+  it('écarte ce qui ne peut pas être une branche git', () => {
+    expect(branchOf(card({ body: '- branch_name : fix/2-a..b' }), [])).toBeNull();
+    expect(branchOf(card({ body: '- branch_name : [fix] 2' }), [])).toBeNull();
+    expect(branchOf(card({ body: 'pas de branche' }), [])).toBeNull();
   });
 });

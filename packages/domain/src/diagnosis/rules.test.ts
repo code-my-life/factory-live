@@ -480,6 +480,17 @@ describe('l’état du travail', () => {
     expect(diagnosis.work?.commits).toBe('none');
   });
 
+  it('une PR connue sur la branche prouve le push, même sans session lisible', () => {
+    const work = diagnose(
+      input({
+        sessions: null,
+        branch: 'fix/1-x',
+        prUrl: 'https://github.com/code-my-life/factory-live/pull/3',
+      }),
+    ).work;
+    expect(work).toMatchObject({ commits: 'unknown', pushed: 'yes' });
+  });
+
   it('sans sessions lisibles, le travail est inconnu ; sans rien, il n’y a rien à raconter', () => {
     expect(diagnose(input({ sessions: null, branch: 'fix/1-x' })).work).toMatchObject({
       commits: 'unknown',

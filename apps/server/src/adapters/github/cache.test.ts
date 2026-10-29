@@ -39,4 +39,45 @@ describe('GitHubCache', () => {
     expect(issue.mock.calls.filter(([, number]) => number === 99999)).toHaveLength(2);
     expect(logger.info).toHaveBeenCalledOnce();
   });
+
+  it('retrouve la PR par sa branche quand aucun run n’en a noté le lien', async () => {
+    const { client } = fakeClient();
+    const pullRequestOfBranch = vi.fn(() => Promise.resolve(3));
+    const pullRequest = vi.fn(() =>
+      Promise.resolve({
+        number: 3,
+        url: 'https://github.com/code-my-life/factory-live/pull/3',
+        title: 'fix: version serveur',
+        state: 'open' as const,
+        checks: 'success' as const,
+        reviewDecision: 'review_required' as const,
+        autoMerge: false,
+        additions: 10,
+        deletions: 2,
+        changedFiles: 4,
+        headSha: 'b055de5',
+      }),
+    );
+    Object.assign(client, { pullRequestOfBranch, pullRequest });
+    const cache = new GitHubCache(client, 'code-my-life', log());
+    await cache.refresh(
+      [
+        {
+          key: 'factory-live#2',
+          prUrl: null,
+          branch: 'fix/2-server-version-in-settings',
+          active: true,
+        },
+      ],
+      0,
+    );
+    expect(pullRequestOfBranch).toHaveBeenCalledWith(
+      'factory-live',
+      'fix/2-server-version-in-settings',
+    );
+    expect(pullRequest).toHaveBeenCalledWith('factory-live', 3);
+    expect(cache.pullRequest('factory-live#2')?.url).toBe(
+      'https://github.com/code-my-life/factory-live/pull/3',
+    );
+  });
 });

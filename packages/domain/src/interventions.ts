@@ -1,5 +1,5 @@
 import { cardKindOf } from './cards.ts';
-import type { Board, Task, TaskEvent } from './hermes.ts';
+import type { Board, Run, Task, TaskEvent } from './hermes.ts';
 import { groupByIssue } from './issues.ts';
 import { message } from './messages.ts';
 import type { Message, Text } from './messages.ts';
@@ -101,6 +101,27 @@ function text(value: unknown): string {
 
 function firstLine(value: string, fallback: InterventionMessage): InterventionText {
   return value.split('\n')[0]?.trim() || fallback;
+}
+
+/** Un nom de branche git valable : pas d'espace, ni `[`, ni caractère de contrôle (et pas de `..`). */
+const BRANCH = /^[\w./-]{1,250}$/;
+/** Le brief de la factory nomme la branche d'une carte : « - branch_name : fix/8-island-blur ». */
+const BRIEF_BRANCH = /^- branch_name : (\S{1,250})\s*$/m;
+
+/**
+ * La branche d'une carte : déclarée sur la carte, sinon notée par son dernier run (`branch`), sinon
+ * celle que le brief lui donne (champ `branch_name` du skill factory-brief).
+ */
+export function branchOf(task: Task, runs: readonly Run[]): string | null {
+  const noted = runs
+    .filter((run) => run.taskId === task.id)
+    .sort((left, right) => left.id - right.id)
+    .map((run) => text(run.metadata['branch']))
+    .filter(Boolean)
+    .at(-1);
+  const briefed = BRIEF_BRANCH.exec(task.body)?.[1];
+  const branch = task.branchName ?? noted ?? briefed ?? null;
+  return branch && BRANCH.test(branch) && !branch.includes('..') ? branch : null;
 }
 
 /** Le lien de la PR d'un ensemble de cartes, relevé dans les runs d'Hermès (`pr_url`, `published_pr`). */

@@ -69,6 +69,7 @@ export const Message = z.discriminatedUnion('code', [
   message('timeline.timedOut', none),
   message('timeline.rateLimited', none),
   message('timeline.protocolViolation', none),
+  message('timeline.protocolViolation.nudged', none),
   message('timeline.spawnFailed', none),
   message('timeline.gaveUp', { failures: count.nullable() }),
   message('timeline.workerReaped', none),

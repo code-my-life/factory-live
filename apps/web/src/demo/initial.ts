@@ -933,10 +933,12 @@ export function createInitialState(now: number): DemoState {
         profile: 'coder',
         cardId: CARDS.hookImpl,
       }),
+      // Run 189 : Hermès l'a relancé deux fois pour qu'il rende la carte, il est sorti quand même.
       timeline(ago(56 * min), msg('timeline.protocolViolation'), {
         profile: 'coder',
         cardId: CARDS.hookImpl,
         tone: 'danger',
+        detail: msg('timeline.protocolViolation.nudged'),
       }),
       timeline(ago(33 * min), msg('timeline.protocolViolation'), {
         profile: 'coder',
