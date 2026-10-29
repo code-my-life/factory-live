@@ -1,12 +1,15 @@
 import type { IssueSummary } from '@factory-live/contracts';
 import { BellIcon } from '@primer/octicons-react';
-import { Heading, Label, SegmentedControl } from '@primer/react';
+import { Heading, SegmentedControl } from '@primer/react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useSnapshot } from '../../data/FactoryProvider.tsx';
+import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
+import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
-import { ISSUE_STATUS_LABEL, STATION_LABEL } from '../../ui/vocabulary.ts';
+import { STATION_LABEL } from '../../ui/vocabulary.ts';
 import { issuePath } from '../../ui/paths.ts';
+import { WorkStateLabel, issueWorkState } from '../../ui/work/workState.tsx';
 import styles from './issues.module.css';
 
 const FILTERS: { label: string; keep: (issue: IssueSummary) => boolean }[] = [
@@ -14,15 +17,6 @@ const FILTERS: { label: string; keep: (issue: IssueSummary) => boolean }[] = [
   { label: 'Terminées', keep: (issue) => issue.status === 'done' || issue.status === 'stopped' },
   { label: 'Toutes', keep: () => true },
 ];
-
-const STATUS_VARIANT = {
-  active: 'accent',
-  queued: 'secondary',
-  waiting_human: 'attention',
-  blocked: 'danger',
-  done: 'done',
-  stopped: 'secondary',
-} as const;
 
 export function IssuesPage() {
   const snapshot = useSnapshot();
@@ -55,17 +49,18 @@ export function IssuesPage() {
           <li key={issue.key} className={styles.issueListItem}>
             <Link to={issuePath(issue.key)} className={styles.issueRow}>
               <span className={styles.issueRowMain}>
-                <span className={styles.issueRowKey}>{issue.key}</span>
+                <IssueBadge issueKey={issue.key} />
                 <span className={styles.issueRowTitle}>{issue.title}</span>
               </span>
               <span className={styles.issueRowMeta}>
-                <Label variant={STATUS_VARIANT[issue.status]}>
-                  {ISSUE_STATUS_LABEL[issue.status]}
-                </Label>
+                <WorkStateLabel state={issueWorkState(issue, null)} />
                 <span>{STATION_LABEL[issue.station]}</span>
-                {issue.activeProfiles.length > 0 ? (
-                  <span className="fl-mono">{issue.activeProfiles.join(', ')}</span>
-                ) : null}
+                {issue.activeProfiles.map((profile) => (
+                  <span key={profile} className={styles.agentCell}>
+                    <AgentAvatar profile={profile} size={16} named />
+                    {profile}
+                  </span>
+                ))}
                 {issue.interventionIds.length > 0 ? (
                   <span className={styles.issueRowBell}>
                     <BellIcon size={14} aria-hidden="true" /> {issue.interventionIds.length}

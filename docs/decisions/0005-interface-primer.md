@@ -27,3 +27,10 @@ Graphiques maison en HTML et CSS (une série, marques fines, valeur au bout ou a
 - Chaque agent a son avatar : identicon à la manière de GitHub (motif 5 × 5 symétrique, couleur propre tirée de la palette de visualisation de Primer), affiché par `Avatar` en carré, la forme que Primer réserve aux bots et aux apps.
 - Les tableaux passent par le composant `Table` de Primer.
 - Bouton de pause des animations en boucle : Primer interdit tout mouvement en boucle sans contrôle de l'utilisateur.
+
+## Révision du 2026-10-29 : badges (proposée, à valider sur la démo)
+
+- Un fait clé | valeur s'affiche en badge (`ui/badge`) : l'étiquette grise à gauche (la clé : fournisseur, dépôt, type de carte, « CI »), la valeur à droite (la donnée, en police de code pour un identifiant), teintée de la couleur de l'état. C'est le modèle du style « flat » de shields.io (liste awesome-badges), rendu en HTML avec les jetons Primer plutôt qu'en image : aucune ressource externe (l'app vit sur un tailnet, hors ligne), les deux thèmes, du vrai texte lu par les lecteurs d'écran. La teinte reste « muted » et le texte garde sa couleur par défaut : les aplats saturés de shields (blanc sur vert) ne passent pas le contraste.
+- Un concept, un badge, partout : modèle (`ModelBadge`, fournisseur | nom, « lane » pour le CLI délégué), issue (`IssueBadge`, dépôt | numéro), carte (`CardBadge`, type | identifiant), CI (`ChecksBadge`), version (`VersionBadge`). Les composants Primer gardent leur rôle : `Label` pour l'état d'une issue ou d'une carte (`WorkStateLabel`, les mêmes couleurs sur toutes les pages), `StateLabel` pour l'état d'une PR, `CounterLabel` pour un compte, `Token` pour une skill.
+- Pas de badge pour les nombres (jetons, coût, durée) : chiffres tabulaires dans les tableaux et les chiffres clés, alignés pour se comparer.
+- Valeur trop longue : tronquée sur une ligne (par défaut), entière sur plusieurs lignes sur un écran de détail (Agents), deux lignes au plus dans un tableau ; le nom entier reste dans l'infobulle et pour les lecteurs d'écran.

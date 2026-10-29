@@ -1,6 +1,7 @@
 import type {
   AgentState,
   CardKind,
+  ChecksState,
   HealthStatus,
   InterventionKind,
   IssueStatus,
@@ -131,3 +132,20 @@ export const RUN_ROLE_LABEL: Record<RunRole, string> = {
 export function needsWatch(status: HealthStatus): boolean {
   return status === 'degraded' || status === 'down';
 }
+
+/*
+ * Libellés des badges (ui/badge) : l'étiquette et la valeur des faits affichés en clé | valeur.
+ * Regroupés ici, à part du reste, pour la traduction.
+ */
+
+/** Étiquette du modèle de la lane CLI (Claude Code, OpenCode), à la place du fournisseur. */
+export const LANE_LABEL = 'lane';
+
+/** Étiquette du badge de CI d'une PR, et sa valeur selon l'état des workflows. */
+export const CHECKS_BADGE_LABEL = 'CI';
+
+export const CHECKS_LABEL: Record<Exclude<ChecksState, 'none'>, string> = {
+  pending: 'en cours',
+  success: 'réussie',
+  failure: 'en échec',
+};

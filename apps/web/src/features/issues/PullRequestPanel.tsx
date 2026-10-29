@@ -1,4 +1,4 @@
-import type { IssueSummary } from '@factory-live/contracts';
+import type { IssueSummary, PullRequestView } from '@factory-live/contracts';
 import {
   CheckCircleFillIcon,
   ClockIcon,
@@ -6,6 +6,8 @@ import {
   XCircleFillIcon,
 } from '@primer/octicons-react';
 import { Button, Link as PrimerLink, StateLabel } from '@primer/react';
+import type { ComponentProps } from 'react';
+import { ChecksBadge } from '../../ui/badge/ChecksBadge.tsx';
 import styles from './issues.module.css';
 
 const CHECKS = [
@@ -13,6 +15,31 @@ const CHECKS = [
   { name: 'E2E', detail: 'Electron, scénarios des cartes' },
   { name: 'GitHub Pages', detail: 'Site de présentation' },
 ];
+
+const PR_STATE: Record<
+  PullRequestView['state'],
+  { status: ComponentProps<typeof StateLabel>['status']; label: string }
+> = {
+  draft: { status: 'draft', label: 'Brouillon' },
+  open: { status: 'pullOpened', label: 'Ouverte' },
+  merged: { status: 'pullMerged', label: 'Fusionnée' },
+  closed: { status: 'pullClosed', label: 'Fermée' },
+};
+
+/** L'état d'une PR, comme sur GitHub : le `StateLabel` de Primer, avec son icône. */
+export function PullRequestState({
+  state,
+  size = 'medium',
+}: {
+  state: PullRequestView['state'];
+  size?: 'small' | 'medium';
+}) {
+  return (
+    <StateLabel status={PR_STATE[state].status} size={size}>
+      {PR_STATE[state].label}
+    </StateLabel>
+  );
+}
 
 /** État de la PR de l'issue, tel que GitHub le donne (API Actions pour la CI). */
 export function PullRequestPanel({ issue }: { issue: IssueSummary }) {
@@ -36,14 +63,6 @@ export function PullRequestPanel({ issue }: { issue: IssueSummary }) {
       </p>
     );
   }
-  const status =
-    pr.state === 'merged'
-      ? 'pullMerged'
-      : pr.state === 'closed'
-        ? 'pullClosed'
-        : pr.state === 'draft'
-          ? 'draft'
-          : 'pullOpened';
   const CheckIcon =
     pr.checks === 'success'
       ? CheckCircleFillIcon
@@ -53,15 +72,8 @@ export function PullRequestPanel({ issue }: { issue: IssueSummary }) {
   return (
     <div className={styles.pr}>
       <div className={styles.prHead}>
-        <StateLabel status={status}>
-          {pr.state === 'draft'
-            ? 'Brouillon'
-            : pr.state === 'merged'
-              ? 'Fusionnée'
-              : pr.state === 'closed'
-                ? 'Fermée'
-                : 'Ouverte'}
-        </StateLabel>
+        <PullRequestState state={pr.state} />
+        <ChecksBadge checks={pr.checks} />
         <h3 className={styles.prTitle}>
           {pr.title} <span className={styles.muted}>#{pr.number}</span>
         </h3>

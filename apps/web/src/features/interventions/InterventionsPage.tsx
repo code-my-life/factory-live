@@ -3,6 +3,8 @@ import { ArrowLeftIcon, BellIcon, CheckCircleIcon } from '@primer/octicons-react
 import { Heading } from '@primer/react';
 import { Link, useParams } from 'react-router';
 import { useSnapshot } from '../../data/FactoryProvider.tsx';
+import { CardBadge } from '../../ui/badge/CardBadge.tsx';
+import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { INTERVENTION_LABEL } from '../../ui/vocabulary.ts';
 import { InterventionDetail } from './InterventionDetail.tsx';
@@ -69,8 +71,14 @@ export function InterventionsPage() {
                     </span>
                     <span className={styles.itemTitle}>{intervention.title}</span>
                     <span className={styles.itemMeta}>
-                      {intervention.issueKey ?? intervention.cardId} · ouverte{' '}
-                      <Elapsed since={intervention.openedAt} mode="age" />
+                      {intervention.issueKey ? (
+                        <IssueBadge issueKey={intervention.issueKey} />
+                      ) : intervention.cardId ? (
+                        <CardBadge id={intervention.cardId} />
+                      ) : null}
+                      <span>
+                        ouverte <Elapsed since={intervention.openedAt} mode="age" />
+                      </span>
                     </span>
                     {intervention.unblock ? (
                       <span className={styles.itemProgress}>

@@ -51,7 +51,10 @@ const CARD_STATE: Record<KanbanStatus, { tone: WorkTone; icon: Icon }> = {
   archived: { tone: 'secondary', icon: ArchiveIcon },
 };
 
-export function issueWorkState(issue: IssueSummary, agent: AgentActivity | null): WorkState {
+export function issueWorkState(
+  issue: Pick<IssueSummary, 'status'>,
+  agent: AgentActivity | null,
+): WorkState {
   return {
     label: ISSUE_STATUS_LABEL[issue.status],
     ...ISSUE_STATE[issue.status],
@@ -59,7 +62,10 @@ export function issueWorkState(issue: IssueSummary, agent: AgentActivity | null)
   };
 }
 
-export function cardWorkState(card: CardView, agent: AgentActivity | null): WorkState {
+export function cardWorkState(
+  card: Pick<CardView, 'status'>,
+  agent: AgentActivity | null,
+): WorkState {
   return {
     label: CARD_STATUS_LABEL[card.status],
     ...CARD_STATE[card.status],

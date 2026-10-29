@@ -6,7 +6,7 @@ import type { UsagePeriod } from '../../data/source.ts';
 import { BarList } from '../../ui/charts/BarList.tsx';
 import { ColumnChart } from '../../ui/charts/ColumnChart.tsx';
 import { formatCompact, formatDayMonth, formatInteger, formatUsd } from '../../ui/format.ts';
-import { providerLabel } from '../../ui/vocabulary.ts';
+import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import page from '../../ui/page.module.css';
 
 const PERIODS: { days: UsagePeriod; label: string }[] = [
@@ -112,14 +112,13 @@ export function CostsPage() {
         </h2>
         <div className={page.tableBox}>
           <Table
-            gridTemplateColumns="minmax(0, 2fr) repeat(7, auto)"
+            gridTemplateColumns="minmax(12rem, 2fr) repeat(6, auto)"
             cellPadding="condensed"
             aria-labelledby="models-title"
           >
             <Table.Head>
               <Table.Row>
                 <Table.Header>Modèle</Table.Header>
-                <Table.Header>Fournisseur</Table.Header>
                 <Table.Header align="end">Appels</Table.Header>
                 <Table.Header align="end">Entrée</Table.Header>
                 <Table.Header align="end">Sortie</Table.Header>
@@ -131,10 +130,9 @@ export function CostsPage() {
             <Table.Body>
               {usage.models.map((row) => (
                 <Table.Row key={`${row.provider}-${row.model}`}>
-                  <Table.Cell className="fl-mono" style={{ overflowWrap: 'anywhere' }}>
-                    {row.model}
+                  <Table.Cell>
+                    <ModelBadge model={row} overflow="clamp" />
                   </Table.Cell>
-                  <Table.Cell>{providerLabel(row.provider)}</Table.Cell>
                   <Table.Cell align="end">{formatInteger(row.calls)}</Table.Cell>
                   <Table.Cell align="end">{formatCompact(row.inputTokens)}</Table.Cell>
                   <Table.Cell align="end">{formatCompact(row.outputTokens)}</Table.Cell>

@@ -1,0 +1,181 @@
+/*
+ * Badge clé | valeur : l'étiquette sur fond neutre, la valeur teintée de la couleur de l'état, comme
+ * le style « flat » de shields.io, mais avec les jetons « muted » de Primer : le texte garde sa couleur
+ * par défaut, donc son contraste, dans les deux thèmes. Fond opaque : posé sur une boîte choisie
+ * (teinte accent), un badge neutre reste neutre.
+ */
+.badge {
+  --fl-badge-border: var(--borderColor-default);
+
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  min-height: var(--base-size-20);
+  overflow: hidden;
+  border: var(--borderWidth-thin) solid var(--fl-badge-border);
+  border-radius: var(--borderRadius-medium);
+  background-color: var(--bgColor-default);
+  color: var(--fgColor-default);
+  font: var(--text-caption-shorthand);
+  text-decoration: none;
+  vertical-align: middle;
+}
+
+/* La couleur de l'état : le cadre, la teinte de la valeur et son icône. */
+.badge[data-tone='accent'] {
+  --fl-badge-border: var(--borderColor-accent-muted);
+}
+
+.badge[data-tone='accent'] .value {
+  background-color: var(--bgColor-accent-muted);
+}
+
+.badge[data-tone='accent'] .icon {
+  color: var(--fgColor-accent);
+}
+
+.badge[data-tone='success'] {
+  --fl-badge-border: var(--borderColor-success-muted);
+}
+
+.badge[data-tone='success'] .value {
+  background-color: var(--bgColor-success-muted);
+}
+
+.badge[data-tone='success'] .icon {
+  color: var(--fgColor-success);
+}
+
+.badge[data-tone='attention'] {
+  --fl-badge-border: var(--borderColor-attention-muted);
+}
+
+.badge[data-tone='attention'] .value {
+  background-color: var(--bgColor-attention-muted);
+}
+
+.badge[data-tone='attention'] .icon {
+  color: var(--fgColor-attention);
+}
+
+.badge[data-tone='severe'] {
+  --fl-badge-border: var(--borderColor-severe-muted);
+}
+
+.badge[data-tone='severe'] .value {
+  background-color: var(--bgColor-severe-muted);
+}
+
+.badge[data-tone='severe'] .icon {
+  color: var(--fgColor-severe);
+}
+
+.badge[data-tone='danger'] {
+  --fl-badge-border: var(--borderColor-danger-muted);
+}
+
+.badge[data-tone='danger'] .value {
+  background-color: var(--bgColor-danger-muted);
+}
+
+.badge[data-tone='danger'] .icon {
+  color: var(--fgColor-danger);
+}
+
+.badge[data-tone='done'] {
+  --fl-badge-border: var(--borderColor-done-muted);
+}
+
+.badge[data-tone='done'] .value {
+  background-color: var(--bgColor-done-muted);
+}
+
+.badge[data-tone='done'] .icon {
+  color: var(--fgColor-done);
+}
+
+.label,
+.value {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-4);
+  min-width: 0;
+  padding: 0 var(--base-size-6);
+}
+
+/*
+ * L'étiquette, la clé : grise, comme celle d'un badge de shields.io. Elle garde sa largeur (un mot
+ * court) ; seule une étiquette anormalement longue est coupée, pour laisser place à la valeur.
+ */
+.label {
+  flex: none;
+  max-width: 16ch;
+  border-right: var(--borderWidth-thin) solid var(--fl-badge-border);
+  background-color: var(--bgColor-neutral-muted);
+  color: var(--fgColor-muted);
+}
+
+.value {
+  flex: 0 1 auto;
+}
+
+.badge[data-code] .value {
+  font-family: var(--fontStack-monospace);
+}
+
+/* Le numéro d'une issue reste entier ; c'est son dépôt qui se tronque. */
+.badge[data-yields='label'] .label {
+  flex: 0 1 auto;
+  min-width: var(--base-size-24);
+  max-width: none;
+}
+
+.badge[data-yields='label'] .value {
+  flex: none;
+}
+
+.text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * Valeur longue : sur un écran de détail, elle passe à la ligne autant qu'il faut ; dans une cellule de
+ * tableau, sur deux lignes au plus (un identifiant se coupe n'importe où), puis points de suspension.
+ * L'étiquette, un mot, reste sur une ligne.
+ */
+.badge[data-overflow='wrap'] .value,
+.badge[data-overflow='clamp'] .value {
+  padding-block: var(--base-size-2);
+}
+
+.badge[data-overflow='wrap'] .value .text {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.badge[data-overflow='clamp'] .value .text {
+  display: -webkit-box;
+  white-space: normal;
+  word-break: break-all;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.icon {
+  flex: none;
+  color: var(--fgColor-muted);
+}
+
+.badge:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--borderWidth-thin);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .badge[href]:hover {
+    border-color: var(--borderColor-emphasis);
+  }
+}

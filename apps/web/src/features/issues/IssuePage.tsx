@@ -7,6 +7,7 @@ import {
   Label,
   LabelGroup,
   Link as PrimerLink,
+  Token,
   UnderlineNav,
 } from '@primer/react';
 import { Table } from '@primer/react/experimental';
@@ -14,18 +15,22 @@ import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useIssueDetail, useSnapshot } from '../../data/FactoryProvider.tsx';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
+import { CardBadge } from '../../ui/badge/CardBadge.tsx';
+import { ChecksBadge } from '../../ui/badge/ChecksBadge.tsx';
+import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import { useMotion } from '../../ui/motion.tsx';
 import { ActivityTimeline } from '../../ui/timeline/ActivityTimeline.tsx';
 import { fromTimelineEntry } from '../../ui/timeline/rows.ts';
 import { formatCompact, formatDuration, formatUsd } from '../../ui/format.ts';
-import { INTERVENTION_LABEL, ISSUE_STATUS_LABEL, STATION_LABEL } from '../../ui/vocabulary.ts';
-import { CARD_STATUS_LABEL, RUN_ROLE_LABEL } from '../../ui/vocabulary.ts';
+import { INTERVENTION_LABEL, STATION_LABEL } from '../../ui/vocabulary.ts';
+import { RUN_ROLE_LABEL } from '../../ui/vocabulary.ts';
+import { WorkStateLabel, cardWorkState, issueWorkState } from '../../ui/work/workState.tsx';
 import { shortCardTitle } from './cardText.ts';
 import { IssueGraph } from './IssueGraph.tsx';
 import { issueKeyFromParams } from '../../ui/paths.ts';
-import { PullRequestPanel } from './PullRequestPanel.tsx';
+import { PullRequestPanel, PullRequestState } from './PullRequestPanel.tsx';
 import { TranscriptPanel } from './TranscriptPanel.tsx';
 import styles from './issues.module.css';
 
@@ -89,7 +94,7 @@ function RunsTable({
             {run.model || run.laneModel ? (
               <p className={styles.runModels}>
                 {run.model ? <ModelBadge model={run.model} /> : null}
-                {run.laneModel ? <ModelBadge model={run.laneModel} prefix="lane" emphasis /> : null}
+                {run.laneModel ? <ModelBadge model={run.laneModel} lane /> : null}
               </p>
             ) : null}
             <p className={styles.runOutcome}>
@@ -138,9 +143,7 @@ function RunsTable({
                 </Table.Cell>
                 <Table.Cell className={styles.modelCell}>
                   {run.model ? <ModelBadge model={run.model} /> : '?'}
-                  {run.laneModel ? (
-                    <ModelBadge model={run.laneModel} prefix="lane" emphasis />
-                  ) : null}
+                  {run.laneModel ? <ModelBadge model={run.laneModel} lane /> : null}
                 </Table.Cell>
                 <Table.Cell>
                   <span className={styles.cellStack}>
@@ -224,22 +227,14 @@ export function IssuePage() {
       </nav>
 
       <header className={styles.issueHead}>
-        <p className={styles.issueKey}>{issue.key}</p>
+        <p className={styles.issueKey}>
+          <IssueBadge issueKey={issue.key} />
+        </p>
         <Heading as="h1" variant="medium" className={styles.issueTitle}>
           {issue.title}
         </Heading>
         <div className={styles.issueMeta}>
-          <Label
-            variant={
-              issue.status === 'waiting_human' || issue.status === 'blocked'
-                ? 'attention'
-                : issue.status === 'done'
-                  ? 'done'
-                  : 'accent'
-            }
-          >
-            {ISSUE_STATUS_LABEL[issue.status]}
-          </Label>
+          <WorkStateLabel state={issueWorkState(issue, null)} />
           <span className={styles.metaText}>Étape : {STATION_LABEL[issue.station]}</span>
           <LabelGroup>
             {issue.labels.map((label) => (
@@ -261,17 +256,25 @@ export function IssuePage() {
         </div>
         <div>
           <dt className={styles.factTerm}>Modèle Claude</dt>
-          <dd className={`${styles.factValue} fl-mono`}>
-            {issue.claudeModel ?? 'aucun (pas de label claude)'}
+          <dd className={styles.factValue}>
+            {issue.claudeModel ? (
+              <ModelBadge model={{ model: issue.claudeModel, provider: 'anthropic' }} lane />
+            ) : (
+              'aucun (pas de label claude)'
+            )}
           </dd>
         </div>
         <div>
           <dt className={styles.factTerm}>PR</dt>
           <dd className={styles.factValue}>
             {issue.pr ? (
-              <PrimerLink href={issue.pr.url} target="_blank" rel="noreferrer">
-                #{issue.pr.number} · {issue.pr.state} · CI {issue.pr.checks}
-              </PrimerLink>
+              <span className={styles.factBadges}>
+                <PullRequestState state={issue.pr.state} size="small" />
+                <PrimerLink href={issue.pr.url} target="_blank" rel="noreferrer">
+                  #{issue.pr.number}
+                </PrimerLink>
+                <ChecksBadge checks={issue.pr.checks} />
+              </span>
             ) : issue.prUrl ? (
               <>
                 <PrimerLink href={issue.prUrl} target="_blank" rel="noreferrer">
@@ -349,16 +352,22 @@ export function IssuePage() {
         />
         {selectedCard ? (
           <div ref={cardPanel} className={styles.cardPanel}>
-            <h3 className={styles.cardPanelTitle}>
-              <span className="fl-mono">#{selectedCard.kind}</span> {shortCardTitle(selectedCard)}
-              <span className={styles.muted}>
-                {' '}
-                · {selectedCard.id} · {CARD_STATUS_LABEL[selectedCard.status]} ·{' '}
+            <h3 className={styles.cardPanelTitle}>{shortCardTitle(selectedCard)}</h3>
+            <p className={styles.cardPanelMeta}>
+              <CardBadge kind={selectedCard.kind} id={selectedCard.id} />
+              <WorkStateLabel state={cardWorkState(selectedCard, null)} />
+              <span className={styles.agentCell}>
+                <AgentAvatar profile={selectedCard.assignee} size={16} named />
                 {selectedCard.assignee}
               </span>
-            </h3>
+            </p>
             {selectedCard.skills.length > 0 ? (
-              <p className={styles.muted}>Skills forcées : {selectedCard.skills.join(', ')}</p>
+              <p className={styles.cardPanelMeta}>
+                <span className={styles.muted}>Skills forcées :</span>
+                {selectedCard.skills.map((skill) => (
+                  <Token key={skill} text={skill} size="small" />
+                ))}
+              </p>
             ) : null}
             <RunsTable
               card={selectedCard}
@@ -411,7 +420,7 @@ export function IssuePage() {
           {tab === 'costs' ? (
             <div className={styles.tableBox}>
               <Table
-                gridTemplateColumns="auto auto minmax(10rem, 1fr) auto auto"
+                gridTemplateColumns="auto auto minmax(12rem, 1fr) auto auto"
                 cellPadding="condensed"
                 aria-label="Consommation par run"
               >
@@ -436,8 +445,14 @@ export function IssuePage() {
                             {run.profile}
                           </span>
                         </Table.Cell>
-                        <Table.Cell className="fl-mono">
-                          {run.laneModel?.model ?? run.model?.model ?? '?'}
+                        <Table.Cell>
+                          {run.laneModel ? (
+                            <ModelBadge model={run.laneModel} lane overflow="clamp" />
+                          ) : run.model ? (
+                            <ModelBadge model={run.model} overflow="clamp" />
+                          ) : (
+                            '?'
+                          )}
                         </Table.Cell>
                         <Table.Cell className="fl-tabular">
                           {run.tokens !== null ? formatCompact(run.tokens) : '?'}

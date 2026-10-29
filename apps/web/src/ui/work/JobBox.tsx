@@ -1,4 +1,3 @@
-import { Token } from '@primer/react';
 import { motion } from 'motion/react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -18,16 +17,16 @@ export function JobList({ label, children }: { label: string; children: ReactNod
 
 /**
  * Un job de la voie, à la manière d'un job de GitHub Actions : une boîte par issue (ligne d'usine) ou
- * par carte (graphe d'une issue). En tête l'icône d'état, le badge de l'objet et depuis quand ; puis
- * son titre ; puis l'état nommé et l'agent qui le tient ; puis ce qu'il fait (`children`). Toute la
- * boîte se touche. Elle garde son identité d'une étape à l'autre : quand l'objet change d'étape, elle
- * glisse vers sa nouvelle colonne (`layoutId`), sauf si les animations sont coupées.
+ * par carte (graphe d'une issue). En tête l'icône d'état, le badge de l'objet (`IssueBadge`,
+ * `CardBadge`) et depuis quand ; puis son titre ; puis l'état nommé et l'agent qui le tient ; puis ce
+ * qu'il fait (`children`). Toute la boîte se touche. Elle garde son identité d'une étape à l'autre :
+ * quand l'objet change d'étape, elle glisse vers sa nouvelle colonne (`layoutId`), sauf si les
+ * animations sont coupées.
  */
 export function JobBox({
   id,
   state,
   badge,
-  context,
   since,
   title,
   to,
@@ -40,10 +39,8 @@ export function JobBox({
   /** Identité stable de l'objet : la boîte glisse d'une étape à l'autre sous ce nom. */
   id: string;
   state: WorkState;
-  /** Badge de l'objet : numéro d'issue, type de carte. */
-  badge: string;
-  /** À côté du badge, en retrait : dépôt, identifiant de carte. */
-  context?: string;
+  /** Badge de l'objet : l'issue (dépôt et numéro) ou la carte (type et identifiant). */
+  badge: ReactNode;
   /** Depuis quand le job est à cette étape, déjà mis en forme. */
   since?: string;
   title: string;
@@ -70,8 +67,7 @@ export function JobBox({
     >
       <span className={styles.jobHead}>
         <WorkStateIcon state={state} />
-        <Token text={badge} size="small" className={styles.jobBadge} />
-        {context ? <span className={styles.jobContext}>{context}</span> : null}
+        {badge}
         {since ? <span className={styles.jobSince}>{since}</span> : null}
       </span>
       {to ? (

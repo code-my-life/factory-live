@@ -3,13 +3,12 @@ import { AlertIcon, ArrowRightIcon } from '@primer/octicons-react';
 import { Heading, Label, Token } from '@primer/react';
 import { useProfiles, useSnapshot } from '../../data/FactoryProvider.tsx';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
+import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { LiveDot } from '../../ui/LiveDot.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import { formatPercent, formatUsd } from '../../ui/format.ts';
 import { AGENT_STATE_LABEL, STATION_LABEL } from '../../ui/vocabulary.ts';
-import { InlineLink } from '../../ui/InlineLink.tsx';
-import { issuePath } from '../../ui/paths.ts';
 import page from '../../ui/page.module.css';
 import styles from './agents.module.css';
 
@@ -44,7 +43,7 @@ function AgentProfileCard({
             {activity.issueKey ? (
               <>
                 {' '}
-                sur <InlineLink to={issuePath(activity.issueKey)}>{activity.issueKey}</InlineLink>
+                sur <IssueBadge issueKey={activity.issueKey} link />
               </>
             ) : null}
             {activity.runStartedAt ? (
@@ -81,6 +80,7 @@ function AgentProfileCard({
                     ? activity.model
                     : model
                 }
+                overflow="wrap"
               />
             </li>
           ))}

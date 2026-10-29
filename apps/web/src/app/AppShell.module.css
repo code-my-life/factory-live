@@ -204,9 +204,10 @@
 }
 
 .sidebarFoot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-4);
   margin: var(--base-size-16) var(--base-size-12) 0;
-  color: var(--fgColor-muted);
-  font: var(--text-body-shorthand-small);
 }
 
 .hideNarrow {

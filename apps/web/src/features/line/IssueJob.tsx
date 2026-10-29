@@ -1,4 +1,5 @@
 import type { AgentActivity, Intervention, IssueSummary } from '@factory-live/contracts';
+import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { formatStay } from '../../ui/format.ts';
 import { issuePath } from '../../ui/paths.ts';
 import { AGENT_STATE_LABEL, INTERVENTION_ACTION_LABEL } from '../../ui/vocabulary.ts';
@@ -35,8 +36,7 @@ export function IssueJob({
       {...(finished ? {} : { since })}
       id={issue.key}
       state={state}
-      badge={`#${issue.number}`}
-      context={issue.repo}
+      badge={<IssueBadge issueKey={issue.key} />}
       title={issue.title}
       to={issuePath(issue.key)}
       compact={compact}

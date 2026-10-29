@@ -10,8 +10,9 @@ import { FlowLine } from '../../ui/flow/FlowLine.tsx';
 import type { LineStep } from '../../ui/flow/FlowLine.tsx';
 import { MotionToggle } from '../../ui/motion.tsx';
 import { useNow } from '../../ui/useNow.ts';
-import { CARD_STATUS_LABEL, LINE_STATIONS, STATION_LABEL } from '../../ui/vocabulary.ts';
+import { LINE_STATIONS, STATION_LABEL } from '../../ui/vocabulary.ts';
 import { JobList } from '../../ui/work/JobBox.tsx';
+import { WorkStateLabel, cardWorkState } from '../../ui/work/workState.tsx';
 import { IssueJob } from './IssueJob.tsx';
 import { LiveActivity } from './LiveActivity.tsx';
 import { LiveAgents } from './LiveAgents.tsx';
@@ -195,8 +196,10 @@ export function FactoryLinePage() {
                 <span className={styles.sideText}>
                   <span className={styles.sideTitle}>{card.title}</span>
                   <span className={styles.sideMeta}>
-                    {card.assignee} · {CARD_STATUS_LABEL[card.status]} ·{' '}
-                    <Elapsed since={card.openedAt} mode="age" />
+                    <WorkStateLabel state={cardWorkState(card, null)} />
+                    <span>
+                      {card.assignee} · <Elapsed since={card.openedAt} mode="age" />
+                    </span>
                   </span>
                   {card.note ? <span className={styles.sideNote}>{card.note}</span> : null}
                 </span>

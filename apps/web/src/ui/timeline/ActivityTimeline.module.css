@@ -68,21 +68,11 @@
 .meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--stack-gap-condensed);
+  align-items: center;
+  gap: var(--base-size-4) var(--stack-gap-condensed);
   margin: 0;
   color: var(--fgColor-muted);
   font: var(--text-caption-shorthand);
-}
-
-.issue {
-  color: var(--fgColor-accent);
-  font-family: var(--fontStack-monospace);
-}
-
-.model {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  font-family: var(--fontStack-monospace);
 }
 
 .duration {

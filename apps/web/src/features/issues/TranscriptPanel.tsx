@@ -13,6 +13,7 @@ import { useTranscripts } from '../../data/FactoryProvider.tsx';
 import { AnsiLog } from '../../ui/AnsiLog.tsx';
 import { Markdown } from '../../ui/Markdown.tsx';
 import { formatClock } from '../../ui/format.ts';
+import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import styles from './issues.module.css';
 
 const ROLE_LABEL: Record<TranscriptEntry['role'], string> = {
@@ -72,7 +73,7 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
         <p className={styles.entryHead}>
           <span className={styles.entryRole}>{ROLE_LABEL[entry.role]}</span>
           {entry.toolName ? <code className={styles.entryTool}>{entry.toolName}</code> : null}
-          {entry.model ? <span className={styles.entryModel}>{entry.model}</span> : null}
+          {entry.model ? <ModelBadge model={{ model: entry.model }} /> : null}
           <time className={styles.entryTime} dateTime={entry.at}>
             {formatClock(entry.at)}
           </time>

@@ -1,8 +1,8 @@
 import { Label, Timeline } from '@primer/react';
-import { Link } from 'react-router';
-import { issuePath } from '../paths.ts';
 import { AgentAvatar } from '../agents/AgentAvatar.tsx';
+import { IssueBadge } from '../badge/IssueBadge.tsx';
 import { formatClock, formatDuration } from '../format.ts';
+import { ModelBadge } from '../ModelBadge.tsx';
 import type { TimelineRow } from './rows.ts';
 import styles from './ActivityTimeline.module.css';
 
@@ -41,12 +41,8 @@ export function ActivityTimeline({ rows, label }: { rows: readonly TimelineRow[]
               {row.detail ? <p className={styles.detail}>{row.detail}</p> : null}
               {row.issueKey || row.model || row.durationMs !== null ? (
                 <p className={styles.meta}>
-                  {row.issueKey ? (
-                    <Link to={issuePath(row.issueKey)} className={styles.issue}>
-                      {row.issueKey}
-                    </Link>
-                  ) : null}
-                  {row.model ? <span className={styles.model}>{row.model}</span> : null}
+                  {row.issueKey ? <IssueBadge issueKey={row.issueKey} link /> : null}
+                  {row.model ? <ModelBadge model={{ model: row.model }} /> : null}
                   {row.durationMs !== null ? (
                     <span className={styles.duration}>{formatDuration(row.durationMs)}</span>
                   ) : null}

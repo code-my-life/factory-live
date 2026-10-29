@@ -45,3 +45,64 @@ export async function swipeUp(page: Page, x: number, y: number, distance = 300):
   }
   await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
+
+/** Un défaut de badge relevé dans la page : quel badge, et ce qui ne va pas. */
+interface BadgeDefect {
+  badge: string;
+  defect: string;
+}
+
+/**
+ * Les badges (ui/badge) de la page sont propres : aucun segment coupé net par le cadre (une valeur
+ * trop longue se tronque avec des points de suspension, sur une ou deux lignes), l'étiquette reste
+ * entière sur une ligne, et aucun badge ne chevauche un voisin (comparé ligne à ligne : un texte voisin
+ * peut passer à la ligne). Les badges cachés (onglet fermé, version téléphone d'un tableau) sont ignorés.
+ */
+export async function expectCleanBadges(page: Page): Promise<number> {
+  const { count, defects } = await page.evaluate(() => {
+    const found: BadgeDefect[] = [];
+    const visible = (element: Element) => {
+      const box = element.getBoundingClientRect();
+      return box.width > 0 && box.height > 0 && element.checkVisibility();
+    };
+    const badges = [...document.querySelectorAll('[data-badge]')].filter(visible);
+    const intersects = (left: DOMRect, right: DOMRect) =>
+      left.left < right.right - 0.5 &&
+      right.left < left.right - 0.5 &&
+      left.top < right.bottom - 0.5 &&
+      right.top < left.bottom - 0.5;
+    for (const badge of badges) {
+      const name = badge.getAttribute('title') ?? badge.textContent ?? '';
+      if (badge.scrollWidth > badge.clientWidth + 1)
+        found.push({ badge: name, defect: 'segment coupé net par le cadre' });
+      const label = badge.querySelector('[data-segment="label"] > span');
+      if (label && badge.getAttribute('data-yields') === 'value') {
+        if (label.scrollWidth > label.clientWidth + 1)
+          found.push({ badge: name, defect: 'étiquette tronquée' });
+        const lineHeight = Number.parseFloat(getComputedStyle(label).lineHeight);
+        if (label.getBoundingClientRect().height > lineHeight * 1.5)
+          found.push({ badge: name, defect: 'étiquette sur plusieurs lignes' });
+      }
+      for (const text of badge.querySelectorAll('[data-segment] > span')) {
+        const style = getComputedStyle(text);
+        if (text.scrollWidth > text.clientWidth + 1 && style.textOverflow !== 'ellipsis')
+          found.push({ badge: name, defect: 'valeur tronquée sans points de suspension' });
+        const clamp = style.getPropertyValue('-webkit-line-clamp');
+        if (text.scrollHeight > text.clientHeight + 1 && (clamp === '' || clamp === 'none'))
+          found.push({ badge: name, defect: 'valeur coupée en hauteur sans points de suspension' });
+      }
+      const box = badge.getBoundingClientRect();
+      for (const sibling of badge.parentElement?.children ?? []) {
+        if (sibling === badge || !visible(sibling)) continue;
+        if ([...sibling.getClientRects()].some((fragment) => intersects(box, fragment)))
+          found.push({
+            badge: name,
+            defect: `chevauche son voisin « ${sibling.textContent?.slice(0, 40) ?? ''} »`,
+          });
+      }
+    }
+    return { count: badges.length, defects: found };
+  });
+  expect(defects, 'badges mal rendus').toEqual([]);
+  return count;
+}

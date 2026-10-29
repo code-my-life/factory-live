@@ -30,9 +30,6 @@
 
 .issueKey {
   margin: 0;
-  color: var(--fgColor-muted);
-  font-family: var(--fontStack-monospace);
-  font-size: var(--text-body-size-small);
 }
 
 .issueTitle {
@@ -80,6 +77,15 @@
   overflow-wrap: anywhere;
 }
 
+/* Une PR dans les faits de l'issue : son état, son numéro et sa CI, à la ligne si la place manque. */
+.factBadges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-4) var(--base-size-8);
+  min-width: 0;
+}
+
 .section {
   display: flex;
   flex-direction: column;
@@ -116,6 +122,17 @@
   font-size: var(--text-body-size-medium);
   font-weight: var(--base-text-weight-semibold);
   overflow-wrap: anywhere;
+}
+
+/* Sous le titre de la carte : son badge, son état, l'agent qui la tient ; puis ses skills forcées. */
+.cardPanelMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-4) var(--base-size-8);
+  min-width: 0;
+  margin: 0;
+  font: var(--text-body-shorthand-small);
 }
 
 /* Runs d'une carte : fiches empilées sur téléphone, tableau au-delà (breakpoint small de Primer, 544 px). */
@@ -326,12 +343,6 @@
   font-family: var(--fontStack-monospace);
 }
 
-.entryModel {
-  color: var(--fgColor-muted);
-  font-family: var(--fontStack-monospace);
-  overflow-wrap: anywhere;
-}
-
 .entryTime {
   margin-left: auto;
   color: var(--fgColor-muted);
@@ -474,12 +485,6 @@
   align-items: baseline;
   gap: var(--base-size-4) var(--base-size-8);
   min-width: 0;
-}
-
-.issueRowKey {
-  color: var(--fgColor-muted);
-  font-family: var(--fontStack-monospace);
-  font-size: var(--base-text-size-xs);
 }
 
 .issueRowTitle {

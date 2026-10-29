@@ -125,3 +125,12 @@
 .flash {
   width: 100%;
 }
+
+/* Les versions en service (factory-live, Hermès), puis la source des données. */
+.versions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8);
+  margin: 0;
+}

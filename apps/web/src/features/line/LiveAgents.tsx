@@ -1,10 +1,9 @@
 import type { AgentActivity } from '@factory-live/contracts';
 import { CommentDiscussionIcon, TerminalIcon, ToolsIcon } from '@primer/octicons-react';
-import { Link } from 'react-router';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
+import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
-import { issuePath } from '../../ui/paths.ts';
 import { AGENT_STATE_LABEL, STATION_LABEL } from '../../ui/vocabulary.ts';
 import styles from './line.module.css';
 
@@ -50,17 +49,8 @@ export function LiveAgents({
               <p className={styles.liveHead}>
                 <span className={styles.liveName}>{agent.profile}</span>
                 <span className={styles.liveState}>{AGENT_STATE_LABEL[agent.state]}</span>
-                <span className={styles.liveWhere}>
-                  {STATION_LABEL[agent.station]}
-                  {agent.issueKey ? (
-                    <>
-                      {' · '}
-                      <Link to={issuePath(agent.issueKey)} className={styles.liveIssue}>
-                        {agent.issueKey}
-                      </Link>
-                    </>
-                  ) : null}
-                </span>
+                <span className={styles.liveWhere}>{STATION_LABEL[agent.station]}</span>
+                {agent.issueKey ? <IssueBadge issueKey={agent.issueKey} link /> : null}
                 {agent.runStartedAt ? (
                   <span className={styles.liveElapsed}>
                     <Elapsed since={agent.runStartedAt} />
@@ -91,9 +81,7 @@ export function LiveAgents({
               {agent.model ? (
                 <p className={styles.liveModels}>
                   <ModelBadge model={agent.model} />
-                  {agent.laneModel ? (
-                    <ModelBadge model={agent.laneModel} prefix="lane" emphasis />
-                  ) : null}
+                  {agent.laneModel ? <ModelBadge model={agent.laneModel} lane /> : null}
                 </p>
               ) : null}
             </div>

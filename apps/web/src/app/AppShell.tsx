@@ -38,6 +38,8 @@ import {
   useSnapshot,
 } from '../data/FactoryProvider.tsx';
 import { setAppBadge } from '../pwa/badge.ts';
+import { Badge } from '../ui/badge/Badge.tsx';
+import { VersionBadge } from '../ui/badge/VersionBadge.tsx';
 import { Elapsed } from '../ui/Elapsed.tsx';
 import { LiveDot } from '../ui/LiveDot.tsx';
 import { needsWatch } from '../ui/vocabulary.ts';
@@ -251,7 +253,10 @@ export function AppShell() {
               <SideNavItem destination={SECONDARY[2] as Destination} />
               <SideNavItem destination={SECONDARY[3] as Destination} />
             </NavList>
-            <p className={styles.sidebarFoot}>Hermès 0.22.2 · board factory</p>
+            <p className={styles.sidebarFoot}>
+              <VersionBadge of="Hermès" version="0.22.2" />
+              <Badge label="board" value="factory" code />
+            </p>
           </div>
         </nav>
 

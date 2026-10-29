@@ -9,6 +9,7 @@ import {
 } from '@primer/octicons-react';
 import type { Icon } from '@primer/octicons-react';
 import { ProgressBar } from '@primer/react';
+import { CardBadge } from '../../ui/badge/CardBadge.tsx';
 import { formatStay } from '../../ui/format.ts';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import { JobBox, JobDetail } from '../../ui/work/JobBox.tsx';
@@ -56,8 +57,7 @@ export function CardJob({
       {...(since ? { since } : {})}
       id={card.id}
       state={cardWorkState(card, agent)}
-      badge={card.kind}
-      context={card.id}
+      badge={<CardBadge kind={card.kind} id={card.id} />}
       title={shortCardTitle(card)}
       onSelect={onSelect}
       selected={selected}
@@ -65,10 +65,7 @@ export function CardJob({
     >
       {model ? (
         <span className={styles.models}>
-          <ModelBadge
-            {...(laneModel ? { prefix: 'lane', emphasis: true } : {})}
-            model={laneModel ?? model}
-          />
+          <ModelBadge model={laneModel ?? model} lane={laneModel !== null} />
         </span>
       ) : null}
       {agent?.action ? (
