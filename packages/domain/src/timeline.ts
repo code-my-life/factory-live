@@ -1,4 +1,5 @@
 import type { BlockKind, Run, TaskEvent } from './hermes.ts';
+import { wasNudged } from './diagnosis/hermesText.ts';
 import { message } from './messages.ts';
 import type { Message, Text } from './messages.ts';
 import { redactSecrets } from './redact.ts';
@@ -47,6 +48,7 @@ export type TimelineMessage =
   | Message<'timeline.timedOut'>
   | Message<'timeline.rateLimited'>
   | Message<'timeline.protocolViolation'>
+  | Message<'timeline.protocolViolation.nudged'>
   | Message<'timeline.spawnFailed'>
   | Message<'timeline.gaveUp', { failures: number | null }>
   | Message<'timeline.workerReaped'>
@@ -199,7 +201,14 @@ const DESCRIBE: Readonly<Record<string, Describe>> = {
     tone: 'danger',
   }),
   rate_limited: () => ({ label: message('timeline.rateLimited'), tone: 'attention' }),
-  protocol_violation: () => ({ label: message('timeline.protocolViolation'), tone: 'danger' }),
+  // Hermès a relancé l'agent pour qu'il rende la carte (texte exact de sa sortie), sans succès.
+  protocol_violation: (p) => ({
+    label: message('timeline.protocolViolation'),
+    detail: wasNudged(text(p['worker_output']))
+      ? message('timeline.protocolViolation.nudged')
+      : null,
+    tone: 'danger',
+  }),
   spawn_failed: (p) => ({
     label: message('timeline.spawnFailed'),
     detail: text(p['error']),

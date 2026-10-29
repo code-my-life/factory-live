@@ -3,7 +3,13 @@ import type {
   Finding as FindingView,
   RunVerdict as RunVerdictView,
 } from '@factory-live/contracts';
-import { diagnose, pullRequestUrl, resumeSessionOf } from '@factory-live/domain';
+import {
+  branchOf,
+  diagnose,
+  groupByIssue,
+  pullRequestUrl,
+  resumeSessionOf,
+} from '@factory-live/domain';
 import type {
   Board,
   Diagnosis,
@@ -19,6 +25,7 @@ import type {
 import type {
   AgentLogPort,
   CardFilesPort,
+  GitHubReadPort,
   LoggerPort,
   ProfilesPort,
   RunRef,
@@ -37,6 +44,8 @@ export interface DiagnosisDeps {
   files: Pick<CardFilesPort, 'evidence' | 'evidenceStamp'>;
   /** `null` tant que le journal d'Hermès n'est pas lu : les règles qui en dépendent restent probables. */
   agentLog: AgentLogPort | null;
+  /** Les PR vues sur GitHub, par issue : celle d'une branche dont aucun run n'a noté le lien. */
+  pullRequests?: Pick<GitHubReadPort, 'pullRequest'> | null;
   log: LoggerPort;
   boardName: string;
 }
@@ -334,6 +343,16 @@ export class DiagnosisService {
     }
   }
 
+  /** La PR de l'issue de la carte, telle que GitHub la connaît (retrouvée par sa branche au besoin). */
+  private issuePullRequest(board: Board, task: Task): string | null {
+    const pullRequests = this.deps.pullRequests;
+    if (!pullRequests) return null;
+    for (const [key, tasks] of groupByIssue(board))
+      if (tasks.some((item) => item.id === task.id))
+        return this.safe(() => pullRequests.pullRequest(key)?.url ?? null, null);
+    return null;
+  }
+
   private sessionsOf(runs: readonly Run[]): SessionFacts[] | null {
     const byProfile = new Map<string, RunRef[]>();
     for (const run of runs)
@@ -378,8 +397,8 @@ export class DiagnosisService {
         profile && agentLog ? this.safe(() => agentLog.facts(profile, from - 60, now), null) : null,
       profile: profile ? this.safe(() => this.deps.profiles.facts(profile), null) : null,
       evidence: this.safe(() => this.deps.files.evidence(task.id), null),
-      branch: task.branchName ?? text(read.at(-1)?.metadata['branch']),
-      prUrl: pullRequestUrl([task], board),
+      branch: branchOf(task, runs),
+      prUrl: pullRequestUrl([task], board) ?? this.issuePullRequest(board, task),
       owner: task.assignee,
     };
     try {

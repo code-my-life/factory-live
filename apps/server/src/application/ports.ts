@@ -181,6 +181,8 @@ export interface IssueInfo {
 export interface TrackedIssue {
   key: string;
   prUrl: string | null;
+  /** La branche du travail, pour retrouver la PR quand aucun run n'en a noté le lien. */
+  branch?: string | null;
   active: boolean;
 }
 

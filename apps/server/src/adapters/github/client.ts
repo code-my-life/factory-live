@@ -189,6 +189,17 @@ export class GitHubClient implements GitHubWritePort {
     };
   }
 
+  /** La PR la plus récente dont la tête est cette branche du dépôt ; `null` s'il n'y en a pas. */
+  async pullRequestOfBranch(repo: string, branch: string): Promise<number | null> {
+    const head = encodeURIComponent(`${this.owner}:${branch}`);
+    const data = await this.request(
+      'GET',
+      this.path(repo, `/pulls?head=${head}&state=all&sort=created&direction=desc&per_page=1`),
+    );
+    const first = Array.isArray(data) ? (data[0] as Json | undefined) : undefined;
+    return typeof first?.['number'] === 'number' ? first['number'] : null;
+  }
+
   /** Workflows de main après un merge (ce que surveille `watch-main` côté factory). */
   async mainChecks(repo: string, sha: string): Promise<ChecksState> {
     const runs = (await this.request(

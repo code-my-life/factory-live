@@ -267,6 +267,17 @@ describe('timelineOf', () => {
     ['rate_limited', { exit_code: 75 }, message('timeline.rateLimited'), null],
     ['protocol_violation', { exit_code: 0 }, message('timeline.protocolViolation'), null],
     [
+      'protocol_violation',
+      {
+        exit_code: 0,
+        // La fin de la sortie du run 189 de factory-live#2, telle qu'Hermès l'a notée.
+        worker_output:
+          'o finish ⚠️ Kanban worker tried to exit without a terminal board call (kanban_complete/kanban_request_review/kanban_block) \u2014 nudging to finish',
+      },
+      message('timeline.protocolViolation'),
+      message('timeline.protocolViolation.nudged'),
+    ],
+    [
       'spawn_failed',
       { error: 'workspace absent' },
       message('timeline.spawnFailed'),

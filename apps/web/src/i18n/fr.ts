@@ -163,6 +163,8 @@ const server: ServerMessages = {
   'timeline.timedOut': () => 'Délai du worker dépassé',
   'timeline.rateLimited': () => 'Worker arrêté par une limite du fournisseur',
   'timeline.protocolViolation': () => 'Worker sorti sans terminer ni bloquer la carte',
+  'timeline.protocolViolation.nudged': () =>
+    'Hermès l’avait relancé pour qu’il rende la carte : il est sorti quand même',
   'timeline.spawnFailed': () => 'Lancement du worker en échec',
   'timeline.gaveUp': ({ failures }) =>
     failures === null

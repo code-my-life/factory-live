@@ -1,6 +1,7 @@
 import { message } from '../messages.ts';
 import { toolsSummary, unique } from './context.ts';
 import type { DiagnosisContext, Observation } from './context.ts';
+import { effectiveHookLimit } from './guards.ts';
 import {
   HOOK_TIMEOUT_DEFAULT,
   HOOK_TIMEOUT_MAX,
@@ -97,7 +98,10 @@ export const guardHookTimeout: Rule = (ctx) => {
   const name = ctx.profile ?? '?';
   const current = profile?.hookTimeout ?? null;
   const deadline = profile?.toolDeadline ?? TOOL_DEADLINE_DEFAULT;
-  const effective = Math.min(current ?? HOOK_TIMEOUT_DEFAULT, deadline);
+  // Sans délai effectif (hook et plafond des outils désactivés), plus rien ne coupe le hook.
+  const effective = profile
+    ? (effectiveHookLimit(profile) ?? Number.POSITIVE_INFINITY)
+    : HOOK_TIMEOUT_DEFAULT;
   const lastAt = Math.max(...hits.map((item) => item.result.at), ...logs.map((fact) => fact.at));
   const repo = profile?.repoHookTimeout;
 

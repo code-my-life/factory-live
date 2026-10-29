@@ -275,6 +275,41 @@ describe('DiagnosisService', () => {
   });
 });
 
+describe('DiagnosisService, branche et PR', () => {
+  it('prend la branche du brief et retrouve la PR de l’issue sur GitHub', () => {
+    const briefed = task({
+      branchName: null,
+      body: 'Brief\n- branch_name : fix/2-server-version-in-settings\n- tests',
+    });
+    const service = new DiagnosisService({
+      ...deps,
+      pullRequests: {
+        pullRequest: (key) =>
+          key === 'factory-live#2'
+            ? {
+                number: 3,
+                url: 'https://github.com/code-my-life/factory-live/pull/3',
+                title: 'fix: version serveur',
+                state: 'open',
+                checks: 'success',
+                reviewDecision: 'review_required',
+                autoMerge: false,
+                additions: 10,
+                deletions: 2,
+                changedFiles: 4,
+              }
+            : null,
+      },
+    });
+    service.refresh(board({ tasks: [briefed] }), [INTERVENTION], NOW_MS);
+    expect(service.of(INTERVENTION.id)?.work).toMatchObject({
+      branch: 'fix/2-server-version-in-settings',
+      prUrl: 'https://github.com/code-my-life/factory-live/pull/3',
+      pushed: 'yes',
+    });
+  });
+});
+
 describe('anchorOf', () => {
   // t_03d9d40d : deux runs de coder sortis sans appel kanban, une revue, puis trois runs de la gate
   // sortis de même, et l'abandon du disjoncteur noté sans run avant la relance.

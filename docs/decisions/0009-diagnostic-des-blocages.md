@@ -31,3 +31,4 @@ factory-live avait déjà une partie des preuves (refus reçus par webhook, rés
 - Une mise à jour d'Hermès qui change un de ses textes casse les règles concernées : les formats sont tous dans `hermesText.ts`, les fixtures le montrent.
 - Le conteneur lit le journal des agents et le code de leurs plugins par le montage `profiles` existant, en liste blanche ; aucun fichier n'est écrit dans `~/.hermes`.
 - Le journal d'Hermès note l'heure locale sans fuseau : `HERMES_TZ` (Europe/Paris par défaut) doit suivre le fuseau de ce PC.
+- Les mêmes faits servent avant tout blocage : la santé signale une garde dont le code peut attendre au moins le délai effectif de son hook (cas de coder-guard, qui aurait été vu avant l'incident), et l'écran Agents compte ses dépassements.

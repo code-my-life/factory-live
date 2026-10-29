@@ -51,14 +51,7 @@ const paths = new HermesPaths({
 const profiles = new ProfileConfigReader(config.HERMES_HOME, config.FACTORY_REPO, paths);
 const sessions = new SessionReader(config.profilesDir);
 const files = new CardFiles(config.boardDir, config.CLAUDE_PROJECTS, paths);
-const diagnoses = new DiagnosisService({
-  sessions,
-  profiles,
-  files,
-  agentLog: new AgentLogReader(paths, config.HERMES_TZ),
-  log: log.child({ component: 'diagnosis' }),
-  boardName: config.HERMES_BOARD,
-});
+const agentLog = new AgentLogReader(paths, config.HERMES_TZ);
 // GitHub : App factory-live (lectures, quota propre) et connexion de Clément (déblocage) ; le jeton
 // fine-grained de ~/.config/factory-live/github-token sert de repli tant que l'App n'existe pas.
 const githubAuth = new GitHubAppAuth({
@@ -84,6 +77,16 @@ const github = new GitHubCache(
       : msg('health.github.app.loginNeeded', { slug });
   },
 );
+
+const diagnoses = new DiagnosisService({
+  sessions,
+  profiles,
+  files,
+  agentLog,
+  pullRequests: github,
+  log: log.child({ component: 'diagnosis' }),
+  boardName: config.HERMES_BOARD,
+});
 
 const hub = new Hub(
   {
@@ -176,6 +179,7 @@ const app = createApp({
     profiles,
     github,
     files,
+    agentLog,
     owner: config.GITHUB_OWNER,
     boardName: config.HERMES_BOARD,
     dashboardUrl: config.DASHBOARD_URL,

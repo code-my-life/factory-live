@@ -301,7 +301,8 @@ export function workStateOf(input: DiagnosisInput): WorkState | null {
     branch: input.branch,
     commits: sessions ? (made.length > 0 ? 'some' : 'none') : 'unknown',
     commitsRefused: refused.length,
-    pushed: sessions ? (pushes.length > 0 ? 'yes' : 'no') : 'unknown',
+    // Une PR ouverte sur la branche prouve qu'elle a été poussée, même sans `git push` vu.
+    pushed: pushes.length > 0 || input.prUrl ? 'yes' : sessions ? 'no' : 'unknown',
     prUrl: input.prUrl,
     editedFiles: edited.length,
     evidence: [...evidence].sort((left, right) => left.name.localeCompare(right.name)),

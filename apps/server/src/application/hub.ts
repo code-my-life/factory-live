@@ -9,13 +9,15 @@ import type {
   Snapshot,
   StreamEvent,
 } from '@factory-live/contracts';
-import { applyHook } from '@factory-live/domain';
+import { applyHook, branchOf, guardRisks } from '@factory-live/domain';
 import type {
   Board,
   Comment,
   Intervention as FoundIntervention,
+  GuardRisk,
   HookEvent,
   LiveAgent,
+  ProfileFacts,
   Task,
 } from '@factory-live/domain';
 import { DIAGNOSED } from './diagnosis.ts';
@@ -119,6 +121,9 @@ export class Hub {
     string,
     { intervention: FoundIntervention; resolvedAt: number }
   >();
+  /** Les gardes à risque, relues quand la config ou le code d'un plugin d'un agent change. */
+  private guards: { risks: GuardRisk[]; checkedAt: number } | null = null;
+  private guardsStamp: string | null = null;
   private root: RootSettings;
   private factoryProfiles: string[];
   private readonly configModels = new Map<string, { model: string; provider: string } | null>();
@@ -279,14 +284,36 @@ export class Hub {
   }
 
   /**
-   * Recalcule les diagnostics dont les faits ont changé (config d'un agent, plugin, preuves) : appelé
-   * après chaque lecture du kanban, et par une minuterie pour voir une correction en direct.
+   * Recalcule ce qui dépend des fichiers d'Hermès quand ils changent : les diagnostics (config d'un
+   * agent, plugin, preuves) et les délais des gardes de la santé. Appelé après chaque lecture du
+   * kanban, et par une minuterie pour voir une correction en direct.
    */
   refreshDiagnoses(): void {
+    this.refreshGuards();
     const diagnoses = this.deps.diagnoses;
     if (!diagnoses) return;
     const all = [...this.found, ...[...this.resolved.values()].map((entry) => entry.intervention)];
     if (diagnoses.refresh(this.board, all, this.deps.now())) this.dirty.add('board');
+  }
+
+  /** Les gardes dont le code peut attendre au moins le délai de leur hook, agent par agent. */
+  private refreshGuards(): void {
+    const stamp = () =>
+      this.factoryProfiles.map((profile) => this.deps.profiles.factsStamp(profile)).join('#');
+    if (this.guardsStamp !== null && stamp() === this.guardsStamp) return;
+    const facts = this.factoryProfiles.flatMap((profile): ProfileFacts[] => {
+      try {
+        const read = this.deps.profiles.facts(profile);
+        return read ? [read] : [];
+      } catch {
+        return [];
+      }
+    });
+    // L'empreinte se relit après coup : `facts` y ajoute les fichiers des plugins qu'il a lus.
+    this.guardsStamp = stamp();
+    const risks = guardRisks(facts);
+    if (JSON.stringify(risks) !== JSON.stringify(this.guards?.risks)) this.dirty.add('health');
+    this.guards = { risks, checkedAt: this.deps.now() };
   }
 
   diagnosisOf(interventionId: string): Diagnosis | null {
@@ -374,7 +401,13 @@ export class Hub {
         output: Number(usage['output_tokens'] ?? 0) || 0,
       });
     } else if (event.event === 'api_request_error') {
-      const limited = extra['status_code'] === 429;
+      // Hermès classe lui-même l'échec (`error.type`) : une limite de débit sans code 429 en est une.
+      const error = extra['error'];
+      const type =
+        typeof error === 'object' && error !== null
+          ? (error as Record<string, unknown>)['type']
+          : null;
+      const limited = extra['status_code'] === 429 || type === 'rate_limit';
       stats.lastErrorAt = event.at;
       if (limited) stats.rateLimited.push(event.at);
       this.deps.store.addUsage({
@@ -501,6 +534,7 @@ export class Hub {
       webhookDeliveries: github?.lastDelivery ?? null,
       providers,
       claudeLastSessionAt: this.claudeLastSessionAt,
+      guards: this.guards,
       running: this.board.tasks.filter((task) => task.status === 'running').length,
       maxInProgress: this.root.maxInProgress,
       maxInProgressPerProfile: this.root.maxInProgressPerProfile,
@@ -639,12 +673,15 @@ export class Hub {
       }
     }
     const tracked = new Map<string, TrackedIssue>();
+    const tasks = new Map(this.board.tasks.map((task) => [task.id, task]));
     for (const [card, key] of this.issueOfCard) {
       const urls = runsByTask.get(card) ?? [];
       const known = tracked.get(key);
+      const task = tasks.get(card);
       tracked.set(key, {
         key,
         prUrl: urls.at(-1) ?? known?.prUrl ?? null,
+        branch: (task ? branchOf(task, this.board.runs) : null) ?? known?.branch ?? null,
         active: known?.active ?? false,
       });
     }

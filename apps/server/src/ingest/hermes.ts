@@ -9,6 +9,9 @@ import type { HookEvent } from '@factory-live/domain';
  */
 const EXTRA_KEEP = new Set([
   'status',
+  // L'appel d'outil exact (même identifiant que dans state.db) et la nature de l'échec selon Hermès
+  // (`plugin_block`, `tool_timeout`... ; `error.type` pour une requête d'API).
+  'tool_call_id',
   'error_type',
   'error_message',
   'duration_ms',

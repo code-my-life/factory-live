@@ -25,6 +25,7 @@ function signals(patch: Partial<HealthSignals> = {}): HealthSignals {
     webhookDeliveries: null,
     providers: new Map(),
     claudeLastSessionAt: null,
+    guards: null,
     running: 1,
     maxInProgress: 2,
     maxInProgressPerProfile: 1,
@@ -140,5 +141,52 @@ describe('buildHealth', () => {
         sessionsError: 'state.db illisible',
       }),
     });
+  });
+
+  it('montre les gardes qui peuvent dépasser le délai de leur hook, ou qu’aucune ne le peut', () => {
+    const risky = buildHealth(
+      signals({
+        guards: {
+          checkedAt: NOW - 2_000,
+          risks: [
+            {
+              plugin: 'coder-guard',
+              profiles: ['coder', 'coder-claude', 'coder-opencode', 'scribe'],
+              longest: 900,
+              limit: 420,
+            },
+            { plugin: 'merge-guard', profiles: ['release'], longest: 30, limit: 30 },
+          ],
+        },
+      }),
+    );
+    expect(service(risky, 'guards')).toEqual({
+      id: 'guards',
+      label: msg('health.guards'),
+      group: 'hermes',
+      status: 'degraded',
+      detail: msg('health.guards.risk', { count: 2 }),
+      checkedAt: new Date(NOW - 2_000).toISOString(),
+      metrics: [
+        {
+          label: msg('health.guards.riskItem', {
+            profile: 'coder, coder-claude, coder-opencode, scribe',
+            plugin: 'coder-guard',
+          }),
+          value: msg('health.guards.limits', { longest: 900, limit: 420 }),
+        },
+        {
+          label: msg('health.guards.riskItem', { profile: 'release', plugin: 'merge-guard' }),
+          value: msg('health.guards.limits', { longest: 30, limit: 30 }),
+        },
+      ],
+    });
+    const calm = buildHealth(signals({ guards: { checkedAt: NOW, risks: [] } }));
+    expect(service(calm, 'guards')).toMatchObject({
+      status: 'ok',
+      detail: msg('health.guards.ok'),
+      metrics: [],
+    });
+    expect(service(buildHealth(signals()), 'guards')).toBeUndefined();
   });
 });

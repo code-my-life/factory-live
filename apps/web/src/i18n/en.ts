@@ -117,6 +117,8 @@ const server: ServerMessages = {
   'timeline.timedOut': () => 'Worker timed out',
   'timeline.rateLimited': () => 'Worker stopped by a provider limit',
   'timeline.protocolViolation': () => 'Worker exited without completing or blocking the card',
+  'timeline.protocolViolation.nudged': () =>
+    'Hermès had nudged it to hand the card back: it exited anyway',
   'timeline.spawnFailed': () => 'Worker failed to start',
   'timeline.gaveUp': ({ failures }) => gaveUp(failures),
   'timeline.workerReaped': () => 'Leftover worker stopped',

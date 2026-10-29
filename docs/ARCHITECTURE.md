@@ -67,4 +67,6 @@ Chaque intervention qui s'explique porte un diagnostic : la cause, qui agit, si 
 | Hooks des plugins actifs              | `plugins/<plugin>/__init__.py` (agent, sinon dépôt)     | `register_hook("<hook>", <fonction>)`                             |
 | Preuves de la carte                   | `workspaces/<carte>/evidence`, sinon `evidence/<carte>` | 50 fichiers au plus, sans fichier caché ni lien                   |
 
+La branche d'une carte est celle déclarée, sinon celle notée par un run, sinon le champ `branch_name` du brief ; GitHub retrouve la PR par cette branche quand aucun run n'en a noté le lien. Les mêmes faits servent hors blocage : la tuile Santé « Délais des gardes » signale une garde dont le code peut attendre au moins le délai effectif de son hook (le plus petit du hook, plafonné à 600 s, et du plafond des outils), et l'écran Agents montre, garde par garde, ses refus, ses dépassements notés dans le journal d'Hermès et sa plus longue commande.
+
 `DiagnosisService` (`apps/server/src/application/diagnosis.ts`) calcule après chaque lecture du kanban, au tick et toutes les 2 s sur les seules empreintes des fichiers ; la projection du tableau ne lit que son cache. Le chemin du diagnostic n'importe aucun module réseau (`diagnosis-is-offline`, dependency-cruiser).
