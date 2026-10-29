@@ -251,6 +251,13 @@ function sessionOfRun(input: DiagnosisInput, runId: number): string | null {
   return input.sessions?.find((session) => session.runId === runId)?.id ?? null;
 }
 
+/**
+ * Un commit fait : git écrit « [<branche> <sha court>] <sujet> ». Un nom de branche ne contient ni
+ * `[` ni `]` ni espace (`git check-ref-format`) : les exclure garde la recherche linéaire, même sur
+ * une sortie d'outil faite de crochets à la suite.
+ */
+const COMMIT_MADE = /\[[^[\]\s]{1,250} [0-9a-f]{7,40}\]/;
+
 /** Où en est le travail, d'après les appels de l'agent (commit, push, fichiers édités) et le worktree. */
 export function workStateOf(input: DiagnosisInput): WorkState | null {
   const sessions = input.sessions;
@@ -275,7 +282,7 @@ export function workStateOf(input: DiagnosisInput): WorkState | null {
   }
   const commits = items.filter((item) => /\bgit\s+commit\b/.test(item.call?.input ?? ''));
   const made = commits.filter(
-    (item) => item.outcome.kind === 'ok' && /\[[^\]\s]+ [0-9a-f]{7,}\]/.test(item.result.content),
+    (item) => item.outcome.kind === 'ok' && COMMIT_MADE.test(item.result.content),
   );
   const refused = commits.filter((item) => isRefusal(item.outcome));
   const pushes = items.filter(

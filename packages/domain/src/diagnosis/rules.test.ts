@@ -470,6 +470,16 @@ describe('l’état du travail', () => {
     });
   });
 
+  it('lit une sortie piégée de crochets en temps linéaire, sans y voir de commit', () => {
+    const trap = `{"output": "${'['.repeat(200_000)}", "exit_code": 0, "error": null}`;
+    const started = Date.now();
+    const diagnosis = diagnose(
+      input({ sessions: [session(1, [['terminal', 'git commit -m "x"', trap, 30]])] }),
+    );
+    expect(Date.now() - started).toBeLessThan(500);
+    expect(diagnosis.work?.commits).toBe('none');
+  });
+
   it('sans sessions lisibles, le travail est inconnu ; sans rien, il n’y a rien à raconter', () => {
     expect(diagnose(input({ sessions: null, branch: 'fix/1-x' })).work).toMatchObject({
       commits: 'unknown',
