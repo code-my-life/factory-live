@@ -360,18 +360,20 @@ export function createApp(deps: AppDeps) {
       responses: {
         200: json(UnblockProgress, 'Réponse postée sur l’issue'),
         ...errors,
-        409: json(ApiError, 'Pas de déblocage depuis l’app'),
+        409: json(ApiError, 'Pas de déblocage depuis l’app, ou cause encore présente'),
         502: json(ApiError, 'GitHub a refusé'),
         503: json(ApiError, 'Jeton absent'),
       },
     }),
     async (c) => {
       try {
+        const body = c.req.valid('json');
         const record = await unblockIntervention(
           deps.unblock,
           c.req.valid('param').id,
-          c.req.valid('json').text,
+          body.text,
           c.get('actor'),
+          body.acknowledgeCause,
         );
         return c.json(
           {

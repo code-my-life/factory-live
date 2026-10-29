@@ -4,6 +4,7 @@ import type {
   HistoryStats,
   IssueDetail,
   ModelRef,
+  ProfileLimit,
   ProfileView,
   RunView,
   StationId,
@@ -12,6 +13,9 @@ import type {
   UsageReport,
 } from '@factory-live/contracts';
 import {
+  HOOK_TIMEOUT_DEFAULT,
+  TERMINAL_TIMEOUT_DEFAULT,
+  TOOL_DEADLINE_DEFAULT,
   cardKindOf,
   finishedIssues,
   gateVerdicts,
@@ -23,7 +27,7 @@ import {
   stationMinutes,
   timelineOf,
 } from '@factory-live/domain';
-import type { Run, Task } from '@factory-live/domain';
+import type { ProfileFacts, Run, Task } from '@factory-live/domain';
 import { configDrift } from './drift.ts';
 import type { Hub } from './hub.ts';
 import type {
@@ -120,6 +124,8 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
     stations: deps.store.stations(),
     configModel: (profile: string) => deps.hub.configModel(profile),
     keepFinishedMs: Number.POSITIVE_INFINITY,
+    diagnosis: (id: string) => deps.hub.diagnosisOf(id),
+    resolved: [],
   };
   const issue = projectIssues(input, projectInterventions(input)).find((item) => item.key === key);
   if (!issue) return null;
@@ -131,6 +137,7 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
     parents.set(link.childId, [...(parents.get(link.childId) ?? []), link.parentId]);
   const cards: CardView[] = tasks.map((task) => {
     const events = board.events.filter((event) => event.taskId === task.id);
+    const verdicts = deps.hub.verdictsOf(task);
     const runs: RunView[] = board.runs
       .filter((run) => run.taskId === task.id)
       .map((run) => {
@@ -154,7 +161,7 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
           summary: run.summary,
           tokens: runTokens,
           costUsd: session?.costUsd ?? null,
-          verdict: null,
+          verdict: verdicts.get(run.id) ?? null,
         };
       });
     const files = new Map<string, number>();
@@ -181,7 +188,8 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
         task,
         task.status === 'review' || (task.status === 'running' && current?.role === 'reviewer'),
       ),
-      blockKind: task.blockKind,
+      // Le type d'un blocage passé reste noté par Hermès : il ne compte que si la carte bloque.
+      blockKind: task.status === 'blocked' ? task.blockKind : null,
       blockReason: task.status === 'blocked' ? text(lastBlock?.payload['reason']) : null,
       parents: parents.get(task.id) ?? [],
       skills: [...task.skills],
@@ -189,7 +197,10 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
       changedFiles: [...files].map(([path, edits]) => ({ path, edits })),
       testsPassed,
       testsTotal,
-      evidence: [],
+      evidence: (deps.files.evidence(task.id) ?? []).map((file) => ({
+        ...file,
+        at: isoSeconds(file.at),
+      })),
     };
   });
 
@@ -202,8 +213,7 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
     new Map(tasks.map((task) => [task.id, task.assignee])),
   ).map((item) => ({ ...item, at: isoSeconds(item.at) }));
   const hooks: TimelineEntry[] = deps.store
-    .activityOfCards(ids)
-    .filter((event) => event.kind === 'guard' || event.kind === 'skill' || event.status === 'error')
+    .activityOfCards(ids, { kinds: ['guard', 'skill'], statuses: ['error'] })
     .map((event) => ({
       id: event.id,
       at: event.at,
@@ -260,17 +270,47 @@ export function transcripts(deps: ViewDeps, runId: number): TranscriptView[] | n
   return views;
 }
 
+/** Les délais d'Hermès qui coupent le travail de l'agent : réglés dans sa config, sinon par défaut. */
+function limitsOf(facts: ProfileFacts | null): ProfileLimit[] {
+  if (!facts) return [];
+  // Une valeur négative ou nulle désactive la limite chez Hermès : rien de réglé à montrer.
+  const set = (value: number | null) => (value !== null && value > 0 ? value : null);
+  return [
+    {
+      key: 'hook_callback_timeout',
+      value: set(facts.hookTimeout),
+      defaultValue: HOOK_TIMEOUT_DEFAULT,
+      unit: 'seconds',
+    },
+    {
+      key: 'tool_deadline',
+      value: set(facts.toolDeadline),
+      defaultValue: TOOL_DEADLINE_DEFAULT,
+      unit: 'seconds',
+    },
+    {
+      key: 'terminal_timeout',
+      value: set(facts.terminalTimeout),
+      defaultValue: TERMINAL_TIMEOUT_DEFAULT,
+      unit: 'seconds',
+    },
+    { key: 'max_turns', value: set(facts.maxTurns), defaultValue: null, unit: 'turns' },
+  ];
+}
+
 export function profileViews(deps: ViewDeps, periodDays = 30): ProfileView[] {
   const manifest = deps.profiles.manifest();
   const board = deps.hub.boardData;
   const since = deps.now() / 1000 - periodDays * 86_400;
   const verdicts = gateVerdicts(board, since);
+  // Les refus de chaque garde, agent par agent : coder-guard ne refuse pas la même chose à coder et à scribe.
   const refusals = new Map<string, number>();
-  for (const event of deps.store.recentActivity(5_000)) {
+  for (const event of deps.store.activityOfKinds(['guard'], 5_000)) {
     // Le refus d'une garde est le message du plugin, tel quel : « coder-guard : PR absente… ».
-    if (event.kind !== 'guard' || typeof event.detail !== 'string') continue;
+    if (typeof event.detail !== 'string') continue;
     const plugin = /^([\w-]+)\s*:/.exec(event.detail)?.[1];
-    if (plugin) refusals.set(plugin, (refusals.get(plugin) ?? 0) + 1);
+    const key = `${event.profile}|${plugin ?? ''}`;
+    if (plugin) refusals.set(key, (refusals.get(key) ?? 0) + 1);
   }
   return deps.hub.profiles.map((name) => {
     const live = deps.profiles.live(name);
@@ -290,13 +330,13 @@ export function profileViews(deps: ViewDeps, periodDays = 30): ProfileView[] {
       skills: manifest.profiles[name]?.skills ?? [],
       plugins: (live?.plugins ?? []).map((plugin) => ({
         name: plugin,
-        refusals: refusals.get(plugin) ?? 0,
+        refusals: refusals.get(`${name}|${plugin}`) ?? 0,
         timeouts: 0,
         longestSeconds: null,
       })),
-      limits: [],
+      limits: limitsOf(safeFacts(deps, name)),
       mcp: live?.mcp ?? [],
-      drift: live && repo ? configDrift(live, repo) : [],
+      drift: live && repo ? configDrift(live, repo, manifest.profiles[name]?.plugins ?? null) : [],
       stats: {
         runs: runs.length,
         gatePassRate: passes.length
@@ -394,6 +434,14 @@ export function usageReport(deps: ViewDeps, periodDays: number): UsageReport {
       .sort((left, right) => left.day.localeCompare(right.day)),
     claudeSubscriptionNote: msg('usage.claudeNote'),
   };
+}
+
+function safeFacts(deps: ViewDeps, profile: string): ProfileFacts | null {
+  try {
+    return deps.profiles.facts(profile);
+  } catch {
+    return null;
+  }
 }
 
 function safeUsage(deps: ViewDeps, profile: string, since: number) {

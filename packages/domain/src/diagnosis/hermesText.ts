@@ -13,6 +13,8 @@ export const HOOK_TIMEOUT_DEFAULT = 30;
 export const HOOK_TIMEOUT_MAX = 600;
 /** `timeouts.tools.sequential_call` par défaut : le plafond d'un appel d'outil, hooks compris. */
 export const TOOL_DEADLINE_DEFAULT = 420;
+/** `terminal.timeout` par défaut : le délai d'une commande du terminal. */
+export const TERMINAL_TIMEOUT_DEFAULT = 180;
 /** Après un dépassement, Hermès refuse les appels suivants pendant 60 s (même callback). */
 export const HOOK_SUPPRESSION_SECONDS = 60;
 /** Au 2e blocage du même type d'affilée, le noyau passe la carte en triage. */

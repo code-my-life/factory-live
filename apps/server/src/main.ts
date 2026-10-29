@@ -6,6 +6,7 @@ import { GitHubCache } from './adapters/github/cache.ts';
 import { GitHubClient } from './adapters/github/client.ts';
 import { CardFiles } from './adapters/hermes/files.ts';
 import { KanbanReader } from './adapters/hermes/kanban.ts';
+import { HermesPaths } from './adapters/hermes/paths.ts';
 import { ProfileConfigReader } from './adapters/hermes/profiles.ts';
 import { SessionReader } from './adapters/hermes/sessions.ts';
 import { PushNotifier, vapidKeys } from './adapters/push/webpush.ts';
@@ -13,6 +14,7 @@ import { HistoryStore } from './adapters/store/history.ts';
 import { loadConfig } from './config.ts';
 import { createApp } from './http/app.ts';
 import { StreamBuffer } from './http/stream.ts';
+import { DiagnosisService } from './application/diagnosis.ts';
 import { Hub } from './application/hub.ts';
 import { createLogger } from './logger.ts';
 import { notifyOpened } from './application/notify.ts';
@@ -39,8 +41,23 @@ const store = (() => {
     process.exit(1);
   }
 })();
-const profiles = new ProfileConfigReader(config.HERMES_HOME, config.FACTORY_REPO);
+// Les seuls fichiers d'Hermès lus pour le diagnostic : config, journal, plugins actifs, preuves.
+const paths = new HermesPaths({
+  profilesDir: config.profilesDir,
+  boardDir: config.boardDir,
+  factoryRepo: config.FACTORY_REPO,
+});
+const profiles = new ProfileConfigReader(config.HERMES_HOME, config.FACTORY_REPO, paths);
 const sessions = new SessionReader(config.profilesDir);
+const files = new CardFiles(config.boardDir, config.CLAUDE_PROJECTS, paths);
+const diagnoses = new DiagnosisService({
+  sessions,
+  profiles,
+  files,
+  agentLog: null,
+  log: log.child({ component: 'diagnosis' }),
+  boardName: config.HERMES_BOARD,
+});
 // GitHub : App factory-live (lectures, quota propre) et connexion de Clément (déblocage) ; le jeton
 // fine-grained de ~/.config/factory-live/github-token sert de repli tant que l'App n'existe pas.
 const githubAuth = new GitHubAppAuth({
@@ -76,7 +93,7 @@ const hub = new Hub(
     heldAfterSeconds: config.HELD_AFTER_MINUTES * 60,
     keepFinishedMs: 24 * 3600_000,
   },
-  { store, profiles, github, log: log.child({ component: 'hub' }), now },
+  { store, profiles, github, diagnoses, log: log.child({ component: 'hub' }), now },
 );
 const buffer = new StreamBuffer();
 hub.subscribe((event) => buffer.push(event));
@@ -139,6 +156,8 @@ const timers = [
   setInterval(pollKanban, 300),
   setInterval(() => hub.flush(), 250),
   setInterval(() => hub.tick(), 15_000),
+  // Une config ou un plugin corrigé se voit en direct : seules les empreintes des fichiers sont relues.
+  setInterval(() => hub.refreshDiagnoses(), 2_000),
   setInterval(() => hub.reloadConfig(), 5 * 60_000),
   setInterval(() => void refreshGitHub(), 30_000),
   setInterval(() => store.purgeActivity(now() - 30 * 86_400_000), 6 * 3600_000),
@@ -155,7 +174,7 @@ const app = createApp({
     sessions,
     profiles,
     github,
-    files: new CardFiles(config.boardDir, config.CLAUDE_PROJECTS),
+    files,
     owner: config.GITHUB_OWNER,
     boardName: config.HERMES_BOARD,
     dashboardUrl: config.DASHBOARD_URL,

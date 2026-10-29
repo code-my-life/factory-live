@@ -2,16 +2,28 @@ import { msg } from '@factory-live/contracts';
 import type {
   ActivityEvent,
   AppAddresses,
+  Diagnosis,
   Intervention,
   ProbeReport,
+  RunVerdict,
   Snapshot,
   StreamEvent,
 } from '@factory-live/contracts';
 import { applyHook } from '@factory-live/domain';
-import type { Board, Comment, HookEvent, LiveAgent } from '@factory-live/domain';
+import type {
+  Board,
+  Comment,
+  Intervention as FoundIntervention,
+  HookEvent,
+  LiveAgent,
+  Task,
+} from '@factory-live/domain';
+import { DIAGNOSED } from './diagnosis.ts';
+import type { DiagnosisService } from './diagnosis.ts';
 import { buildHealth } from './health.ts';
 import type { HealthSignals } from './health.ts';
 import {
+  foundInterventions,
   issueOfCards,
   projectAgents,
   projectInterventions,
@@ -20,7 +32,7 @@ import {
   stationViews,
   toActivityEvent,
 } from './projection.ts';
-import type { ProjectionInput } from './projection.ts';
+import type { ProjectionInput, ResolvedIntervention } from './projection.ts';
 import type {
   GitHubReadPort,
   HistoryPort,
@@ -47,6 +59,8 @@ export interface HubDeps {
   store: HistoryPort;
   profiles: ProfilesPort;
   github: GitHubReadPort | null;
+  /** Le diagnostic des blocages ; `null` : interventions sans diagnostic. */
+  diagnoses: DiagnosisService | null;
   log: LoggerPort;
   now: () => number;
 }
@@ -57,6 +71,11 @@ type FullBoard = Board & { comments: Comment[] };
 const ACTIVITY_KEPT = 200;
 const STALE_AGENT_MS = 20 * 60_000;
 const PR_KEYS = ['pr_url', 'published_pr'];
+/** Une intervention débloquée reste visible ce temps-là, pour suivre la reprise de la carte. */
+const RESOLVED_KEPT_MS = 30 * 60_000;
+/** Statuts d'une carte repartie (débloquée, relayée) : son intervention se ferme. */
+const RESUMED = new Set(['ready', 'running', 'review', 'done']);
+const RESUME_EVENTS = new Set(['unblocked', 'claimed', 'promoted', 'status', 'assigned']);
 
 interface ProviderStats {
   lastOkAt: number | null;
@@ -94,6 +113,12 @@ export class Hub {
   private readonly lastSent = new Map<Slice, string>();
   private readonly dirty = new Set<Slice>(['board', 'agents', 'health']);
   private interventions: Intervention[] = [];
+  /** Les interventions du kanban au dernier passage, et celles fermées depuis moins de 30 min. */
+  private found: FoundIntervention[] = [];
+  private readonly resolved = new Map<
+    string,
+    { intervention: FoundIntervention; resolvedAt: number }
+  >();
   private root: RootSettings;
   private factoryProfiles: string[];
   private readonly configModels = new Map<string, { model: string; provider: string } | null>();
@@ -113,6 +138,8 @@ export class Hub {
     this.activity = deps.store.recentActivity(ACTIVITY_KEPT);
     this.root = deps.profiles.root();
     this.factoryProfiles = this.loadProfiles();
+    // Le miroir du kanban suffit pour montrer les interventions avant la première lecture.
+    this.found = foundInterventions(this.projectionInput());
   }
 
   private loadProfiles(): string[] {
@@ -182,7 +209,93 @@ export class Hub {
     this.issueOfCard = issueOfCards(this.board);
     this.kanbanStatus = { state: 'read', cards: this.board.tasks.length, error: null, readAt };
     this.trackUnblocks(delta, readAt);
+    this.trackInterventions();
     this.dirty.add('board').add('agents').add('health');
+  }
+
+  /**
+   * Suit les interventions d'un passage à l'autre : celle dont la carte est repartie (un run lancé
+   * après elle, ou un statut de reprise) passe dans les « récemment débloquées » pendant 30 min.
+   * Puis recalcule les diagnostics dont les faits ont changé.
+   */
+  private trackInterventions(): void {
+    const now = this.deps.now();
+    const found = foundInterventions(this.projectionInput());
+    const ids = new Set(found.map((item) => item.id));
+    const tasks = new Map(this.board.tasks.map((task) => [task.id, task]));
+    for (const previous of this.found) {
+      if (ids.has(previous.id) || !DIAGNOSED.has(previous.kind)) continue;
+      const restarted = this.board.runs.some(
+        (run) => run.taskId === previous.cardId && run.startedAt >= previous.openedAt,
+      );
+      const status = tasks.get(previous.cardId)?.status ?? '';
+      if (restarted || RESUMED.has(status))
+        this.resolved.set(previous.id, {
+          intervention: previous,
+          resolvedAt: this.resumedAt(previous) ?? now,
+        });
+    }
+    for (const [id, entry] of this.resolved)
+      if (ids.has(id) || now - entry.resolvedAt > RESOLVED_KEPT_MS) this.resolved.delete(id);
+    this.found = found;
+    this.refreshDiagnoses();
+  }
+
+  /** Quand la carte est repartie : premier événement de reprise, sinon premier run, après l'intervention. */
+  private resumedAt(intervention: FoundIntervention): number | null {
+    const after = (at: number, id: number) =>
+      at >= intervention.openedAt && (intervention.eventId === null || id > intervention.eventId);
+    const event = this.board.events.find(
+      (item) =>
+        item.taskId === intervention.cardId &&
+        RESUME_EVENTS.has(item.kind) &&
+        after(item.createdAt, item.id),
+    );
+    const run = this.board.runs.find(
+      (item) => item.taskId === intervention.cardId && item.startedAt >= intervention.openedAt,
+    );
+    const at = event?.createdAt ?? run?.startedAt;
+    return at === undefined ? null : at * 1000;
+  }
+
+  /** Le run lancé après le déblocage, son issue, et s'il rebloque pour la même cause. */
+  private followUpOf(intervention: FoundIntervention): Intervention['followUp'] {
+    const run = this.board.runs
+      .filter(
+        (item) => item.taskId === intervention.cardId && item.startedAt >= intervention.openedAt,
+      )
+      .sort((left, right) => left.id - right.id)[0];
+    if (!run) return null;
+    const next = this.found.find(
+      (item) => item.cardId === intervention.cardId && DIAGNOSED.has(item.kind),
+    );
+    const before = this.deps.diagnoses?.primaryOf(intervention.id) ?? null;
+    const after = next ? (this.deps.diagnoses?.primaryOf(next.id) ?? null) : null;
+    return {
+      runId: run.id,
+      outcome: run.outcome,
+      sameCause: before && after ? before === after : null,
+    };
+  }
+
+  /**
+   * Recalcule les diagnostics dont les faits ont changé (config d'un agent, plugin, preuves) : appelé
+   * après chaque lecture du kanban, et par une minuterie pour voir une correction en direct.
+   */
+  refreshDiagnoses(): void {
+    const diagnoses = this.deps.diagnoses;
+    if (!diagnoses) return;
+    const all = [...this.found, ...[...this.resolved.values()].map((entry) => entry.intervention)];
+    if (diagnoses.refresh(this.board, all, this.deps.now())) this.dirty.add('board');
+  }
+
+  diagnosisOf(interventionId: string): Diagnosis | null {
+    return this.deps.diagnoses?.of(interventionId) ?? null;
+  }
+
+  /** Le verdict des runs en échec d'une carte (page d'une issue), calculé à la demande et gardé. */
+  verdictsOf(task: Task): ReadonlyMap<number, RunVerdict> {
+    return this.deps.diagnoses?.verdictsOf(this.board, task, this.deps.now()) ?? new Map();
   }
 
   /** La lecture de `kanban.db` échoue : `error`, le message de l'erreur, tel quel. */
@@ -330,7 +443,15 @@ export class Hub {
       stations: this.stations,
       configModel: (profile) => this.configModel(profile),
       keepFinishedMs: this.options.keepFinishedMs,
+      diagnosis: (id) => this.diagnosisOf(id),
+      resolved: this.resolvedInterventions(),
     };
+  }
+
+  private resolvedInterventions(): ResolvedIntervention[] {
+    return [...this.resolved.values()]
+      .sort((left, right) => right.resolvedAt - left.resolvedAt)
+      .map((entry) => ({ ...entry, followUp: this.followUpOf(entry.intervention) }));
   }
 
   private healthSlice() {
@@ -384,7 +505,7 @@ export class Hub {
 
   private boardSlice() {
     const input = this.projectionInput();
-    const interventions = projectInterventions(input);
+    const interventions = projectInterventions(input, this.found);
     const issues = projectIssues(input, interventions);
     const now = this.deps.now();
     for (const issue of issues) {
@@ -410,16 +531,18 @@ export class Hub {
   }
 
   private noticeInterventions(interventions: Intervention[]): void {
-    this.interventions = interventions;
-    const opened = interventions.filter((item) => !this.knownInterventions.has(item.id));
-    this.knownInterventions = new Set(interventions.map((item) => item.id));
+    // Une intervention débloquée n'est plus ouverte : ni notifiée, ni comptée.
+    const open = interventions.filter((item) => !item.resolvedAt);
+    this.interventions = open;
+    const opened = open.filter((item) => !this.knownInterventions.has(item.id));
+    this.knownInterventions = new Set(open.map((item) => item.id));
     if (this.firstBoard) {
       this.firstBoard = false;
-      for (const listener of this.interventionListeners) listener(opened, interventions);
+      for (const listener of this.interventionListeners) listener(opened, open);
       return;
     }
     if (opened.length > 0)
-      for (const listener of this.interventionListeners) listener(opened, interventions);
+      for (const listener of this.interventionListeners) listener(opened, open);
   }
 
   get openInterventions(): readonly Intervention[] {
@@ -496,6 +619,7 @@ export class Hub {
 
   /** Ce qui dépend de l'heure (carte retenue depuis 30 min, dispatcher muet, âges) se recalcule régulièrement. */
   tick(): void {
+    this.trackInterventions();
     this.dirty.add('board').add('agents').add('health');
   }
 

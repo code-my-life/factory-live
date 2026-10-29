@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { aRun, aTask, anEvent } from '../fixtures.test-helpers.ts';
 import { diagnose } from './diagnose.ts';
 import { FACTORY_HOOKS, coderProfile } from './incidents.fixture-builder.test-helpers.ts';
-import type { DiagnosisInput, LogFact, SessionFacts } from './types.ts';
+import type { DiagnosisInput, LogFact, ProfileFacts, SessionFacts } from './types.ts';
 
 /*
  * Les règles qu'aucun incident réel du kanban n'a encore déclenchées, sur les formats exacts
@@ -309,6 +309,16 @@ describe('limites d’Hermès', () => {
     );
     expect(diagnosis.primary).toMatchObject({ code: 'command_timeout', actor: 'agent' });
     expect(diagnosis.primary.summary.params).toEqual({ seconds: 900 });
+  });
+
+  it('sans durée dans la sortie, le délai du terminal de l’agent, sinon celui d’Hermès', () => {
+    const silent = [
+      session(1, [['terminal', 'npm run e2e', '{"output": "", "exit_code": 124}', 100]]),
+    ];
+    const seconds = (profile: ProfileFacts) =>
+      diagnose(input({ sessions: silent, profile })).primary.summary.params;
+    expect(seconds(coderProfile({ terminalTimeout: 600 }))).toEqual({ seconds: 600 });
+    expect(seconds(coderProfile({ terminalTimeout: null }))).toEqual({ seconds: 180 });
   });
 });
 

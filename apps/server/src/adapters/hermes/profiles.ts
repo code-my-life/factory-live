@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import type { PluginHook, ProfileFacts } from '@factory-live/domain';
 import { parse } from 'yaml';
 import type {
   FactoryManifest,
@@ -7,6 +8,8 @@ import type {
   ProfilesPort,
   RootSettings,
 } from '../../application/ports.ts';
+import { MAX_CONFIG_BYTES, MAX_PLUGIN_BYTES } from './paths.ts';
+import type { HermesPaths } from './paths.ts';
 
 const PROFILE = /^[\w-]+$/;
 
@@ -34,6 +37,91 @@ function readYaml(path: string): Yaml | null {
   } catch {
     return null;
   }
+}
+
+/** Le contenu d'un fichier de la liste blanche, s'il ne dépasse pas son plafond. */
+function readCapped(path: string, max: number): string | null {
+  try {
+    return statSync(path).size <= max ? readFileSync(path, 'utf8') : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Un YAML de la liste blanche ; `null` s'il est absent, trop gros ou illisible. */
+function parseCapped(path: string, max: number): Yaml | null {
+  const content = readCapped(path, max);
+  if (content === null) return null;
+  try {
+    return record(parse(content));
+  } catch {
+    return null;
+  }
+}
+
+function mtimeSeconds(path: string): number | null {
+  try {
+    return statSync(path).mtimeMs / 1000;
+  } catch {
+    return null;
+  }
+}
+
+/** Un délai ou un nombre de tours, comme Hermès le lit (`float(...)`) ; autre chose compte pour absent. */
+function amount(value: unknown): number | null {
+  const number =
+    typeof value === 'number' ? value : typeof value === 'string' ? Number(value.trim()) : NaN;
+  return value !== '' && Number.isFinite(number) ? number : null;
+}
+
+function stampOf(path: string | null): string {
+  if (!path) return '-';
+  try {
+    const stat = statSync(path);
+    return `${stat.mtimeMs}:${stat.size}`;
+  } catch {
+    return '-';
+  }
+}
+
+const REGISTER_HOOK = /register_hook\(\s*["'](\w+)["']\s*,\s*(\w+)/g;
+
+/** Les hooks qu'un plugin branche, lus dans son code : `ctx.register_hook("<hook>", <fonction>)`. */
+export function pluginHooksOf(plugin: string, source: string): PluginHook[] {
+  return [...source.matchAll(REGISTER_HOOK)].map((match) => {
+    const start = source.lastIndexOf('\n', match.index) + 1;
+    const end = source.indexOf('\n', match.index);
+    return {
+      plugin,
+      hook: match[1] ?? '',
+      callback: match[2] ?? '',
+      source: source.slice(start, end === -1 ? undefined : end).trim(),
+    };
+  });
+}
+
+/** Ce que le diagnostic retient d'une config d'agent : ses délais et ses plugins actifs. */
+export function profileFactsOf(
+  profile: string,
+  yaml: Yaml,
+  repo: Yaml | null,
+  changedAt: number | null,
+  hooks: readonly PluginHook[],
+): ProfileFacts {
+  const plugins = record(yaml['plugins']);
+  const tools = record(record(yaml['timeouts'])['tools']);
+  return {
+    profile,
+    hookTimeout: amount(plugins['hook_callback_timeout']),
+    // Hermès retombe sur le délai d'un lot d'outils quand celui d'un appel n'est pas réglé.
+    toolDeadline: amount(tools['sequential_call']) ?? amount(tools['concurrent_batch']),
+    terminalTimeout: amount(record(yaml['terminal'])['timeout']),
+    maxTurns: amount(record(yaml['agent'])['max_turns']),
+    changedAt,
+    ...(repo ? { repoHookTimeout: amount(record(repo['plugins'])['hook_callback_timeout']) } : {}),
+    plugins: strings(plugins['enabled']),
+    hooks,
+  };
 }
 
 export function profileConfigOf(yaml: Yaml): ProfileConfig {
@@ -75,10 +163,14 @@ export function profileConfigOf(yaml: Yaml): ProfileConfig {
 export class ProfileConfigReader implements ProfilesPort {
   private readonly hermesHome: string;
   private readonly factoryRepo: string;
+  private readonly paths: HermesPaths;
+  /** Les fichiers lus par le dernier `facts` de chaque agent : leur empreinte dit quand relire. */
+  private readonly factsFiles = new Map<string, string[]>();
 
-  constructor(hermesHome: string, factoryRepo: string) {
+  constructor(hermesHome: string, factoryRepo: string, paths: HermesPaths) {
     this.hermesHome = hermesHome;
     this.factoryRepo = factoryRepo;
+    this.paths = paths;
   }
 
   profiles(): string[] {
@@ -121,6 +213,34 @@ export class ProfileConfigReader implements ProfilesPort {
       ]),
     );
     return { owner: str(yaml['github_user']), projects, profiles };
+  }
+
+  facts(profile: string): ProfileFacts | null {
+    const path = this.paths.config(profile);
+    const yaml = path ? parseCapped(path, MAX_CONFIG_BYTES) : null;
+    if (!path || !yaml) return null;
+    const repoPath = this.paths.repoConfig(profile);
+    const read = [path, ...(repoPath ? [repoPath] : [])];
+    const hooks = strings(record(yaml['plugins'])['enabled']).flatMap((plugin) => {
+      const source = this.paths.pluginSource(profile, plugin);
+      const code = source ? readCapped(source, MAX_PLUGIN_BYTES) : null;
+      if (!source || code === null) return [];
+      read.push(source);
+      return pluginHooksOf(plugin, code);
+    });
+    this.factsFiles.set(profile, read);
+    return profileFactsOf(
+      profile,
+      yaml,
+      repoPath ? parseCapped(repoPath, MAX_CONFIG_BYTES) : null,
+      mtimeSeconds(path),
+      hooks,
+    );
+  }
+
+  factsStamp(profile: string): string {
+    const files = this.factsFiles.get(profile) ?? [this.paths.config(profile)];
+    return files.map(stampOf).join('|');
   }
 
   root(): RootSettings {

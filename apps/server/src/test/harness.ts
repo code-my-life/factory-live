@@ -6,6 +6,7 @@ import { GitHubCache } from '../adapters/github/cache.ts';
 import { GitHubClient } from '../adapters/github/client.ts';
 import { CardFiles } from '../adapters/hermes/files.ts';
 import { KanbanReader } from '../adapters/hermes/kanban.ts';
+import { HermesPaths } from '../adapters/hermes/paths.ts';
 import { ProfileConfigReader } from '../adapters/hermes/profiles.ts';
 import { SessionReader } from '../adapters/hermes/sessions.ts';
 import { PushNotifier } from '../adapters/push/webpush.ts';
@@ -13,6 +14,7 @@ import type { StoredSubscription } from '../adapters/store/history.ts';
 import { HistoryStore } from '../adapters/store/history.ts';
 import { createApp } from '../http/app.ts';
 import { StreamBuffer } from '../http/stream.ts';
+import { DiagnosisService } from '../application/diagnosis.ts';
 import { Hub } from '../application/hub.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
 import { createLogger } from '../logger.ts';
@@ -125,7 +127,14 @@ export function harness(
   const now = () => clock.now;
   const log = createLogger('silent');
   const store = new HistoryStore(join(dir.path, 'data'));
-  const profiles = new ProfileConfigReader(hermes, factory);
+  const paths = new HermesPaths({
+    profilesDir: join(hermes, 'profiles'),
+    boardDir,
+    factoryRepo: factory,
+  });
+  const profiles = new ProfileConfigReader(hermes, factory, paths);
+  const sessions = new SessionReader(join(hermes, 'profiles'));
+  const files = new CardFiles(boardDir, join(dir.path, 'claude-projects'), paths);
   const github: Harness['github'] = { calls: [], reactions: [] };
   const fakeFetch = ((input: string | URL | Request, init: RequestInit = {}) => {
     const url = input instanceof Request ? input.url : input.toString();
@@ -206,7 +215,21 @@ export function harness(
       heldAfterSeconds: 1_800,
       keepFinishedMs: 86_400_000,
     },
-    { store, profiles, github: cache, log, now },
+    {
+      store,
+      profiles,
+      github: cache,
+      diagnoses: new DiagnosisService({
+        sessions,
+        profiles,
+        files,
+        agentLog: null,
+        log,
+        boardName: 'factory',
+      }),
+      log,
+      now,
+    },
   );
   const buffer = new StreamBuffer();
   hub.subscribe((event) => buffer.push(event));
@@ -241,10 +264,10 @@ export function harness(
     views: {
       hub,
       store,
-      sessions: new SessionReader(join(hermes, 'profiles')),
+      sessions,
       profiles,
       github: cache,
-      files: new CardFiles(boardDir, join(dir.path, 'claude-projects')),
+      files,
       owner: 'code-my-life',
       boardName: 'factory',
       dashboardUrl: 'https://machine.tailnet.ts.net:9443',

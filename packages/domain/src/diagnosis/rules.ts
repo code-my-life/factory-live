@@ -5,6 +5,7 @@ import {
   HOOK_TIMEOUT_DEFAULT,
   HOOK_TIMEOUT_MAX,
   RATE_LIMIT_COOLDOWN_MINUTES,
+  TERMINAL_TIMEOUT_DEFAULT,
   TOOL_DEADLINE_DEFAULT,
   budgetOf,
   isRefusal,
@@ -775,7 +776,9 @@ export const commandTimeout: Rule = (ctx) => {
   );
   const last = hits.at(-1);
   if (!last || last.outcome.kind !== 'command_timeout') return [];
-  const seconds = last.outcome.seconds ?? ctx.input.profile?.terminalTimeout ?? 0;
+  const profile = ctx.input.profile;
+  const seconds =
+    last.outcome.seconds ?? (profile ? (profile.terminalTimeout ?? TERMINAL_TIMEOUT_DEFAULT) : 0);
   return [
     {
       code: 'command_timeout',

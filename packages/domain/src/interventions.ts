@@ -62,6 +62,8 @@ export interface Intervention {
   question: InterventionText;
   /** Secondes epoch. */
   openedAt: number;
+  /** L'événement du kanban que l'intervention raconte (blocage, abandon, boucle) ; `null` : aucun. */
+  eventId: number | null;
   push: boolean;
   actions: InterventionAction[];
 }
@@ -141,6 +143,7 @@ function build(
     cardId: task.id,
     profile: task.assignee,
     openedAt,
+    eventId: event?.id ?? null,
     push: push ?? PUSHED.has(kind),
     ...rest,
   };

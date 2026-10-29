@@ -42,6 +42,7 @@ describe('interventionsOf', () => {
       issueKey: 'cv-site#49',
       title: 'Carte UI sans maquette jointe.',
       openedAt: 90_000,
+      eventId: 10,
     });
     expect(found?.question).toContain('Deux options');
     expect(found?.actions).toContainEqual({ kind: 'unblock' });
@@ -195,6 +196,7 @@ describe('interventionsOf', () => {
       kind: 'held_active_pr',
       push: true,
       openedAt: 97_000,
+      eventId: null,
       title: message('intervention.title.held', { minutes: 50 }),
       question: message('intervention.question.held'),
     });

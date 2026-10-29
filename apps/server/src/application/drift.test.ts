@@ -36,4 +36,18 @@ describe('configDrift', () => {
   it('ne signale rien quand la config en service suit le dépôt', () => {
     expect(configDrift({ ...repo }, repo)).toEqual([]);
   });
+
+  it('compare les plugins à factory.yaml, qui les fait activer par install.sh', () => {
+    const bare = { ...repo, plugins: [] };
+    expect(configDrift({ ...repo }, bare, ['factory-notify', 'coder-guard'])).toEqual([]);
+    expect(
+      configDrift({ ...repo }, bare, ['coder-guard', 'comment-guard', 'factory-notify']),
+    ).toEqual([
+      {
+        field: 'plugins',
+        live: 'coder-guard, factory-notify',
+        repo: 'coder-guard, comment-guard, factory-notify',
+      },
+    ]);
+  });
 });

@@ -10,10 +10,15 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { redactSecrets } from '@factory-live/domain';
+import type { EvidenceFile } from '@factory-live/domain';
 import type { CardFilesPort, LaneTranscript, TranscriptLine } from '../../application/ports.ts';
+import type { HermesPaths } from './paths.ts';
 
 const CARD = /^t_[0-9a-f]{8}$/;
 const TAIL_BYTES = 512 * 1024;
+const EVIDENCE_MAX_FILES = 50;
+/** Les preuves de la gate sont rangées par passage : `gate/<n>/01-….txt`. */
+const EVIDENCE_MAX_DEPTH = 3;
 
 /** Fin d'un fichier, sans tout charger : un log de carte peut peser des dizaines de Mo. */
 function tail(path: string, bytes: number): string {
@@ -196,14 +201,65 @@ export function claudeCost(jsonl: string): ClaudeCost | null {
   };
 }
 
+/**
+ * Les fichiers d'un dossier de preuves, sous-dossiers compris, par ordre de nom : ni fichier caché
+ * (marqueurs de la factory), ni lien, ni plus de 50 fichiers.
+ */
+export function evidenceFiles(paths: HermesPaths, dir: string): EvidenceFile[] {
+  const files: EvidenceFile[] = [];
+  const visit = (parts: readonly string[]) => {
+    let names: string[];
+    try {
+      names = readdirSync(join(dir, ...parts)).sort();
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      if (files.length >= EVIDENCE_MAX_FILES) return;
+      if (name.startsWith('.')) continue;
+      const entry = [...parts, name];
+      const file = paths.evidenceEntry(dir, entry, 'file');
+      if (file) {
+        try {
+          const stat = statSync(file);
+          files.push({ name: entry.join('/'), bytes: stat.size, at: stat.mtimeMs / 1000 });
+        } catch {
+          // supprimé entre la liste et la lecture : il n'est plus une preuve
+        }
+      } else if (entry.length < EVIDENCE_MAX_DEPTH && paths.evidenceEntry(dir, entry, 'dir')) {
+        visit(entry);
+      }
+    }
+  };
+  visit([]);
+  return files;
+}
+
 /** Fichiers de la factory lus pour l'interface : logs de cartes et transcriptions des lanes Claude Code. */
 export class CardFiles implements CardFilesPort {
   private readonly boardDir: string;
   private readonly claudeProjects: string;
+  private readonly paths: HermesPaths;
 
-  constructor(boardDir: string, claudeProjects: string) {
+  constructor(boardDir: string, claudeProjects: string, paths: HermesPaths) {
     this.boardDir = boardDir;
     this.claudeProjects = claudeProjects;
+    this.paths = paths;
+  }
+
+  evidence(cardId: string): EvidenceFile[] | null {
+    const dir = this.paths.evidenceDir(cardId);
+    return dir ? evidenceFiles(this.paths, dir) : null;
+  }
+
+  evidenceStamp(cardId: string): string {
+    const dir = this.paths.evidenceDir(cardId);
+    if (!dir) return '-';
+    try {
+      return String(statSync(dir).mtimeMs);
+    } catch {
+      return '-';
+    }
   }
 
   cardLog(cardId: string): string[] | null {

@@ -2,6 +2,7 @@ import type {
   ActivityEvent,
   AgentActivity,
   AgentState,
+  Diagnosis,
   Intervention,
   IssueSummary,
   ModelRef,
@@ -20,7 +21,15 @@ import {
   pullRequestUrl,
   runRoleOf,
 } from '@factory-live/domain';
-import type { ActivityLine, Board, Comment, LiveAgent, Run, Task } from '@factory-live/domain';
+import type {
+  ActivityLine,
+  Board,
+  Comment,
+  Intervention as FoundIntervention,
+  LiveAgent,
+  Run,
+  Task,
+} from '@factory-live/domain';
 import type { UnblockRecord } from './ports.ts';
 
 export interface IssueInfoView {
@@ -34,6 +43,14 @@ export interface StationMemory {
   previous: string | null;
   /** Millisecondes epoch. */
   changedAt: number;
+}
+
+/** Une intervention fermée depuis peu parce que sa carte est repartie : gardée pour suivre la reprise. */
+export interface ResolvedIntervention {
+  intervention: FoundIntervention;
+  /** Millisecondes epoch. */
+  resolvedAt: number;
+  followUp: Intervention['followUp'];
 }
 
 export interface ProjectionInput {
@@ -54,6 +71,9 @@ export interface ProjectionInput {
   configModel: (profile: string) => { model: string; provider: string } | null;
   /** Issues finies depuis moins longtemps restent sur la ligne (station Terminé). */
   keepFinishedMs: number;
+  /** Le diagnostic en cache d'une intervention (jamais calculé pendant la projection). */
+  diagnosis: (interventionId: string) => Diagnosis | null;
+  resolved: readonly ResolvedIntervention[];
 }
 
 /** Les stations de la ligne, dans l'ordre ; le client les nomme dans sa langue. */
@@ -107,32 +127,51 @@ export function stationViews(profiles: readonly string[]): StationView[] {
   }));
 }
 
-export function projectInterventions(input: ProjectionInput): Intervention[] {
+/** Ce qui attend Clément d'après le kanban, tel que le domaine le trouve (secondes epoch). */
+export function foundInterventions(input: ProjectionInput): FoundIntervention[] {
   return interventionsOf(input.board, {
     now: Math.floor(input.now / 1000),
     board: input.boardName,
     owner: input.owner,
     dashboardUrl: input.dashboardUrl,
     heldAfterSeconds: input.heldAfterSeconds,
-  }).map((found) => {
-    const unblock = input.unblock(found.id);
-    return {
-      ...found,
-      openedAt: isoSeconds(found.openedAt),
-      unblock:
-        unblock && unblock.state !== 'failed'
-          ? {
-              state: unblock.state,
-              text: unblock.text,
-              commentUrl: unblock.commentUrl,
-              at: iso(unblock.updatedAt),
-            }
-          : null,
-      diagnosis: null,
-      resolvedAt: null,
-      followUp: null,
-    };
   });
+}
+
+function interventionView(
+  input: ProjectionInput,
+  found: FoundIntervention,
+  resolved: ResolvedIntervention | null,
+): Intervention {
+  const { eventId, ...rest } = found;
+  const unblock = input.unblock(found.id);
+  return {
+    ...rest,
+    openedAt: isoSeconds(found.openedAt),
+    unblock:
+      unblock && unblock.state !== 'failed'
+        ? {
+            state: unblock.state,
+            text: unblock.text,
+            commentUrl: unblock.commentUrl,
+            at: iso(unblock.updatedAt),
+          }
+        : null,
+    diagnosis: input.diagnosis(found.id),
+    resolvedAt: resolved ? iso(resolved.resolvedAt) : null,
+    followUp: resolved?.followUp ?? null,
+  };
+}
+
+/** Les interventions ouvertes, puis celles qui viennent de se fermer (`resolvedAt`). */
+export function projectInterventions(
+  input: ProjectionInput,
+  found: readonly FoundIntervention[] = foundInterventions(input),
+): Intervention[] {
+  return [
+    ...found.map((item) => interventionView(input, item, null)),
+    ...input.resolved.map((entry) => interventionView(input, entry.intervention, entry)),
+  ];
 }
 
 export function projectIssues(
@@ -163,7 +202,7 @@ export function projectIssues(
       continue;
     const { repo, number } = splitKey(key);
     const info = input.issueInfo(key);
-    const open = interventions.filter((item) => item.issueKey === key);
+    const open = interventions.filter((item) => item.issueKey === key && !item.resolvedAt);
     const implementer = latestImplementerRun(tasks, input.board);
     const labels = info?.labels ?? [];
     const memory = input.stations.get(key);

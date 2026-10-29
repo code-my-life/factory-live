@@ -5,6 +5,7 @@ import type { ActivityEvent } from '@factory-live/contracts';
 import type { Board, Comment, Run, Task, TaskEvent } from '@factory-live/domain';
 import type { AppCredentials, GitHubAuthStore, UserTokens } from '../github/app.ts';
 import type {
+  ActivityFilter,
   HistoryPort,
   KanbanDelta,
   StationRecord,
@@ -162,14 +163,32 @@ export class HistoryStore implements HistoryPort, GitHubAuthStore {
       .reverse();
   }
 
-  activityOfCards(cardIds: readonly string[], limit = 500): ActivityEvent[] {
+  activityOfCards(cardIds: readonly string[], filter: ActivityFilter = {}): ActivityEvent[] {
     if (cardIds.length === 0) return [];
-    const placeholders = cardIds.map(() => '?').join(', ');
+    const list = (values: readonly string[]) => values.map(() => '?').join(', ');
+    const kinds = filter.kinds ?? [];
+    const statuses = filter.statuses ?? [];
+    // Le tri se fait avant la limite : une carte bavarde ne fait pas disparaître ses refus anciens.
+    const notable =
+      kinds.length + statuses.length === 0
+        ? ''
+        : ` AND (json_extract(data, '$.kind') IN (${list(kinds) || "''"}) OR json_extract(data, '$.status') IN (${list(statuses) || "''"}))`;
     return this.db
       .prepare(
-        `SELECT data FROM activity WHERE json_extract(data, '$.cardId') IN (${placeholders}) ORDER BY seq DESC LIMIT ?`,
+        `SELECT data FROM activity WHERE json_extract(data, '$.cardId') IN (${list(cardIds)})${notable} ORDER BY seq DESC LIMIT ?`,
       )
-      .all(...cardIds, limit)
+      .all(...cardIds, ...kinds, ...statuses, filter.limit ?? 500)
+      .map((row) => parse<ActivityEvent>(row['data']))
+      .reverse();
+  }
+
+  activityOfKinds(kinds: readonly string[], limit: number): ActivityEvent[] {
+    if (kinds.length === 0) return [];
+    return this.db
+      .prepare(
+        `SELECT data FROM activity WHERE json_extract(data, '$.kind') IN (${kinds.map(() => '?').join(', ')}) ORDER BY seq DESC LIMIT ?`,
+      )
+      .all(...kinds, limit)
       .map((row) => parse<ActivityEvent>(row['data']))
       .reverse();
   }

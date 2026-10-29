@@ -1,9 +1,11 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { HOOK_TIMEOUT_MESSAGE, classifyToolResult } from '@factory-live/domain';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { schemaFor, tempDir } from '../../test/hermes-fixtures.ts';
 import type { TempDir } from '../../test/hermes-fixtures.ts';
+import type { RunRef } from '../../application/ports.ts';
 import { SessionReader } from './sessions.ts';
 
 let dir: TempDir;
@@ -138,5 +140,149 @@ describe('SessionReader', () => {
     const [entry] = reader.transcript('coder', 's1');
     expect(entry?.text?.length).toBeLessThan(20_100);
     expect(entry?.text).toContain('caractères de plus');
+  });
+
+  it('montre un refus de garde ou d’Hermès comme un refus, pas comme une erreur', () => {
+    session('s1', 1_000);
+    message('s1', 'tool', {
+      tool_name: 'terminal',
+      content: JSON.stringify({ error: HOOK_TIMEOUT_MESSAGE }),
+    });
+    message('s1', 'tool', {
+      tool_name: 'terminal',
+      content: '{"error": "coder-guard : git add . / -A interdit"}',
+    });
+    expect(reader.transcript('coder', 's1').map((entry) => entry.status)).toEqual([
+      'blocked',
+      'blocked',
+    ]);
+  });
+});
+
+describe('SessionReader.runFacts', () => {
+  const card = 't_665ba7d7';
+  const run = (patch: Partial<RunRef> = {}): RunRef => ({
+    id: 191,
+    taskId: card,
+    startedAt: 1_793_263_010,
+    endedAt: 1_793_263_637,
+    workerSessionId: null,
+    resumeSessionId: null,
+    ...patch,
+  });
+  const call = (id: string, name: string, args: Record<string, unknown>) => ({
+    id,
+    type: 'function',
+    function: { name, arguments: JSON.stringify(args) },
+  });
+
+  beforeEach(() => {
+    session('20261029_093652_fc383d', 1_793_263_013.77, { title: 'impl factory-live#2 #3' });
+    message('20261029_093652_fc383d', 'user', {
+      content: `work kanban task ${card}`,
+      timestamp: 1_793_263_013.5,
+    });
+  });
+
+  it('rattache un run à sa session par la fenêtre, confirmée par « work kanban task <carte> »', () => {
+    // Une autre carte lancée au même moment n'est pas prise.
+    session('20261029_093700_aaaaaa', 1_793_263_020);
+    message('20261029_093700_aaaaaa', 'user', {
+      content: 'work kanban task t_00000000',
+      timestamp: 1_793_263_020,
+    });
+    expect(reader.runFacts('coder', [run()])?.map((facts) => [facts.id, facts.runId])).toEqual([
+      ['20261029_093652_fc383d', 191],
+    ]);
+    // Hors de la fenêtre du run : aucune session, jamais une session voisine.
+    expect(reader.runFacts('coder', [run({ startedAt: 1_793_270_000 })])).toEqual([]);
+  });
+
+  it('préfère la session notée par Hermès, puis celle de `hermes --resume`', () => {
+    session('20261029_101049_0612ab', 1_793_265_050);
+    expect(
+      reader
+        .runFacts('coder', [
+          run({ id: 192, workerSessionId: '20261029_101049_0612ab' }),
+          run({ id: 193, workerSessionId: 'inconnue', resumeSessionId: '20261029_101049_0612ab' }),
+        ])
+        ?.map((facts) => [facts.id, facts.runId]),
+    ).toEqual([['20261029_101049_0612ab', 192]]);
+  });
+
+  it('ne devine pas entre deux sessions qui conviennent toutes les deux', () => {
+    session('20261029_093653_bbbbbb', 1_793_263_014);
+    message('20261029_093653_bbbbbb', 'user', {
+      content: `work kanban task ${card}`,
+      timestamp: 1_793_263_014,
+    });
+    expect(reader.runFacts('coder', [run()])).toEqual([]);
+  });
+
+  it('lit appels et résultats : argument parlant, refus exacts, début et fin des longs contenus', () => {
+    const sid = '20261029_093652_fc383d';
+    message(sid, 'assistant', {
+      timestamp: 1_793_263_100,
+      tool_calls: JSON.stringify([
+        call('call_1', 'terminal', { command: 'git commit -m "feat: version"', timeout: 600 }),
+        call('call_2', 'write_file', { path: 'apps/web/src/a.ts', content: 'x'.repeat(5_000) }),
+      ]),
+    });
+    message(sid, 'tool', {
+      timestamp: 1_793_263_131,
+      tool_call_id: 'call_1',
+      tool_name: 'terminal',
+      content: JSON.stringify({ error: HOOK_TIMEOUT_MESSAGE }),
+    });
+    message(sid, 'tool', {
+      timestamp: 1_793_263_132,
+      tool_call_id: 'call_2',
+      tool_name: 'write_file',
+      content: `{"output": "${'ligne\\n'.repeat(2_000)}[Command timed out after 900s]", "exit_code": 124, "error": null}`,
+    });
+    // Des appels illisibles ne cassent pas la lecture.
+    message(sid, 'assistant', { timestamp: 1_793_263_140, tool_calls: '[{"id": "call_3"' });
+    message(sid, 'assistant', { timestamp: 1_793_263_141, tool_calls: '{"id": "call_4"}' });
+
+    const [facts] = reader.runFacts('coder', [run()]) ?? [];
+    expect(facts?.calls).toEqual([
+      {
+        at: 1_793_263_100,
+        tool: 'terminal',
+        input: 'git commit -m "feat: version"',
+        callId: 'call_1',
+      },
+      { at: 1_793_263_100, tool: 'write_file', input: 'apps/web/src/a.ts', callId: 'call_2' },
+    ]);
+    expect(facts?.results.map((result) => classifyToolResult(result.content).kind)).toEqual([
+      'hook_timeout',
+      'command_timeout',
+    ]);
+    expect(facts?.results[1]?.content.length).toBeLessThan(2_100);
+    expect(facts?.results[1]?.callId).toBe('call_2');
+  });
+
+  it('masque les secrets des commandes et des résultats', () => {
+    const sid = '20261029_093652_fc383d';
+    const token = `ghp_${'a'.repeat(36)}`;
+    message(sid, 'assistant', {
+      timestamp: 1_793_263_100,
+      tool_calls: JSON.stringify([
+        call('c1', 'terminal', { command: `GH_TOKEN=${token} gh pr view` }),
+      ]),
+    });
+    message(sid, 'tool', {
+      timestamp: 1_793_263_101,
+      tool_call_id: 'c1',
+      tool_name: 'terminal',
+      content: `{"output": "${token}", "exit_code": 0}`,
+    });
+    const [facts] = reader.runFacts('coder', [run()]) ?? [];
+    expect(JSON.stringify(facts)).not.toContain(token);
+  });
+
+  it('rend null quand la base de l’agent est absente', () => {
+    expect(reader.runFacts('inconnu', [run()])).toBeNull();
+    expect(reader.runFacts('../coder', [run()])).toBeNull();
   });
 });

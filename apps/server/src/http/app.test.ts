@@ -7,12 +7,16 @@ import {
   StreamEvent,
   msg,
 } from '@factory-live/contracts';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { mkdirSync, utimesSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { HOOK_TIMEOUT_MESSAGE } from '@factory-live/domain';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackUnblockReactions } from '../application/unblock.ts';
 import { sign } from '../ingest/signature.ts';
 import { NOW, NOW_S, ORIGINS, SECRET, harness } from '../test/harness.ts';
 import type { Harness } from '../test/harness.ts';
-import { insertEvent, insertRun, insertTask } from '../test/hermes-fixtures.ts';
+import { insertEvent, insertRun, insertTask, schemaFor } from '../test/hermes-fixtures.ts';
 
 let h: Harness;
 
@@ -823,5 +827,169 @@ describe('documentation', () => {
         '/api/interventions/{id}/unblock',
       ]),
     );
+  });
+});
+
+describe('diagnostic des blocages', () => {
+  const CARD = 't_1a9f0049';
+  const coder = () => join(h.dir.path, 'hermes', 'profiles', 'coder');
+  const CONFIG =
+    'model:\n  default: auto\n  provider: freellmapi\nplugins:\n  enabled: [coder-guard]\n';
+
+  /**
+   * Le run bloqué de cv-site#49 refait sur le modèle de factory-live#2 : son `git commit` est refusé par
+   * Hermès, qui a coupé le hook de coder-guard à 30 s. Config sans délai de hook, réglée avant l'incident.
+   */
+  function hookTimeoutIncident() {
+    const db = new DatabaseSync(join(coder(), 'state.db'));
+    db.exec(schemaFor('state', ['system_prompts', 'sessions', 'messages', 'session_model_usage']));
+    const sid = '20261028_163000_abcdef';
+    db.prepare(
+      "INSERT INTO sessions (id, source, profile_name, model, started_at) VALUES (?, 'kanban', 'coder', 'auto', ?)",
+    ).run(sid, NOW_S - 4_998);
+    const message = db.prepare(
+      'INSERT INTO messages (session_id, role, content, tool_call_id, tool_calls, tool_name, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    );
+    message.run(sid, 'user', `work kanban task ${CARD}`, null, null, null, NOW_S - 4_998);
+    const commit = { command: 'git commit -m "feat: page projets"' };
+    message.run(
+      sid,
+      'assistant',
+      null,
+      null,
+      JSON.stringify([
+        {
+          id: 'c1',
+          type: 'function',
+          function: { name: 'terminal', arguments: JSON.stringify(commit) },
+        },
+      ]),
+      null,
+      NOW_S - 1_000,
+    );
+    message.run(
+      sid,
+      'tool',
+      JSON.stringify({ error: HOOK_TIMEOUT_MESSAGE }),
+      'c1',
+      null,
+      'terminal',
+      NOW_S - 969,
+    );
+    db.close();
+    mkdirSync(join(coder(), 'plugins', 'coder-guard'), { recursive: true });
+    writeFileSync(
+      join(coder(), 'plugins', 'coder-guard', '__init__.py'),
+      'def register(ctx):\n    ctx.register_hook("pre_tool_call", pre_tool)\n',
+    );
+    writeConfig(CONFIG, NOW_S - 86_400);
+    h.hub.refreshDiagnoses();
+  }
+
+  function writeConfig(yaml: string, mtime: number) {
+    writeFileSync(join(coder(), 'config.yaml'), yaml);
+    utimesSync(join(coder(), 'config.yaml'), mtime, mtime);
+  }
+
+  const unblock = (id: string, body: Record<string, unknown>) =>
+    h.app.request(`/api/interventions/${encodeURIComponent(id)}/unblock`, {
+      method: 'POST',
+      headers: LOCAL,
+      body: JSON.stringify(body),
+    });
+
+  it('dit la cause, qui agit et si débloquer suffit, sans réseau ni modèle', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const before = h.github.calls.length;
+    hookTimeoutIncident();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(h.github.calls).toHaveLength(before);
+    fetchSpy.mockRestore();
+    const [intervention] = (await snapshot()).interventions;
+    expect(intervention?.diagnosis?.primary).toMatchObject({
+      code: 'guard_hook_timeout',
+      actor: 'you_factory',
+      cause: { state: 'present' },
+      subject: { plugin: 'coder-guard' },
+    });
+    expect(intervention?.diagnosis?.unblock.when).toBe('after_fix');
+    expect(intervention?.diagnosis?.sources).toMatchObject({ transcript: true, config: true });
+  });
+
+  it('refuse de débloquer tant que la cause est là, sauf à le vouloir', async () => {
+    hookTimeoutIncident();
+    const id = (await snapshot()).interventions[0]?.id as string;
+    expect(await refusal(await unblock(id, { text: 'Reprends' }))).toEqual([409, 'cause_present']);
+    expect(h.github.calls.filter((call) => call.method === 'POST')).toHaveLength(0);
+    const forced = await unblock(id, { text: 'Reprends', acknowledgeCause: true });
+    expect(forced.status).toBe(200);
+    expect(h.github.calls.filter((call) => call.method === 'POST')).toHaveLength(1);
+  });
+
+  it('voit la correction de la config en direct, et laisse alors débloquer', async () => {
+    hookTimeoutIncident();
+    writeConfig(`${CONFIG}  hook_callback_timeout: 600\n`, NOW_S - 300);
+    h.hub.refreshDiagnoses();
+    const [intervention] = (await snapshot()).interventions;
+    expect(intervention?.diagnosis?.primary.cause).toMatchObject({ state: 'fixed' });
+    expect(intervention?.diagnosis?.unblock.when).toBe('now');
+    expect((await unblock(intervention?.id as string, { text: 'Reprends' })).status).toBe(200);
+  });
+
+  it('garde l’intervention débloquée et suit le run suivant, sans la compter', async () => {
+    hookTimeoutIncident();
+    const id = (await snapshot()).interventions[0]?.id as string;
+    insertEvent(h.writer, { taskId: CARD, kind: 'unblocked', createdAt: NOW_S - 100 });
+    h.writer.prepare(`UPDATE tasks SET status = 'running' WHERE id = '${CARD}'`).run();
+    insertRun(h.writer, {
+      taskId: CARD,
+      profile: 'coder',
+      status: 'running',
+      startedAt: NOW_S - 90,
+    });
+    h.syncKanban();
+    const data = await snapshot();
+    expect(data.interventions).toEqual([
+      expect.objectContaining({
+        id,
+        resolvedAt: new Date((NOW_S - 100) * 1000).toISOString(),
+        followUp: { runId: 3, outcome: null, sameCause: null },
+      }),
+    ]);
+    expect(data.issues.find((issue) => issue.key === 'cv-site#49')?.interventionIds).toEqual([]);
+    expect(h.hub.openInterventions).toEqual([]);
+    expect(await refusal(await unblock(id, { text: 'Encore' }))).toEqual([
+      404,
+      'intervention_unknown',
+    ]);
+    // Une demi-heure plus tard, elle n'est plus suivie.
+    h.clock.now = NOW + 31 * 60_000;
+    h.hub.tick();
+    expect((await snapshot()).interventions).toEqual([]);
+  });
+
+  it('donne à la page de l’issue le verdict des runs et les vraies preuves', async () => {
+    hookTimeoutIncident();
+    const evidence = join(
+      h.dir.path,
+      'hermes',
+      'kanban',
+      'boards',
+      'factory',
+      'workspaces',
+      CARD,
+      'evidence',
+    );
+    mkdirSync(evidence, { recursive: true });
+    writeFileSync(join(evidence, '01-test-fails-on-base.txt'), 'FAIL');
+    const detail = IssueDetail.parse(
+      await (await h.app.request('/api/issues/cv-site/49', { headers: THIS_PC })).json(),
+    );
+    const card = detail.cards.find((item) => item.id === CARD);
+    expect(card?.runs.at(-1)?.verdict).toMatchObject({ finding: 'guard_hook_timeout' });
+    expect(card?.evidence.map((file) => [file.name, file.bytes])).toEqual([
+      ['01-test-fails-on-base.txt', 4],
+    ]);
+    expect(detail.cards.find((item) => item.id === 't_b1ef0049')?.blockKind).toBeNull();
   });
 });

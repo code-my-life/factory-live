@@ -1,5 +1,5 @@
 import { msg } from '@factory-live/contracts';
-import type { Intervention } from '@factory-live/contracts';
+import type { Diagnosis, FindingCode, Intervention } from '@factory-live/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { notifyOpened } from './notify.ts';
 import type { NotifyDeps } from './notify.ts';
@@ -25,6 +25,36 @@ function intervention(patch: Partial<Intervention> = {}): Intervention {
     resolvedAt: null,
     followUp: null,
     ...patch,
+  };
+}
+
+/** Le diagnostic de factory-live#2 réduit à ce que la notification lit : la cause principale. */
+function diagnosis(code: FindingCode): Diagnosis {
+  return {
+    computedAt: new Date(NOW).toISOString(),
+    episode: { from: new Date(NOW - 3_600_000).toISOString(), runIds: [191] },
+    primary: {
+      code,
+      confidence: 'certain',
+      actor: 'you_factory',
+      cause: { state: 'present' },
+      summary: msg('diagnosis.summary.guardHookTimeout', { plugin: 'coder-guard', seconds: 30 }),
+      why: msg('diagnosis.why.guardHookTimeout', {
+        plugin: 'coder-guard',
+        trigger: 'git commit',
+        seconds: 30,
+      }),
+      subject: { profile: 'coder', plugin: 'coder-guard', tool: null },
+      setting: null,
+      evidence: [],
+      steps: [],
+      runIds: [191],
+    },
+    others: [],
+    unblock: { when: 'after_fix', template: null, nextBlock: 'triage' },
+    runs: [],
+    work: null,
+    sources: { transcript: true, agentLog: true, config: true, workspace: true },
   };
 }
 
@@ -97,5 +127,20 @@ describe('notifyOpened', () => {
       [],
     );
     expect(sent).toEqual([]);
+  });
+
+  it('dit la cause trouvée par le diagnostic, et la question de l’agent quand c’en est une', async () => {
+    const { value, sent } = deps();
+    const hook = intervention({
+      id: 'capability:t_9:30',
+      diagnosis: diagnosis('guard_hook_timeout'),
+    });
+    const question = intervention({ id: 'needs_input:t_8:31', diagnosis: diagnosis('question') });
+    const resolved = intervention({ id: 'r', resolvedAt: new Date(NOW).toISOString() });
+    await notifyOpened(value, [hook, question], [hook, question, resolved]);
+    expect(sent.map((message) => [message.title, message.body, message.badge])).toEqual([
+      [hook.diagnosis?.primary.summary, hook.diagnosis?.primary.why, 2],
+      ['Quelle base de données ?', 'Quelle base de données ? PostgreSQL ou SQLite ?', 2],
+    ]);
   });
 });
