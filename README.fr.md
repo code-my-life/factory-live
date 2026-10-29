@@ -28,7 +28,7 @@
 
 </div>
 
-<p align="center"><img src="docs/factory-live.png" alt="factory-live sur un écran d’ordinateur : la ligne d’usine de l’intake à terminé, une boîte par issue avec son état et son agent, deux blocages qui attendent une décision, et ce que fait chaque agent en ce moment"></p>
+<p align="center"><img src="docs/factory-live.fr.png" alt="factory-live sur un écran d’ordinateur : la ligne d’usine de l’intake à terminé, une boîte par issue avec son état et son agent, deux blocages qui attendent une décision, et ce que fait chaque agent en ce moment"></p>
 
 [site-badge]: https://img.shields.io/badge/site-code--my--life.github.io-000000?style=flat
 [site]: https://code-my-life.github.io/factory-live/fr/

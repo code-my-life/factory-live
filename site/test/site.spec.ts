@@ -7,8 +7,22 @@ import type { Page } from '@playwright/test';
  * déborde, chaque lien mène quelque part, les onglets et la glissière marchent, la démo s'ouvre.
  */
 const PAGES = [
-  { path: '', lang: 'en', cta: 'Try the live demo', other: 'Français', otherLang: 'fr' },
-  { path: 'fr/', lang: 'fr', cta: 'Essayer la démo', other: 'English', otherLang: 'en' },
+  {
+    path: '',
+    lang: 'en',
+    cta: 'Try the live demo',
+    other: 'Français',
+    otherLang: 'fr',
+    demoHeading: 'Factory line',
+  },
+  {
+    path: 'fr/',
+    lang: 'fr',
+    cta: 'Essayer la démo',
+    other: 'English',
+    otherLang: 'en',
+    demoHeading: 'Ligne d’usine',
+  },
 ] as const;
 
 /** Erreurs de la page : console, exceptions, requêtes du site en échec ou en 4xx/5xx. */
@@ -248,12 +262,18 @@ for (const site of PAGES) {
       await expect(page.locator('html')).toHaveAttribute('lang', site.otherLang);
     });
 
-    test('le bouton de la démo ouvre la vraie app, sans service worker', async ({ page }) => {
+    test('le bouton de la démo ouvre la vraie app dans la langue de la page, sans service worker', async ({
+      page,
+    }) => {
       const errors = watchErrors(page);
+      // Le navigateur parle l'autre langue : c'est la page qui choisit celle de la démo.
+      await page.addInitScript((lang) => {
+        Object.defineProperty(navigator, 'language', { get: () => lang });
+      }, site.otherLang);
       await page.goto(site.path);
       await page.getByRole('link', { name: site.cta }).first().click();
       await expect(page).toHaveURL(/\/factory-live\/demo\/$/);
-      await expect(page.getByRole('heading', { level: 1, name: 'Ligne d’usine' })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1, name: site.demoHeading })).toBeVisible();
       const workers = await page.evaluate(async () =>
         'serviceWorker' in navigator
           ? (await navigator.serviceWorker.getRegistrations()).length

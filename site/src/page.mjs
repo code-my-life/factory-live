@@ -29,13 +29,14 @@ function external(target) {
 }
 
 /**
- * Une image du site : `name` dans assets/img, sa densité (2x, 3x) et sa taille en pixels mesurée au
- * build (`page.images`). Les attributs width et height réservent la place avant le chargement.
+ * Une image du site : `name` dans assets/img/<langue>, sa densité (2x, 3x) et sa taille en pixels
+ * mesurée au build (`page.images`). Les attributs width et height réservent la place avant le
+ * chargement.
  */
 function img(page, name, density, alt, extra = '') {
   const size = page.images[name];
   if (!size) throw new Error(`Image absente : ${name}`);
-  const src = `${page.root}assets/img/${name}`;
+  const src = `${page.root}assets/img/${page.lang}/${name}`;
   const width = Math.round(size.width / density);
   const height = Math.round(size.height / density);
   return `<img src="${src}" srcset="${src} ${density}x" width="${width}" height="${height}" alt="${attr(alt)}"${extra}>`;
@@ -61,7 +62,7 @@ function head(t, page) {
 <meta property="og:description" content="${attr(t.meta.description)}">
 <meta property="og:url" content="${url}">
 <meta property="og:locale" content="${t.lang === 'fr' ? 'fr_FR' : 'en_US'}">
-<meta property="og:image" content="${SITE_URL}assets/img/og.png">
+<meta property="og:image" content="${SITE_URL}assets/img/${page.lang}/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="${attr(t.meta.ogAlt)}">
@@ -109,7 +110,7 @@ function hero(t, page) {
 <span class="stage-stop" aria-hidden="true">${logo('stage-logo')}</span>
 <div class="hero-shot" data-ui>
 <picture>
-<source media="(max-width: 47.99rem)" srcset="${page.root}assets/img/line-phone.webp 3x" width="${Math.round(page.images['line-phone.webp'].width / 3)}" height="${Math.round(page.images['line-phone.webp'].height / 3)}">
+<source media="(max-width: 47.99rem)" srcset="${page.root}assets/img/${page.lang}/line-phone.webp 3x" width="${Math.round(page.images['line-phone.webp'].width / 3)}" height="${Math.round(page.images['line-phone.webp'].height / 3)}">
 ${img(page, 'line-hero.webp', 2, t.hero.alt, ' class="hero-image" fetchpriority="high"')}
 </picture>
 </div>

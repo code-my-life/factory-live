@@ -45,6 +45,22 @@
     });
   }
 
+  /**
+   * La démo s'ouvre dans la langue de la page : l'app lit `factory-live:locale` (sa langue choisie
+   * dans Réglages) avant celle du navigateur. Sans script ou sans stockage, elle suit le navigateur.
+   */
+  const remember = (event) => {
+    const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+    if (!link || !/(^|\/)demo\/(#|$)/.test(link.getAttribute('href') ?? '')) return;
+    try {
+      localStorage.setItem('factory-live:locale', root.lang === 'fr' ? 'fr' : 'en');
+    } catch {
+      // Stockage indisponible (navigation privée, aperçu) : la démo suit la langue du navigateur.
+    }
+  };
+  document.addEventListener('click', remember);
+  document.addEventListener('auxclick', remember);
+
   /** La glissière de « Comment ça marche » : une étape, son texte, son chemin dans le schéma. */
   const how = document.querySelector('.how');
   const range = how?.querySelector('.stage-range');

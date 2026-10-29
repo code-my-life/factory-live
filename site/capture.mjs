@@ -1,9 +1,11 @@
-// Refait les captures du site (site/src/img/) et celle du README (docs/factory-live.png) sur la
-// démo : heure figée, animations en pause, police Mona Sans (la première de la pile de Primer).
+// Refait les captures du site (site/src/img/<langue>/) et celles des README (docs/factory-live.png,
+// docs/factory-live.fr.png) sur la démo, une passe par langue : la page anglaise montre l'app en
+// anglais, la française en français. Heure figée, animations en pause, police Mona Sans (la
+// première de la pile de Primer).
 // Les polices de secours varient d'un poste à l'autre : lancer dans l'image de Playwright (RUNBOOK).
 //   node site/capture.mjs
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -12,7 +14,11 @@ import { serve } from './serve.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const IMG = join(ROOT, 'site/src/img');
-const README_IMAGE = join(ROOT, 'docs/factory-live.png');
+/** La langue de l'app (Réglages), celle du navigateur, et la capture du README de cette langue. */
+const LANGUAGES = [
+  { lang: 'en', locale: 'en-US', readme: join(ROOT, 'docs/factory-live.png') },
+  { lang: 'fr', locale: 'fr-FR', readme: join(ROOT, 'docs/factory-live.fr.png') },
+];
 const NOW = new Date('2026-10-28T18:00:00Z');
 const require = createRequire(import.meta.url);
 
@@ -178,46 +184,57 @@ try {
   const encoder = await browser.newPage();
   const fontCss = monaSansCss();
   try {
-    for (const shot of SHOTS) {
-      const context = await browser.newContext({
-        ...shot.device,
-        colorScheme: 'dark',
-        locale: 'fr-FR',
-        timezoneId: 'Europe/Paris',
-      });
-      // La police entre au DOMContentLoaded : au tout début du document, <head> n'existe pas encore.
-      await context.addInitScript((css) => {
-        localStorage.setItem('factory-live:motion', 'paused');
-        const add = () => {
-          const style = document.createElement('style');
-          style.textContent = css;
-          document.head.append(style);
-        };
-        if (document.head) add();
-        else document.addEventListener('DOMContentLoaded', add, { once: true });
-      }, fontCss);
-      const page = await context.newPage();
-      await page.clock.setFixedTime(NOW);
-      await page.goto(new URL(shot.route.slice(1), url).href);
-      await page.getByRole('heading', { level: 1 }).first().waitFor();
-      const loaded = await page.evaluate(async () => {
-        await document.fonts.load('600 16px "Mona Sans VF"');
-        await document.fonts.ready;
-        return [...document.fonts].some(
-          (face) => face.family.replace(/"/g, '') === 'Mona Sans VF' && face.status === 'loaded',
+    for (const { lang, locale, readme } of LANGUAGES) {
+      mkdirSync(join(IMG, lang), { recursive: true });
+      for (const shot of SHOTS) {
+        const context = await browser.newContext({
+          ...shot.device,
+          colorScheme: 'dark',
+          locale,
+          timezoneId: 'Europe/Paris',
+        });
+        // La police entre au DOMContentLoaded : au tout début du document, <head> n'existe pas encore.
+        await context.addInitScript(
+          ({ css, lang }) => {
+            localStorage.setItem('factory-live:motion', 'paused');
+            localStorage.setItem('factory-live:locale', lang);
+            const add = () => {
+              const style = document.createElement('style');
+              style.textContent = css;
+              document.head.append(style);
+            };
+            if (document.head) add();
+            else document.addEventListener('DOMContentLoaded', add, { once: true });
+          },
+          { css: fontCss, lang },
         );
-      });
-      if (!loaded) throw new Error(`Capture ${shot.name} : Mona Sans non chargée`);
-      await page.waitForTimeout(600);
-      const clip = shot.clip ? await shot.clip(page) : undefined;
-      const png = await page.screenshot({ clip, fullPage: Boolean(clip), animations: 'disabled' });
-      if (shot.png) writeFileSync(join(IMG, `${shot.name}.png`), png);
-      else writeFileSync(join(IMG, `${shot.name}.webp`), await toWebp(encoder, png));
-      if (shot.name === 'line-desktop') writeFileSync(README_IMAGE, png);
-      console.log(
-        `${shot.name} : ${clip ? `${Math.round(clip.width)} x ${Math.round(clip.height)}` : 'écran'}`,
-      );
-      await context.close();
+        const page = await context.newPage();
+        await page.clock.setFixedTime(NOW);
+        await page.goto(new URL(shot.route.slice(1), url).href);
+        await page.getByRole('heading', { level: 1 }).first().waitFor();
+        const loaded = await page.evaluate(async () => {
+          await document.fonts.load('600 16px "Mona Sans VF"');
+          await document.fonts.ready;
+          return [...document.fonts].some(
+            (face) => face.family.replace(/"/g, '') === 'Mona Sans VF' && face.status === 'loaded',
+          );
+        });
+        if (!loaded) throw new Error(`Capture ${lang}/${shot.name} : Mona Sans non chargée`);
+        await page.waitForTimeout(600);
+        const clip = shot.clip ? await shot.clip(page) : undefined;
+        const png = await page.screenshot({
+          clip,
+          fullPage: Boolean(clip),
+          animations: 'disabled',
+        });
+        if (shot.png) writeFileSync(join(IMG, lang, `${shot.name}.png`), png);
+        else writeFileSync(join(IMG, lang, `${shot.name}.webp`), await toWebp(encoder, png));
+        if (shot.name === 'line-desktop') writeFileSync(readme, png);
+        console.log(
+          `${lang}/${shot.name} : ${clip ? `${Math.round(clip.width)} x ${Math.round(clip.height)}` : 'écran'}`,
+        );
+        await context.close();
+      }
     }
   } finally {
     await browser.close();

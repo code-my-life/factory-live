@@ -59,12 +59,12 @@ Une capture qui change exprès : la même commande avec `npm run e2e:captures --
 
 `site/` construit la page d'accueil (anglais, `fr/`) et la démo de l'app dans `site/dist`, servi sous `/factory-live/` comme sur GitHub Pages :
 
-| Besoin               | Commande                                                                                     |
-| -------------------- | -------------------------------------------------------------------------------------------- |
-| Construire           | `npm run site:build`                                                                         |
-| Prévisualiser        | `npm run site:preview`, puis http://127.0.0.1:4195/factory-live/                             |
-| Tester               | `npm run site:test` (WebKit : la commande des e2e ci-dessus, `-c site/playwright.config.ts`) |
-| Refaire les captures | la commande ci-dessous, puis relire `site/src/img/` et `docs/factory-live.png`               |
+| Besoin               | Commande                                                                                             |
+| -------------------- | ---------------------------------------------------------------------------------------------------- |
+| Construire           | `npm run site:build`                                                                                 |
+| Prévisualiser        | `npm run site:preview`, puis http://127.0.0.1:4195/factory-live/                                     |
+| Tester               | `npm run site:test` (WebKit : la commande des e2e ci-dessus, `-c site/playwright.config.ts`)         |
+| Refaire les captures | la commande ci-dessous, puis relire `site/src/img/en`, `site/src/img/fr` et `docs/factory-live*.png` |
 
 ```sh
 docker run --rm --ipc=host --user "$(id -u):$(id -g)" -e HOME=/tmp \

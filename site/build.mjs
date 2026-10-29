@@ -116,22 +116,42 @@ mkdirSync(join(OUT, 'fr'), { recursive: true });
 
 if (!values['no-demo']) buildDemo();
 
-const images = Object.fromEntries(
-  readdirSync(join(SRC, 'img')).map((name) => [
-    name,
-    imageSize(readFileSync(join(SRC, 'img', name))),
-  ]),
-);
+/** Les captures de chaque langue, dans img/<langue>/, avec leur taille en pixels. */
+function imagesOf(lang) {
+  return Object.fromEntries(
+    readdirSync(join(SRC, 'img', lang)).map((name) => [
+      name,
+      imageSize(readFileSync(join(SRC, 'img', lang, name))),
+    ]),
+  );
+}
+const images = { en: imagesOf('en'), fr: imagesOf('fr') };
 const pages = [
   {
     file: 'index.html',
     content: en,
-    page: { path: '', root: '', otherLang: 'fr', otherPath: 'fr/', otherHref: 'fr/', images },
+    page: {
+      path: '',
+      root: '',
+      lang: 'en',
+      otherLang: 'fr',
+      otherPath: 'fr/',
+      otherHref: 'fr/',
+      images: images.en,
+    },
   },
   {
     file: 'fr/index.html',
     content: fr,
-    page: { path: 'fr/', root: '../', otherLang: 'en', otherPath: '', otherHref: '../', images },
+    page: {
+      path: 'fr/',
+      root: '../',
+      lang: 'fr',
+      otherLang: 'en',
+      otherPath: '',
+      otherHref: '../',
+      images: images.fr,
+    },
   },
 ];
 for (const { file, content, page } of pages) {
@@ -162,4 +182,6 @@ cpSync(join(SRC, 'img'), join(OUT, 'assets/img'), { recursive: true });
 cpSync(join(ROOT, 'apps/web/public/icons/icon.svg'), join(OUT, 'favicon.svg'));
 
 const demo = existsSync(join(OUT, 'demo/index.html')) ? ', démo' : ', sans la démo';
-console.log(`Site construit dans ${OUT} : 2 pages, ${Object.keys(images).length} images${demo}.`);
+console.log(
+  `Site construit dans ${OUT} : 2 pages, ${Object.keys(images.en).length} images par langue${demo}.`,
+);
