@@ -91,6 +91,20 @@ for (const file of files.filter((name) => UI_SOURCES.test(name) && !/\.test\.tsx
   });
 }
 
+// Les pages publiques (README, site) : le même vocabulaire que l'app. Le nom d'hôte de tailnet réel y
+// est déjà refusé plus haut, comme partout ; les exemples s'écrivent <machine>.<tailnet>.ts.net.
+const PUBLIC = /^(README(\.fr)?\.md|site\/src\/.*\.(mjs|js|css|html))$/;
+const PUBLIC_RULES = [{ pattern: /\bprofile?s?\b/i, message: 'écrire « agent »' }];
+for (const file of files.filter((name) => PUBLIC.test(name))) {
+  readFileSync(file, 'utf8')
+    .split('\n')
+    .forEach((line, index) => {
+      for (const rule of PUBLIC_RULES) {
+        if (rule.pattern.test(line)) vocabulary.push(`${file}:${index + 1} (${rule.message})`);
+      }
+    });
+}
+
 if (
   offenders.length > 0 ||
   vocabulary.length > 0 ||
@@ -106,9 +120,9 @@ if (
       `Valeur propre à ce PC (à mettre dans docker/.env, exemple fictif ailleurs) :\n${infrastructure.join('\n')}`,
     );
   if (vocabulary.length > 0)
-    console.error(`Vocabulaire de l'interface :\n${vocabulary.join('\n')}`);
+    console.error(`Vocabulaire et pages publiques :\n${vocabulary.join('\n')}`);
   process.exit(1);
 }
 console.log(
-  `check-text : ${files.length} fichiers, aucun tiret cadratin, vocabulaire de l'interface respecté, aucune valeur propre à ce PC, workflows en lecture par défaut.`,
+  `check-text : ${files.length} fichiers, aucun tiret cadratin, vocabulaire de l'interface et des pages publiques respecté, aucune valeur propre à ce PC, workflows en lecture par défaut.`,
 );
