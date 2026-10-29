@@ -69,7 +69,6 @@
 .figureValue {
   margin: var(--base-size-2) 0 0;
   font: var(--text-title-shorthand-medium);
-  font-variant-numeric: tabular-nums;
 }
 
 /*

@@ -80,7 +80,6 @@
 .metricValue {
   margin: 0;
   font: var(--text-caption-shorthand);
-  font-variant-numeric: tabular-nums;
 }
 
 .checked {

@@ -347,7 +347,6 @@
   margin-left: auto;
   color: var(--fgColor-muted);
   font-family: var(--fontStack-monospace);
-  font-variant-numeric: tabular-nums;
 }
 
 .entryText {

@@ -162,7 +162,6 @@
   margin-left: auto;
   color: var(--fgColor-muted);
   font: var(--text-caption-shorthand);
-  font-variant-numeric: tabular-nums;
 }
 
 /* L'action en cours change souvent : la nouvelle entre en fondu (clé = action). */

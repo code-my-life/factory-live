@@ -51,7 +51,6 @@
   margin-left: auto;
   color: var(--fgColor-muted);
   font: var(--text-caption-shorthand);
-  font-variant-numeric: tabular-nums;
 }
 
 .detail {
@@ -73,8 +72,4 @@
   margin: 0;
   color: var(--fgColor-muted);
   font: var(--text-caption-shorthand);
-}
-
-.duration {
-  font-variant-numeric: tabular-nums;
 }

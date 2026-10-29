@@ -70,7 +70,7 @@ export function PullRequestPanel({ issue }: { issue: IssueSummary }) {
       <dl className={styles.facts}>
         <div>
           <dt className={styles.factTerm}>{t.pr.changes}</dt>
-          <dd className={`${styles.factValue} fl-tabular`}>
+          <dd className={styles.factValue}>
             +{pr.additions} −{pr.deletions} · {t.issue.files(pr.changedFiles)}
           </dd>
         </div>

@@ -12,9 +12,5 @@ export function Elapsed({
   const { fmt } = useI18n();
   const now = useNow();
   const text = mode === 'age' ? fmt.age(since, now) : fmt.duration(now - Date.parse(since));
-  return (
-    <time dateTime={since} className="fl-tabular">
-      {text}
-    </time>
-  );
+  return <time dateTime={since}>{text}</time>;
 }

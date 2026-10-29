@@ -176,7 +176,6 @@
   margin: var(--base-size-2) 0 0;
   font: var(--text-body-shorthand-small);
   font-weight: var(--base-text-weight-semibold);
-  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 420px) {

@@ -44,9 +44,7 @@ export function ActivityTimeline({ rows, label }: { rows: readonly TimelineRow[]
                 <p className={styles.meta}>
                   {row.issueKey ? <IssueBadge issueKey={row.issueKey} link /> : null}
                   {row.model ? <ModelBadge model={{ model: row.model }} /> : null}
-                  {row.durationMs !== null ? (
-                    <span className={styles.duration}>{fmt.duration(row.durationMs)}</span>
-                  ) : null}
+                  {row.durationMs !== null ? <span>{fmt.duration(row.durationMs)}</span> : null}
                 </p>
               ) : null}
             </Timeline.Body>

@@ -104,7 +104,6 @@
   margin-inline-start: auto;
   color: var(--fgColor-muted);
   font: var(--text-caption-shorthand);
-  font-variant-numeric: tabular-nums;
 }
 
 .jobTitle {

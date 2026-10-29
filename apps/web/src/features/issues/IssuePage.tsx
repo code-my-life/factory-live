@@ -83,7 +83,7 @@ function RunsTable({
                 {run.profile}
               </span>
               <span className={styles.cellNote}>{t.runRole[run.role]}</span>
-              <span className={`${styles.runDuration} fl-tabular`}>{duration(run)}</span>
+              <span className={styles.runDuration}>{duration(run)}</span>
             </p>
             {run.model || run.laneModel ? (
               <p className={styles.runModels}>
@@ -285,7 +285,7 @@ export function IssuePage() {
         </div>
         <div>
           <dt className={styles.factTerm}>{t.issue.facts.duration}</dt>
-          <dd className={`${styles.factValue} fl-tabular`}>
+          <dd className={styles.factValue}>
             {elapsedEnd !== null ? (
               fmt.duration(elapsedEnd - Date.parse(issue.startedAt))
             ) : (
@@ -295,11 +295,11 @@ export function IssuePage() {
         </div>
         <div>
           <dt className={styles.factTerm}>{t.issue.facts.tokens}</dt>
-          <dd className={`${styles.factValue} fl-tabular`}>{fmt.compact(detail.tokens)}</dd>
+          <dd className={styles.factValue}>{fmt.compact(detail.tokens)}</dd>
         </div>
         <div>
           <dt className={styles.factTerm}>{t.issue.facts.cost}</dt>
-          <dd className={`${styles.factValue} fl-tabular`}>
+          <dd className={styles.factValue}>
             {detail.costUsd > 0 ? fmt.usd(detail.costUsd) : t.issue.facts.noCost}
           </dd>
         </div>
