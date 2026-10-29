@@ -108,6 +108,7 @@ export function createApp(deps: AppDeps) {
         return c.json(
           {
             error: 'Requête invalide',
+            code: 'invalid_request' as const,
             detail: result.error.issues.map((issue) => issue.message).join(' ; '),
           },
           400,
@@ -136,7 +137,7 @@ export function createApp(deps: AppDeps) {
       { component: 'http', path: c.req.path, error: String(error), stack: error.stack },
       'erreur non prévue',
     );
-    return c.json({ error: 'Erreur interne de factory-live' }, 500);
+    return c.json({ error: 'Erreur interne de factory-live', code: 'internal' }, 500);
   });
 
   app.get('/healthz', (c) => c.json({ ok: true, version: deps.version }));
@@ -210,7 +211,9 @@ export function createApp(deps: AppDeps) {
     (c) => {
       const { repo, number } = c.req.valid('param');
       const detail = issueDetail(deps.views, `${repo}#${number}`);
-      return detail ? c.json(detail, 200) : c.json({ error: 'Issue inconnue de la factory' }, 404);
+      return detail
+        ? c.json(detail, 200)
+        : c.json({ error: 'Issue inconnue de la factory', code: 'not_found' as const }, 404);
     },
   );
 
@@ -223,7 +226,9 @@ export function createApp(deps: AppDeps) {
     }),
     (c) => {
       const views = transcripts(deps.views, c.req.valid('param').id);
-      return views ? c.json(views, 200) : c.json({ error: 'Run inconnu' }, 404);
+      return views
+        ? c.json(views, 200)
+        : c.json({ error: 'Run inconnu', code: 'not_found' as const }, 404);
     },
   );
 
@@ -367,7 +372,8 @@ export function createApp(deps: AppDeps) {
           200,
         );
       } catch (error) {
-        if (error instanceof UnblockError) return c.json({ error: error.message }, error.status);
+        if (error instanceof UnblockError)
+          return c.json({ error: error.message, code: error.code }, error.status);
         throw error;
       }
     },
@@ -385,7 +391,7 @@ export function createApp(deps: AppDeps) {
     (c) =>
       deps.notifier
         ? c.json({ publicKey: deps.notifier.publicKey }, 200)
-        : c.json({ error: 'Notifications indisponibles' }, 503),
+        : c.json({ error: 'Notifications indisponibles', code: 'push_unavailable' as const }, 503),
   );
 
   app.openapi(
@@ -422,7 +428,8 @@ export function createApp(deps: AppDeps) {
   );
 
   app.post('/api/push/test', async (c) => {
-    if (!deps.notifier) return c.json({ error: 'Notifications indisponibles' }, 503);
+    if (!deps.notifier)
+      return c.json({ error: 'Notifications indisponibles', code: 'push_unavailable' }, 503);
     const result = await deps.notifier.notify({
       title: 'factory-live : test',
       body: 'Les notifications de cet appareil fonctionnent.',
@@ -435,9 +442,11 @@ export function createApp(deps: AppDeps) {
 
   app.post('/api/client-logs', bodyLimit({ maxSize: 32 * 1024 }), async (c) => {
     const origin = c.req.header('origin');
-    if (origin && !deps.origins.includes(origin)) return c.json({ error: 'Origine refusée' }, 403);
+    if (origin && !deps.origins.includes(origin))
+      return c.json({ error: 'Origine refusée', code: 'origin_refused' }, 403);
     const parsed = ClientLog.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: 'Journal inattendu' }, 400);
+    if (!parsed.success)
+      return c.json({ error: 'Journal inattendu', code: 'invalid_request' }, 400);
     deps.log[parsed.data.level === 'info' ? 'info' : parsed.data.level](
       { component: 'client', ...parsed.data },
       parsed.data.message,
@@ -580,7 +589,7 @@ export function createApp(deps: AppDeps) {
     },
   });
 
-  app.all('/api/*', (c) => c.json({ error: 'Route inconnue' }, 404));
+  app.all('/api/*', (c) => c.json({ error: 'Route inconnue', code: 'not_found' }, 404));
 
   // --- PWA -------------------------------------------------------------------------------------
 

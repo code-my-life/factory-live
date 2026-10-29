@@ -1,4 +1,10 @@
-import { GitHubAccess, IssueDetail, Snapshot, StreamEvent } from '@factory-live/contracts';
+import {
+  ApiError,
+  GitHubAccess,
+  IssueDetail,
+  Snapshot,
+  StreamEvent,
+} from '@factory-live/contracts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { trackUnblockReactions } from '../application/unblock.ts';
 import { sign } from '../ingest/signature.ts';
@@ -50,6 +56,11 @@ const LOCAL = {
   'x-factory-live': '1',
   'content-type': 'application/json',
 };
+/** Statut et code d'un refus de l'API. */
+async function refusal(response: Response): Promise<[number, string | undefined]> {
+  return [response.status, ApiError.parse(await response.json()).code];
+}
+
 const TAILNET = {
   host: 'desktop-gja56n4.tail40220c.ts.net:8446',
   origin: 'https://desktop-gja56n4.tail40220c.ts.net:8446',
@@ -261,35 +272,46 @@ describe('déblocage depuis l’app', () => {
         headers,
         body: JSON.stringify({ text: 'ok' }),
       });
-    expect((await post({ ...LOCAL, 'x-factory-live': '' })).status).toBe(403);
-    expect((await post({ ...LOCAL, origin: 'https://evil.example' })).status).toBe(403);
-    expect((await post({ ...TAILNET })).status).toBe(403);
-    expect((await post({ ...TAILNET, 'tailscale-user-login': 'intrus@github' })).status).toBe(403);
-    expect((await post({ ...LOCAL, 'x-forwarded-for': '100.64.0.7' })).status).toBe(403);
+    expect(await refusal(await post({ ...LOCAL, 'x-factory-live': '' }))).toEqual([
+      403,
+      'csrf_missing',
+    ]);
+    expect(await refusal(await post({ ...LOCAL, origin: 'https://evil.example' }))).toEqual([
+      403,
+      'origin_refused',
+    ]);
+    expect(await refusal(await post({ ...TAILNET }))).toEqual([403, 'write_local_only']);
+    expect(
+      await refusal(await post({ ...TAILNET, 'tailscale-user-login': 'intrus@github' })),
+    ).toEqual([403, 'write_login_refused']);
+    expect(await refusal(await post({ ...LOCAL, 'x-forwarded-for': '100.64.0.7' }))).toEqual([
+      403,
+      'write_local_only',
+    ]);
     expect(h.github.calls.filter((call) => call.method === 'POST')).toHaveLength(0);
     expect((await post({ ...TAILNET, 'tailscale-user-login': 'cddev@github' })).status).toBe(200);
   });
 
-  it('refuse une réponse vide et une intervention inconnue', async () => {
+  it('refuse une réponse vide et une intervention inconnue, avec un code que la PWA écrit dans sa langue', async () => {
     const id = encodeURIComponent(await interventionId());
     expect(
-      (
+      await refusal(
         await h.app.request(`/api/interventions/${id}/unblock`, {
           method: 'POST',
           headers: LOCAL,
           body: JSON.stringify({ text: '   ' }),
-        })
-      ).status,
-    ).toBe(400);
+        }),
+      ),
+    ).toEqual([400, 'invalid_request']);
     expect(
-      (
+      await refusal(
         await h.app.request('/api/interventions/inconnue/unblock', {
           method: 'POST',
           headers: LOCAL,
           body: JSON.stringify({ text: 'ok' }),
-        })
-      ).status,
-    ).toBe(404);
+        }),
+      ),
+    ).toEqual([404, 'intervention_unknown']);
   });
 });
 
@@ -539,8 +561,10 @@ describe('GitHub App et connexion de Clément', () => {
     h.close();
     h = harness({ githubToken: null });
     const response = await unblock(await interventionId());
+    const body = ApiError.parse(await response.json());
     expect(response.status).toBe(503);
-    expect(((await response.json()) as { error: string }).error).toMatch(/Connecte-toi/);
+    expect(body.error).toMatch(/Connecte-toi/);
+    expect(body.code).toBe('github_login_required');
     expect(h.github.calls.filter((call) => call.method === 'POST')).toHaveLength(0);
   });
 

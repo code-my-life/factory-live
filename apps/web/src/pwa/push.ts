@@ -1,5 +1,4 @@
-import { ActionError } from '../data/errors.ts';
-import type { FailedAction } from '../data/errors.ts';
+import { ActionError, refusal } from '../data/errors.ts';
 
 /**
  * Notifications de cet appareil : abonnement Web Push du navigateur (service worker), enregistré
@@ -86,11 +85,6 @@ export function keyBytes(value: string): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
-async function failure(response: Response, action: FailedAction): Promise<Error> {
-  const body = (await response.json().catch(() => ({}))) as { error?: string };
-  return body.error ? new Error(body.error) : new ActionError(action, response.status);
-}
-
 const WRITE_HEADERS = { 'Content-Type': 'application/json', 'X-Factory-Live': '1' };
 
 export async function pushSubscribed(env: PushEnv = browserEnv()): Promise<boolean> {
@@ -105,7 +99,7 @@ export async function enablePush(env: PushEnv = browserEnv()): Promise<void> {
   if (permission !== 'granted')
     throw new ActionError(permission === 'denied' ? 'pushDenied' : 'pushNotAllowed');
   const keyResponse = await env.fetch('/api/push/key', { headers: { Accept: 'application/json' } });
-  if (!keyResponse.ok) throw await failure(keyResponse, 'pushKey');
+  if (!keyResponse.ok) throw await refusal(keyResponse, 'pushKey');
   const { publicKey } = (await keyResponse.json()) as { publicKey: string };
   const registration = await env.navigator.serviceWorker.ready;
   const subscription =
@@ -120,7 +114,7 @@ export async function enablePush(env: PushEnv = browserEnv()): Promise<void> {
     headers: WRITE_HEADERS,
     body: JSON.stringify({ endpoint, keys, device: deviceLabel(env.navigator) }),
   });
-  if (!response.ok) throw await failure(response, 'pushSubscribe');
+  if (!response.ok) throw await refusal(response, 'pushSubscribe');
 }
 
 export async function disablePush(env: PushEnv = browserEnv()): Promise<void> {
@@ -134,11 +128,11 @@ export async function disablePush(env: PushEnv = browserEnv()): Promise<void> {
     headers: WRITE_HEADERS,
     body: JSON.stringify({ endpoint }),
   });
-  if (!response.ok) throw await failure(response, 'pushUnsubscribe');
+  if (!response.ok) throw await refusal(response, 'pushUnsubscribe');
 }
 
 /** Demande au serveur un push de test vers tous les appareils abonnés. */
 export async function sendTestPush(env: PushEnv = browserEnv()): Promise<void> {
   const response = await env.fetch('/api/push/test', { method: 'POST', headers: WRITE_HEADERS });
-  if (!response.ok) throw await failure(response, 'pushTest');
+  if (!response.ok) throw await refusal(response, 'pushTest');
 }

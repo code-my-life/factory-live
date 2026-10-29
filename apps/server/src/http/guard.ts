@@ -36,7 +36,10 @@ export function writeGuard(
     let actor: string;
     if (login) {
       if (!options.tailscaleLogins.includes(login))
-        return c.json({ error: 'Login Tailscale non autorisé à écrire' }, 403);
+        return c.json(
+          { error: 'Login Tailscale non autorisé à écrire', code: 'write_login_refused' },
+          403,
+        );
       actor = `tailscale:${login}`;
     } else if (
       LOCAL_HOSTS.has(host) &&
@@ -46,16 +49,22 @@ export function writeGuard(
       // Une requête passée par `tailscale serve` porte X-Forwarded-* : sans identité, elle n'est pas locale.
       actor = 'local';
     } else {
-      return c.json({ error: 'Écriture réservée à ce PC et à ton login Tailscale' }, 403);
+      return c.json(
+        { error: 'Écriture réservée à ce PC et à ton login Tailscale', code: 'write_local_only' },
+        403,
+      );
     }
     const origin = c.req.header('origin');
     if (origin && !options.origins.includes(origin))
-      return c.json({ error: 'Origine refusée' }, 403);
+      return c.json({ error: 'Origine refusée', code: 'origin_refused' }, 403);
     if (c.req.header(CSRF_HEADER) !== '1')
-      return c.json({ error: 'En-tête x-factory-live manquant' }, 403);
+      return c.json({ error: 'En-tête x-factory-live manquant', code: 'csrf_missing' }, 403);
     const times = (recent.get(actor) ?? []).filter((at) => now() - at < 60_000);
     if (times.length >= limit)
-      return c.json({ error: 'Trop de demandes, réessaie dans une minute' }, 429);
+      return c.json(
+        { error: 'Trop de demandes, réessaie dans une minute', code: 'rate_limited' },
+        429,
+      );
     recent.set(actor, [...times, now()]);
     c.set('actor', actor);
     await next();

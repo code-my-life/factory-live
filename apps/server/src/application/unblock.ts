@@ -1,12 +1,16 @@
+import type { ApiErrorCode } from '@factory-live/contracts';
 import type { Hub } from './hub.ts';
 import type { GitHubWritePort, HistoryPort, LoggerPort, UnblockRecord } from './ports.ts';
 
 export class UnblockError extends Error {
   readonly status: 404 | 409 | 502 | 503;
+  /** Ce que la PWA écrit dans sa langue ; le message reste pour les journaux. */
+  readonly code: ApiErrorCode;
 
-  constructor(status: 404 | 409 | 502 | 503, message: string) {
+  constructor(status: 404 | 409 | 502 | 503, code: ApiErrorCode, message: string) {
     super(message);
     this.status = status;
+    this.code = code;
     this.name = 'UnblockError';
   }
 }
@@ -33,16 +37,19 @@ export async function unblockIntervention(
   actor: string,
 ): Promise<UnblockRecord> {
   const intervention = deps.hub.openInterventions.find((item) => item.id === interventionId);
-  if (!intervention) throw new UnblockError(404, 'Intervention inconnue ou déjà résolue');
+  if (!intervention)
+    throw new UnblockError(404, 'intervention_unknown', 'Intervention inconnue ou déjà résolue');
   if (!intervention.issueKey || !intervention.actions.some((action) => action.kind === 'unblock')) {
     throw new UnblockError(
       409,
+      'unblock_not_available',
       'Cette intervention ne se débloque pas depuis l’app : utilise les commandes proposées',
     );
   }
   if (!deps.github || (deps.canWrite && !deps.canWrite())) {
     throw new UnblockError(
       503,
+      'github_login_required',
       'Connecte-toi à GitHub dans factory-live (Réglages) pour débloquer depuis l’app',
     );
   }
@@ -91,6 +98,7 @@ export async function unblockIntervention(
     );
     throw new UnblockError(
       502,
+      'github_refused',
       'GitHub a refusé le commentaire : réessaie, ou réponds sur l’issue',
     );
   }

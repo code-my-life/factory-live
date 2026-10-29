@@ -1,5 +1,6 @@
 import type {
   AgentState,
+  ApiErrorCode,
   CardKind,
   HealthStatus,
   InterventionKind,
@@ -619,6 +620,24 @@ export const fr = {
       pushTest: 'Test refusé par factory-live',
     },
     http: (what: string, status: number) => `${what} (HTTP ${status})`,
+    /** Ce que dit l'API quand elle refuse (`ApiError.code`). */
+    api: {
+      invalid_request: 'Requête invalide',
+      not_found: 'Introuvable',
+      internal: 'Erreur interne de factory-live',
+      intervention_unknown: 'Intervention inconnue ou déjà résolue',
+      unblock_not_available:
+        'Cette intervention ne se débloque pas depuis l’app : utilise les commandes proposées',
+      github_login_required:
+        'Connecte-toi à GitHub dans factory-live (Réglages) pour débloquer depuis l’app',
+      github_refused: 'GitHub a refusé le commentaire : réessaie, ou réponds sur l’issue',
+      push_unavailable: 'Notifications indisponibles',
+      write_login_refused: 'Login Tailscale non autorisé à écrire',
+      write_local_only: 'Écriture réservée à ce PC et à ton login Tailscale',
+      origin_refused: 'Origine refusée',
+      csrf_missing: 'En-tête x-factory-live manquant',
+      rate_limited: 'Trop de demandes, réessaie dans une minute',
+    } satisfies Record<ApiErrorCode, string>,
   },
 
   notification: {

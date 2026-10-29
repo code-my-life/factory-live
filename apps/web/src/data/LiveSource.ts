@@ -11,7 +11,7 @@ import type {
   UsageReport,
 } from '@factory-live/contracts';
 import { STREAM_PING, STREAM_PING_EVERY_MS } from '@factory-live/contracts';
-import { ActionError } from './errors.ts';
+import { refusal } from './errors.ts';
 import type { Connection, FactoryDataSource, UsagePeriod } from './source.ts';
 
 type Fetch = typeof fetch;
@@ -364,7 +364,7 @@ export class LiveSource implements FactoryDataSource {
       method: 'POST',
       headers: { 'X-Factory-Live': '1' },
     });
-    if (!response.ok) throw new ActionError('logout', response.status);
+    if (!response.ok) throw await refusal(response, 'logout');
     if (this.github) this.github.stale = true;
     this.getGitHubAccess();
   }
@@ -463,9 +463,6 @@ export class LiveSource implements FactoryDataSource {
         body: JSON.stringify({ text }),
       },
     );
-    if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as { error?: string };
-      throw body.error ? new Error(body.error) : new ActionError('unblock', response.status);
-    }
+    if (!response.ok) throw await refusal(response, 'unblock');
   }
 }

@@ -1,5 +1,8 @@
 import type { ActivityEvent, IssueDetail, Snapshot } from '@factory-live/contracts';
 import { describe, expect, it, vi } from 'vitest';
+import { en } from '../i18n/en.ts';
+import { fr } from '../i18n/fr.ts';
+import { describeError } from './errors.ts';
 import { LOST_AFTER_MS, LiveSource, RECONNECT_DELAYS_MS, SILENT_AFTER_MS } from './LiveSource.ts';
 import type { LiveOptions, StreamLike } from './LiveSource.ts';
 
@@ -66,7 +69,7 @@ function setup(routes: Record<string, unknown> = {}, options: Partial<LiveOption
     const body = Object.entries(routes).find(([route]) => url.endsWith(route))?.[1];
     return Promise.resolve(
       body === undefined
-        ? new Response('{"error":"Introuvable"}', { status: 404 })
+        ? new Response('{"error":"Introuvable","code":"not_found"}', { status: 404 })
         : new Response(JSON.stringify(body), { status: 200 }),
     );
   }) as unknown as typeof fetch;
@@ -158,9 +161,12 @@ describe('LiveSource', () => {
 
   it('débloque avec l’en-tête anti-CSRF et remonte le refus du serveur', async () => {
     const { source, calls } = setup();
-    await expect(source.unblock('needs_input:t_1:10', 'Prends PostgreSQL')).rejects.toThrow(
-      'Introuvable',
-    );
+    const refused = await source
+      .unblock('needs_input:t_1:10', 'Prends PostgreSQL')
+      .catch((error: unknown) => error);
+    expect(refused).toMatchObject({ action: 'unblock', status: 404, code: 'not_found' });
+    expect(describeError(refused, fr)).toBe('Introuvable');
+    expect(describeError(refused, en)).toBe('Not found');
     const call = calls.at(-1);
     expect(call?.url).toBe('/api/interventions/needs_input%3At_1%3A10/unblock');
     expect(new Headers(call?.init?.headers).get('x-factory-live')).toBe('1');

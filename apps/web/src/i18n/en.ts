@@ -577,6 +577,22 @@ export const en: Messages = {
       pushTest: 'Test refused by factory-live',
     },
     http: (what, status) => `${what} (HTTP ${status})`,
+    api: {
+      invalid_request: 'Invalid request',
+      not_found: 'Not found',
+      internal: 'factory-live internal error',
+      intervention_unknown: 'Unknown or already resolved intervention',
+      unblock_not_available:
+        'This intervention can’t be unblocked from the app: use the suggested commands',
+      github_login_required: 'Sign in to GitHub in factory-live (Settings) to unblock from the app',
+      github_refused: 'GitHub refused the comment: try again, or reply on the issue',
+      push_unavailable: 'Notifications unavailable',
+      write_login_refused: 'This Tailscale login isn’t allowed to write',
+      write_local_only: 'Writing is limited to this PC and your Tailscale login',
+      origin_refused: 'Origin refused',
+      csrf_missing: 'Missing x-factory-live header',
+      rate_limited: 'Too many requests, try again in a minute',
+    },
   },
 
   notification: {

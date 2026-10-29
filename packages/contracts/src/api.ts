@@ -23,8 +23,33 @@ export const ClientLog = z.object({
 });
 export type ClientLog = z.infer<typeof ClientLog>;
 
+/**
+ * Raison d'un refus que la PWA peut montrer : elle l'écrit dans sa langue. Le texte de `error`
+ * reste en français, pour les journaux et pour qui appelle l'API à la main.
+ */
+export const ApiErrorCode = z.enum([
+  'invalid_request',
+  'not_found',
+  'internal',
+  'intervention_unknown',
+  'unblock_not_available',
+  'github_login_required',
+  'github_refused',
+  'push_unavailable',
+  'write_login_refused',
+  'write_local_only',
+  'origin_refused',
+  'csrf_missing',
+  'rate_limited',
+]);
+export type ApiErrorCode = z.infer<typeof ApiErrorCode>;
+
 /** Réponse d'erreur commune de l'API. */
-export const ApiError = z.object({ error: z.string(), detail: z.string().optional() });
+export const ApiError = z.object({
+  error: z.string(),
+  code: ApiErrorCode.optional(),
+  detail: z.string().optional(),
+});
 export type ApiError = z.infer<typeof ApiError>;
 
 /** Accès de factory-live à GitHub : GitHub App (lectures) et connexion de Clément (déblocage). */
