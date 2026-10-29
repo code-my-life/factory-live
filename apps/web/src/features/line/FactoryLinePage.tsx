@@ -17,7 +17,8 @@ import { WorkStateLabel, cardWorkState, interventionTone } from '../../ui/work/w
 import { IssueJob } from './IssueJob.tsx';
 import { LiveActivity } from './LiveActivity.tsx';
 import { LiveAgents } from './LiveAgents.tsx';
-import { STATION_ICON, StationCounter, StationCrew, stationTone } from './stations.tsx';
+import { STATION_ICON } from '../../ui/flow/StationMark.tsx';
+import { StationCounter, StationCrew, stationTone } from './stations.tsx';
 import styles from './line.module.css';
 
 /** Une issue qui vient de changer de station : le compteur de la station d'arrivée bat une fois. */

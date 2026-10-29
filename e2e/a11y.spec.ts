@@ -17,6 +17,12 @@ for (const route of ROUTES) {
   test(`accessibilité : ${route}`, async ({ page }) => {
     await page.goto(route);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    // La page posée : Mona Sans chargée (elle change la largeur des textes, donc ce qui déborde), puis
+    // deux images pour que les régions défilantes des tableaux de Primer aient pris leur tabindex.
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    });
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
       .analyze();

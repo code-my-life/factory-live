@@ -1,30 +1,9 @@
 import type { AgentActivity, IssueSummary, StationId, StationView } from '@factory-live/contracts';
-import {
-  BlockedIcon,
-  CheckCircleIcon,
-  CodeIcon,
-  IssueOpenedIcon,
-  RocketIcon,
-  ShieldCheckIcon,
-  WorkflowIcon,
-} from '@primer/octicons-react';
-import type { Icon } from '@primer/octicons-react';
 import { CounterLabel } from '@primer/react';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import type { FlowTone } from '../../ui/flow/FlowStop.tsx';
 import styles from './line.module.css';
-
-export const STATION_ICON: Record<StationId, Icon> = {
-  intake: IssueOpenedIcon,
-  brief: WorkflowIcon,
-  implementation: CodeIcon,
-  gate: ShieldCheckIcon,
-  release: RocketIcon,
-  done: CheckCircleIcon,
-  stopped: BlockedIcon,
-  side: WorkflowIcon,
-};
 
 const AGENT_ORDER: Record<AgentActivity['state'], number> = {
   cli: 0,

@@ -658,7 +658,7 @@ export const en: Messages = {
     tokensValue: (tokens) => `${tokens} tokens`,
     rateLimitedPerDay: '429 responses per day',
     rateLimitedValue: (count, formatted) =>
-      `${formatted} 429 ${f.plural(count, 'response', 'responses')}`,
+      `${formatted} ${f.plural(count, 'response', 'responses')} (429)`,
     byModel: 'By model',
     columns: {
       model: 'Model',

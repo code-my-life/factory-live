@@ -75,6 +75,14 @@ describe('pluriels et nombres dans les textes', () => {
     expect(english.shell.running(1, 2)).toBe('1 of 2 cards running');
   });
 
+  it('ne colle jamais un compte au code 429 : « 10 429 » se lirait comme un seul nombre', () => {
+    const { t: french } = i18nOf('fr');
+    const { t: english } = i18nOf('en');
+    expect(french.costs.rateLimitedValue(10, '10')).toBe('10 réponses 429');
+    expect(english.costs.rateLimitedValue(10, '10')).toBe('10 responses (429)');
+    expect(english.costs.rateLimitedValue(1, '1')).toBe('1 response (429)');
+  });
+
   it('écrit les durées et les nombres de chaque langue', () => {
     expect(i18nOf('fr').fmt.duration(252_000)).toBe('4 min 12 s');
     expect(i18nOf('en').fmt.duration(252_000)).toBe('4m 12s');

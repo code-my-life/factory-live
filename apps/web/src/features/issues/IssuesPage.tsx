@@ -9,6 +9,7 @@ import type { Messages } from '../../i18n/fr.ts';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import { IssueBadge, issueState } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
+import { StationMark } from '../../ui/flow/StationMark.tsx';
 import { issuePath } from '../../ui/paths.ts';
 import { WorkStateLabel, issueWorkState } from '../../ui/work/workState.tsx';
 import styles from './issues.module.css';
@@ -59,7 +60,7 @@ export function IssuesPage() {
               </span>
               <span className={styles.issueRowMeta}>
                 <WorkStateLabel state={issueWorkState(issue, null, t)} />
-                <span>{t.station[issue.station]}</span>
+                <StationMark station={issue.station} />
                 {issue.activeProfiles.map((profile) => (
                   <span key={profile} className={styles.agentCell}>
                     <AgentAvatar profile={profile} size={16} named />

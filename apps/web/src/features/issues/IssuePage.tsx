@@ -21,6 +21,7 @@ import { CardBadge } from '../../ui/badge/CardBadge.tsx';
 import { ChecksBadge } from '../../ui/badge/ChecksBadge.tsx';
 import { IssueBadge, issueState } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
+import { StationMark } from '../../ui/flow/StationMark.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import { useMotion } from '../../ui/motion.tsx';
 import { ActivityTimeline } from '../../ui/timeline/ActivityTimeline.tsx';
@@ -240,7 +241,9 @@ export function IssuePage() {
         </Heading>
         <div className={styles.issueMeta}>
           <WorkStateLabel state={issueWorkState(issue, null, t)} />
-          <span className={styles.metaText}>{t.issue.stage(t.station[issue.station])}</span>
+          <span className={styles.metaText}>
+            <StationMark station={issue.station} label={t.issue.stage(t.station[issue.station])} />
+          </span>
           <LabelGroup>
             {issue.labels.map((label) => (
               <Label key={label} variant="secondary">

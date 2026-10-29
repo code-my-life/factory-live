@@ -1,11 +1,12 @@
 import type { AgentActivity, ProfileView } from '@factory-live/contracts';
 import { AlertIcon, ArrowRightIcon } from '@primer/octicons-react';
-import { Heading, Label, Token } from '@primer/react';
+import { Heading, Token } from '@primer/react';
 import { useProfiles, useSnapshot } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
+import { StationMark } from '../../ui/flow/StationMark.tsx';
 import { LiveDot } from '../../ui/LiveDot.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import type { ModelName } from '../../ui/ModelBadge.tsx';
@@ -48,7 +49,9 @@ function AgentProfileCard({
         <h2 id={`agent-${profile.name}`} className={styles.name}>
           {profile.name}
         </h2>
-        <Label variant="secondary">{t.station[profile.station]}</Label>
+        <span className={styles.station}>
+          <StationMark station={profile.station} />
+        </span>
       </header>
       <p className={styles.role}>{text(profile.role)}</p>
 
