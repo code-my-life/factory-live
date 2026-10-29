@@ -4,6 +4,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { GitHubAppAuth } from '../adapters/github/app.ts';
 import { GitHubCache } from '../adapters/github/cache.ts';
 import { GitHubClient } from '../adapters/github/client.ts';
+import { AgentLogReader } from '../adapters/hermes/agentLog.ts';
 import { CardFiles } from '../adapters/hermes/files.ts';
 import { KanbanReader } from '../adapters/hermes/kanban.ts';
 import { HermesPaths } from '../adapters/hermes/paths.ts';
@@ -223,7 +224,7 @@ export function harness(
         sessions,
         profiles,
         files,
-        agentLog: null,
+        agentLog: new AgentLogReader(paths, 'Europe/Paris'),
         log,
         boardName: 'factory',
       }),

@@ -69,3 +69,13 @@ describe('configuration, bot de la factory', () => {
     );
   });
 });
+
+describe('configuration, fuseau du journal d’Hermès', () => {
+  it('Paris par défaut, un autre fuseau IANA si demandé, et rien d’inconnu', () => {
+    expect(loadConfig(BASE).HERMES_TZ).toBe('Europe/Paris');
+    expect(loadConfig({ ...BASE, HERMES_TZ: 'America/Montreal' }).HERMES_TZ).toBe(
+      'America/Montreal',
+    );
+    expect(() => loadConfig({ ...BASE, HERMES_TZ: 'Mars/Olympus' })).toThrow();
+  });
+});

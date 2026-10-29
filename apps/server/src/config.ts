@@ -72,6 +72,21 @@ const Env = z.object({
     .transform((value) => value || null),
   FREELLMAPI_URL: z.string().default(''),
   HELD_AFTER_MINUTES: z.coerce.number().int().positive().default(30),
+  /**
+   * Fuseau de la machine où tourne Hermès : son journal (`logs/agent.log`) note l'heure locale sans
+   * fuseau. Le conteneur est en UTC ; sans ce réglage, les lignes du journal seraient décalées.
+   */
+  HERMES_TZ: z
+    .string()
+    .default('Europe/Paris')
+    .refine((zone) => {
+      try {
+        new Intl.DateTimeFormat('en-US', { timeZone: zone });
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'fuseau IANA inconnu (exemple : Europe/Paris)'),
   /** Contact exigé par Web Push (claim `sub`) : l'URL du dépôt plutôt qu'une adresse e-mail. */
   VAPID_SUBJECT: z.string().default('https://github.com/code-my-life/factory-live'),
   DEMO: flag,

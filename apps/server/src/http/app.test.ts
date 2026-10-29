@@ -916,6 +916,24 @@ describe('diagnostic des blocages', () => {
     expect(intervention?.diagnosis?.sources).toMatchObject({ transcript: true, config: true });
   });
 
+  it('confirme par le journal d’Hermès, à l’heure de Paris, quel hook a été coupé', async () => {
+    hookTimeoutIncident();
+    expect((await snapshot()).interventions[0]?.diagnosis?.sources.agentLog).toBe(false);
+    // 17:43:51 UTC, 18:43:51 à Paris : la ligne du dépassement, 30 s après le `git commit`.
+    mkdirSync(join(coder(), 'logs'), { recursive: true });
+    writeFileSync(
+      join(coder(), 'logs', 'agent.log'),
+      "2026-10-28 18:43:51,000 WARNING [20261028_163000_abcdef] hermes_cli.plugins: Hook 'pre_tool_call' callback pre_tool timed out after 30s \u2014 skipping\n",
+    );
+    h.clock.now = NOW + 16_000;
+    h.hub.refreshDiagnoses();
+    const primary = (await snapshot()).interventions[0]?.diagnosis?.primary;
+    expect(primary).toMatchObject({ code: 'guard_hook_timeout', confidence: 'certain' });
+    expect(primary?.evidence.find((item) => item.source === 'agent_log')).toMatchObject({
+      at: new Date((NOW_S - 969) * 1000).toISOString(),
+    });
+  });
+
   it('refuse de débloquer tant que la cause est là, sauf à le vouloir', async () => {
     hookTimeoutIncident();
     const id = (await snapshot()).interventions[0]?.id as string;

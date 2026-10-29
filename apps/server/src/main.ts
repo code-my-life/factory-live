@@ -4,6 +4,7 @@ import { serve } from '@hono/node-server';
 import { GitHubAppAuth } from './adapters/github/app.ts';
 import { GitHubCache } from './adapters/github/cache.ts';
 import { GitHubClient } from './adapters/github/client.ts';
+import { AgentLogReader } from './adapters/hermes/agentLog.ts';
 import { CardFiles } from './adapters/hermes/files.ts';
 import { KanbanReader } from './adapters/hermes/kanban.ts';
 import { HermesPaths } from './adapters/hermes/paths.ts';
@@ -54,7 +55,7 @@ const diagnoses = new DiagnosisService({
   sessions,
   profiles,
   files,
-  agentLog: null,
+  agentLog: new AgentLogReader(paths, config.HERMES_TZ),
   log: log.child({ component: 'diagnosis' }),
   boardName: config.HERMES_BOARD,
 });
