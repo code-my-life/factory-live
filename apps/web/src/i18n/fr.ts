@@ -37,7 +37,7 @@ const station = {
   release: 'Release',
   done: 'Terminé',
   stopped: 'Arrêté',
-  side: 'Hors ligne',
+  side: 'Voie annexe',
 } satisfies Record<StationId, string>;
 
 const intervention = {

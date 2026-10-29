@@ -1,20 +1,22 @@
-import { Heading, Link, Text } from '@primer/react';
-import { Link as RouterLink } from 'react-router';
+import { LocationIcon } from '@primer/octicons-react';
+import { Blankslate } from '@primer/react/experimental';
+import { useNavigate } from 'react-router';
 import { useI18n } from '../i18n/I18nProvider.tsx';
 
+/** Une adresse sans vue : l'état vide de Primer (Blankslate), et le retour à la ligne d'usine. */
 export function NotFoundPage() {
   const { t } = useI18n();
+  const navigate = useNavigate();
   return (
-    <section>
-      <Heading as="h1" variant="medium">
-        {t.notFound.title}
-      </Heading>
-      <Text as="p">
-        {t.notFound.text}{' '}
-        <Link as={RouterLink} to="/" inline>
-          {t.notFound.back}
-        </Link>
-      </Text>
-    </section>
+    <Blankslate spacious>
+      <Blankslate.Visual>
+        <LocationIcon size="medium" />
+      </Blankslate.Visual>
+      <Blankslate.Heading as="h1">{t.notFound.title}</Blankslate.Heading>
+      <Blankslate.Description>{t.notFound.text}</Blankslate.Description>
+      <Blankslate.PrimaryAction onClick={() => void navigate('/')}>
+        {t.notFound.back}
+      </Blankslate.PrimaryAction>
+    </Blankslate>
   );
 }

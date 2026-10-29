@@ -54,7 +54,7 @@ export function IssuesPage() {
           <li key={issue.key} className={styles.issueListItem}>
             <Link to={issuePath(issue.key)} className={styles.issueRow}>
               <span className={styles.issueRowMain}>
-                <IssueBadge issueKey={issue.key} state={issueState(issue.status)} />
+                <IssueBadge issueKey={issue.key} state={issueState(issue.status)} />{' '}
                 <span className={styles.issueRowTitle}>{issue.title}</span>
               </span>
               <span className={styles.issueRowMeta}>

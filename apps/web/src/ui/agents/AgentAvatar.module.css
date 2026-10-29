@@ -20,17 +20,14 @@
   pointer-events: none;
 }
 
+/*
+ * Les couleurs des états d'une issue : bleu au travail (réflexion, outil ou lane CLI), rouge bloqué ;
+ * en file, l'anneau reste gris comme le « En file » d'une issue.
+ */
 .frame[data-state='thinking']::after,
-.frame[data-state='tool']::after {
-  outline-color: var(--borderColor-accent-emphasis);
-}
-
+.frame[data-state='tool']::after,
 .frame[data-state='cli']::after {
-  outline-color: var(--borderColor-done-emphasis);
-}
-
-.frame[data-state='queued']::after {
-  outline-color: var(--borderColor-attention-emphasis);
+  outline-color: var(--borderColor-accent-emphasis);
 }
 
 .frame[data-state='blocked']::after {

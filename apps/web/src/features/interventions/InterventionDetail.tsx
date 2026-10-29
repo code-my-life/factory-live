@@ -9,9 +9,8 @@ import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import { CardBadge } from '../../ui/badge/CardBadge.tsx';
 import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Markdown } from '../../ui/Markdown.tsx';
+import { interventionTone } from '../../ui/work/workState.tsx';
 import styles from './interventions.module.css';
-
-const SEVERITY_VARIANT = { critical: 'danger', warning: 'attention', info: 'accent' } as const;
 
 const STEPS = ['sent', 'acknowledged', 'resumed'] as const;
 
@@ -155,7 +154,7 @@ export function InterventionDetail({ intervention }: { intervention: Interventio
     <article className={styles.card} aria-labelledby={`titre-${intervention.id}`}>
       <header className={styles.cardHead}>
         <div className={styles.cardLabels}>
-          <Label variant={SEVERITY_VARIANT[intervention.severity]}>
+          <Label variant={interventionTone(intervention)}>
             {t.interventions.severity[intervention.severity]}
           </Label>
           <span className={styles.kind}>{t.intervention[intervention.kind]}</span>

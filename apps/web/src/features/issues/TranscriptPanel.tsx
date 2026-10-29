@@ -99,6 +99,7 @@ export function TranscriptPanel({ runId }: { runId: number }) {
     <div className={styles.transcript}>
       <SegmentedControl
         aria-label={t.transcript.sourceLabel}
+        className={styles.sources}
         size="small"
         onChange={(next) => setIndex(next ?? 0)}
       >

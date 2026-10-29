@@ -5,7 +5,7 @@ import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import { actionModel } from '../../ui/modelText.ts';
 import { issuePath } from '../../ui/paths.ts';
 import { JobAction, JobBox, JobDetail } from '../../ui/work/JobBox.tsx';
-import { issueWorkState } from '../../ui/work/workState.tsx';
+import { interventionTone, issueWorkState } from '../../ui/work/workState.tsx';
 
 /**
  * Une issue sur la ligne d'usine : sa boîte, son état, l'agent qui la tient, et ce qu'il y fait
@@ -69,10 +69,12 @@ function IssueJobDetail({
 }) {
   const { t, text } = useI18n();
   if (issue.status === 'waiting_human' || issue.status === 'blocked') {
-    const tone = issue.status === 'blocked' ? 'danger' : 'attention';
     return (
       <>
-        {intervention ? <JobDetail tone={tone}>{text(intervention.title)}</JobDetail> : null}
+        {/* L'intervention garde sa couleur, la même que dans sa liste : rouge si elle bloque. */}
+        {intervention ? (
+          <JobDetail tone={interventionTone(intervention)}>{text(intervention.title)}</JobDetail>
+        ) : null}
         {intervention ? (
           <JobAction to={`/interventions/${encodeURIComponent(intervention.id)}`}>
             {t.interventionAction[intervention.kind]}

@@ -1,5 +1,5 @@
 import type { CardView, IssueDetail, RunView } from '@factory-live/contracts';
-import { ArrowLeftIcon, LinkExternalIcon } from '@primer/octicons-react';
+import { ArrowLeftIcon, IssueOpenedIcon, LinkExternalIcon } from '@primer/octicons-react';
 import {
   Banner,
   Button,
@@ -10,7 +10,7 @@ import {
   Token,
   UnderlineNav,
 } from '@primer/react';
-import { Table } from '@primer/react/experimental';
+import { Blankslate, Table } from '@primer/react/experimental';
 import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useIssueDetail, useSnapshot } from '../../data/FactoryProvider.tsx';
@@ -25,7 +25,12 @@ import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import { useMotion } from '../../ui/motion.tsx';
 import { ActivityTimeline } from '../../ui/timeline/ActivityTimeline.tsx';
 import { fromTimelineEntry } from '../../ui/timeline/rows.ts';
-import { WorkStateLabel, cardWorkState, issueWorkState } from '../../ui/work/workState.tsx';
+import {
+  WorkStateLabel,
+  cardWorkState,
+  interventionTone,
+  issueWorkState,
+} from '../../ui/work/workState.tsx';
 import { shortCardTitle } from './cardText.ts';
 import { IssueGraph } from './IssueGraph.tsx';
 import { issueKeyFromParams } from '../../ui/paths.ts';
@@ -113,7 +118,7 @@ function RunsTable({
               <Table.Header>{t.issue.runs.agent}</Table.Header>
               <Table.Header>{t.issue.runs.model}</Table.Header>
               <Table.Header>{t.issue.runs.outcome}</Table.Header>
-              <Table.Header>{t.issue.runs.duration}</Table.Header>
+              <Table.Header align="end">{t.issue.runs.duration}</Table.Header>
               <Table.Header>
                 <span className="fl-visually-hidden">{t.issue.runs.transcript}</span>
               </Table.Header>
@@ -145,7 +150,9 @@ function RunsTable({
                     {run.summary ? <span className={styles.cellNote}>{run.summary}</span> : null}
                   </span>
                 </Table.Cell>
-                <Table.Cell className="fl-tabular">{duration(run)}</Table.Cell>
+                <Table.Cell align="end" className="fl-tabular">
+                  {duration(run)}
+                </Table.Cell>
                 <Table.Cell>
                   <Button size="small" onClick={() => onSelectRun(run.id)}>
                     {t.issue.runs.transcript}
@@ -188,15 +195,17 @@ export function IssuePage() {
   const motion = useMotion();
 
   if (!key || !detail) {
+    // Le même état vide que la page introuvable : Blankslate de Primer, retour à la liste.
     return (
-      <section className={styles.page}>
-        <Heading as="h1" variant="medium">
-          {t.issue.notFound}
-        </Heading>
-        <p>
-          <Link to="/issues">{t.issue.backToList}</Link>
-        </p>
-      </section>
+      <Blankslate spacious>
+        <Blankslate.Visual>
+          <IssueOpenedIcon size="medium" />
+        </Blankslate.Visual>
+        <Blankslate.Heading as="h1">{t.issue.notFound}</Blankslate.Heading>
+        <Blankslate.PrimaryAction onClick={() => void navigate('/issues')}>
+          {t.issue.backToList}
+        </Blankslate.PrimaryAction>
+      </Blankslate>
     );
   }
 
@@ -308,7 +317,8 @@ export function IssuePage() {
       {interventions.map((intervention) => (
         <Banner
           key={intervention.id}
-          variant={intervention.push ? 'critical' : 'info'}
+          // La couleur de l'intervention dans sa liste et sur la ligne : rouge si elle bloque, jaune sinon.
+          variant={interventionTone(intervention) === 'danger' ? 'critical' : 'warning'}
           title={t.common.labelValue(t.intervention[intervention.kind], text(intervention.title))}
           description={t.issue.bannerDescription}
           primaryAction={
@@ -427,8 +437,8 @@ export function IssuePage() {
                     <Table.Header>{t.issue.costs.run}</Table.Header>
                     <Table.Header>{t.issue.costs.agent}</Table.Header>
                     <Table.Header>{t.issue.costs.model}</Table.Header>
-                    <Table.Header>{t.issue.costs.tokens}</Table.Header>
-                    <Table.Header>{t.issue.costs.cost}</Table.Header>
+                    <Table.Header align="end">{t.issue.costs.tokens}</Table.Header>
+                    <Table.Header align="end">{t.issue.costs.cost}</Table.Header>
                   </Table.Row>
                 </Table.Head>
                 <Table.Body>
@@ -452,10 +462,10 @@ export function IssuePage() {
                             t.common.unknown
                           )}
                         </Table.Cell>
-                        <Table.Cell className="fl-tabular">
+                        <Table.Cell align="end" className="fl-tabular">
                           {run.tokens !== null ? fmt.compact(run.tokens) : t.common.unknown}
                         </Table.Cell>
-                        <Table.Cell className="fl-tabular">
+                        <Table.Cell align="end" className="fl-tabular">
                           {run.costUsd !== null ? fmt.usd(run.costUsd) : t.common.free}
                         </Table.Cell>
                       </Table.Row>

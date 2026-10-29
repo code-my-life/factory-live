@@ -1,4 +1,10 @@
-import type { AgentActivity, CardView, IssueSummary, KanbanStatus } from '@factory-live/contracts';
+import type {
+  AgentActivity,
+  CardView,
+  Intervention,
+  IssueSummary,
+  KanbanStatus,
+} from '@factory-live/contracts';
 import {
   AlertFillIcon,
   ArchiveIcon,
@@ -39,6 +45,10 @@ const ISSUE_STATE: Record<IssueSummary['status'], { tone: WorkTone; icon: Icon }
   stopped: { tone: 'secondary', icon: SkipIcon },
 };
 
+/**
+ * Les mêmes couleurs que pour une issue : bleu au travail (la revue en est un), jaune ce qui t'attend,
+ * rouge ce qui bloque, gris ce qui patiente, violet ce qui est fini (« Terminée » partout pareil).
+ */
 const CARD_STATE: Record<KanbanStatus, { tone: WorkTone; icon: Icon }> = {
   triage: { tone: 'attention', icon: AlertFillIcon },
   todo: { tone: 'secondary', icon: ClockIcon },
@@ -46,8 +56,8 @@ const CARD_STATE: Record<KanbanStatus, { tone: WorkTone; icon: Icon }> = {
   ready: { tone: 'secondary', icon: ClockIcon },
   running: { tone: 'accent', icon: DotFillIcon },
   blocked: { tone: 'danger', icon: BlockedIcon },
-  review: { tone: 'done', icon: EyeIcon },
-  done: { tone: 'success', icon: CheckCircleFillIcon },
+  review: { tone: 'accent', icon: EyeIcon },
+  done: { tone: 'done', icon: CheckCircleFillIcon },
   archived: { tone: 'secondary', icon: ArchiveIcon },
 };
 
@@ -73,6 +83,17 @@ export function cardWorkState(
     ...CARD_STATE[card.status],
     working: card.status === 'running' && agent !== null && BUSY.has(agent.state),
   };
+}
+
+/**
+ * La couleur d'une intervention, la même partout où elle se montre (liste, détail, bandeaux, ligne) :
+ * celle de sa gravité, rouge quand elle bloque, jaune quand elle est à traiter ou pour info. L'issue
+ * qu'elle arrête garde la sienne (« Attend ta décision », jaune).
+ */
+export function interventionTone(
+  intervention: Pick<Intervention, 'severity'>,
+): 'attention' | 'danger' {
+  return intervention.severity === 'critical' ? 'danger' : 'attention';
 }
 
 /**

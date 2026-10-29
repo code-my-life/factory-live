@@ -2,14 +2,16 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--base-size-16);
+  /* Entre les blocs d'une page, le même souffle que sur la ligne d'usine. */
+  gap: var(--stack-gap-spacious);
   min-width: 0;
 }
 
+/* Le titre à gauche, ses commandes (période, filtre) à droite, à la hauteur du titre. */
 .head {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--base-size-8) var(--base-size-16);
 }
@@ -52,7 +54,8 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  /* auto-fit : deux panneaux sur un grand écran prennent toute la largeur au lieu d'en laisser un tiers vide. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   gap: var(--base-size-12);
 }
 

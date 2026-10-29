@@ -9,7 +9,7 @@
 .pageHead {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--stack-gap-condensed) var(--stack-gap-normal);
 }
@@ -31,8 +31,14 @@
 }
 
 /* Tête de station : son compteur (posé sur l'arrêt), qui bat quand une issue arrive, et son équipe. */
+/*
+ * Le fond translucide du compteur de Primer se pose sur le fond de la page, pas sur la couleur de
+ * l'arrêt : le chiffre garde son contraste quelle que soit la couleur de l'étape.
+ */
 .counter {
   display: inline-flex;
+  border-radius: var(--borderRadius-full);
+  background-color: var(--bgColor-default);
 }
 
 .counter[data-arrived] {
@@ -119,7 +125,8 @@
   min-width: 0;
   padding: var(--stack-padding-condensed);
   border: var(--borderWidth-thin) solid var(--borderColor-default);
-  border-radius: var(--borderRadius-large);
+  /* Le rayon de toutes les boîtes de l'app (jobs, panneaux, tableaux). */
+  border-radius: var(--borderRadius-medium);
   background-color: var(--bgColor-default);
   transition: border-color var(--motion-transition-stateChange);
 

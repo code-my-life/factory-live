@@ -2,7 +2,13 @@ import type { AgentActivity, CardView, IssueSummary } from '@factory-live/contra
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { fr } from '../../i18n/fr.ts';
-import { WorkStateIcon, WorkStateLabel, cardWorkState, issueWorkState } from './workState.tsx';
+import {
+  WorkStateIcon,
+  WorkStateLabel,
+  cardWorkState,
+  interventionTone,
+  issueWorkState,
+} from './workState.tsx';
 
 const issue = (status: IssueSummary['status']) => ({ status }) as IssueSummary;
 const card = (status: CardView['status']) => ({ status }) as CardView;
@@ -44,8 +50,29 @@ describe('cardWorkState', () => {
     expect(cardWorkState(card('triage'), null, fr).tone).toBe('attention');
     expect(cardWorkState(card('done'), null, fr)).toMatchObject({
       label: 'Terminée',
-      tone: 'success',
+      tone: 'done',
     });
+  });
+
+  it('« Terminée » a la même couleur pour une carte que pour une issue', () => {
+    expect(cardWorkState(card('done'), null, fr).tone).toBe(
+      issueWorkState(issue('done'), null, fr).tone,
+    );
+  });
+
+  it('une carte en revue se lit comme un travail en cours, pas comme une carte finie', () => {
+    expect(cardWorkState(card('review'), null, fr).tone).toBe('accent');
+    expect(cardWorkState(card('review'), null, fr).tone).not.toBe(
+      cardWorkState(card('done'), null, fr).tone,
+    );
+  });
+});
+
+describe('interventionTone', () => {
+  it('une intervention a la couleur de sa gravité : rouge quand elle bloque, jaune sinon', () => {
+    expect(interventionTone({ severity: 'critical' })).toBe('danger');
+    expect(interventionTone({ severity: 'warning' })).toBe('attention');
+    expect(interventionTone({ severity: 'info' })).toBe('attention');
   });
 });
 

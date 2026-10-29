@@ -59,6 +59,19 @@
   font-size: var(--base-text-size-xs);
 }
 
+/* Le mot de l'état prend la couleur de sa pastille : « OK » se lit vert, comme sur la ligne. */
+.tile[data-status='ok'] .tileStatus {
+  color: var(--fgColor-success);
+}
+
+.tile[data-status='degraded'] .tileStatus {
+  color: var(--fgColor-attention);
+}
+
+.tile[data-status='down'] .tileStatus {
+  color: var(--fgColor-danger);
+}
+
 .tileDetail {
   margin: 0;
   font-size: var(--text-body-size-small);

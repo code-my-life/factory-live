@@ -85,8 +85,8 @@
 }
 
 .columnHit:focus-visible {
-  outline: 2px solid var(--fgColor-accent);
-  outline-offset: 1px;
+  outline: var(--focus-outline);
+  outline-offset: var(--borderWidth-thin);
 }
 
 .columnBar {
@@ -143,7 +143,10 @@
   font: var(--text-caption-shorthand);
 }
 
+/* Une cible de 24 px de haut (WCAG 2.2, taille de cible) sans grossir le texte ; le triangle reste. */
 .tableSummary {
+  width: fit-content;
+  padding-block: var(--base-size-4);
   color: var(--fgColor-accent);
   font: var(--text-caption-shorthand);
   cursor: pointer;
@@ -158,7 +161,10 @@
   list-style: none;
 }
 
+/* La part de la barre est posée en style sur la ligne ; ce 0 % n'est que sa valeur par défaut. */
 .barRow {
+  --fl-pct: 0%;
+
   display: grid;
   grid-template-columns: minmax(96px, 140px) minmax(0, 1fr);
   align-items: center;
@@ -172,8 +178,6 @@
 
 /* La barre et sa valeur se suivent ; la barre la plus longue laisse toujours la place de la valeur. */
 .barScale {
-  --fl-pct: 0%;
-
   display: flex;
   align-items: center;
   gap: var(--base-size-8);

@@ -121,7 +121,6 @@ export function AppShell() {
   const moreRef = useRef<HTMLButtonElement>(null);
 
   const openInterventions = snapshot.interventions.length;
-  const pushable = snapshot.interventions.filter((intervention) => intervention.push).length;
   // Pastille de l'icône de l'app installée : les blocages qui t'attendent, comme le serveur la pose
   // à chaque push (notify.ts) ; la démo n'y touche pas.
   const waiting = snapshot.interventions.filter(
@@ -208,9 +207,9 @@ export function AppShell() {
                 ) : null}
               </span>
             ) : null}
+            {/* Un raccourci, pas une action destructrice : le bouton par défaut, le compte dit l'urgence. */}
             <Button
               leadingVisual={BellIcon}
-              variant={pushable > 0 ? 'danger' : 'default'}
               size="small"
               count={openInterventions}
               onClick={() => void navigate('/interventions')}

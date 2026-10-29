@@ -164,7 +164,7 @@ export function HistoryPage() {
               {history.recent.map((row) => (
                 <Table.Row key={row.key}>
                   <Table.Cell className={page.badgeCell}>
-                    <IssueBadge issueKey={row.key} state={OUTCOME[row.outcome].state} link />
+                    <IssueBadge issueKey={row.key} state={OUTCOME[row.outcome].state} link />{' '}
                     <span className={page.cellText}>{row.title}</span>
                   </Table.Cell>
                   <Table.Cell>

@@ -130,6 +130,36 @@ test('un état a la même couleur partout : « Bloquée » est rouge sur la lign
   );
 });
 
+test('une intervention a la même couleur partout : rouge quand elle bloque, jaune sinon', async ({
+  page,
+}) => {
+  // cv-site#49 : « Carte UI sans maquette jointe », bloquante ; cv-site#44 : carte retenue, à traiter.
+  await page.goto('/');
+  await expect(
+    issueJob(page, 'cv-site#49').getByText('Carte UI sans maquette jointe'),
+  ).toHaveAttribute('data-tone', 'danger');
+  await page.goto('/interventions');
+  const list = page.getByRole('navigation', { name: 'Interventions en attente' });
+  await expect(list.getByRole('link', { name: /cv-site#49/ })).toHaveAttribute(
+    'data-tone',
+    'danger',
+  );
+  await expect(list.getByRole('link', { name: /cv-site#44/ })).toHaveAttribute(
+    'data-tone',
+    'attention',
+  );
+  await expect(page.getByText('Bloquant', { exact: true })).toHaveAttribute(
+    'data-variant',
+    'danger',
+  );
+  await page.goto('/issues/cv-site/49');
+  await expect(
+    page.locator('[data-variant="critical"]').getByText(/Carte UI sans maquette jointe/),
+  ).toBeVisible();
+  await page.goto('/issues/cv-site/44');
+  await expect(page.locator('[data-variant="warning"]').getByRole('button')).toBeVisible();
+});
+
 test('la PR d’une issue se lit comme sur GitHub : son état, son numéro, sa CI, en français', async ({
   page,
 }) => {

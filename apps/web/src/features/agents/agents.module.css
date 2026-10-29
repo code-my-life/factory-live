@@ -53,14 +53,19 @@
   font-size: var(--base-text-size-xs);
 }
 
+/* Ce que fait l'agent, écrit comme sur la ligne : l'action en clair, son détail en police de code. */
 .action {
   margin: 0;
   overflow: hidden;
-  color: var(--fgColor-accent);
-  font-family: var(--fontStack-monospace);
-  font-size: var(--base-text-size-xs);
+  color: var(--fgColor-default);
+  font: var(--text-body-shorthand-small);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.actionDetail {
+  color: var(--fgColor-muted);
+  font-family: var(--fontStack-monospace);
 }
 
 .block {
@@ -158,11 +163,12 @@
   overflow-wrap: anywhere;
 }
 
+/* Les chiffres ferment la carte : au pied de chaque carte d'une rangée, à la même hauteur. */
 .stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--base-size-8);
-  margin: 0;
+  margin: auto 0 0;
   padding-top: var(--base-size-12);
   border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
 }

@@ -13,7 +13,7 @@ import { MotionToggle } from '../../ui/motion.tsx';
 import { useNow } from '../../ui/useNow.ts';
 import { LINE_STATIONS } from '../../ui/vocabulary.ts';
 import { JobList } from '../../ui/work/JobBox.tsx';
-import { WorkStateLabel, cardWorkState } from '../../ui/work/workState.tsx';
+import { WorkStateLabel, cardWorkState, interventionTone } from '../../ui/work/workState.tsx';
 import { IssueJob } from './IssueJob.tsx';
 import { LiveActivity } from './LiveActivity.tsx';
 import { LiveAgents } from './LiveAgents.tsx';
@@ -107,6 +107,8 @@ export function FactoryLinePage() {
   });
 
   const pushable = snapshot.interventions.filter((intervention) => intervention.push);
+  // Rouge si l'une des interventions bloque, jaune si elles ne sont qu'à traiter.
+  const blocking = pushable.some((intervention) => interventionTone(intervention) === 'danger');
   const lastEvent = [...snapshot.activity].sort((left, right) =>
     right.at.localeCompare(left.at),
   )[0];
@@ -138,7 +140,7 @@ export function FactoryLinePage() {
 
       {pushable.length > 0 ? (
         <Banner
-          variant="critical"
+          variant={blocking ? 'critical' : 'warning'}
           title={t.line.blockersWaiting(pushable.length)}
           description={
             <ul className={styles.blockers}>

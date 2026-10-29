@@ -23,18 +23,20 @@ export function ActivityTimeline({ rows, label }: { rows: readonly TimelineRow[]
             </Timeline.Badge>
             <Timeline.Body className={styles.body}>
               <div className={styles.head}>
-                {row.agent ? (
-                  <span className={styles.agent}>
-                    <AgentAvatar profile={row.agent} size={16} named />
-                    <span className={styles.agentName}>{row.agent}</span>
-                  </span>
-                ) : null}
-                <span className={styles.title}>{row.title}</span>
-                {row.running ? (
-                  <Label variant="accent" size="small">
-                    {t.activity.running}
-                  </Label>
-                ) : null}
+                <span className={styles.lead}>
+                  {row.agent ? (
+                    <span className={styles.agent}>
+                      <AgentAvatar profile={row.agent} size={16} named />
+                      <span className={styles.agentName}>{row.agent}</span>
+                    </span>
+                  ) : null}
+                  <span className={styles.title}>{row.title}</span>
+                  {row.running ? (
+                    <Label variant="accent" size="small">
+                      {t.activity.running}
+                    </Label>
+                  ) : null}
+                </span>
                 <time className={styles.time} dateTime={row.at}>
                   {fmt.clock(row.at)}
                 </time>

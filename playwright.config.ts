@@ -16,7 +16,7 @@ const IPHONE = {
   isMobile: true,
   hasTouch: true,
 };
-const DEMO_SPECS = /(line|issue|intervention|settings|a11y|mobile|badges)\.spec\.ts/;
+const DEMO_SPECS = /(line|issue|intervention|settings|a11y|mobile|badges|charts)\.spec\.ts/;
 
 export default defineConfig({
   testDir: 'e2e',

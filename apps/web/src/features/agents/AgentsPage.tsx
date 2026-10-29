@@ -34,6 +34,9 @@ function AgentProfileCard({
 }) {
   const { t, fmt, text } = useI18n();
   const working = activity && activity.state !== 'idle';
+  // La pastille dit l'état comme l'anneau de l'avatar : bleue au travail, rouge bloqué, grise sinon.
+  const busy =
+    activity?.state === 'thinking' || activity?.state === 'tool' || activity?.state === 'cli';
   return (
     <article
       className={styles.card}
@@ -50,7 +53,10 @@ function AgentProfileCard({
       <p className={styles.role}>{text(profile.role)}</p>
 
       <div className={styles.now}>
-        <LiveDot tone={working ? 'success' : 'muted'} pulse={Boolean(working)} />
+        <LiveDot
+          tone={busy ? 'accent' : activity?.state === 'blocked' ? 'danger' : 'muted'}
+          pulse={busy}
+        />
         {activity && working ? (
           <span>
             {t.agentState[activity.state]}
@@ -76,7 +82,9 @@ function AgentProfileCard({
       {activity?.action ? (
         <p className={styles.action}>
           {text(activity.action.label)}
-          {activity.action.detail && !actionModel(activity) ? ` · ${activity.action.detail}` : ''}
+          {activity.action.detail && !actionModel(activity) ? (
+            <span className={styles.actionDetail}> {activity.action.detail}</span>
+          ) : null}
         </p>
       ) : null}
 

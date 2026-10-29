@@ -21,14 +21,23 @@
   min-width: 0;
 }
 
+/* L'heure tient sa colonne, en haut à droite : un titre qui passe à la ligne ne la fait plus tomber. */
 .head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
   gap: var(--stack-gap-condensed);
   min-width: 0;
   color: var(--fgColor-default);
   font: var(--text-body-shorthand-small);
+}
+
+.lead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-4) var(--stack-gap-condensed);
+  min-width: 0;
 }
 
 .agent {
@@ -48,9 +57,9 @@
 }
 
 .time {
-  margin-left: auto;
   color: var(--fgColor-muted);
   font: var(--text-caption-shorthand);
+  white-space: nowrap;
 }
 
 .detail {

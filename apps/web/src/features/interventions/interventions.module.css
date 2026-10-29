@@ -1,7 +1,8 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--base-size-16);
+  /* Entre les blocs d'une page, le même souffle que sur la ligne d'usine. */
+  gap: var(--stack-gap-spacious);
   min-width: 0;
 }
 
@@ -68,6 +69,11 @@
   color: var(--fgColor-success);
 }
 
+/* Rien n'attend ta décision : la coche de l'état vide prend la couleur du succès. */
+.calm {
+  color: var(--fgColor-success);
+}
+
 .items {
   display: flex;
   flex-direction: column;
@@ -89,11 +95,12 @@
   text-decoration: none;
 }
 
-.item[data-severity='critical'] {
+/* La couleur de l'intervention, la même sur la ligne et sur l'issue : rouge, elle bloque ; jaune sinon. */
+.item[data-tone='danger'] {
   border-color: var(--borderColor-danger-muted);
 }
 
-.item[data-severity='warning'] {
+.item[data-tone='attention'] {
   border-color: var(--borderColor-attention-muted);
 }
 
@@ -103,8 +110,8 @@
 }
 
 .item:focus-visible {
-  outline: 2px solid var(--fgColor-accent);
-  outline-offset: 2px;
+  outline: var(--focus-outline);
+  outline-offset: var(--borderWidth-thick);
 }
 
 .itemKind {
@@ -115,8 +122,12 @@
   font-size: var(--base-text-size-xs);
 }
 
-.item[data-severity='critical'] .itemKind {
+.item[data-tone='danger'] .itemKind {
   color: var(--fgColor-danger);
+}
+
+.item[data-tone='attention'] .itemKind {
+  color: var(--fgColor-attention);
 }
 
 .itemTitle {

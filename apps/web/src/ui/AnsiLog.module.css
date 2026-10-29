@@ -9,8 +9,8 @@
 }
 
 .frame:focus-visible {
-  outline: 2px solid var(--fgColor-accent);
-  outline-offset: 2px;
+  outline: var(--focus-outline);
+  outline-offset: var(--borderWidth-thick);
 }
 
 .log {
