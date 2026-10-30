@@ -9,6 +9,7 @@ import { FactoryProvider } from '../data/FactoryProvider.tsx';
 import { buildProfiles } from '../demo/catalog.ts';
 import { DemoSource } from '../demo/DemoSource.ts';
 import { I18nProvider } from '../i18n/I18nProvider.tsx';
+import { hueOf } from '../ui/badge/hues.ts';
 import { AgentsPage } from './agents/AgentsPage.tsx';
 import { CostsPage } from './costs/CostsPage.tsx';
 import { HistoryPage } from './history/HistoryPage.tsx';
@@ -95,6 +96,24 @@ describe('l’écran Agents, en badges', () => {
     expect(container.querySelector('[data-overflow="wrap"]')).toBeNull();
   });
 
+  it('garde affiché un toolset `mcp-<serveur>` dont le serveur n’est pas déclaré', () => {
+    const [first, ...others] = buildProfiles();
+    const inconsistent = {
+      ...first,
+      toolsets: ['terminal', 'mcp-graphify', 'mcp-ghost'],
+      mcp: ['graphify'],
+    } as ProfileView;
+    const { container } = renderPage(
+      <AgentsPage />,
+      '/',
+      '/',
+      new TestSource([inconsistent, ...others]),
+    );
+    const card = container.querySelector('article') as HTMLElement;
+    expect(card).not.toHaveTextContent('mcp-graphify');
+    expect(card).toHaveTextContent('mcp-ghost');
+  });
+
   it('écrit un écart de toolsets ou de plugins en badges, comme un écart de modèles', () => {
     const [first, ...others] = buildProfiles();
     const drifting = {
@@ -131,6 +150,24 @@ describe('l’écran Coûts et l’Historique, un badge par ligne', () => {
     );
     expect(full).toEqual(expect.arrayContaining([QWEN, NEMOTRON]));
     expect(container.querySelector('[data-overflow="clamp"]')).toBeNull();
+  });
+
+  it('rend chaque modèle deux fois : une fiche pour le téléphone, une ligne du tableau', () => {
+    const { container } = renderPage(<CostsPage />);
+    const cards = container.querySelectorAll('ul li [data-badge]');
+    const rows = container.querySelectorAll('[role="row"] [data-badge]');
+    expect(cards.length).toBeGreaterThan(0);
+    expect(rows.length).toBe(cards.length);
+  });
+
+  it('porte le dépôt de l’issue et sa teinte sur la version de chaque ligne de l’Historique', () => {
+    const { container } = renderPage(<HistoryPage />);
+    const version = [...container.querySelectorAll('[data-badge]')].find(
+      (badge) => badge.querySelector('[data-segment="value"]')?.textContent === 'v0.12.0',
+    );
+    expect(version).toBeDefined();
+    expect(version?.querySelector('[data-segment="label"]')).toHaveTextContent('claude-cockpit');
+    expect(version).toHaveAttribute('data-hue', hueOf('product', 'claude-cockpit'));
   });
 
   it('montre l’agent de chaque harnais et le modèle utilisé en badges dans l’Historique', () => {

@@ -29,7 +29,7 @@ import {
 } from '../../ui/work/workState.tsx';
 import { shortCardTitle } from './cardText.ts';
 import { IssueGraph } from './IssueGraph.tsx';
-import { issueKeyFromParams, repoOfKey } from '../../ui/paths.ts';
+import { issueKeyFromParams, prNumberOfUrl, repoOfKey } from '../../ui/paths.ts';
 import { PullRequestPanel, PullRequestState } from './PullRequestPanel.tsx';
 import { TranscriptPanel } from './TranscriptPanel.tsx';
 import styles from './issues.module.css';
@@ -249,6 +249,8 @@ export function IssuePage() {
     ),
   );
   const elapsedEnd = issue.status === 'done' ? Date.parse(issue.updatedAt) : null;
+  // A URL with no PR number is not a PR we can name: it is treated as no PR.
+  const spottedNumber = issue.prUrl ? prNumberOfUrl(issue.prUrl) : null;
 
   return (
     <article className={styles.page}>
@@ -310,11 +312,11 @@ export function IssuePage() {
                 />
                 <ChecksBadge checks={issue.pr.checks} />
               </span>
-            ) : issue.prUrl ? (
+            ) : issue.prUrl && spottedNumber !== null ? (
               <>
                 <PullRequestBadge
                   repo={repoOfKey(issue.key)}
-                  number={Number(issue.prUrl.split('/').at(-1))}
+                  number={spottedNumber}
                   url={issue.prUrl}
                 />{' '}
                 <span className={styles.muted}>{t.issue.facts.prUnknownState}</span>

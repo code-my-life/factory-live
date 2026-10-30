@@ -161,7 +161,7 @@ export function spareHues(kind: HueKind): Hue[] {
  * fingerprint) among those its type does not use yet. Always the same for a given name.
  */
 export function hueOf(kind: HueKind, name: string): Hue {
-  const fixed = FIXED_HUES[kind][name];
+  const fixed = Object.hasOwn(FIXED_HUES[kind], name) ? FIXED_HUES[kind][name] : undefined;
   if (fixed) return fixed;
   const spare = spareHues(kind);
   return spare[fingerprint(name, 0) % spare.length] as Hue;

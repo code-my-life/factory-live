@@ -36,6 +36,14 @@ describe('la table des teintes', () => {
 });
 
 describe('hueOf', () => {
+  it('ne lit pas les propriétés héritées d’un objet : « constructor » a une vraie teinte', () => {
+    for (const kind of KINDS)
+      for (const name of ['constructor', 'toString', 'hasOwnProperty']) {
+        expect(HUES, `${kind}/${name}`).toContain(hueOf(kind, name));
+        expect(hueOf(kind, name), `${kind}/${name}`).not.toBe('red');
+      }
+  });
+
   it('rend la teinte fixée d’un élément connu', () => {
     expect(hueOf('skill', 'factory-brief')).toBe('indigo');
     expect(hueOf('agent', 'coder-claude')).toBe('plum');

@@ -18,6 +18,7 @@ import { PullRequestBadge } from '../../ui/badge/PullRequestBadge.tsx';
 import { SourceBadge } from '../../ui/badge/SourceBadge.tsx';
 import type { SourceKind } from '../../ui/badge/SourceBadge.tsx';
 import { CopyCommand } from '../../ui/CopyCommand.tsx';
+import { prNumberOfUrl } from '../../ui/paths.ts';
 import styles from './diagnosis.module.css';
 
 type LabelVariant = 'accent' | 'attention' | 'danger' | 'secondary' | 'success';
@@ -179,6 +180,8 @@ function Runs({ runs, primary }: { runs: readonly RunVerdict[]; primary: Finding
 
 function Work({ work, repo }: { work: WorkState; repo: string | undefined }) {
   const { t } = useI18n();
+  // A URL with no PR number is not a PR we can name: it is treated as no PR.
+  const prNumber = work.prUrl ? prNumberOfUrl(work.prUrl) : null;
   const facts = [
     work.commits === 'none' && work.commitsRefused > 0
       ? `${t.diagnosis.commits.none} (${t.diagnosis.commitsRefused(work.commitsRefused)})`
@@ -206,12 +209,8 @@ function Work({ work, repo }: { work: WorkState; repo: string | undefined }) {
       <div className={styles.workItem}>
         <dt className={styles.workTerm}>{t.diagnosis.pr}</dt>
         <dd className={styles.workData}>
-          {work.prUrl ? (
-            <PullRequestBadge
-              repo={repo}
-              number={Number(work.prUrl.split('/').at(-1))}
-              url={work.prUrl}
-            />
+          {work.prUrl && prNumber !== null ? (
+            <PullRequestBadge repo={repo} number={prNumber} url={work.prUrl} />
           ) : (
             t.diagnosis.noPr
           )}

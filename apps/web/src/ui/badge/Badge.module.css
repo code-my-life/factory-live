@@ -156,15 +156,16 @@
 }
 
 /*
- * Identifier too long: cut in the middle. The head gives way (ellipsis), the tail
- * stays whole; the full name is placed, hidden, for screen readers and search.
+ * Identifier too long: cut in the middle. The head gives way (ellipsis) down to one
+ * character, the tail stays whole; the full name is placed, hidden, for screen readers and search.
  */
 .text[data-split] {
   display: flex;
 }
 
 .head {
-  min-width: 0;
+  /* At least one character and the ellipsis (the value is in a code font: 1ch per character). */
+  min-width: 2ch;
   overflow: hidden;
   text-overflow: ellipsis;
 }

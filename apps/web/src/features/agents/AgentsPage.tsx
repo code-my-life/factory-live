@@ -11,7 +11,7 @@ import { useProfiles, useSnapshot } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import { EffortBadge, McpBadge, PluginBadge, ToolsetBadge } from '../../ui/badge/ConfigBadges.tsx';
-import { isMcpToolset, splitNames } from '../../ui/badge/config.ts';
+import { hiddenToolset, splitNames } from '../../ui/badge/config.ts';
 import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { SkillBadge } from '../../ui/badge/SkillBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
@@ -171,7 +171,10 @@ function AgentProfileCard({
           ))}
         </ol>
         {profile.effort ? (
-          <EffortBadge level={profile.effort} description={t.agents.effort(profile.effort)} />
+          // In its own row, like the other badges of a block: a flex column would stretch it.
+          <div className={styles.tokens}>
+            <EffortBadge level={profile.effort} description={t.agents.effort(profile.effort)} />
+          </div>
         ) : null}
       </section>
 
@@ -269,9 +272,9 @@ function AgentProfileCard({
           ))}
         <h3 className={styles.blockTitle}>{t.agents.toolsets(profile.mcp.length > 0)}</h3>
         <div className={styles.tokens}>
-          {/* A `mcp-<server>` toolset is not repeated: its server has its own badge. */}
+          {/* A `mcp-<server>` toolset of a declared server is not repeated: the server has its own badge. */}
           {profile.toolsets
-            .filter((toolset) => !isMcpToolset(toolset))
+            .filter((toolset) => !hiddenToolset(toolset, profile.mcp))
             .map((toolset) => (
               <ToolsetBadge key={toolset} name={toolset} />
             ))}

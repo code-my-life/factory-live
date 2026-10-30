@@ -29,8 +29,15 @@ describe('splitMiddle', () => {
     });
   });
 
-  it('ne coupe pas une valeur courte', () => {
-    expect(splitMiddle('claude-opus-5-5')).toBeNull();
+  it('coupe aussi une valeur courte : sa tête cède la place seulement si elle manque', () => {
+    expect(splitMiddle('claude-opus-5-5')).toEqual({ head: 'claude', tail: '-opus-5-5' });
+    expect(splitMiddle('claude-sonnet-5-5')).toEqual({ head: 'claude', tail: '-sonnet-5-5' });
+    expect(splitMiddle('gpt-oss-20b-MXFP4')).toEqual({ head: 'gpt-oss', tail: '-20b-MXFP4' });
+  });
+
+  it('ne coupe pas une valeur dont la fin couvre tout', () => {
     expect(splitMiddle('#90')).toBeNull();
+    expect(splitMiddle('opus')).toBeNull();
+    expect(splitMiddle('abcdefgh')).toBeNull();
   });
 });

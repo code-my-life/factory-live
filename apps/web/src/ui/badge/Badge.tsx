@@ -144,8 +144,12 @@ export function Badge({
         {middle ? (
           <span className={styles.text} data-split="">
             <span className="fl-visually-hidden">{value}</span>
-            <span className={styles.head}>{middle.head}</span>
-            <span className={styles.tail}>{middle.tail}</span>
+            <span className={styles.head} data-part="head">
+              {middle.head}
+            </span>
+            <span className={styles.tail} data-part="tail">
+              {middle.tail}
+            </span>
           </span>
         ) : (
           <span className={styles.text}>{value}</span>

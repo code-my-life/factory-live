@@ -12,6 +12,7 @@ import { BarList } from '../../ui/charts/BarList.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import type { ModelName } from '../../ui/ModelBadge.tsx';
 import page from '../../ui/page.module.css';
+import { repoOfKey } from '../../ui/paths.ts';
 import { WorkStateLabel } from '../../ui/work/workState.tsx';
 
 type Recent = HistoryStats['recent'][number];
@@ -182,7 +183,11 @@ export function HistoryPage() {
                   </Table.Cell>
                   <Table.Cell align="end">{fmt.minutes(row.leadTimeMinutes)}</Table.Cell>
                   <Table.Cell>
-                    {row.version ? <VersionBadge version={row.version} /> : t.history.noTag}
+                    {row.version ? (
+                      <VersionBadge of={repoOfKey(row.key)} version={row.version} />
+                    ) : (
+                      t.history.noTag
+                    )}
                   </Table.Cell>
                   <Table.Cell>{fmt.dayMonth(row.finishedAt)}</Table.Cell>
                 </Table.Row>

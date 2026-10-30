@@ -9,7 +9,7 @@ import { Badge } from './Badge.tsx';
 import { BranchBadge } from './BranchBadge.tsx';
 import { CardBadge, KIND_ICON } from './CardBadge.tsx';
 import { ChecksBadge } from './ChecksBadge.tsx';
-import { isMcpToolset, splitNames } from './config.ts';
+import { hiddenToolset, isMcpToolset, splitNames } from './config.ts';
 import { EffortBadge, McpBadge, PluginBadge, ToolsetBadge } from './ConfigBadges.tsx';
 import { GithubLabelBadge } from './GithubLabelBadge.tsx';
 import { FIXED_HUES, hueOf } from './hues.ts';
@@ -431,6 +431,13 @@ describe('le tableau 1 de l’inventaire, un badge par ligne', () => {
     expect(splitNames('terminal, file, kanban')).toEqual(['terminal', 'file', 'kanban']);
   });
 
+  it('un toolset `mcp-<serveur>` ne se masque que si son serveur est déclaré', () => {
+    expect(hiddenToolset('mcp-graphify', ['graphify'])).toBe(true);
+    expect(hiddenToolset('mcp-graphify', [])).toBe(false);
+    expect(hiddenToolset('mcp-graphify', ['other'])).toBe(false);
+    expect(hiddenToolset('terminal', ['graphify'])).toBe(false);
+  });
+
   it('source : l’icône de la source, « source », son nom, la teinte de la source', () => {
     const rows = [
       ['kanban', 'Kanban', 'olive'],
@@ -522,6 +529,14 @@ describe('un badge tient sur une ligne', () => {
     expect(tail).toHaveTextContent('-MTP-Q8_0');
     expect(badgeOf(container)).toHaveAttribute('data-overflow', 'truncate');
     expect(badgeOf(container)?.getAttribute('title')).toContain(QWEN);
+  });
+
+  it('marque la tête et la fin d’une valeur coupée, pour les cibler', () => {
+    const { container } = render(
+      <ModelBadge model={{ model: 'claude-opus-5-5', provider: 'anthropic' }} />,
+    );
+    expect(container.querySelector('[data-part="head"]')).toHaveTextContent(/^claude$/);
+    expect(container.querySelector('[data-part="tail"]')).toHaveTextContent(/^-opus-5-5$/);
   });
 
   it('coupe nvidia/nemotron-3-ultra-550b-a55b en gardant -550b-a55b', () => {

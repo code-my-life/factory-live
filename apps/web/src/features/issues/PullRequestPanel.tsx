@@ -10,7 +10,7 @@ import type { ComponentProps } from 'react';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { ChecksBadge } from '../../ui/badge/ChecksBadge.tsx';
 import { PullRequestBadge } from '../../ui/badge/PullRequestBadge.tsx';
-import { repoOfKey } from '../../ui/paths.ts';
+import { prNumberOfUrl, repoOfKey } from '../../ui/paths.ts';
 import styles from './issues.module.css';
 
 const PR_STATUS: Record<PullRequestView['state'], ComponentProps<typeof StateLabel>['status']> = {
@@ -40,15 +40,13 @@ export function PullRequestState({
 export function PullRequestPanel({ issue }: { issue: IssueSummary }) {
   const { t } = useI18n();
   const pr = issue.pr;
-  if (!pr && issue.prUrl) {
+  // A URL with no PR number is not a PR we can name: it is treated as no PR.
+  const spottedNumber = issue.prUrl ? prNumberOfUrl(issue.prUrl) : null;
+  if (!pr && issue.prUrl && spottedNumber !== null) {
     return (
       <p className={styles.muted}>
         {t.pr.spottedBefore}
-        <PullRequestBadge
-          repo={repoOfKey(issue.key)}
-          number={Number(issue.prUrl.split('/').at(-1))}
-          url={issue.prUrl}
-        />
+        <PullRequestBadge repo={repoOfKey(issue.key)} number={spottedNumber} url={issue.prUrl} />
         {t.pr.spottedAfter}
       </p>
     );
