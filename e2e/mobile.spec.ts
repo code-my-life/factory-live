@@ -39,27 +39,45 @@ test('les colonnes des dernières issues terminées ne débordent pas l’une su
   await expectNoHorizontalOverflow(page);
 });
 
-test('les coûts par modèle restent lisibles sur téléphone : la colonne Modèle ne s’écrase pas', async ({
+test('les coûts par modèle restent lisibles sur téléphone : une fiche par modèle, sans débordement', async ({
   page,
 }) => {
   await page.goto('/costs');
-  const table = page.getByRole('table', { name: 'Par modèle' });
-  const rows = table.getByRole('row').filter({ has: page.getByRole('cell') });
-  await expect(rows.first()).toBeVisible();
-  for (const row of await rows.all()) {
-    const model = row.getByRole('cell').first();
-    const box = await model.boundingBox();
-    // La colonne garde sa largeur minimale (12rem) : avant, elle tombait à zéro, une lettre par ligne.
-    expect(box?.width ?? 0, `colonne écrasée : ${await model.innerText()}`).toBeGreaterThanOrEqual(
-      190,
-    );
-    for (const cell of await row.getByRole('cell').all()) {
-      const overflow = await cell.evaluate((element) => element.scrollWidth - element.clientWidth);
+  // Under 544 px the table gives way to one card per model.
+  await expect(page.getByRole('table', { name: 'Par modèle' })).toBeHidden();
+  const cards = page.getByRole('list', { name: 'Par modèle' }).getByRole('listitem');
+  await expect(cards.first()).toBeVisible();
+  for (const card of await cards.all()) {
+    const cardBox = await card.boundingBox();
+    const badgeBox = await card.locator('[data-badge]').first().boundingBox();
+    // A badge keeps at least 190 px (the old Model column minimum), unless its value is
+    // shown whole (no clipped head or value): then it keeps its natural width.
+    const shownWhole = await card
+      .locator('[data-badge]')
+      .first()
+      .evaluate((badge) => {
+        const fits = (element: Element | null) =>
+          !element || element.scrollWidth <= element.clientWidth;
+        return (
+          fits(badge.querySelector('[data-segment="value"]')) &&
+          fits(badge.querySelector('[data-part="head"]'))
+        );
+      });
+    if (!shownWhole) {
       expect(
-        overflow,
-        `contenu qui déborde de sa colonne : ${await cell.innerText()}`,
-      ).toBeLessThanOrEqual(0);
+        badgeBox?.width ?? 0,
+        `badge écrasé : ${await card.innerText()}`,
+      ).toBeGreaterThanOrEqual(190);
     }
+    expect(
+      (badgeBox?.x ?? 0) + (badgeBox?.width ?? 0),
+      `badge hors de sa fiche : ${await card.innerText()}`,
+    ).toBeLessThanOrEqual((cardBox?.x ?? 0) + (cardBox?.width ?? 0));
+    const overflow = await card.evaluate((element) => element.scrollWidth - element.clientWidth);
+    expect(
+      overflow,
+      `contenu qui déborde de sa fiche : ${await card.innerText()}`,
+    ).toBeLessThanOrEqual(0);
   }
   await expectNoHorizontalOverflow(page);
 });
