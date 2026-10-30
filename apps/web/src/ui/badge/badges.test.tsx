@@ -66,7 +66,7 @@ describe('ChecksBadge', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('ChecksBadge does not put a grey label background behind the GitHub Actions logo', () => {
+  it('ChecksBadge ne pose pas de fond d’étiquette gris derrière le logo de GitHub Actions', () => {
     // The "CI" label and its logo rest on the card background (transparent), not on the grey
     // panel of other labels: only the state, in the value, is painted with its solid color.
     const { container } = render(<ChecksBadge checks="success" />);
