@@ -170,15 +170,24 @@
 }
 
 /*
- * L'étiquette, la clé : grise, comme celle d'un badge de shields.io. Elle garde sa largeur (un mot
- * court) ; seule une étiquette anormalement longue est coupée, pour laisser place à la valeur.
+ * The label, the key: grey like a shields.io badge, except for the CI state which
+ * rests on the card background (transparent) to avoid clashing with the solid-color
+ * value. It keeps its width (a short word); only an abnormally long label is cut
+ * to make room for the value.
  */
 .label {
   flex: none;
   max-width: 16ch;
   border-right: var(--borderWidth-thin) solid var(--fl-badge-border);
-  background-color: var(--bgColor-neutral-muted);
   color: var(--fgColor-muted);
+}
+
+.label[data-label-bg='shaded'] {
+  background-color: var(--bgColor-neutral-muted);
+}
+
+.label[data-label-bg='transparent'] {
+  background-color: transparent;
 }
 
 .value {

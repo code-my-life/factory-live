@@ -29,6 +29,11 @@ export interface BadgeProps {
   tone?: BadgeTone;
   /** Un état (CI) : la valeur peinte de la couleur franche du rôle, plutôt que teintée. */
   solid?: boolean;
+  /**
+   * Label background: grey (default, like a shields.io key) or transparent to rest on the
+   * card background. The CI label is transparent: only the value (state) keeps its solid color.
+   */
+  labelBackground?: 'shaded' | 'transparent';
   /** Identifiant (modèle, numéro, version) : la valeur en police de code. */
   code?: boolean;
   /** Le segment qui cède la place quand la largeur manque : la valeur (défaut) ou l'étiquette. */
@@ -56,6 +61,7 @@ export function Badge({
   value,
   tone = 'neutral',
   solid = false,
+  labelBackground = 'shaded',
   code = false,
   yields = 'value',
   icon,
@@ -82,6 +88,7 @@ export function Badge({
         <span
           className={styles.label}
           data-segment="label"
+          data-label-bg={labelBackground}
           data-brand={painted?.title}
           data-icon-tone={labelIconTone}
           // Couleur de marque (Simple Icons) : une donnée, pas un jeton ; texte au contraste calculé.
