@@ -1,44 +1,41 @@
+import { fingerprint, hueOf } from '../badge/hues.ts';
+import type { Hue } from '../badge/hues.ts';
+
 /**
  * Avatars des agents : un identicon par agent, à la manière des avatars par défaut de GitHub
  * (grille 5 × 5 symétrique sur fond clair), affiché par le composant `Avatar` de Primer en carré,
- * la forme que Primer réserve aux bots et aux apps. Couleurs : palette de visualisation de Primer
- * (`--data-*-color-emphasis`, valeurs du thème clair, lisibles sur le fond clair de l'image).
+ * the shape Primer reserves for bots and apps. An agent's hue comes from the single table of hues
+ * (`ui/badge/hues.ts`), the same as its badge's; here, the solid color of that hue, readable on the
+ * light background of the image (light theme values).
  */
-
-/** Une couleur par agent de la factory, toutes différentes (rôle voisin, teinte voisine mais distincte). */
-const AGENT_COLOR: Readonly<Record<string, string>> = {
-  coordinator: '#006edb', // data-blue
-  'coordinator-claude': '#894ceb', // data-purple
-  coder: '#30a147', // data-green
-  'coder-claude': '#a830e8', // data-plum
-  'coder-opencode': '#179b9b', // data-teal
-  gate: '#eb670f', // data-orange
-  'gate-claude': '#ce2c85', // data-pink
-  scribe: '#b88700', // data-yellow
-  release: '#d43511', // data-coral
-  'tool-setup': '#808fa3', // data-gray
+const HUE_COLOR: Readonly<Record<Hue, string>> = {
+  auburn: '#9d615c',
+  blue: '#006edb', // data-blue
+  brown: '#856d4c',
+  coral: '#d43511', // data-coral
+  cyan: '#007b94',
+  gray: '#808fa3', // data-gray
+  green: '#30a147', // data-green
+  indigo: '#5a61e7',
+  lemon: '#866e04',
+  lime: '#527a29',
+  olive: '#64762d',
+  orange: '#eb670f', // data-orange
+  pine: '#167e53',
+  pink: '#ce2c85', // data-pink
+  plum: '#a830e8', // data-plum
+  purple: '#894ceb', // data-purple
+  red: '#df0c24',
+  teal: '#179b9b', // data-teal
+  yellow: '#b88700', // data-yellow
 };
-
-/** Pour un agent inconnu de la liste : une teinte de la même palette, choisie par empreinte du nom. */
-const SPARE_COLORS = ['#527a29', '#64762d', '#167e53', '#9d615c', '#856d4c', '#866e04', '#df0c24'];
 
 const BACKGROUND = '#f6f8fa'; // bgColor-muted du thème clair, comme les avatars par défaut de GitHub
 const GRID = 5;
 
-/** Empreinte 32 bits déterministe (FNV-1a), suffisante pour dessiner un motif. */
-function fingerprint(text: string, seed: number): number {
-  let hash = 0x811c9dc5 ^ seed;
-  for (let index = 0; index < text.length; index += 1) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash >>> 0;
-}
-
+/** The identicon color of an agent: that of its hue (an unknown agent gets one by fingerprint). */
 export function agentColor(profile: string): string {
-  return (
-    AGENT_COLOR[profile] ?? (SPARE_COLORS[fingerprint(profile, 7) % SPARE_COLORS.length] as string)
-  );
+  return HUE_COLOR[hueOf('agent', profile)];
 }
 
 /**

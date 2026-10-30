@@ -1,29 +1,48 @@
-import type { AgentActivity, ProfileLimit, ProfileView } from '@factory-live/contracts';
+import type {
+  AgentActivity,
+  ConfigField,
+  ProfileLimit,
+  ProfileView,
+} from '@factory-live/contracts';
 import { AlertIcon, ArrowRightIcon } from '@primer/octicons-react';
-import { Heading, Token } from '@primer/react';
+import { Heading } from '@primer/react';
+import type { ReactNode } from 'react';
 import { useProfiles, useSnapshot } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
+import { EffortBadge, McpBadge, PluginBadge, ToolsetBadge } from '../../ui/badge/ConfigBadges.tsx';
+import { isMcpToolset, splitNames } from '../../ui/badge/config.ts';
 import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
+import { SkillBadge } from '../../ui/badge/SkillBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { StationMark } from '../../ui/flow/StationMark.tsx';
 import { LiveDot } from '../../ui/LiveDot.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
-import type { ModelName } from '../../ui/ModelBadge.tsx';
 import { actionModel, parseModelLinks } from '../../ui/modelText.ts';
 import page from '../../ui/page.module.css';
 import styles from './agents.module.css';
 
-/** Les modèles d'un côté d'un écart (en service ou dans le dépôt), en badges ; sinon le texte tel quel. */
-function DriftModels({ models, fallback }: { models: ModelName[] | null; fallback: string }) {
-  if (!models) return <span className={styles.driftLive}>{fallback}</span>;
+/**
+ * The items on one side of a drift (live or in the repo) as badges: models, toolsets or plugins;
+ * `null` when the value does not have that shape (shown as is).
+ */
+function driftBadges(field: ConfigField, value: string | null): ReactNode[] | null {
+  if (!value) return null;
+  if (field === 'toolsets')
+    return splitNames(value).map((name) => <ToolsetBadge key={name} name={name} />);
+  if (field === 'plugins')
+    return splitNames(value).map((name) => <PluginBadge key={name} name={name} />);
+  if (field !== 'model' && field !== 'fallbacks') return null;
   return (
-    <>
-      {models.map((model, index) => (
-        <ModelBadge key={`${model.model}-${index}`} model={model} overflow="wrap" />
-      ))}
-    </>
+    parseModelLinks(value)?.map((model, index) => (
+      <ModelBadge key={`${model.model}-${index}`} model={model} />
+    )) ?? null
   );
+}
+
+function DriftSide({ badges, fallback }: { badges: ReactNode[] | null; fallback: string }) {
+  if (!badges) return <span className={styles.driftLive}>{fallback}</span>;
+  return <>{badges}</>;
 }
 
 /** La limite appliquée : la valeur réglée, sinon celle d'Hermès par défaut ; `null` : sans limite. */
@@ -147,12 +166,13 @@ function AgentProfileCard({
                     ? activity.model
                     : model
                 }
-                overflow="wrap"
               />
             </li>
           ))}
         </ol>
-        {profile.effort ? <p className={styles.muted}>{t.agents.effort(profile.effort)}</p> : null}
+        {profile.effort ? (
+          <EffortBadge level={profile.effort} description={t.agents.effort(profile.effort)} />
+        ) : null}
       </section>
 
       {profile.drift.length > 0 ? (
@@ -162,20 +182,19 @@ function AgentProfileCard({
           </p>
           <ul className={styles.driftList}>
             {profile.drift.map((drift) => {
-              // Un écart de modèle ou de fallbacks : des badges de modèle, comme partout ailleurs.
-              const models = (value: string | null) =>
-                (drift.field === 'model' || drift.field === 'fallbacks') && value
-                  ? parseModelLinks(value)
-                  : null;
-              const [live, repo] = [models(drift.live), models(drift.repo)];
+              // A drift of models, toolsets or plugins: badges, as everywhere else.
+              const [live, repo] = [
+                driftBadges(drift.field, drift.live),
+                driftBadges(drift.field, drift.repo),
+              ];
               if (live || repo)
                 return (
                   <li key={drift.field}>
                     <span className={styles.driftModels}>
                       <code>{t.agents.field[drift.field]}</code>
                       {t.common.colon}
-                      <DriftModels
-                        models={live}
+                      <DriftSide
+                        badges={live}
                         fallback={drift.live ?? t.agents.unset[drift.field]}
                       />
                       <span className={styles.driftRepoModels}>
@@ -183,8 +202,8 @@ function AgentProfileCard({
                           {t.agents.driftRepoLabel}
                           {t.common.colon}
                         </span>
-                        <DriftModels
-                          models={repo}
+                        <DriftSide
+                          badges={repo}
                           fallback={drift.repo ?? t.agents.unset[drift.field]}
                         />
                       </span>
@@ -212,20 +231,20 @@ function AgentProfileCard({
         <h3 className={styles.blockTitle}>{t.agents.skills}</h3>
         <div className={styles.tokens}>
           {profile.skills.map((skill) => (
-            <Token key={skill} text={skill} size="small" />
+            <SkillBadge key={skill} name={skill} />
           ))}
         </div>
         <h3 className={styles.blockTitle}>{t.agents.plugins}</h3>
         <div className={styles.tokens}>
           {profile.plugins.map((plugin) => (
-            <Token
-              key={plugin.name}
-              text={[
-                plugin.refusals > 0 ? t.agents.refusals(plugin.name, plugin.refusals) : plugin.name,
+            <span key={plugin.name} className={styles.plugin}>
+              <PluginBadge name={plugin.name} />
+              {/* Refusals and overruns stay as text, after the badge. */}
+              {[
+                ...(plugin.refusals > 0 ? [t.agents.refusals(plugin.refusals)] : []),
                 ...(plugin.timeouts > 0 ? [t.agents.timeouts(plugin.timeouts)] : []),
               ].join(' · ')}
-              size="small"
-            />
+            </span>
           ))}
         </div>
         {/* Une garde dont le code peut attendre plus longtemps que son hook : le risque de l'incident #2. */}
@@ -249,10 +268,17 @@ function AgentProfileCard({
             </p>
           ))}
         <h3 className={styles.blockTitle}>{t.agents.toolsets(profile.mcp.length > 0)}</h3>
-        <p className={styles.toolsets}>
-          {profile.toolsets.join(' · ')}
-          {profile.mcp.length > 0 ? ` · MCP ${profile.mcp.join(', ')}` : ''}
-        </p>
+        <div className={styles.tokens}>
+          {/* A `mcp-<server>` toolset is not repeated: its server has its own badge. */}
+          {profile.toolsets
+            .filter((toolset) => !isMcpToolset(toolset))
+            .map((toolset) => (
+              <ToolsetBadge key={toolset} name={toolset} />
+            ))}
+          {profile.mcp.map((server) => (
+            <McpBadge key={server} name={server} />
+          ))}
+        </div>
       </section>
 
       <Limits limits={profile.limits} />

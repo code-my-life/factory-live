@@ -5,6 +5,7 @@ import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
 import { CardBadge } from '../../ui/badge/CardBadge.tsx';
 import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
+import { repoOfKey } from '../../ui/paths.ts';
 import { CopyCommand } from '../../ui/CopyCommand.tsx';
 import { Markdown } from '../../ui/Markdown.tsx';
 import { interventionHeadline, interventionTone } from '../../ui/work/workState.tsx';
@@ -60,7 +61,11 @@ export function InterventionDetail({ intervention }: { intervention: Interventio
       </header>
 
       {diagnosis ? (
-        <DiagnosisPanel diagnosis={diagnosis} unblocked={intervention.unblock?.state ?? null} />
+        <DiagnosisPanel
+          diagnosis={diagnosis}
+          repo={intervention.issueKey ? repoOfKey(intervention.issueKey) : undefined}
+          unblocked={intervention.unblock?.state ?? null}
+        />
       ) : null}
 
       <section

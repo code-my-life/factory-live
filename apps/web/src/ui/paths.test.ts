@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { issueKeyFromParams, issuePath } from './paths.ts';
+import { issueKeyFromParams, issuePath, repoOfKey } from './paths.ts';
+
+describe('repoOfKey', () => {
+  it('donne le dépôt d’une clé d’issue', () => {
+    expect(repoOfKey('claude-cockpit#71')).toBe('claude-cockpit');
+  });
+});
 
 describe('issuePath', () => {
   it('construit le chemin de la vue issue', () => {

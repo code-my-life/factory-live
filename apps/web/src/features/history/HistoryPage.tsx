@@ -4,6 +4,7 @@ import { Heading } from '@primer/react';
 import { Table } from '@primer/react/experimental';
 import { useFactorySource, useHistory, useProfiles } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
+import { AgentBadge } from '../../ui/badge/AgentBadge.tsx';
 import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { modelEditor } from '../../ui/badge/marks.ts';
 import { VersionBadge } from '../../ui/badge/VersionBadge.tsx';
@@ -121,10 +122,12 @@ export function HistoryPage() {
                 const used = gateModel(row, profiles);
                 return (
                   <Table.Row key={`${row.harness}-${row.model ?? ''}`}>
-                    <Table.Cell>{row.harness}</Table.Cell>
+                    <Table.Cell>
+                      <AgentBadge profile={row.harness} />
+                    </Table.Cell>
                     <Table.Cell>
                       {used ? (
-                        <ModelBadge model={used.model} lane={used.lane} overflow="clamp" />
+                        <ModelBadge model={used.model} lane={used.lane} />
                       ) : (
                         t.history.agentModel
                       )}

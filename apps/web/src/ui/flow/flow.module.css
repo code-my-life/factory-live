@@ -207,24 +207,3 @@
   display: inline-flex;
   white-space: nowrap;
 }
-
-/* Une station hors de la ligne : son arrêt en miniature, neutre, puis son nom. */
-.mark {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--base-size-6);
-  min-width: 0;
-}
-
-.markStop {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: var(--base-size-20);
-  height: var(--base-size-20);
-  border: var(--borderWidth-thin) solid var(--borderColor-default);
-  border-radius: var(--borderRadius-full);
-  background-color: var(--bgColor-muted);
-  color: var(--fgColor-muted);
-}

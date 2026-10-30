@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
-import { AgentAvatar } from '../agents/AgentAvatar.tsx';
+import { AgentBadge } from '../badge/AgentBadge.tsx';
 import { WorkStateIcon, WorkStateLabel } from './workState.tsx';
 import type { WorkState } from './workState.tsx';
 import styles from './work.module.css';
@@ -89,12 +89,7 @@ export function JobBox({
       {compact ? null : (
         <span className={styles.jobWho}>
           <WorkStateLabel state={state} icon={false} />
-          {agent ? (
-            <span className={styles.jobAgent}>
-              <AgentAvatar profile={agent} size={16} named />
-              <span className={styles.jobAgentName}>{agent}</span>
-            </span>
-          ) : null}
+          {agent ? <AgentBadge profile={agent} /> : null}
         </span>
       )}
       {children}

@@ -1,25 +1,19 @@
 import type { CardView, IssueDetail, RunView } from '@factory-live/contracts';
 import { ArrowLeftIcon, IssueOpenedIcon, LinkExternalIcon } from '@primer/octicons-react';
-import {
-  Banner,
-  Button,
-  Heading,
-  Label,
-  LabelGroup,
-  Link as PrimerLink,
-  Token,
-  UnderlineNav,
-} from '@primer/react';
+import { Banner, Button, Heading, Link as PrimerLink, UnderlineNav } from '@primer/react';
 import { Blankslate, Table } from '@primer/react/experimental';
 import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useIssueDetail, useSnapshot } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { Messages } from '../../i18n/fr.ts';
-import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
+import { AgentBadge } from '../../ui/badge/AgentBadge.tsx';
 import { CardBadge } from '../../ui/badge/CardBadge.tsx';
 import { ChecksBadge } from '../../ui/badge/ChecksBadge.tsx';
+import { GithubLabelBadge } from '../../ui/badge/GithubLabelBadge.tsx';
 import { IssueBadge, issueState } from '../../ui/badge/IssueBadge.tsx';
+import { PullRequestBadge } from '../../ui/badge/PullRequestBadge.tsx';
+import { SkillBadge } from '../../ui/badge/SkillBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { StationMark } from '../../ui/flow/StationMark.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
@@ -35,7 +29,7 @@ import {
 } from '../../ui/work/workState.tsx';
 import { shortCardTitle } from './cardText.ts';
 import { IssueGraph } from './IssueGraph.tsx';
-import { issueKeyFromParams } from '../../ui/paths.ts';
+import { issueKeyFromParams, repoOfKey } from '../../ui/paths.ts';
 import { PullRequestPanel, PullRequestState } from './PullRequestPanel.tsx';
 import { TranscriptPanel } from './TranscriptPanel.tsx';
 import styles from './issues.module.css';
@@ -85,10 +79,7 @@ function RunsTable({
           >
             <p className={styles.runHead}>
               <span className="fl-mono">#{run.id}</span>
-              <span className={styles.agentCell}>
-                <AgentAvatar profile={run.profile} size={16} named />
-                {run.profile}
-              </span>
+              <AgentBadge profile={run.profile} />
               <span className={styles.cellNote}>{t.runRole[run.role]}</span>
               <span className={styles.runDuration}>{duration(run)}</span>
             </p>
@@ -134,10 +125,7 @@ function RunsTable({
                 <Table.Cell className="fl-mono">#{run.id}</Table.Cell>
                 <Table.Cell>
                   <span className={styles.cellStack}>
-                    <span className={styles.agentCell}>
-                      <AgentAvatar profile={run.profile} size={16} named />
-                      {run.profile}
-                    </span>
+                    <AgentBadge profile={run.profile} />
                     <span className={styles.cellNote}>{t.runRole[run.role]}</span>
                   </span>
                 </Table.Cell>
@@ -282,13 +270,9 @@ export function IssuePage() {
           <span className={styles.metaText}>
             <StationMark station={issue.station} label={t.issue.stage(t.station[issue.station])} />
           </span>
-          <LabelGroup>
-            {issue.labels.map((label) => (
-              <Label key={label} variant="secondary">
-                {label}
-              </Label>
-            ))}
-          </LabelGroup>
+          {issue.labels.map((label) => (
+            <GithubLabelBadge key={label.name} label={label} />
+          ))}
           <PrimerLink href={issue.url} target="_blank" rel="noreferrer" className={styles.external}>
             {t.issue.onGitHub} <LinkExternalIcon size={12} />
           </PrimerLink>
@@ -298,7 +282,9 @@ export function IssuePage() {
       <dl className={styles.facts}>
         <div className={styles.fact}>
           <dt className={styles.factTerm}>{t.issue.facts.harness}</dt>
-          <dd className={styles.factValue}>{issue.harness ?? t.issue.facts.harnessPending}</dd>
+          <dd className={styles.factValue}>
+            {issue.harness ? <AgentBadge profile={issue.harness} /> : t.issue.facts.harnessPending}
+          </dd>
         </div>
         <div className={styles.fact}>
           <dt className={styles.factTerm}>{t.issue.facts.claudeModel}</dt>
@@ -316,16 +302,21 @@ export function IssuePage() {
             {issue.pr ? (
               <span className={styles.factBadges}>
                 <PullRequestState state={issue.pr.state} size="small" />
-                <PrimerLink href={issue.pr.url} target="_blank" rel="noreferrer">
-                  #{issue.pr.number}
-                </PrimerLink>
+                <PullRequestBadge
+                  repo={repoOfKey(issue.key)}
+                  number={issue.pr.number}
+                  url={issue.pr.url}
+                  state={issue.pr.state}
+                />
                 <ChecksBadge checks={issue.pr.checks} />
               </span>
             ) : issue.prUrl ? (
               <>
-                <PrimerLink href={issue.prUrl} target="_blank" rel="noreferrer">
-                  #{issue.prUrl.split('/').at(-1)}
-                </PrimerLink>{' '}
+                <PullRequestBadge
+                  repo={repoOfKey(issue.key)}
+                  number={Number(issue.prUrl.split('/').at(-1))}
+                  url={issue.prUrl}
+                />{' '}
                 <span className={styles.muted}>{t.issue.facts.prUnknownState}</span>
               </>
             ) : (
@@ -415,12 +406,11 @@ export function IssuePage() {
             <p className={styles.cardPanelMeta}>
               <CardBadge kind={selectedCard.kind} id={selectedCard.id} />
               <WorkStateLabel state={cardWorkState(selectedCard, null, t)} />
-              <span className={styles.agentCell}>
-                {selectedCard.assignee ? (
-                  <AgentAvatar profile={selectedCard.assignee} size={16} named />
-                ) : null}
-                {selectedCard.assignee ?? t.issue.unassigned}
-              </span>
+              {selectedCard.assignee ? (
+                <AgentBadge profile={selectedCard.assignee} />
+              ) : (
+                <span className={styles.agentCell}>{t.issue.unassigned}</span>
+              )}
             </p>
             {selectedCardIntervention?.diagnosis ? (
               <p className={styles.cardCause}>
@@ -438,7 +428,7 @@ export function IssuePage() {
               <p className={styles.cardPanelMeta}>
                 <span className={styles.muted}>{t.issue.forcedSkills}</span>
                 {selectedCard.skills.map((skill) => (
-                  <Token key={skill} text={skill} size="small" />
+                  <SkillBadge key={skill} name={skill} />
                 ))}
               </p>
             ) : null}
@@ -513,16 +503,13 @@ export function IssuePage() {
                       <Table.Row key={run.id}>
                         <Table.Cell className="fl-mono">#{run.id}</Table.Cell>
                         <Table.Cell>
-                          <span className={styles.agentCell}>
-                            <AgentAvatar profile={run.profile} size={16} named />
-                            {run.profile}
-                          </span>
+                          <AgentBadge profile={run.profile} />
                         </Table.Cell>
                         <Table.Cell>
                           {run.laneModel ? (
-                            <ModelBadge model={run.laneModel} lane overflow="clamp" />
+                            <ModelBadge model={run.laneModel} lane />
                           ) : run.model ? (
-                            <ModelBadge model={run.model} overflow="clamp" />
+                            <ModelBadge model={run.model} />
                           ) : (
                             t.common.unknown
                           )}

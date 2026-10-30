@@ -340,6 +340,7 @@ export function buildUsage(now: number): Record<UsagePeriod, UsageReport> {
     usageRow('agnes-2.5-flash', 'freellmapi', 1840, 9_200_000, 410_000, null, 37, 4),
     usageRow('claude-opus-5-5', 'anthropic', 312, 5_600_000, 210_000, 18.62, 0, 0),
     usageRow(NEMOTRON_SUPER, 'nvidia', 610, 3_400_000, 140_000, null, 0, 2),
+    usageRow(NEMOTRON_ULTRA, 'nvidia', 58, 420_000, 24_000, null, 0, 0),
     usageRow('dots3-note-preview', 'freellmapi', 420, 2_100_000, 96_000, null, 6, 1),
     usageRow('claude-sonnet-5-5', 'anthropic', 140, 2_000_000, 80_000, 4.1, 0, 0),
     usageRow('mix', 'moa', 74, 1_100_000, 52_000, null, 0, 0),

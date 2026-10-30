@@ -31,6 +31,13 @@ export const IssueStatus = z.enum([
 ]);
 export type IssueStatus = z.infer<typeof IssueStatus>;
 
+/** A GitHub label: its name and color (hexadecimal without « # », as the GitHub API returns it). */
+export const IssueLabel = z.object({
+  name: z.string(),
+  color: z.string().regex(/^[0-9a-fA-F]{6}$/),
+});
+export type IssueLabel = z.infer<typeof IssueLabel>;
+
 /** Une issue GitHub traitée par la factory, résumée pour la ligne d'usine et les listes. */
 export const IssueSummary = z.object({
   key: IssueKey,
@@ -38,7 +45,7 @@ export const IssueSummary = z.object({
   number: z.number().int().positive(),
   title: z.string(),
   url: z.url(),
-  labels: z.array(z.string()),
+  labels: z.array(IssueLabel),
   station: StationId,
   /** Station quittée au dernier changement, pour animer la liaison franchie. */
   previousStation: StationId.nullable(),

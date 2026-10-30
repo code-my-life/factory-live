@@ -1,4 +1,4 @@
-import type { ChecksState, PullRequestView } from '@factory-live/contracts';
+import type { ChecksState, IssueLabel, PullRequestView } from '@factory-live/contracts';
 import type { GitHubWritePort, IssueInfo } from '../../application/ports.ts';
 import { StaticTokenSource } from './app.ts';
 import type { TokenSource } from './app.ts';
@@ -45,6 +45,17 @@ const NAME = /^[\w.-]+$/;
 const str = (value: unknown): string => (typeof value === 'string' ? value : '');
 const obj = (value: unknown): Json =>
   typeof value === 'object' && value !== null ? (value as Json) : {};
+
+/** Neutral grey, used when GitHub gives a label without a usable color (contract: 6 hex digits). */
+const FALLBACK_LABEL_COLOR = 'ededed';
+
+function labelOf(label: Json): IssueLabel {
+  const color = str(label['color']);
+  return {
+    name: str(label['name']),
+    color: /^[0-9a-fA-F]{6}$/.test(color) ? color : FALLBACK_LABEL_COLOR,
+  };
+}
 
 /**
  * Client REST de GitHub. Les jetons viennent d'une source (`TokenSource`) : jeton d'installation de
@@ -142,8 +153,11 @@ export class GitHubClient implements GitHubWritePort {
     return {
       title: str(data['title']),
       url: str(data['html_url']),
-      labels: (Array.isArray(data['labels']) ? data['labels'] : []).map((label: unknown) =>
-        typeof label === 'string' ? label : str(obj(label)['name']),
+      labels: (Array.isArray(data['labels']) ? data['labels'] : []).map(
+        (label: unknown): IssueLabel =>
+          typeof label === 'string'
+            ? { name: label, color: FALLBACK_LABEL_COLOR }
+            : labelOf(obj(label)),
       ),
       state: data['state'] === 'closed' ? 'closed' : 'open',
     };

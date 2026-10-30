@@ -36,7 +36,8 @@
 
 /* La station de l'agent, à droite de son nom : l'arrêt de la ligne en miniature. */
 .station {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   color: var(--fgColor-muted);
   font-size: var(--text-body-size-small);
 }
@@ -203,12 +204,15 @@
   font-variant-numeric: tabular-nums;
 }
 
-.toolsets {
-  margin: 0;
-  color: var(--fgColor-default);
-  font-family: var(--fontStack-monospace);
+/* A plugin: its badge, then its refusals and overruns as text. */
+.plugin {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-4);
+  min-width: 0;
+  color: var(--fgColor-muted);
   font-size: var(--base-text-size-xs);
-  overflow-wrap: anywhere;
 }
 
 /* Les chiffres ferment la carte : au pied de chaque carte d'une rangée, à la même hauteur. */

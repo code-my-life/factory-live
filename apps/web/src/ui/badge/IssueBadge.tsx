@@ -1,7 +1,8 @@
 import type { IssueKey, IssueStatus } from '@factory-live/contracts';
 import { IssueClosedIcon, IssueOpenedIcon, SkipIcon } from '@primer/octicons-react';
-import { issuePath } from '../paths.ts';
+import { issuePath, repoOfKey } from '../paths.ts';
 import { Badge } from './Badge.tsx';
+import { hueOf } from './hues.ts';
 
 /** L'état GitHub d'une issue : ouverte, fermée (faite), ou arrêtée (abandonnée). */
 export type IssueState = 'open' | 'closed' | 'stopped';
@@ -36,14 +37,16 @@ export function IssueBadge({
   link?: boolean;
 }) {
   const hash = issueKey.lastIndexOf('#');
+  const repo = repoOfKey(issueKey);
   const mark = STATE_ICON[state ?? 'open'];
   return (
     <Badge
       {...(link ? { to: issuePath(issueKey) } : {})}
       {...(icon && state && mark.tone ? { labelIconTone: mark.tone } : {})}
       {...(icon ? { labelIcon: mark.icon } : {})}
-      label={issueKey.slice(0, hash)}
+      label={repo}
       value={issueKey.slice(hash)}
+      hue={hueOf('repo', repo)}
       code
       yields="label"
       description={issueKey}

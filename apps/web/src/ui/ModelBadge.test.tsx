@@ -53,7 +53,9 @@ describe('ModelBadge', () => {
   it('se contente du nom quand on ne connaît ni le fournisseur ni la source', () => {
     const { container } = render(<ModelBadge model={{ model: 'agnes-2.5-flash' }} />);
     const badge = badgeOf(container);
-    expect(badge?.querySelectorAll('[data-segment]')).toHaveLength(1);
+    // Without a provider: the generic « modèle » label (sparkle-fill icon), hue drawn from the name.
+    expect(badge?.querySelectorAll('[data-segment]')).toHaveLength(2);
+    expect(screen.getByText('modèle')).toBeInTheDocument();
     expect(badge).toHaveAttribute('title', 'agnes-2.5-flash');
   });
 });

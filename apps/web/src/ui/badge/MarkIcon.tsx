@@ -14,9 +14,12 @@ export function MarkIcon({
   size = 12,
   background = 'value',
   painted = false,
+  fill,
 }: {
   mark: BadgeMark;
   className?: string | undefined;
+  /** The color of an octicon, in place of the text color; a brand logo has its own. */
+  fill?: string | undefined;
   size?: 12 | 16;
   /** Le fond sous l'icône : celui de la page (valeur d'un badge, tuile) ou l'étiquette grise. */
   background?: 'label' | 'value';
@@ -24,7 +27,7 @@ export function MarkIcon({
 }) {
   if (!isBrand(mark)) {
     const Octicon = mark;
-    return <Octicon size={size} className={className} />;
+    return <Octicon {...(fill ? { fill } : {})} size={size} className={className} />;
   }
   return (
     <svg

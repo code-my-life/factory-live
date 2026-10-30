@@ -5,7 +5,7 @@ import { LayoutGroup } from 'motion/react';
 import { Link, useNavigate } from 'react-router';
 import { useSnapshot } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
-import { AgentAvatar } from '../../ui/agents/AgentAvatar.tsx';
+import { AgentBadge } from '../../ui/badge/AgentBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { FlowLine } from '../../ui/flow/FlowLine.tsx';
 import type { LineStep } from '../../ui/flow/FlowLine.tsx';
@@ -209,13 +209,13 @@ export function FactoryLinePage() {
           <ul className={styles.sideList}>
             {snapshot.sideCards.map((card) => (
               <li key={card.id} className={styles.sideItem}>
-                {card.assignee ? <AgentAvatar profile={card.assignee} size={20} named /> : null}
                 <span className={styles.sideText}>
                   <span className={styles.sideTitle}>{card.title}</span>
                   <span className={styles.sideMeta}>
                     <WorkStateLabel state={cardWorkState(card, null, t)} />
+                    {card.assignee ? <AgentBadge profile={card.assignee} /> : null}
                     <span>
-                      {card.assignee ?? t.issue.unassigned} ·{' '}
+                      {card.assignee ? null : `${t.issue.unassigned} · `}
                       <Elapsed since={card.openedAt} mode="age" />
                     </span>
                   </span>

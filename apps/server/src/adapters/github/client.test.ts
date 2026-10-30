@@ -82,7 +82,7 @@ describe('GitHubClient', () => {
             {
               title: 'Page Projets',
               html_url: 'https://github.com/code-my-life/cv-site/issues/49',
-              labels: [{ name: 'factory' }],
+              labels: [{ name: 'factory', color: 'a2eeef' }, 'bug', { name: 'odd', color: 'zz' }],
               state: 'open',
             },
             { etag: 'W/"abc"' },
@@ -96,7 +96,11 @@ describe('GitHubClient', () => {
     expect(issue).toEqual({
       title: 'Page Projets',
       url: 'https://github.com/code-my-life/cv-site/issues/49',
-      labels: ['factory'],
+      labels: [
+        { name: 'factory', color: 'a2eeef' },
+        { name: 'bug', color: 'ededed' },
+        { name: 'odd', color: 'ededed' },
+      ],
       state: 'open',
     });
     expect(await client.issue('cv-site', 49)).toEqual(issue);

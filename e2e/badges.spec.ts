@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { Locator } from '@playwright/test';
 import {
   expectCleanBadges,
   expectNoHorizontalOverflow,
@@ -67,27 +68,33 @@ test('un modèle de 70 caractères est tronqué proprement, son nom entier reste
   const live = card.locator('[data-badge]', { hasText: QWEN });
   await expect(live).toBeVisible();
   await expect(live).toHaveAttribute('title', new RegExp(`^${QWEN} via llama\\.cpp`));
-  const value = live.locator('[data-segment="value"] > span');
-  const { truncated, ellipsis } = await value.evaluate((element) => ({
+  // Cut in the middle: the head gives way (ellipsis), the last segments stay whole.
+  const [, head, tail] = await live.locator('[data-segment="value"] [data-split] > span').all();
+  const { truncated, ellipsis } = await (head as Locator).evaluate((element) => ({
     truncated: element.scrollWidth > element.clientWidth,
     ellipsis: getComputedStyle(element).textOverflow === 'ellipsis',
   }));
-  expect(truncated, 'le nom ne tient pas : il est tronqué').toBe(true);
+  expect(truncated, 'le nom ne tient pas : son début est tronqué').toBe(true);
   expect(ellipsis).toBe(true);
+  await expect(tail as Locator).toHaveText('-MTP-Q8_0');
+  expect(
+    await (tail as Locator).evaluate((element) => element.scrollWidth <= element.clientWidth),
+    'la fin du nom reste entière',
+  ).toBe(true);
   const [badgeBox, cardBox] = [await live.boundingBox(), await card.boundingBox()];
   expect((badgeBox?.x ?? 0) + (badgeBox?.width ?? 0)).toBeLessThanOrEqual(
     (cardBox?.x ?? 0) + (cardBox?.width ?? 0),
   );
 });
 
-test('sur la page Agents, le nom long passe à la ligne au lieu d’être tronqué', async ({
-  page,
-}) => {
+test('sur la page Agents, le nom long reste sur une ligne, coupé au milieu', async ({ page }) => {
   await page.goto('/agents');
   const chain = page.getByRole('article', { name: 'coder-claude' }).getByRole('listitem').first();
-  const value = chain.locator('[data-segment="value"] > span');
-  await expect(value).toHaveText(QWEN);
-  expect(await value.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  const badge = chain.locator('[data-badge]');
+  await expect(badge).toHaveAttribute('title', new RegExp(`^${QWEN}`));
+  const box = await badge.boundingBox();
+  expect(box?.height, 'un badge ne passe jamais à la ligne').toBeCloseTo(20, 0);
+  await expect(badge.locator('[data-split] > span').nth(2)).toHaveText('-MTP-Q8_0');
 });
 
 test('une issue a le même badge partout : ligne, liste, page, activité', async ({ page }) => {
@@ -107,7 +114,11 @@ test('une issue a le même badge partout : ligne, liste, page, activité', async
   );
   await page.goto('/issues');
   await expect(
-    page.getByRole('link', { name: /Vue ÉQUIPE/ }).locator('[data-badge]'),
+    // The row now also carries the station badge: the issue badge comes first.
+    page
+      .getByRole('link', { name: /Vue ÉQUIPE/ })
+      .locator('[data-badge]')
+      .first(),
   ).toHaveAttribute('title', 'claude-cockpit#71');
 });
 
@@ -238,17 +249,23 @@ test('un modèle a son badge partout : écarts de configuration, historique', as
     await expect(row.getByRole('cell').nth(1).locator('[data-badge]')).toBeVisible();
 });
 
-test('la CI se peint de sa couleur franche, avec le logo de GitHub Actions', async ({ page }) => {
+test('la CI teinte sa valeur de la couleur de l’état, avec le logo de GitHub Actions', async ({
+  page,
+}) => {
   await page.goto('/issues/claude-cockpit/68');
   const ci = page.locator('dl').first().locator('[data-badge]', { hasText: 'réussie' });
-  await expect(ci).toHaveAttribute('data-solid', '');
+  await expect(ci).not.toHaveAttribute('data-solid');
+  await expect(ci).toHaveAttribute('data-tone', 'success');
   await expect(ci.locator('[data-segment="label"] svg')).toBeVisible();
 });
 
 test('une issue porte l’icône de GitHub à la couleur de son état', async ({ page }) => {
   await page.goto('/issues');
   await expect(
-    page.getByRole('link', { name: /Page Projets/ }).locator('[data-segment="label"]'),
+    page
+      .getByRole('link', { name: /Page Projets/ })
+      .locator('[data-segment="label"]')
+      .first(),
   ).toHaveAttribute('data-icon-tone', 'success');
   await page.goto('/history');
   await expect(

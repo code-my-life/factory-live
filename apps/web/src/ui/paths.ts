@@ -6,6 +6,11 @@ export function issuePath(key: IssueKey): string {
   return `/issues/${encodeURIComponent(repo ?? '')}/${number ?? ''}`;
 }
 
+/** `claude-cockpit#71` → `claude-cockpit` */
+export function repoOfKey(key: IssueKey): string {
+  return key.slice(0, key.lastIndexOf('#'));
+}
+
 export function issueKeyFromParams(
   repo: string | undefined,
   number: string | undefined,

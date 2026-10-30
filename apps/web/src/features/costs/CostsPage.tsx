@@ -123,7 +123,7 @@ export function CostsPage() {
               {usage.models.map((row) => (
                 <Table.Row key={`${row.provider}-${row.model}`}>
                   <Table.Cell>
-                    <ModelBadge model={row} overflow="clamp" />
+                    <ModelBadge model={row} />
                   </Table.Cell>
                   <Table.Cell align="end">{fmt.integer(row.calls)}</Table.Cell>
                   <Table.Cell align="end">{fmt.compact(row.inputTokens)}</Table.Cell>
