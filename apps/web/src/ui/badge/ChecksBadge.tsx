@@ -27,6 +27,9 @@ export function ChecksBadge({ checks }: { checks: ChecksState }) {
       value={t.pr.ci[checks]}
       tone={CHECKS[checks].tone}
       solid
+      // The "CI" label takes no grey background: it rests on the card background, only
+      // the solid-color value keeps its color.
+      labelBackground="transparent"
       icon={CHECKS[checks].icon}
     />
   );

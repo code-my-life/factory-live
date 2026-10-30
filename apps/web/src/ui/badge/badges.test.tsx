@@ -65,6 +65,17 @@ describe('ChecksBadge', () => {
     const { container } = render(<ChecksBadge checks="none" />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('ChecksBadge does not put a grey label background behind the GitHub Actions logo', () => {
+    // The "CI" label and its logo rest on the card background (transparent), not on the grey
+    // panel of other labels: only the state, in the value, is painted with its solid color.
+    const { container } = render(<ChecksBadge checks="success" />);
+    const label = container.querySelector('[data-segment="label"]');
+    expect(label).toHaveAttribute('data-label-bg', 'transparent');
+    // The GitHub Actions logo and label text remain present.
+    expect(label?.querySelector('svg path')).toHaveAttribute('d', CHECKS_MARK.path);
+    expect(screen.getByText('CI')).toBeInTheDocument();
+  });
 });
 
 describe('VersionBadge', () => {
@@ -111,6 +122,20 @@ describe('icônes et couleurs des badges de concept', () => {
   it('marque une version d’une étiquette', () => {
     const { container } = render(<VersionBadge of="Hermès" version="0.22.2" />);
     expect(label(container)?.querySelector('svg')).not.toBeNull();
+  });
+});
+
+describe('label background of badges', () => {
+  const label = (container: HTMLElement) => container.querySelector('[data-segment="label"]');
+
+  it('other badges keep a grey label background (not transparent)', () => {
+    // Only the CI label is transparent; key|value badges keep their shaded label.
+    const { container: issue } = render(<IssueBadge issueKey="cv-site#49" />);
+    const { container: version } = render(<VersionBadge of="Hermès" version="0.22.2" />);
+    const { container: card } = render(<CardBadge kind="impl" id="t_5e21c0d9" />);
+    expect(label(issue)).toHaveAttribute('data-label-bg', 'shaded');
+    expect(label(version)).toHaveAttribute('data-label-bg', 'shaded');
+    expect(label(card)).toHaveAttribute('data-label-bg', 'shaded');
   });
 });
 
