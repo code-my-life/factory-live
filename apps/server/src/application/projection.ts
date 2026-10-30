@@ -4,6 +4,7 @@ import type {
   AgentState,
   Diagnosis,
   Intervention,
+  IssueLabel,
   IssueSummary,
   ModelRef,
   PullRequestView,
@@ -35,7 +36,7 @@ import type { UnblockRecord } from './ports.ts';
 export interface IssueInfoView {
   title: string;
   url: string;
-  labels: string[];
+  labels: IssueLabel[];
 }
 
 export interface StationMemory {
@@ -220,7 +221,7 @@ export function projectIssues(
       status: issueStatusOf(tasks, station, open.length),
       claudeModel:
         text(implementer?.metadata['claude_model']) ??
-        labels.find((label) => label.startsWith('claude:'))?.slice('claude:'.length) ??
+        labels.find((label) => label.name.startsWith('claude:'))?.name.slice('claude:'.length) ??
         null,
       harness:
         text(implementer?.metadata['harness'])?.split(' (')[0] ?? implementer?.profile ?? null,

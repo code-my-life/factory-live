@@ -95,6 +95,19 @@ export default defineConfig([
       'primer-react/spread-props-first': 'error',
       'primer-react/enforce-css-module-default-import': 'error',
       'primer-react/a11y-link-in-text-block': 'error',
+      // Skills, plugins and GitHub labels are `Badge`s (`ui/badge`), never Primer tokens.
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@primer/react',
+              importNames: ['Token', 'IssueLabelToken'],
+              message: 'Use a `Badge` from `ui/badge` (issue #11): no Primer `Token` in the app.',
+            },
+          ],
+        },
+      ],
     },
   },
   {

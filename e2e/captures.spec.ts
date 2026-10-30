@@ -6,6 +6,7 @@ import { pauseMotion } from './helpers.ts';
  * officielle de Playwright pour que les polices soient les mêmes partout :
  * `npm run e2e:captures` (voir le RUNBOOK).
  */
+// The badge checks (standard, middle cut) live in badges.spec.ts, which also runs under WebKit.
 const VIEWS = [
   ['ligne', '/'],
   ['issue', '/issues/claude-cockpit/71'],

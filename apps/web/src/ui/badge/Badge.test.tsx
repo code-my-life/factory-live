@@ -64,13 +64,9 @@ describe('Badge', () => {
     expect(badgeOf(container)).toHaveAttribute('data-yields', 'label');
   });
 
-  it('tronque la valeur longue sur une ligne, sauf à la couper (détail) ou sur deux lignes (tableau)', () => {
-    const { container, rerender } = render(<Badge value="Qwen3.5-9B" />);
+  it('tronque la valeur longue sur une ligne', () => {
+    const { container } = render(<Badge value="Qwen3.5-9B" />);
     expect(badgeOf(container)).toHaveAttribute('data-overflow', 'truncate');
-    rerender(<Badge value="Qwen3.5-9B" overflow="wrap" />);
-    expect(badgeOf(container)).toHaveAttribute('data-overflow', 'wrap');
-    rerender(<Badge value="Qwen3.5-9B" overflow="clamp" />);
-    expect(badgeOf(container)).toHaveAttribute('data-overflow', 'clamp');
   });
 
   it('pose une icône décorative devant la valeur', () => {
@@ -112,9 +108,29 @@ describe('Badge', () => {
     expect(label).toHaveStyle({ backgroundColor: 'rgb(118, 185, 0)', color: 'rgb(0, 0, 0)' });
   });
 
-  it('peint la valeur d’un état de la couleur franche de son rôle', () => {
-    const { container } = render(<Badge label="CI" value="en échec" tone="danger" solid />);
-    expect(badgeOf(container)).toHaveAttribute('data-solid');
+  it('teinte l’icône de la valeur de la teinte de l’élément, le texte garde sa couleur', () => {
+    const { container } = render(
+      <Badge label="skill" value="factory-brief" hue="indigo" icon={CheckIcon} />,
+    );
+    const style = badgeOf(container)?.getAttribute('style') ?? '';
+    expect(style).toContain('--fl-hue-fg: var(--display-indigo-fgColor)');
+    expect(container.querySelector('[data-segment="value"] svg')).toHaveAttribute(
+      'fill',
+      'var(--fl-hue-fg)',
+    );
+    expect(style).not.toContain('color:');
+  });
+
+  it('teinte l’étiquette GitHub de sa couleur, sans toucher au texte', () => {
+    const { container } = render(<Badge label="étiquette" value="bug" githubColor="d73a4a" />);
+    const style = badgeOf(container)?.getAttribute('style') ?? '';
+    expect(style).toContain('color-mix(in srgb, #d73a4a 18%, var(--bgColor-default))');
+    expect(style).toContain('color-mix(in srgb, #d73a4a 45%, var(--bgColor-default))');
+  });
+
+  it('teinte la valeur d’un état de la couleur de son rôle, sans valeur pleine', () => {
+    const { container } = render(<Badge label="CI" value="en échec" tone="danger" />);
+    expect(badgeOf(container)).not.toHaveAttribute('data-solid');
     expect(badgeOf(container)).toHaveAttribute('data-tone', 'danger');
   });
 });

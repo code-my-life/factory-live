@@ -1,13 +1,28 @@
 import { expect, test } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import {
   expectCleanBadges,
   expectNoHorizontalOverflow,
+  expectOneLine,
+  expectReadableCut,
   expectReadablePaint,
+  expectStandardBadge,
   expectVisibleMarks,
+  hueTint,
   issueJob,
+  pauseMotion,
 } from './helpers.ts';
 
 const QWEN = 'Qwen3.5-9B-The-Defiant-Fable-Uncnr-Heretic-plusIQ-TOOLS-NEO-MAX-MTP-Q8_0';
+const NEMOTRON = 'nvidia/nemotron-3-ultra-550b-a55b';
+
+/** The badge of a type (its label word) inside a scope, narrowed by its value. */
+function badge(page: Page, scope: Locator, word: string, value: string): Locator {
+  return scope
+    .locator('[data-badge]')
+    .filter({ has: page.locator('[data-segment="label"]', { hasText: new RegExp(`^${word}$`) }) })
+    .filter({ has: page.locator('[data-segment="value"]', { hasText: value }) });
+}
 
 /** Les écrans qui portent des badges, et ce qu'il faut attendre pour qu'ils soient tous dessinés. */
 const SCREENS = [
@@ -67,27 +82,33 @@ test('un modèle de 70 caractères est tronqué proprement, son nom entier reste
   const live = card.locator('[data-badge]', { hasText: QWEN });
   await expect(live).toBeVisible();
   await expect(live).toHaveAttribute('title', new RegExp(`^${QWEN} via llama\\.cpp`));
-  const value = live.locator('[data-segment="value"] > span');
-  const { truncated, ellipsis } = await value.evaluate((element) => ({
+  // Cut in the middle: the head gives way (ellipsis), the last segments stay whole.
+  const [, head, tail] = await live.locator('[data-segment="value"] [data-split] > span').all();
+  const { truncated, ellipsis } = await (head as Locator).evaluate((element) => ({
     truncated: element.scrollWidth > element.clientWidth,
     ellipsis: getComputedStyle(element).textOverflow === 'ellipsis',
   }));
-  expect(truncated, 'le nom ne tient pas : il est tronqué').toBe(true);
+  expect(truncated, 'le nom ne tient pas : son début est tronqué').toBe(true);
   expect(ellipsis).toBe(true);
+  await expect(tail as Locator).toHaveText('-MTP-Q8_0');
+  expect(
+    await (tail as Locator).evaluate((element) => element.scrollWidth <= element.clientWidth),
+    'la fin du nom reste entière',
+  ).toBe(true);
   const [badgeBox, cardBox] = [await live.boundingBox(), await card.boundingBox()];
   expect((badgeBox?.x ?? 0) + (badgeBox?.width ?? 0)).toBeLessThanOrEqual(
     (cardBox?.x ?? 0) + (cardBox?.width ?? 0),
   );
 });
 
-test('sur la page Agents, le nom long passe à la ligne au lieu d’être tronqué', async ({
-  page,
-}) => {
+test('sur la page Agents, le nom long reste sur une ligne, coupé au milieu', async ({ page }) => {
   await page.goto('/agents');
   const chain = page.getByRole('article', { name: 'coder-claude' }).getByRole('listitem').first();
-  const value = chain.locator('[data-segment="value"] > span');
-  await expect(value).toHaveText(QWEN);
-  expect(await value.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  const badge = chain.locator('[data-badge]');
+  await expect(badge).toHaveAttribute('title', new RegExp(`^${QWEN}`));
+  const box = await badge.boundingBox();
+  expect(box?.height, 'un badge ne passe jamais à la ligne').toBeCloseTo(20, 0);
+  await expect(badge.locator('[data-split] > span').nth(2)).toHaveText('-MTP-Q8_0');
 });
 
 test('une issue a le même badge partout : ligne, liste, page, activité', async ({ page }) => {
@@ -107,7 +128,11 @@ test('une issue a le même badge partout : ligne, liste, page, activité', async
   );
   await page.goto('/issues');
   await expect(
-    page.getByRole('link', { name: /Vue ÉQUIPE/ }).locator('[data-badge]'),
+    // The row now also carries the station badge: the issue badge comes first.
+    page
+      .getByRole('link', { name: /Vue ÉQUIPE/ })
+      .locator('[data-badge]')
+      .first(),
   ).toHaveAttribute('title', 'claude-cockpit#71');
 });
 
@@ -238,17 +263,23 @@ test('un modèle a son badge partout : écarts de configuration, historique', as
     await expect(row.getByRole('cell').nth(1).locator('[data-badge]')).toBeVisible();
 });
 
-test('la CI se peint de sa couleur franche, avec le logo de GitHub Actions', async ({ page }) => {
+test('la CI teinte sa valeur de la couleur de l’état, avec le logo de GitHub Actions', async ({
+  page,
+}) => {
   await page.goto('/issues/claude-cockpit/68');
   const ci = page.locator('dl').first().locator('[data-badge]', { hasText: 'réussie' });
-  await expect(ci).toHaveAttribute('data-solid', '');
+  await expect(ci).not.toHaveAttribute('data-solid');
+  await expect(ci).toHaveAttribute('data-tone', 'success');
   await expect(ci.locator('[data-segment="label"] svg')).toBeVisible();
 });
 
 test('une issue porte l’icône de GitHub à la couleur de son état', async ({ page }) => {
   await page.goto('/issues');
   await expect(
-    page.getByRole('link', { name: /Page Projets/ }).locator('[data-segment="label"]'),
+    page
+      .getByRole('link', { name: /Page Projets/ })
+      .locator('[data-segment="label"]')
+      .first(),
   ).toHaveAttribute('data-icon-tone', 'success');
   await page.goto('/history');
   await expect(
@@ -303,4 +334,130 @@ test('un même service a la même image partout : GitHub et ses webhooks, NVIDIA
       .first(),
   ).toHaveAttribute('d', nvidia ?? '');
   expect(await expectVisibleMarks(page)).toBeGreaterThan(0);
+});
+
+/*
+ * The standard of the badges (issue #11), on the screens of the captures, in both themes: two separate
+ * parts, 20 px high, corners of `borderRadius-medium`, frame of the element's hue, the width of the content.
+ * (The reference captures themselves stay in captures.spec.ts.)
+ */
+for (const scheme of ['light', 'dark'] as const) {
+  test.describe(`badges, thème ${scheme === 'dark' ? 'sombre' : 'clair'}`, () => {
+    test.beforeEach(async ({ page }) => {
+      await pauseMotion(page);
+      await page.addInitScript((value) => {
+        localStorage.setItem('factory-live:color-mode', value);
+      }, scheme);
+    });
+
+    test('l’écran d’une issue avec PR : issue, poste, agent, PR, CI et étiquette GitHub', async ({
+      page,
+    }) => {
+      await page.goto('/issues/claude-cockpit/68');
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      const main = page.getByRole('main');
+      const header = main.locator('header');
+      const facts = main.locator('dl').first();
+      // The repo's hue: issue and PR; the station's hue: release; the agent's: coder.
+      await expectStandardBadge(
+        header.locator('[data-badge][title="claude-cockpit#68"]'),
+        hueTint('coral'),
+      );
+      await expectStandardBadge(badge(page, header, 'poste', 'Release'), hueTint('coral'));
+      await expectStandardBadge(badge(page, facts, 'agent', 'coder'), hueTint('green'));
+      await expectStandardBadge(facts.locator('[data-badge][title="#74"]'), hueTint('coral'));
+      await expectStandardBadge(badge(page, facts, 'CI', 'réussie'), {
+        frame: 'var(--borderColor-success-muted)',
+        background: 'var(--bgColor-success-muted)',
+      });
+      // The GitHub label keeps its own color: 18 % on the value, 45 % on the frame.
+      const label = badge(page, header, 'étiquette', 'factory');
+      await expectStandardBadge(label, {
+        frame: 'color-mix(in srgb, #5319e7 45%, var(--bgColor-default))',
+        background: 'color-mix(in srgb, #5319e7 18%, var(--bgColor-default))',
+      });
+    });
+
+    test('l’écran Agents : skill, toolset, plugin, serveur MCP, effort et modèle', async ({
+      page,
+    }) => {
+      await page.goto('/agents');
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      const card = page.getByRole('article', { name: 'coordinator', exact: true });
+      await expectStandardBadge(badge(page, card, 'skill', 'factory-brief'), hueTint('indigo'));
+      await expectStandardBadge(badge(page, card, 'toolset', 'kanban'), hueTint('blue'));
+      await expectStandardBadge(
+        badge(page, card, 'plugin', 'coordinator-guard'),
+        hueTint('indigo'),
+      );
+      await expectStandardBadge(badge(page, card, 'MCP', 'graphify'), hueTint('pink'));
+      await expectStandardBadge(badge(page, card, 'effort', 'high'), hueTint('indigo'));
+      await expectStandardBadge(badge(page, card, 'MoA', 'mix'), hueTint('plum'));
+    });
+
+    test('à la largeur d’un iPhone, les deux longs noms de modèle tiennent sur une ligne', async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      for (const route of ['/agents', '/costs']) {
+        await page.goto(route);
+        await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+        for (const name of [QWEN, NEMOTRON])
+          await expectOneLine(page.locator('[data-badge]:visible', { hasText: name }));
+      }
+    });
+  });
+}
+
+test('à la largeur d’un iPhone, le modèle de la page Coûts reçoit la largeur de sa fiche', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/costs');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  const qwen = page.locator('[data-badge]:visible', { hasText: QWEN }).first();
+  await expect(qwen).toBeVisible();
+  const box = await qwen.boundingBox();
+  expect(box?.width ?? 0, 'largeur du badge Qwen (px)').toBeGreaterThanOrEqual(390 * 0.8);
+  await expectNoHorizontalOverflow(page);
+});
+
+/** The models of the demo that must show on each screen, whatever its width. */
+const MODELS_ON = {
+  '/costs': [QWEN, NEMOTRON, 'gpt-oss-20b-MXFP4', 'claude-sonnet-5-5', 'claude-opus-5-5'],
+  // The demo shows no Claude model on the Agents screen.
+  '/agents': [QWEN, NEMOTRON, 'gpt-oss-20b-MXFP4'],
+} as const;
+
+for (const [route, names] of Object.entries(MODELS_ON)) {
+  test(`à la largeur d’un iPhone, chaque nom de modèle garde sa tête et sa fin : ${route}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(route);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    const cut = page.locator('[data-badge]:visible', { has: page.locator('[data-part="head"]') });
+    const checked: string[] = [];
+    for (const element of await cut.all()) checked.push(await expectReadableCut(element));
+    for (const name of names)
+      expect(
+        checked.some((title) => title.includes(name)),
+        `${name} est affiché et coupé proprement`,
+      ).toBe(true);
+  });
+}
+
+test('sur l’écran d’une issue, à la largeur du bureau, le modèle local n’est pas coupé quand la cellule a la place', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/issues/claude-cockpit/71');
+  await page.getByRole('link', { name: 'Coûts', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  const cell = page.locator('td:visible', { has: page.locator(`[data-badge][title*="${QWEN}"]`) });
+  const local = cell.locator(`[data-badge][title*="${QWEN}"]`).first();
+  await expect(local).toBeVisible();
+  const [cellBox, badgeBox] = [await cell.first().boundingBox(), await local.boundingBox()];
+  expect(badgeBox?.width ?? 0, 'le badge n’est plus borné à 280 px').toBeGreaterThan(280);
+  expect(badgeBox?.width ?? 0).toBeLessThanOrEqual(cellBox?.width ?? 0);
 });

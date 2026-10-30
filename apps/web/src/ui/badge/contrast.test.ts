@@ -11,6 +11,7 @@ import {
   markStyle,
   textOn,
 } from './contrast.ts';
+import { HUES } from './hues.ts';
 import { BRAND_MARKS } from './marks.ts';
 
 /** Les jetons d'un thème de Primer, valeurs résolues, tels que `@primer/primitives` les publie. */
@@ -118,6 +119,49 @@ describe('les couleurs des badges, dans les deux thèmes de Primer', () => {
           contrast(token('fgColor-onEmphasis'), token(`bgColor-${tone}-emphasis`)),
           tone,
         ).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
+    });
+  }
+});
+
+/** A GitHub color (`rrggbb`) tinted at `share` over the page background, like `color-mix` in Badge.tsx. */
+const tinted = (color: string, share: number, page: string) =>
+  composite(`#${color}${Math.round(share * 255).toString(16)}`, page);
+
+// The colors of the labels of the three repos (factory, claude, claude:opus in the demo, the GitHub
+// defaults), plus black and white, the two extremes.
+const GITHUB_COLORS = [
+  '5319e7',
+  'd97757',
+  'd4c5f9',
+  'd73a4a',
+  'a2eeef',
+  'fbca04',
+  '000000',
+  'ffffff',
+];
+
+describe('les teintes des badges, dans les deux thèmes de Primer', () => {
+  for (const [theme, token] of Object.entries(THEMES)) {
+    const page = token('bgColor-default');
+
+    it(`${theme} : le texte par défaut garde 4,5:1 sur le fond de la valeur des 19 teintes`, () => {
+      expect(HUES).toHaveLength(19);
+      for (const hue of HUES)
+        expect(
+          contrast(
+            token('fgColor-default'),
+            composite(token(`display-${hue}-bgColor-muted`), page),
+          ),
+          hue,
+        ).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
+    });
+
+    it(`${theme} : le texte par défaut garde 10,2:1 sur une étiquette GitHub teintée à 18 %`, () => {
+      for (const color of GITHUB_COLORS) {
+        const ratio = contrast(token('fgColor-default'), tinted(color, 0.18, page));
+        expect(ratio, color).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
+        expect(Math.round(ratio * 10) / 10, color).toBeGreaterThanOrEqual(10.2);
+      }
     });
   }
 });

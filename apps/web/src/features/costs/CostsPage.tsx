@@ -8,6 +8,7 @@ import { BarList } from '../../ui/charts/BarList.tsx';
 import { ColumnChart } from '../../ui/charts/ColumnChart.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
 import page from '../../ui/page.module.css';
+import styles from './costs.module.css';
 
 const PERIODS: readonly UsagePeriod[] = [1, 7, 30];
 
@@ -102,7 +103,35 @@ export function CostsPage() {
         <h2 id="models-title" className={page.sectionTitle}>
           {t.costs.byModel}
         </h2>
-        <div className={page.tableBox}>
+        {/* Phone: one card per model, its badge on its own line; the table takes over beyond. */}
+        <ul className={styles.modelList} aria-label={t.costs.byModel}>
+          {usage.models.map((row) => (
+            <li key={`${row.provider}-${row.model}`} className={styles.modelItem}>
+              <p className={styles.modelBadge}>
+                <ModelBadge model={row} />
+              </p>
+              <dl className={styles.modelFigures}>
+                {[
+                  [t.costs.columns.calls, fmt.integer(row.calls)],
+                  [t.costs.columns.input, fmt.compact(row.inputTokens)],
+                  [t.costs.columns.output, fmt.compact(row.outputTokens)],
+                  [t.costs.columns.rateLimited, fmt.integer(row.rateLimited)],
+                  [t.costs.columns.errors, fmt.integer(row.errors)],
+                  [
+                    t.costs.columns.cost,
+                    row.costUsd !== null ? fmt.usd(row.costUsd) : t.common.free,
+                  ],
+                ].map(([term, value]) => (
+                  <div key={term} className={styles.modelFigure}>
+                    <dt className={styles.modelTerm}>{term}</dt>
+                    <dd className={styles.modelValue}>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </li>
+          ))}
+        </ul>
+        <div className={`${page.tableBox} ${styles.modelTable}`}>
           <Table
             gridTemplateColumns="minmax(12rem, 2fr) repeat(6, auto)"
             cellPadding="condensed"
@@ -123,7 +152,7 @@ export function CostsPage() {
               {usage.models.map((row) => (
                 <Table.Row key={`${row.provider}-${row.model}`}>
                   <Table.Cell>
-                    <ModelBadge model={row} overflow="clamp" />
+                    <ModelBadge model={row} />
                   </Table.Cell>
                   <Table.Cell align="end">{fmt.integer(row.calls)}</Table.Cell>
                   <Table.Cell align="end">{fmt.compact(row.inputTokens)}</Table.Cell>

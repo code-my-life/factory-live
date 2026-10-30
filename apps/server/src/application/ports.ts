@@ -1,4 +1,10 @@
-import type { ActivityEvent, PullRequestView, PushPayload, Text } from '@factory-live/contracts';
+import type {
+  ActivityEvent,
+  IssueLabel,
+  PullRequestView,
+  PushPayload,
+  Text,
+} from '@factory-live/contracts';
 import type {
   Board,
   Comment,
@@ -176,7 +182,7 @@ export interface AgentLogPort {
 export interface IssueInfo {
   title: string;
   url: string;
-  labels: string[];
+  labels: IssueLabel[];
   state: 'open' | 'closed';
 }
 

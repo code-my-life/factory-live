@@ -166,7 +166,7 @@ export function harness(
       return respond({
         title: 'Page Projets',
         html_url: 'https://github.com/code-my-life/cv-site/issues/49',
-        labels: [{ name: 'factory' }],
+        labels: [{ name: 'factory', color: 'a2eeef' }],
         state: 'open',
       });
     if (method === 'POST' && url.includes('/app-manifests/'))

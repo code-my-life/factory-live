@@ -1,7 +1,8 @@
 import type { ModelRef } from '@factory-live/contracts';
+import { SparkleFillIcon } from '@primer/octicons-react';
 import { useI18n } from '../i18n/I18nProvider.tsx';
 import { Badge } from './badge/Badge.tsx';
-import type { BadgeOverflow } from './badge/Badge.tsx';
+import { hueOf } from './badge/hues.ts';
 import { isBrand, laneMark, modelEditor, providerMark } from './badge/marks.ts';
 import { providerLabel } from './vocabulary.ts';
 
@@ -13,32 +14,31 @@ export interface ModelName {
 }
 
 /**
- * Le modèle, partout le même badge : le fournisseur en étiquette (« lane » pour le CLI délégué), avec
- * son icône, peinte aux couleurs de la marque quand c'en est une (API NVIDIA, Claude) ; le nom du
- * modèle en valeur, neutre, avec le logo de son éditeur (Qwen, Mistral…). Un seul code couleur par
- * badge : d'où vient l'information (observé sur le dernier appel, configuration…) se lit dans
- * l'infobulle et le texte des lecteurs d'écran, pas dans une teinte. Le nom complet reste dans l'infobulle et pour les lecteurs d'écran : certains noms de
- * modèles locaux dépassent 70 caractères.
+ * The model, the same badge everywhere: the provider as the label (« lane » for the delegated CLI),
+ * with its icon, painted in the brand colors when it is a brand (NVIDIA API, Claude); the model
+ * name as the value, with the logo of its publisher (Qwen, Mistral…), in the hue of its provider.
+ * Without a provider: the « modèle » label and the `sparkle-fill` icon, the hue drawn from the name.
+ * Where the information comes from (observed on the last call, configuration…) is read in the
+ * tooltip and the screen reader text, not in a hue. Always on one line: the name, cut in the middle
+ * when room is short, stays whole in the tooltip and for screen readers (some local model names
+ * exceed 70 characters).
  */
 export function ModelBadge({
   model,
   lane = false,
-  overflow = 'truncate',
 }: {
   model: ModelName;
   /** Modèle de la lane CLI (Claude Code, OpenCode) que pilote l'agent. */
   lane?: boolean;
-  /** Nom trop long : tronqué (défaut), entier sur plusieurs lignes (détail), deux lignes (tableau). */
-  overflow?: BadgeOverflow;
 }) {
   const { t } = useI18n();
   const provider = model.provider ? providerLabel(model.provider) : null;
-  const label = lane ? t.common.lane : provider;
+  const label = lane ? t.common.lane : (provider ?? t.badge.model);
   const mark = lane
     ? laneMark(model.provider ?? null)
     : model.provider
       ? providerMark(model.provider)
-      : null;
+      : SparkleFillIcon;
   const brand = mark && isBrand(mark) ? mark : null;
   const editor = modelEditor(model.model);
   const description = t.model.description(
@@ -49,15 +49,15 @@ export function ModelBadge({
   );
   return (
     <Badge
-      {...(label ? { label } : {})}
-      {...(label && mark ? { labelIcon: mark } : {})}
+      label={label}
+      labelIcon={mark}
       brand={brand}
       value={model.model}
+      hue={model.provider ? hueOf('provider', model.provider) : hueOf('model', model.model)}
       // Le logo de l'éditeur, sauf s'il vient d'être peint en étiquette (Nemotron sur l'API NVIDIA).
       icon={editor && editor !== brand ? editor : null}
       code
       description={description}
-      overflow={overflow}
     />
   );
 }

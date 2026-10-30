@@ -42,6 +42,7 @@ import { useI18n } from '../i18n/I18nProvider.tsx';
 import type { Messages } from '../i18n/fr.ts';
 import { setAppBadge } from '../pwa/badge.ts';
 import { Badge } from '../ui/badge/Badge.tsx';
+import { hueOf } from '../ui/badge/hues.ts';
 import { Elapsed } from '../ui/Elapsed.tsx';
 import { LiveDot } from '../ui/LiveDot.tsx';
 import { needsWatch } from '../ui/vocabulary.ts';
@@ -254,7 +255,13 @@ export function AppShell() {
               <SideNavItem destination={SECONDARY[3] as Destination} />
             </NavList>
             <p className={styles.sidebarFoot}>
-              <Badge label={t.shell.board} labelIcon={ProjectIcon} value="factory" code />
+              <Badge
+                label={t.shell.board}
+                labelIcon={ProjectIcon}
+                value="factory"
+                hue={hueOf('board', 'factory')}
+                code
+              />
             </p>
           </div>
         </nav>

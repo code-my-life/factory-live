@@ -5,10 +5,12 @@ import {
   LinkExternalIcon,
   XCircleFillIcon,
 } from '@primer/octicons-react';
-import { Button, Link as PrimerLink, StateLabel } from '@primer/react';
+import { Button, StateLabel } from '@primer/react';
 import type { ComponentProps } from 'react';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { ChecksBadge } from '../../ui/badge/ChecksBadge.tsx';
+import { PullRequestBadge } from '../../ui/badge/PullRequestBadge.tsx';
+import { prNumberOfUrl, repoOfKey } from '../../ui/paths.ts';
 import styles from './issues.module.css';
 
 const PR_STATUS: Record<PullRequestView['state'], ComponentProps<typeof StateLabel>['status']> = {
@@ -38,13 +40,13 @@ export function PullRequestState({
 export function PullRequestPanel({ issue }: { issue: IssueSummary }) {
   const { t } = useI18n();
   const pr = issue.pr;
-  if (!pr && issue.prUrl) {
+  // A URL with no PR number is not a PR we can name: it is treated as no PR.
+  const spottedNumber = issue.prUrl ? prNumberOfUrl(issue.prUrl) : null;
+  if (!pr && issue.prUrl && spottedNumber !== null) {
     return (
       <p className={styles.muted}>
         {t.pr.spottedBefore}
-        <PrimerLink href={issue.prUrl} target="_blank" rel="noreferrer">
-          #{issue.prUrl.split('/').at(-1)}
-        </PrimerLink>
+        <PullRequestBadge repo={repoOfKey(issue.key)} number={spottedNumber} url={issue.prUrl} />
         {t.pr.spottedAfter}
       </p>
     );
@@ -62,10 +64,14 @@ export function PullRequestPanel({ issue }: { issue: IssueSummary }) {
     <div className={styles.pr}>
       <div className={styles.prHead}>
         <PullRequestState state={pr.state} />
+        <PullRequestBadge
+          repo={repoOfKey(issue.key)}
+          number={pr.number}
+          url={pr.url}
+          state={pr.state}
+        />
         <ChecksBadge checks={pr.checks} />
-        <h3 className={styles.prTitle}>
-          {pr.title} <span className={styles.muted}>#{pr.number}</span>
-        </h3>
+        <h3 className={styles.prTitle}>{pr.title}</h3>
       </div>
       <dl className={styles.facts}>
         <div>

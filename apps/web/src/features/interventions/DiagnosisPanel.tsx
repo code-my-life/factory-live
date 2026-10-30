@@ -13,7 +13,12 @@ import type {
 import { CheckIcon, ChevronRightIcon } from '@primer/octicons-react';
 import { Label } from '@primer/react';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
+import { BranchBadge } from '../../ui/badge/BranchBadge.tsx';
+import { PullRequestBadge } from '../../ui/badge/PullRequestBadge.tsx';
+import { SourceBadge } from '../../ui/badge/SourceBadge.tsx';
+import type { SourceKind } from '../../ui/badge/SourceBadge.tsx';
 import { CopyCommand } from '../../ui/CopyCommand.tsx';
+import { prNumberOfUrl } from '../../ui/paths.ts';
 import styles from './diagnosis.module.css';
 
 type LabelVariant = 'accent' | 'attention' | 'danger' | 'secondary' | 'success';
@@ -112,6 +117,17 @@ function Steps({ steps }: { steps: readonly Step[] }) {
   );
 }
 
+/** Where a piece of evidence comes from: the kanban, GitHub (webhook), or Hermes (sessions, journal, config, plugins, worktree). */
+const SOURCE_KIND: Record<Evidence['source'], SourceKind> = {
+  kanban: 'kanban',
+  transcript: 'hermes',
+  webhook: 'github',
+  agent_log: 'hermes',
+  config: 'hermes',
+  plugin: 'hermes',
+  workspace: 'hermes',
+};
+
 function EvidenceList({ evidence }: { evidence: readonly Evidence[] }) {
   const { t, fmt, text } = useI18n();
   return (
@@ -119,9 +135,7 @@ function EvidenceList({ evidence }: { evidence: readonly Evidence[] }) {
       {evidence.map((item, index) => (
         <li key={index} className={styles.evidenceItem}>
           <span className={styles.evidenceHead}>
-            <Label size="small" variant="secondary">
-              {t.diagnosis.source[item.source]}
-            </Label>
+            <SourceBadge kind={SOURCE_KIND[item.source]} name={t.diagnosis.source[item.source]} />
             {item.at ? (
               <span className={styles.muted}>
                 {item.until
@@ -164,8 +178,10 @@ function Runs({ runs, primary }: { runs: readonly RunVerdict[]; primary: Finding
   );
 }
 
-function Work({ work }: { work: WorkState }) {
+function Work({ work, repo }: { work: WorkState; repo: string | undefined }) {
   const { t } = useI18n();
+  // A URL with no PR number is not a PR we can name: it is treated as no PR.
+  const prNumber = work.prUrl ? prNumberOfUrl(work.prUrl) : null;
   const facts = [
     work.commits === 'none' && work.commitsRefused > 0
       ? `${t.diagnosis.commits.none} (${t.diagnosis.commitsRefused(work.commitsRefused)})`
@@ -178,7 +194,13 @@ function Work({ work }: { work: WorkState }) {
     <dl className={styles.work}>
       <div className={styles.workItem}>
         <dt className={styles.workTerm}>{t.diagnosis.branch}</dt>
-        <dd className={`${styles.workData} fl-mono`}>{work.branch ?? t.diagnosis.noBranch}</dd>
+        <dd className={styles.workData}>
+          {work.branch ? (
+            <BranchBadge repo={repo} name={work.branch} />
+          ) : (
+            <span className="fl-mono">{t.diagnosis.noBranch}</span>
+          )}
+        </dd>
       </div>
       <div className={styles.workItem}>
         <dt className={styles.workTerm}>{t.diagnosis.work}</dt>
@@ -187,10 +209,8 @@ function Work({ work }: { work: WorkState }) {
       <div className={styles.workItem}>
         <dt className={styles.workTerm}>{t.diagnosis.pr}</dt>
         <dd className={styles.workData}>
-          {work.prUrl ? (
-            <a href={work.prUrl} target="_blank" rel="noreferrer">
-              #{work.prUrl.split('/').at(-1)}
-            </a>
+          {work.prUrl && prNumber !== null ? (
+            <PullRequestBadge repo={repo} number={prNumber} url={work.prUrl} />
           ) : (
             t.diagnosis.noPr
           )}
@@ -221,9 +241,12 @@ function OtherFinding({ finding }: { finding: Finding }) {
  */
 export function DiagnosisPanel({
   diagnosis,
+  repo,
   unblocked = null,
 }: {
   diagnosis: Diagnosis;
+  /** The issue's repository: the hue of the branch and the PR. */
+  repo?: string | undefined;
   /** Où en est la réponse déjà postée : elle remplace le conseil « Débloquer suffit ? ». */
   unblocked?: UnblockProgress['state'] | null;
 }) {
@@ -289,7 +312,7 @@ export function DiagnosisPanel({
 
       {diagnosis.work ? (
         <div className={styles.section}>
-          <Work work={diagnosis.work} />
+          <Work work={diagnosis.work} repo={repo} />
         </div>
       ) : null}
 

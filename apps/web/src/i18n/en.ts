@@ -511,6 +511,21 @@ export const en: Messages = {
     unknown: 'Unknown',
   },
 
+  badge: {
+    station: 'station',
+    agent: 'agent',
+    skill: 'skill',
+    toolset: 'toolset',
+    mcp: 'MCP',
+    plugin: 'plugin',
+    effort: 'effort',
+    source: 'source',
+    githubLabel: 'label',
+    branch: 'branch',
+    model: 'model',
+    branchOf: (repo, branch) => `Branch of ${repo}: ${branch}`,
+  },
+
   common: {
     labelValue: (label, value) => `${label}: ${value}`,
     colon: ': ',
@@ -931,7 +946,7 @@ export const en: Messages = {
     tools: 'Tools, skills and plugins',
     skills: 'Skills',
     plugins: 'Plugins and guard refusals (7 days)',
-    refusals: (name, count) => `${name} · ${count} ${f.plural(count, 'refusal', 'refusals')}`,
+    refusals: (count) => `${count} ${f.plural(count, 'refusal', 'refusals')}`,
     timeouts: (count) => `${count} hook ${f.plural(count, 'timeout', 'timeouts')}`,
     risk: (longest, limit) => `can run commands of ${longest}, hook cut at ${limit}`,
     limits: 'Hermès limits',

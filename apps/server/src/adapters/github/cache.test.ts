@@ -10,7 +10,7 @@ function fakeClient() {
       : Promise.resolve({
           title: `Issue ${repo}#${number}`,
           url: `https://github.com/code-my-life/${repo}/issues/${number}`,
-          labels: ['factory'],
+          labels: [{ name: 'factory', color: 'a2eeef' }],
           state: 'open' as const,
         }),
   );

@@ -1,42 +1,12 @@
 import type { StationId } from '@factory-live/contracts';
-import {
-  BlockedIcon,
-  CheckCircleIcon,
-  CodeIcon,
-  IssueOpenedIcon,
-  RocketIcon,
-  ShieldCheckIcon,
-  WorkflowIcon,
-} from '@primer/octicons-react';
-import type { Icon } from '@primer/octicons-react';
-import { useI18n } from '../../i18n/I18nProvider.tsx';
-import styles from './flow.module.css';
+import { StationBadge } from '../badge/StationBadge.tsx';
 
-/** L'icône de chaque station : la même sur l'arrêt de la ligne et sur sa marque ailleurs. */
-export const STATION_ICON: Record<StationId, Icon> = {
-  intake: IssueOpenedIcon,
-  brief: WorkflowIcon,
-  implementation: CodeIcon,
-  gate: ShieldCheckIcon,
-  release: RocketIcon,
-  done: CheckCircleIcon,
-  stopped: BlockedIcon,
-  side: WorkflowIcon,
-};
+export { STATION_ICON } from '../badge/StationBadge.tsx';
 
 /**
- * Une station nommée hors de la ligne (liste d'issues, en-tête d'une issue, carte d'un agent) : son
- * arrêt rond en miniature, puis son nom. Le motif de la ligne, sans couleur : l'état se lit à côté.
+ * A station named outside the line (issue list, issue header, agent card): its badge, in the
+ * station's hue. `label` is what screen readers read (« Étape : Brief »).
  */
 export function StationMark({ station, label }: { station: StationId; label?: string }) {
-  const { t } = useI18n();
-  const StationIcon = STATION_ICON[station];
-  return (
-    <span className={styles.mark}>
-      <span className={styles.markStop} aria-hidden="true">
-        <StationIcon size={12} />
-      </span>
-      {label ?? t.station[station]}
-    </span>
-  );
+  return <StationBadge {...(label ? { description: label } : {})} station={station} />;
 }

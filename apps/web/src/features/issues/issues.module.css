@@ -276,11 +276,6 @@
   gap: var(--base-size-4);
 }
 
-/* La borne de largeur va aux badges, pas à la cellule : son filet du bas court sur toute la colonne. */
-.modelCell > * {
-  max-width: 280px;
-}
-
 .cellStack {
   display: flex;
   flex-direction: column;

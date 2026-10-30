@@ -14,8 +14,9 @@ const CHECKS: Record<Exclude<ChecksState, 'none'>, { tone: BadgeTone; icon: Icon
 };
 
 /**
- * La CI d'une PR, le badge le plus classique de shields.io : le logo de GitHub Actions en étiquette,
- * l'état peint de sa couleur franche. Rien quand la PR n'a pas de workflow.
+ * A PR's CI, the most classic shields.io badge: the GitHub Actions logo and « CI » on
+ * the grey label, the state tinted with its color (its role's « muted » tokens), like any badge.
+ * Nothing when the PR has no workflow.
  */
 export function ChecksBadge({ checks }: { checks: ChecksState }) {
   const { t } = useI18n();
@@ -26,10 +27,6 @@ export function ChecksBadge({ checks }: { checks: ChecksState }) {
       labelIcon={CHECKS_MARK}
       value={t.pr.ci[checks]}
       tone={CHECKS[checks].tone}
-      solid
-      // The "CI" label takes no grey background: it rests on the card background, only
-      // the solid-color value keeps its color.
-      labelBackground="transparent"
       icon={CHECKS[checks].icon}
     />
   );

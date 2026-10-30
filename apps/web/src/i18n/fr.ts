@@ -551,6 +551,23 @@ export const fr = {
     unknown: 'Inconnu',
   } satisfies Record<HealthStatus, string>,
 
+  /** The word for an item's type, on the grey label of its badge (one word). */
+  badge: {
+    station: 'poste',
+    agent: 'agent',
+    skill: 'skill',
+    toolset: 'toolset',
+    mcp: 'MCP',
+    plugin: 'plugin',
+    effort: 'effort',
+    source: 'source',
+    githubLabel: 'étiquette',
+    branch: 'branche',
+    model: 'modèle',
+    /** Branch of a repository, read by screen readers. */
+    branchOf: (repo: string, branch: string) => `Branche de ${repo} : ${branch}`,
+  },
+
   common: {
     /** « libellé : valeur », pour un titre composé ou une infobulle. */
     labelValue: (label: string, value: string) => `${label} : ${value}`,
@@ -1002,7 +1019,7 @@ export const fr = {
     tools: 'Outils, skills et plugins',
     skills: 'Skills',
     plugins: 'Plugins et refus des gardes (7 jours)',
-    refusals: (name: string, count: number) => `${name} · ${count} refus`,
+    refusals: (count: number) => `${count} refus`,
     timeouts: (count: number) =>
       `${count} ${f.plural(count, 'dépassement', 'dépassements')} du hook`,
     risk: (longest: string, limit: string) =>

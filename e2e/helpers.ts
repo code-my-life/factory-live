@@ -200,3 +200,113 @@ export async function expectVisibleMarks(page: Page): Promise<number> {
   expect(defects, 'logos de marque invisibles sur leur fond').toEqual([]);
   return count;
 }
+
+/** The colors of a badge's tint, as CSS expressions of Primer's display tokens (the standard of issue #11). */
+export function hueTint(hue: string): { frame: string; background: string } {
+  return {
+    frame: `var(--display-${hue}-borderColor-muted)`,
+    background: `var(--display-${hue}-bgColor-muted)`,
+  };
+}
+
+/**
+ * A badge follows the standard: two separate parts (grey label, then value), 20 px high, corners of
+ * `borderRadius-medium`, frame and separator of the element's tint, value tinted. The tint is given as
+ * CSS color expressions, resolved by the browser in the page's theme.
+ */
+export async function expectStandardBadge(
+  badge: Locator,
+  tint: { frame: string; background: string },
+): Promise<void> {
+  await expect(badge.first()).toBeVisible();
+  const facts = await badge.first().evaluate((element, expected) => {
+    const resolve = (property: 'color' | 'borderRadius', value: string) => {
+      const probe = document.createElement('div');
+      probe.style[property] = value;
+      document.body.append(probe);
+      const resolved = getComputedStyle(probe)[property];
+      probe.remove();
+      return resolved;
+    };
+    const label = element.querySelector('[data-segment="label"]');
+    const value = element.querySelector('[data-segment="value"]');
+    const style = getComputedStyle(element);
+    return {
+      parts: [label, value].map((part) => part?.getBoundingClientRect().width ?? 0),
+      width: element.getBoundingClientRect().width,
+      frameWidth:
+        Number.parseFloat(style.borderLeftWidth) + Number.parseFloat(style.borderRightWidth),
+      height: element.getBoundingClientRect().height,
+      radius: style.borderTopLeftRadius,
+      expectedRadius: resolve('borderRadius', 'var(--borderRadius-medium)'),
+      frame: style.borderTopColor,
+      expectedFrame: resolve('color', expected.frame),
+      separator: label ? getComputedStyle(label).borderRightColor : null,
+      valueBackground: value ? getComputedStyle(value).backgroundColor : null,
+      expectedBackground: resolve('color', expected.background),
+      labelBackground: label ? getComputedStyle(label).backgroundColor : null,
+      neutralBackground: resolve('color', 'var(--bgColor-neutral-muted)'),
+    };
+  }, tint);
+  const name = (await badge.first().getAttribute('title')) ?? 'badge';
+  expect(facts.parts[0], `${name} : étiquette`).toBeGreaterThan(0);
+  expect(facts.parts[1], `${name} : valeur`).toBeGreaterThan(0);
+  expect(facts.height, `${name} : hauteur`).toBeCloseTo(20, 0);
+  // The badge keeps the width of its content (never stretched by a flex column): label + value + frame.
+  expect(
+    Math.abs(facts.width - (facts.parts[0] ?? 0) - (facts.parts[1] ?? 0) - facts.frameWidth),
+    `${name} : largeur du badge (${facts.width} px) = étiquette + valeur + cadre`,
+  ).toBeLessThanOrEqual(1);
+  expect(facts.radius, `${name} : coins`).toBe(facts.expectedRadius);
+  expect(facts.frame, `${name} : cadre`).toBe(facts.expectedFrame);
+  expect(facts.separator, `${name} : séparateur`).toBe(facts.expectedFrame);
+  expect(facts.valueBackground, `${name} : valeur teintée`).toBe(facts.expectedBackground);
+  expect(facts.labelBackground, `${name} : étiquette grise`).toBe(facts.neutralBackground);
+}
+
+/** A badge stays on one line: 20 px high, whatever the room. */
+export async function expectOneLine(badge: Locator): Promise<void> {
+  await expect(badge.first()).toBeVisible();
+  for (const element of await badge.all()) {
+    const box = await element.boundingBox();
+    expect(box?.height ?? 0, (await element.getAttribute('title')) ?? 'badge').toBeCloseTo(20, 0);
+  }
+}
+
+/**
+ * A model badge cut in the middle stays readable whatever the room: its head keeps at least one
+ * character and the ellipsis, its tail stays whole (its right edge does not pass the value's), and the
+ * badge stays 20 px high. Returns the name of the checked badge.
+ */
+export async function expectReadableCut(badge: Locator): Promise<string> {
+  await expect(badge.first()).toBeVisible();
+  const name = (await badge.first().getAttribute('title')) ?? 'badge';
+  const facts = await badge.first().evaluate((element) => {
+    const head = element.querySelector('[data-part="head"]');
+    const tail = element.querySelector('[data-part="tail"]');
+    const value = element.querySelector('[data-segment="value"]');
+    if (!head || !tail || !value) return null;
+    const context = document.createElement('canvas').getContext('2d');
+    if (!context) return null;
+    const style = getComputedStyle(head);
+    context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const valueStyle = getComputedStyle(value);
+    return {
+      head: head.getBoundingClientRect().width,
+      needed: context.measureText('M…').width,
+      tailRight: tail.getBoundingClientRect().right,
+      valueInner: value.getBoundingClientRect().right - Number.parseFloat(valueStyle.paddingRight),
+      height: element.getBoundingClientRect().height,
+    };
+  });
+  expect(facts, `${name} : tête et fin présentes`).not.toBeNull();
+  const measured = facts as NonNullable<typeof facts>;
+  expect(measured.head, `${name} : la tête garde un caractère et « … »`).toBeGreaterThanOrEqual(
+    measured.needed - 0.5,
+  );
+  expect(measured.tailRight, `${name} : la fin n’est pas rognée`).toBeLessThanOrEqual(
+    measured.valueInner + 0.5,
+  );
+  expect(measured.height, `${name} : hauteur`).toBeCloseTo(20, 0);
+  return name;
+}

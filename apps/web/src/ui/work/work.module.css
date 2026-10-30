@@ -153,21 +153,6 @@
   min-width: 0;
 }
 
-.jobAgent {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--base-size-4);
-  min-width: 0;
-  font: var(--text-body-shorthand-small);
-}
-
-.jobAgentName {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .jobDetail {
   display: -webkit-box;
   min-width: 0;

@@ -1,11 +1,16 @@
 /*
- * Badge clé | valeur : l'étiquette sur fond neutre, la valeur teintée de la couleur de l'état, comme
- * le style « flat » de shields.io, mais avec les jetons « muted » de Primer : le texte garde sa couleur
- * par défaut, donc son contraste, dans les deux thèmes. Fond opaque : posé sur une boîte choisie
- * (teinte accent), un badge neutre reste neutre.
+ * Key | value badge: the label on a grey background, the value tinted with the item's color (a
+ * hue from Primer's « display » palette, or a state color), like shields.io's « flat » style,
+ * but with the « muted » tokens: the text keeps its default color, hence its contrast,
+ * in both themes. Opaque background: placed on a chosen box (accent hue), a badge stays itself.
+ * Always on one line, 20 px high.
  */
 .badge {
-  --fl-badge-border: var(--borderColor-default);
+  /* The three properties of a hue; Badge.tsx overrides them in `style` with the `--display-*` tokens. */
+  --fl-hue-bg: var(--bgColor-default);
+  --fl-hue-border: var(--borderColor-default);
+  --fl-hue-fg: var(--fgColor-muted);
+  --fl-badge-border: var(--fl-hue-border);
 
   display: inline-flex;
   max-width: 100%;
@@ -21,7 +26,16 @@
   vertical-align: middle;
 }
 
-/* La couleur de l'état : le cadre, la teinte de la valeur et son icône. */
+/*
+ * The item's hue: Badge.tsx sets its three properties (value background, frame and separator,
+ * value icon) in `style`, with Primer's `--display-<hue>-*` tokens. The value icon
+ * reads `--fl-hue-fg` in `style` too (Badge.tsx); a brand logo keeps its color.
+ */
+.badge[data-tint] .value {
+  background: var(--fl-hue-bg);
+}
+
+/* The color of a state (CI): the frame, the hue of the value and its icon. */
 .badge[data-tone='accent'] {
   --fl-badge-border: var(--borderColor-accent-muted);
 }
@@ -94,72 +108,6 @@
   color: var(--fgColor-done);
 }
 
-/*
- * Un état (CI) : la valeur peinte de la couleur franche de son rôle (jetons « emphasis »), texte et
- * icône blancs (`--fgColor-onEmphasis`), comme les `StateLabel` de Primer. 4,5:1 au moins dans les deux
- * thèmes (test de contraste).
- */
-.badge[data-solid] .value,
-.badge[data-solid] .value .icon {
-  color: var(--fgColor-onEmphasis);
-}
-
-.badge[data-solid][data-tone='neutral'] {
-  --fl-badge-border: var(--borderColor-neutral-emphasis);
-}
-
-.badge[data-solid][data-tone='neutral'] .value {
-  background-color: var(--bgColor-neutral-emphasis);
-}
-
-.badge[data-solid][data-tone='accent'] {
-  --fl-badge-border: var(--borderColor-accent-emphasis);
-}
-
-.badge[data-solid][data-tone='accent'] .value {
-  background-color: var(--bgColor-accent-emphasis);
-}
-
-.badge[data-solid][data-tone='success'] {
-  --fl-badge-border: var(--borderColor-success-emphasis);
-}
-
-.badge[data-solid][data-tone='success'] .value {
-  background-color: var(--bgColor-success-emphasis);
-}
-
-.badge[data-solid][data-tone='attention'] {
-  --fl-badge-border: var(--borderColor-attention-emphasis);
-}
-
-.badge[data-solid][data-tone='attention'] .value {
-  background-color: var(--bgColor-attention-emphasis);
-}
-
-.badge[data-solid][data-tone='severe'] {
-  --fl-badge-border: var(--borderColor-severe-emphasis);
-}
-
-.badge[data-solid][data-tone='severe'] .value {
-  background-color: var(--bgColor-severe-emphasis);
-}
-
-.badge[data-solid][data-tone='danger'] {
-  --fl-badge-border: var(--borderColor-danger-emphasis);
-}
-
-.badge[data-solid][data-tone='danger'] .value {
-  background-color: var(--bgColor-danger-emphasis);
-}
-
-.badge[data-solid][data-tone='done'] {
-  --fl-badge-border: var(--borderColor-done-emphasis);
-}
-
-.badge[data-solid][data-tone='done'] .value {
-  background-color: var(--bgColor-done-emphasis);
-}
-
 .label,
 .value {
   display: flex;
@@ -170,24 +118,15 @@
 }
 
 /*
- * The label, the key: grey like a shields.io badge, except for the CI state which
- * rests on the card background (transparent) to avoid clashing with the solid-color
- * value. It keeps its width (a short word); only an abnormally long label is cut
- * to make room for the value.
+ * The label, the key: grey like a shields.io badge. It keeps its width (a short word); only an
+ * abnormally long label is cut to make room for the value.
  */
 .label {
   flex: none;
   max-width: 16ch;
   border-right: var(--borderWidth-thin) solid var(--fl-badge-border);
-  color: var(--fgColor-muted);
-}
-
-.label[data-label-bg='shaded'] {
   background-color: var(--bgColor-neutral-muted);
-}
-
-.label[data-label-bg='transparent'] {
-  background-color: transparent;
+  color: var(--fgColor-muted);
 }
 
 .value {
@@ -217,31 +156,35 @@
 }
 
 /*
- * Valeur longue : sur un écran de détail, elle passe à la ligne autant qu'il faut ; dans une cellule de
- * tableau, sur deux lignes au plus (un identifiant se coupe n'importe où), puis points de suspension.
- * L'étiquette, un mot, reste sur une ligne.
+ * Identifier too long: cut in the middle. The head gives way (ellipsis) down to one
+ * character, the tail stays whole; the full name is placed, hidden, for screen readers and search.
  */
-.badge[data-overflow='wrap'] .value,
-.badge[data-overflow='clamp'] .value {
-  padding-block: var(--base-size-2);
+.text[data-split] {
+  display: flex;
 }
 
-.badge[data-overflow='wrap'] .value .text {
-  white-space: normal;
-  overflow-wrap: anywhere;
+.head {
+  /* At least one character and the ellipsis (the value is in a code font: 1ch per character). */
+  min-width: 2ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.badge[data-overflow='clamp'] .value .text {
-  display: -webkit-box;
-  white-space: normal;
-  word-break: break-all;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+.tail {
+  flex: none;
 }
 
 .icon {
   flex: none;
   color: var(--fgColor-muted);
+}
+
+/* An agent's avatar on the label: a square, as in the rest of the app. */
+.image {
+  flex: none;
+  width: var(--base-size-12);
+  height: var(--base-size-12);
+  border-radius: var(--borderRadius-small);
 }
 
 /* Une octicon d'étiquette qui dit un état : l'issue ouverte en vert, fermée en violet, comme GitHub. */
