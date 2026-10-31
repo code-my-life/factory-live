@@ -49,7 +49,7 @@ export interface ViewDeps {
   profiles: ProfilesPort;
   github: GitHubReadPort | null;
   files: CardFilesPort;
-  /** Le journal d'Hermès des agents : les dépassements de hook, garde par garde. */
+  /** Hermes agent log: hook timeouts, per guard. */
   agentLog: AgentLogPort | null;
   owner: string;
   boardName: string;
@@ -192,7 +192,7 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
         task,
         task.status === 'review' || (task.status === 'running' && current?.role === 'reviewer'),
       ),
-      // Le type d'un blocage passé reste noté par Hermès : il ne compte que si la carte bloque.
+      // The type of a past block stays recorded by Hermes: it only counts if the card is blocked.
       blockKind: task.status === 'blocked' ? task.blockKind : null,
       blockReason: task.status === 'blocked' ? text(lastBlock?.payload['reason']) : null,
       parents: parents.get(task.id) ?? [],
@@ -237,7 +237,7 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
   };
 }
 
-/** Transcriptions d'un run : session Hermès (avec le log brut de la carte), puis la lane Claude Code s'il y en a une. */
+/** Transcripts of a run: Hermes session (with card raw log), then Claude Code lane if any. */
 export function transcripts(deps: ViewDeps, runId: number): TranscriptView[] | null {
   const board = deps.hub.boardData;
   const run = board.runs.find((item) => item.id === runId);
@@ -282,10 +282,10 @@ export function transcripts(deps: ViewDeps, runId: number): TranscriptView[] | n
   return views;
 }
 
-/** Les délais d'Hermès qui coupent le travail de l'agent : réglés dans sa config, sinon par défaut. */
+/** Hermes timeouts that cut agent work: set in its config, or defaults. */
 function limitsOf(facts: ProfileFacts | null): ProfileLimit[] {
   if (!facts) return [];
-  // Une valeur négative ou nulle désactive la limite chez Hermès : rien de réglé à montrer.
+  // A negative or zero value disables the limit in Hermes: nothing set to show.
   const set = (value: number | null) => (value !== null && value > 0 ? value : null);
   return [
     {
@@ -315,10 +315,10 @@ export function profileViews(deps: ViewDeps, periodDays = 30): ProfileView[] {
   const board = deps.hub.boardData;
   const since = deps.now() / 1000 - periodDays * 86_400;
   const verdicts = gateVerdicts(board, since);
-  // Les refus de chaque garde, agent par agent : coder-guard ne refuse pas la même chose à coder et à scribe.
+  // Guard refusals, per agent: coder-guard doesn't refuse the same thing to coder and to scribe.
   const refusals = new Map<string, number>();
   for (const event of deps.store.activityOfKinds(['guard'], 5_000)) {
-    // Le refus d'une garde est le message du plugin, tel quel : « coder-guard : PR absente… ».
+    // A guard refusal is the plugin message as-is: "coder-guard: missing PR...".
     if (typeof event.detail !== 'string') continue;
     const plugin = /^([\w-]+)\s*:/.exec(event.detail)?.[1];
     const key = `${event.profile}|${plugin ?? ''}`;
@@ -418,7 +418,7 @@ export function usageReport(deps: ViewDeps, periodDays: number): UsageReport {
     daily.set(row.day, day);
   }
   if (observed.length === 0) {
-    // Avant les webhooks : l'usage enregistré par Hermès dans les sessions (modèle tel qu'il le voit, souvent « auto »).
+    // Before webhooks: usage recorded by Hermes in sessions (model as it sees it, often "auto").
     for (const profile of deps.hub.profiles) {
       for (const row of safeUsage(deps, profile, deps.now() / 1000 - periodDays * 86_400)) {
         add(row.model, row.provider, {
@@ -487,7 +487,7 @@ export function historyStats(deps: ViewDeps, periodDays: number): HistoryStats {
     { harness: string; model: string | null; runs: number; passed: number }
   >();
   for (const verdict of verdicts) {
-    // Sans lane Claude, le modèle est celui de l'agent : `null`, que le client nomme.
+    // Without a Claude lane, the model is the agent's: `null`, which the client names.
     const model = verdict.claudeModel;
     const key = `${verdict.harness}|${model ?? ''}`;
     const group = groups.get(key) ?? { harness: verdict.harness, model, runs: 0, passed: 0 };
