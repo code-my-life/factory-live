@@ -156,6 +156,9 @@ export interface SessionsPort {
 
 export interface LaneTranscript {
   entries: TranscriptLine[];
+  name: string | null;
+  startedAt: number | null;
+  endedAt: number | null;
   costUsd: number | null;
 }
 
