@@ -42,6 +42,13 @@ vi.mock('../../i18n/I18nProvider.tsx', () => ({
         notKept: 'Transcription non conservée',
         rawLog: (runId: number) => `Log brut du run ${runId}`,
         redaction: 'Les secrets sont masqués.',
+        legend: {
+          withRole: (role: string, name: string) => `${role} : ${name}`,
+          unnamed: (label: string) => label,
+          inProgress: (since: string) => `depuis ${since} (en cours)`,
+          noCost: 'coût inconnu',
+          withCost: (cost: string) => cost,
+        },
       },
     },
     text: testText,
@@ -133,7 +140,7 @@ describe('TranscriptPanel', () => {
   });
 
   it('affiche le nom quand il ny a pas de role', () => {
-    // Test: name without colon gives the name as-is
+    // Test: name without colon gives "Claude Code" as label, legend shows full name
     mockTranscripts = [
       {
         runId: 1,
@@ -148,14 +155,16 @@ describe('TranscriptPanel', () => {
       },
     ];
     render(<TranscriptPanel runId={1} />);
-    // The label is just the name, not "Claude Code"
-    const buttons = screen.getAllByRole('button', { name: /Implémentation/ });
-    expect(buttons).toHaveLength(1);
-    expect(buttons[0]!.textContent).toBe('Implémentation');
+    // With variant prop, Primer renders both regular and dropdown buttons in test env
+    // Check distinct labels instead of button count
+    const buttons = screen.getAllByRole('button');
+    const labels = [...new Set(buttons.map((b) => b.textContent).filter(Boolean))];
+    expect(labels).toEqual(['Claude Code']);
+    expect(labels[0]).toBe('Claude Code');
   });
 
-  it('affiche Claude Code : label quand le nom contient un role', () => {
-    // Test: name with colon at position 1-20 gives "Claude Code : <name>"
+  it('affiche le rôle quand le nom contient un role', () => {
+    // Test: name with colon at position 1-20 gives the role as label
     mockTranscripts = [
       {
         runId: 1,
@@ -170,9 +179,11 @@ describe('TranscriptPanel', () => {
       },
     ];
     render(<TranscriptPanel runId={1} />);
-    const buttons = screen.getAllByRole('button', { name: /Claude Code/ });
-    expect(buttons).toHaveLength(1);
-    // Colon at position 4 <= 20, so it should show "Claude Code : Fix : bug 123"
-    expect(buttons[0]!.textContent).toBe('Claude Code : Fix : bug 123');
+    // With variant prop, Primer renders both regular and dropdown buttons in test env
+    // Check distinct labels instead of button count
+    const buttons = screen.getAllByRole('button');
+    const labels = [...new Set(buttons.map((b) => b.textContent).filter(Boolean))];
+    expect(labels).toEqual(['Fix']);
+    expect(labels[0]).toBe('Fix');
   });
 });

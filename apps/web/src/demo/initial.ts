@@ -1641,11 +1641,11 @@ export function createInitialState(now: number): DemoState {
       {
         runId: RUNS.teamImpl,
         source: 'claude-code',
-        title: msg('transcript.claudeCode', { costUsd: null }),
-        name: null,
+        title: msg('transcript.claudeCode', { costUsd: 1.12 }),
+        name: 'Implémentation : vue ÉQUIPE groupée par projet',
         startedAt: now - 7 * min * 1000,
-        endedAt: now - 3 * min * 1000,
-        costUsd: null,
+        endedAt: now - 5 * min * 1000,
+        costUsd: 1.12,
         entries: [
           entry(
             ago(7 * min),
@@ -1687,6 +1687,67 @@ export function createInitialState(now: number): DemoState {
             "Il reste l'ordre des groupes : je trie avec localeCompare en français pour que « Élan » passe avant « Zéphyr ».",
             { model: 'claude-opus-5-5' },
           ),
+        ],
+        terminal: [],
+      },
+      {
+        runId: RUNS.teamImpl,
+        source: 'claude-code',
+        title: msg('transcript.claudeCode', { costUsd: 0.41 }),
+        name: 'Correction : ordre des groupes par nom de projet',
+        startedAt: now - 5 * min * 1000,
+        endedAt: now - 3 * min * 1000,
+        costUsd: 0.41,
+        entries: [
+          entry(
+            ago(5 * min),
+            'system',
+            `Session 7b9e2a1f · ~/perso/claude-cockpit/.worktrees/${CARDS.teamImpl} · claude-opus-5-5`,
+          ),
+          entry(
+            ago(5 * min),
+            'user',
+            "Corrige l'ordre des groupes par nom de projet : utiliser localeCompare en français.",
+          ),
+          entry(ago(5 * min - 2), 'tool_call', 'desktop/src/team/groupByProject.ts', {
+            toolName: 'Edit',
+          }),
+          entry(ago(4 * min), 'tool_call', 'npm test -- team', { toolName: 'Bash' }),
+          entry(ago(4 * min - 5), 'tool_result', '13 passing', { toolName: 'Bash', status: 'ok' }),
+          entry(
+            ago(3 * min),
+            'assistant',
+            'Groupes triés correctement avec localeCompare(fr). Tests verts.',
+            { model: 'claude-opus-5-5' },
+          ),
+        ],
+        terminal: [],
+      },
+      {
+        runId: RUNS.teamImpl,
+        source: 'claude-code',
+        title: msg('transcript.claudeCode', { costUsd: null }),
+        name: 'Correction : cartes sans projet en fin de liste',
+        startedAt: now - 2 * min * 1000,
+        endedAt: null,
+        costUsd: null,
+        entries: [
+          entry(
+            ago(2 * min),
+            'system',
+            `Session a1f8c3e7 · ~/perso/claude-cockpit/.worktrees/${CARDS.teamImpl} · claude-opus-5-5`,
+          ),
+          entry(
+            ago(2 * min),
+            'user',
+            'Ajoute les tests pour les cartes sans projet qui doivent apparaître en fin de liste.',
+          ),
+          entry(ago(2 * min - 1), 'tool_call', 'desktop/test/team.test.js', { toolName: 'Edit' }),
+          entry(ago(1 * min), 'tool_call', 'npm test -- team', { toolName: 'Bash' }),
+          entry(ago(30), 'tool_result', '14 passing, 1 failing', {
+            toolName: 'Bash',
+            status: 'error',
+          }),
         ],
         terminal: [],
       },

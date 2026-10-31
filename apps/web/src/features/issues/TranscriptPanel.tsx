@@ -35,13 +35,67 @@ function labelForView(view: TranscriptView, t: Messages, unnamedIndex: number): 
     // If the name contains a role (e.g., "Implementation: name"), extract the role
     const colonIdx = view.name.indexOf(':');
     if (colonIdx > 0 && colonIdx <= 20) {
-      return `Claude Code : ${view.name}`;
+      return view.name.slice(0, colonIdx).trim();
     }
-    return view.name;
+    // Name without role (1-20 chars before colon): label is "Claude Code"
+    return t.transcript.source['claude-code'];
   }
   // Otherwise, generate a distinct label based on index
   if (unnamedIndex === 0) return t.transcript.source['claude-code'];
   return `${t.transcript.source['claude-code']} ${unnamedIndex + 1}`;
+}
+
+function legendForView(
+  view: TranscriptView,
+  t: Messages,
+  allViews: readonly TranscriptView[],
+  currentIndex: number,
+  fmt: ReturnType<typeof useI18n>['fmt'],
+): string {
+  // Count only claude-code lanes for ranking
+  const claudeViews = allViews.filter((v) => v.source === 'claude-code' || v.source === 'opencode');
+  const rank = claudeViews.findIndex((v) => v === view);
+  const total = claudeViews.length;
+
+  const parts: string[] = [];
+
+  // "Lane Claude Code X of Y" or "Lane Claude Code" (if only one)
+  if (total === 1) {
+    parts.push(t.transcript.legend.unnamed(t.transcript.source['claude-code']));
+  } else {
+    parts.push(
+      t.transcript.legend.withRole(
+        `${t.transcript.source['claude-code']} ${rank + 1}`,
+        `${rank + 1} sur ${total}`,
+      ),
+    );
+  }
+
+  // Lane name if present
+  if (view.name && view.name.trim()) {
+    parts.push(`« ${view.name.trim()} »`);
+  }
+
+  // Time range
+  if (view.startedAt !== null) {
+    const startIso = new Date(view.startedAt).toISOString();
+    const start = fmt.clock(startIso);
+    if (view.endedAt !== null) {
+      const endIso = new Date(view.endedAt).toISOString();
+      const end = fmt.clock(endIso);
+      const duration = fmt.duration(view.endedAt - view.startedAt);
+      parts.push(`de ${start} à ${end} (${duration})`);
+    } else {
+      parts.push(`depuis ${start} (en cours)`);
+    }
+  }
+
+  // Cost if known
+  if (view.costUsd !== null) {
+    parts.push(fmt.usd(view.costUsd));
+  }
+
+  return parts.join(', ');
 }
 
 function choices(
@@ -122,7 +176,7 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
 
 /** Full transcript of a run, on demand: Hermès session, CLI lane, or raw log. */
 export function TranscriptPanel({ runId }: { runId: number }) {
-  const { t, text } = useI18n();
+  const { t, fmt } = useI18n();
   const views = useTranscripts(runId);
   const [index, setIndex] = useState(0);
   const options = useMemo(() => choices(views ?? [], t), [views, t]);
@@ -130,12 +184,14 @@ export function TranscriptPanel({ runId }: { runId: number }) {
     return <p className={styles.muted}>{t.transcript.notKept}</p>;
   }
   const current = options[Math.min(index, options.length - 1)];
+  const legend = current ? legendForView(current.choice.view, t, views ?? [], index, fmt) : '';
   return (
     <div className={styles.transcript}>
       <SegmentedControl
         aria-label={t.transcript.sourceLabel}
         className={styles.sources}
         size="small"
+        variant={{ narrow: 'dropdown', regular: 'default' }}
         onChange={(next) => setIndex(next ?? 0)}
       >
         {options.map((option, optionIndex) => (
@@ -147,24 +203,23 @@ export function TranscriptPanel({ runId }: { runId: number }) {
           </SegmentedControl.Button>
         ))}
       </SegmentedControl>
-      {current?.choice.kind === 'terminal' ? (
-        <AnsiLog lines={current.choice.view.terminal} label={t.transcript.rawLog(runId)} />
-      ) : current ? (
+      {current ? (
         <>
-          <p className={styles.muted}>{text(current.choice.view.title)}</p>
-          {/* Most recent at top, in a self-scrolling box: the page no longer grows with the run. */}
-          <div
-            className={styles.entriesFrame}
-            role="region"
-            aria-label={text(current.choice.view.title)}
-            tabIndex={0}
-          >
-            <ol className={styles.entries} reversed>
-              {[...current.choice.view.entries].reverse().map((entry) => (
-                <Entry key={entry.id} entry={entry} />
-              ))}
-            </ol>
-          </div>
+          <p className={styles.legend}>{legend}</p>
+          {current.choice.kind === 'terminal' ? (
+            <AnsiLog lines={current.choice.view.terminal} label={t.transcript.rawLog(runId)} />
+          ) : (
+            <>
+              {/* Most recent at top, in a self-scrolling box: the page no longer grows with the run. */}
+              <div className={styles.entriesFrame} role="region" aria-label={legend} tabIndex={0}>
+                <ol className={styles.entries} reversed>
+                  {[...current.choice.view.entries].reverse().map((entry) => (
+                    <Entry key={entry.id} entry={entry} />
+                  ))}
+                </ol>
+              </div>
+            </>
+          )}
         </>
       ) : null}
       <p className={styles.redaction}>{t.transcript.redaction}</p>
