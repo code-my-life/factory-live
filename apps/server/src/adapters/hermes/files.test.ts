@@ -1,22 +1,33 @@
-import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { tempDir } from '../../test/hermes-fixtures.ts';
 import type { TempDir } from '../../test/hermes-fixtures.ts';
-import { CardFiles } from './files.ts';
+import { CardFiles, claudeTranscriptFiles } from './files.ts';
 import { HermesPaths } from './paths.ts';
+
+function makeTranscriptFile(dir: string, filename: string, content: string): string {
+  const path = join(dir, filename);
+  writeFileSync(path, content);
+  return path;
+}
 
 let dir: TempDir;
 let board: string;
 let files: CardFiles;
+let claudeProjects: string;
 
 beforeEach(() => {
   dir = tempDir();
   board = join(dir.path, 'board');
   mkdirSync(board, { recursive: true });
+  claudeProjects = join(dir.path, 'claude-projects-myworkdir');
+  mkdirSync(claudeProjects, { recursive: true });
+  const prefixedDir = join(claudeProjects, 'myworkdir');
+  mkdirSync(prefixedDir, { recursive: true });
   files = new CardFiles(
     board,
-    join(dir.path, 'claude-projects'),
+    claudeProjects,
     new HermesPaths({
       profilesDir: join(dir.path, 'profiles'),
       boardDir: board,
@@ -55,11 +66,122 @@ describe('CardFiles.evidence', () => {
     expect(files.evidenceStamp('t_00000000')).toBe('-');
   });
 
-  it('s’arrête à 50 fichiers', () => {
+  it("s'arrête à 50 fichiers", () => {
     const evidence = join(board, 'evidence', 't_03d9d40d');
     mkdirSync(evidence, { recursive: true });
-    for (let index = 0; index < 60; index += 1)
-      writeFileSync(join(evidence, `${String(index).padStart(2, '0')}.txt`), '');
+    for (let index = 0; index < 60; index += 1) {
+      writeFileSync(join(evidence, String(index).padStart(2, '0') + '.txt'), '');
+    }
     expect(files.evidence('t_03d9d40d')).toHaveLength(50);
+  });
+
+  describe('claudeTranscriptFiles', () => {
+    beforeEach(() => {
+      dir = tempDir();
+      board = join(dir.path, 'board');
+      mkdirSync(board, { recursive: true });
+      claudeProjects = join(dir.path, 'claude-projects-myworkdir');
+      mkdirSync(claudeProjects, { recursive: true });
+      const prefixedDir = join(claudeProjects, 'myworkdir');
+      mkdirSync(prefixedDir, { recursive: true });
+      files = new CardFiles(
+        board,
+        claudeProjects,
+        new HermesPaths({
+          profilesDir: join(dir.path, 'profiles'),
+          boardDir: board,
+          factoryRepo: join(dir.path, 'factory'),
+        }),
+      );
+    });
+
+    it('extrait le nom depuis le custom-title et les timestamps', () => {
+      const transcriptContent = [
+        '{ "type": "custom-title", "title": "Implementation : projet X" }',
+        '{ "type": "tool_call", "name": "kanban_show", "timestamp": "2026-10-30T10:00:00Z" }',
+        '{ "type": "tool_result", "timestamp": "2026-10-30T10:01:00Z" }',
+        '{ "type": "user", "timestamp": "2026-10-30T10:02:00Z" }',
+      ].join('\n');
+      makeTranscriptFile(claudeProjects, 'myworkdir/session1.jsonl', transcriptContent);
+
+      const result = claudeTranscriptFiles(claudeProjects, 'myworkdir', 0, Date.now() + 86400000);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.name).toBe('Implementation : projet X');
+      expect(result[0]!.startedAt).toBeGreaterThan(0);
+      expect(result[0]!.endedAt).toBeGreaterThan(0);
+    });
+
+    it("rend null quand il n'y a pas de custom-title", () => {
+      const transcriptContent = [
+        '{ "type": "tool_call", "name": "kanban_show", "timestamp": "2026-10-30T10:00:00Z" }',
+        '{ "type": "user", "timestamp": "2026-10-30T10:02:00Z" }',
+      ].join('\n');
+      makeTranscriptFile(claudeProjects, 'myworkdir/session1.jsonl', transcriptContent);
+
+      const result = claudeTranscriptFiles(claudeProjects, 'myworkdir', 0, Date.now() + 86400000);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.name).toBeNull();
+      expect(result[0]!.startedAt).toBeGreaterThan(0);
+    });
+
+    it('classe par mtime lorsque modifie apres le lancement', () => {
+      // Create two sessions: first launched earlier but modified later
+      const firstSession = '{ "type": "user", "timestamp": "2026-10-30T10:00:00Z" }';
+      const secondSession =
+        '{ "type": "custom-title", "title": "Correction : fixes" }' +
+        '\n' +
+        '{ "type": "user", "timestamp": "2026-10-30T10:01:00Z" }';
+      makeTranscriptFile(claudeProjects, 'myworkdir/session-early.jsonl', firstSession);
+      makeTranscriptFile(claudeProjects, 'myworkdir/session-late.jsonl', secondSession);
+
+      const result = claudeTranscriptFiles(claudeProjects, 'myworkdir', 0, Date.now() + 86400000);
+
+      // Files are sorted by mtime (modification time)
+      expect(result).toHaveLength(2);
+      // The first file (session-early) has no custom-title, name should be null
+      expect(result[0]!.name).toBeNull();
+      // The second file (session-late) has custom-title, name should be set
+      expect(result[1]!.name).not.toBeNull();
+    });
+  });
+
+  describe('CardFiles.claudeTranscripts', () => {
+    beforeEach(() => {
+      dir = tempDir();
+      board = join(dir.path, 'board');
+      mkdirSync(board, { recursive: true });
+      claudeProjects = join(dir.path, 'claude-projects-myworkdir');
+      mkdirSync(claudeProjects, { recursive: true });
+      const prefixedDir = join(claudeProjects, 'myworkdir');
+      mkdirSync(prefixedDir, { recursive: true });
+      files = new CardFiles(
+        board,
+        claudeProjects,
+        new HermesPaths({
+          profilesDir: join(dir.path, 'profiles'),
+          boardDir: board,
+          factoryRepo: join(dir.path, 'factory'),
+        }),
+      );
+    });
+
+    it('retourne les lanes avec nom, timestamps et cout', () => {
+      const transcriptContent = [
+        '{ "type": "custom-title", "title": "Correction : fixes" }',
+        '{ "type": "user", "timestamp": "2026-10-30T10:00:00Z" }',
+      ].join('\n');
+      makeTranscriptFile(claudeProjects, 'myworkdir/session1.jsonl', transcriptContent);
+
+      const result = files.claudeTranscripts('myworkdir', 0, Date.now() + 86400000);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.name).toBe('Correction : fixes');
+      expect(result[0]!.startedAt).toBeGreaterThan(0);
+      expect(result[0]!.endedAt).toBeGreaterThan(0);
+      expect(result[0]!.entries).toHaveLength(0);
+      expect(result[0]!.costUsd).toBeNull();
+    });
   });
 });
