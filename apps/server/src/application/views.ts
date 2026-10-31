@@ -250,6 +250,10 @@ export function transcripts(deps: ViewDeps, runId: number): TranscriptView[] | n
       runId,
       source: 'hermes',
       title: msg('transcript.hermes', { profile: run.profile, session: session?.id ?? null }),
+      name: null,
+      startedAt: session ? session.startedAt * 1000 : null,
+      endedAt: session && session.endedAt !== null ? session.endedAt * 1000 : null,
+      costUsd: session?.costUsd ?? null,
       entries: session
         ? deps.sessions
             .transcript(run.profile, session.id)
@@ -266,6 +270,10 @@ export function transcripts(deps: ViewDeps, runId: number): TranscriptView[] | n
         runId,
         source: 'claude-code',
         title: msg('transcript.claudeCode', { costUsd: lane.costUsd }),
+        name: lane.name,
+        startedAt: lane.startedAt,
+        endedAt: lane.endedAt,
+        costUsd: lane.costUsd,
         entries: lane.entries.map((entry) => ({ ...entry, at: iso(entry.at) })),
         terminal: [],
       });
