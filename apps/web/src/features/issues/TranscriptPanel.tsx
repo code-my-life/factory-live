@@ -60,7 +60,11 @@ function choices(
   let unnamedClaudeIndex = 0;
   for (const view of sorted) {
     if (view.source === 'hermes') {
-      result.push({ label: t.transcript.source.hermes, choice: { kind: 'entries', view }, startedAt: view.startedAt });
+      result.push({
+        label: t.transcript.source.hermes,
+        choice: { kind: 'entries', view },
+        startedAt: view.startedAt,
+      });
     } else if (view.source === 'claude-code' || view.source === 'opencode') {
       const label = labelForView(view, t, unnamedClaudeIndex);
       result.push({ label, choice: { kind: 'entries', view }, startedAt: view.startedAt });
@@ -121,10 +125,10 @@ export function TranscriptPanel({ runId }: { runId: number }) {
   const { t, text } = useI18n();
   const views = useTranscripts(runId);
   const [index, setIndex] = useState(0);
+  const options = useMemo(() => choices(views ?? [], t), [views, t]);
   if (!views || views.length === 0) {
     return <p className={styles.muted}>{t.transcript.notKept}</p>;
   }
-  const options = useMemo(() => choices(views, t), [views, t]);
   const current = options[Math.min(index, options.length - 1)];
   return (
     <div className={styles.transcript}>

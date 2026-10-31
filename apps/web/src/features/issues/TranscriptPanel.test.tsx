@@ -8,12 +8,14 @@ const testText = (value: string | { code: string; params: Record<string, unknown
   if (typeof value === 'string') return value;
   // Simple resolution for test message codes
   if (value.code === 'transcript.hermes') {
-    const profile = value.params.profile ?? 'unknown';
-    const session = value.params.session ? ` (${value.params.session})` : '';
+    const profile = String((value.params.profile as string) ?? 'unknown');
+    const sessionValue = value.params.session as string | null | undefined;
+    const session = sessionValue ? ` (${sessionValue})` : '';
     return `Session Hermès de ${profile}${session}`;
   }
   if (value.code === 'transcript.claudeCode') {
-    const cost = value.params.costUsd === null ? '' : ` (${value.params.costUsd} $US)`;
+    const costValue = value.params.costUsd as number | null;
+    const cost = costValue === null ? '' : ` (${costValue} $US)`;
     return `Lane Claude Code${cost}`;
   }
   return value.code;
@@ -35,7 +37,7 @@ vi.mock('../../i18n/I18nProvider.tsx', () => ({
           user: 'Consigne',
           assistant: 'Réponse',
           reasoning: 'Raisonnement',
-          tool_call: 'Appel d\'outil',
+          tool_call: "Appel d'outil",
           tool_result: 'Résultat',
           system: 'Session',
         },
