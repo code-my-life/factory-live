@@ -75,7 +75,7 @@ describe('TranscriptPanel', () => {
   });
 
   it('chaque lane porte un libellé distinct', () => {
-    // Trois lanes Claude Code sans nom : doivent avoir des libellés distincts
+    // Three unnamed Claude Code lanes: must have distinct labels
     mockTranscripts = [
       {
         runId: 1,
@@ -125,15 +125,15 @@ describe('TranscriptPanel', () => {
 
     render(<TranscriptPanel runId={1} />);
 
-    // Le SegmentedControl doit afficher 4 boutons (Hermès + 3 lanes Claude Code)
+    // SegmentedControl must show 4 buttons (Hermes + 3 Claude Code lanes)
     const buttons = screen.getAllByRole('button', { name: /Claude Code/ });
-    expect(buttons).toHaveLength(3); // Trois lanes "Claude Code" sans nom
+    expect(buttons).toHaveLength(3); // Three unnamed "Claude Code" lanes
 
-    // Les libellés doivent être distincts pour éviter les clés React en double
+    // Labels must be distinct to avoid duplicate React keys
     const labels = buttons.map((btn) => btn.textContent);
     expect(new Set(labels).size).toBe(3);
 
-    // L'ordre doit être : Session Hermès, Implémentation, Correction, Correction 2, Terminal
-    // (selon le nom de la lane lu dans custom-title)
+    // Order must be: Session Hermès, Implementation, Correction, Correction 2, Terminal
+    // (based on lane name read from custom-title)
   });
 });

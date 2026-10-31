@@ -137,9 +137,9 @@ export function parseClaudeTranscript(jsonl: string): ClaudeEntry[] {
 }
 
 /**
- * Transcriptions Claude Code d'une carte : dossiers dont le nom commence par celui du workspace
- * (le CLI peut tourner dans un sous-dossier), fichiers modifiés pendant le run.
- * Retourne aussi le nom de la lane (dernier custom-title) et les bornes temporelles.
+ * Claude Code transcripts for a card: directories whose name starts with the workspace name
+ * (the CLI may run in a subdirectory), files modified during the run.
+ * Also returns the lane name (last custom-title) and time bounds.
  */
 export function claudeTranscriptFiles(
   projectsDir: string,
@@ -175,7 +175,7 @@ export function claudeTranscriptFiles(
       const path = join(projectsDir, dir, name);
       const { mtimeMs, birthtimeMs } = statSync(path);
       if (mtimeMs >= fromMs && (birthtimeMs || mtimeMs) <= toMs) {
-        // Lire le nom et les bornes temporelles
+        // Read the name and time bounds
         let laneName: string | null = null;
         let firstAt: number | null = null;
         let lastAt: number | null = null;
@@ -193,7 +193,7 @@ export function claudeTranscriptFiles(
             if (record['type'] === 'custom-title' && typeof record['title'] === 'string') {
               laneName = record['title'];
             }
-            // Timestamp du premier/dernier enregistrement daté
+            // Timestamp of first/last dated record
             const at =
               typeof record['timestamp'] === 'string' ? Date.parse(record['timestamp']) || 0 : 0;
             if (at > 0) {
@@ -202,7 +202,7 @@ export function claudeTranscriptFiles(
             }
           }
         } catch {
-          // Fichier illisible : on garde les valeurs par défaut
+          // Unreadable file: keep default values
         }
         files.push({ path, mtime: mtimeMs, name: laneName, startedAt: firstAt, endedAt: lastAt });
       }
