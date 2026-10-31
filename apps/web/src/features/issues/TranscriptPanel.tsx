@@ -30,16 +30,16 @@ type ViewChoice =
   { kind: 'entries'; view: TranscriptView } | { kind: 'terminal'; view: TranscriptView };
 
 function labelForView(view: TranscriptView, t: Messages, unnamedIndex: number): string {
-  // Si la lane a un nom (custom-title), on l'utilise
+  // If the lane has a name (custom-title), use it
   if (view.name && view.name.trim()) {
-    // Si le nom contient un rôle (ex: "Implémentation : nom"), on extrait le rôle
+    // If the name contains a role (e.g., "Implementation: name"), extract the role
     const colonIdx = view.name.indexOf(':');
     if (colonIdx > 0 && colonIdx <= 20) {
       return `Claude Code : ${view.name}`;
     }
     return view.name;
   }
-  // Sinon, on génère un libellé distinct selon l'index
+  // Otherwise, generate a distinct label based on index
   if (unnamedIndex === 0) return t.transcript.source['claude-code'];
   return `${t.transcript.source['claude-code']} ${unnamedIndex + 1}`;
 }
@@ -48,7 +48,7 @@ function choices(
   views: readonly TranscriptView[],
   t: Messages,
 ): { label: string; choice: ViewChoice; startedAt: number | null }[] {
-  // Trier par startedAt (heure de lancement), les nulls à la fin
+  // Sort by startedAt (launch time), nulls last
   const sorted = [...views].sort((a, b) => {
     if (a.startedAt === null && b.startedAt === null) return 0;
     if (a.startedAt === null) return 1;
@@ -120,7 +120,7 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
   );
 }
 
-/** Transcription intégrale d'un run, à la demande : session Hermès, lane CLI, ou log brut. */
+/** Full transcript of a run, on demand: Hermès session, CLI lane, or raw log. */
 export function TranscriptPanel({ runId }: { runId: number }) {
   const { t, text } = useI18n();
   const views = useTranscripts(runId);
@@ -152,7 +152,7 @@ export function TranscriptPanel({ runId }: { runId: number }) {
       ) : current ? (
         <>
           <p className={styles.muted}>{text(current.choice.view.title)}</p>
-          {/* Le plus récent en haut, dans une boîte qui défile seule : la page ne s'allonge plus avec le run. */}
+          {/* Most recent at top, in a self-scrolling box: the page no longer grows with the run. */}
           <div
             className={styles.entriesFrame}
             role="region"
