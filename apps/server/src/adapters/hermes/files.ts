@@ -190,8 +190,8 @@ export function claudeTranscriptFiles(
               continue;
             }
             // custom-title record
-            if (record['type'] === 'custom-title' && typeof record['title'] === 'string') {
-              laneName = record['title'];
+            if (record['type'] === 'custom-title' && typeof record['customTitle'] === 'string') {
+              laneName = record['customTitle'];
             }
             // Timestamp of first/last dated record
             const at =

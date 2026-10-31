@@ -97,7 +97,7 @@ describe('CardFiles.evidence', () => {
 
     it('extrait le nom depuis le custom-title et les timestamps', () => {
       const transcriptContent = [
-        '{ "type": "custom-title", "title": "Implementation : projet X" }',
+        '{ "type": "custom-title", "customTitle": "Implementation : projet X" }',
         '{ "type": "tool_call", "name": "kanban_show", "timestamp": "2026-10-30T10:00:00Z" }',
         '{ "type": "tool_result", "timestamp": "2026-10-30T10:01:00Z" }',
         '{ "type": "user", "timestamp": "2026-10-30T10:02:00Z" }',
@@ -130,7 +130,7 @@ describe('CardFiles.evidence', () => {
       // Create two sessions: first launched earlier but modified later
       const firstSession = '{ "type": "user", "timestamp": "2026-10-30T10:00:00Z" }';
       const secondSession =
-        '{ "type": "custom-title", "title": "Correction : fixes" }' +
+        '{ "type": "custom-title", "customTitle": "Correction : fixes" }' +
         '\n' +
         '{ "type": "user", "timestamp": "2026-10-30T10:01:00Z" }';
       makeTranscriptFile(claudeProjects, 'myworkdir/session-early.jsonl', firstSession);
@@ -144,6 +144,41 @@ describe('CardFiles.evidence', () => {
       expect(result[0]!.name).toBeNull();
       // The second file (session-late) has custom-title, name should be set
       expect(result[1]!.name).not.toBeNull();
+    });
+
+    it('ignores invalid JSON lines and continues parsing', () => {
+      // A transcript with an invalid JSON line in the middle
+      const transcriptContent = [
+        '{ "type": "custom-title", "customTitle": "Implementation : test" }',
+        'this is not valid json at all',
+        '{ "type": "user", "timestamp": "2026-10-30T10:00:00Z" }',
+      ].join('\n');
+      makeTranscriptFile(claudeProjects, 'myworkdir/session-invalid.jsonl', transcriptContent);
+
+      const result = claudeTranscriptFiles(claudeProjects, 'myworkdir', 0, Date.now() + 86400000);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.name).toBe('Implementation : test');
+      expect(result[0]!.startedAt).toBeGreaterThan(0);
+      expect(result[0]!.endedAt).toBeGreaterThan(0);
+    });
+
+    it('handles a truncated JSON line as a lane still in progress', () => {
+      // A lane in progress: the last line is a partial JSON record (truncated mid-write)
+      const transcriptContent = [
+        '{ "type": "user", "timestamp": "2026-10-30T10:00:00Z" }',
+        '{ "type": "custom-title", "customTitle": "Correction : still running" }',
+        '{ "type": "assistant", "timestamp": "2026-10-30T10:01:00Z" }',
+        '{ "type": "tool_call", "timestamp": "2026-10-30T10:02:00Z" ',
+      ].join('\n');
+      makeTranscriptFile(claudeProjects, 'myworkdir/session-truncated.jsonl', transcriptContent);
+
+      const result = claudeTranscriptFiles(claudeProjects, 'myworkdir', 0, Date.now() + 86400000);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.name).toBe('Correction : still running');
+      expect(result[0]!.startedAt).toBeGreaterThan(0);
+      expect(result[0]!.endedAt).toBeGreaterThan(0);
     });
   });
 
@@ -169,7 +204,7 @@ describe('CardFiles.evidence', () => {
 
     it('retourne les lanes avec nom, timestamps et cout', () => {
       const transcriptContent = [
-        '{ "type": "custom-title", "title": "Correction : fixes" }',
+        '{ "type": "custom-title", "customTitle": "Correction : fixes" }',
         '{ "type": "user", "timestamp": "2026-10-30T10:00:00Z" }',
       ].join('\n');
       makeTranscriptFile(claudeProjects, 'myworkdir/session1.jsonl', transcriptContent);
