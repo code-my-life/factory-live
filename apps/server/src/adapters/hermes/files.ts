@@ -17,10 +17,10 @@ import type { HermesPaths } from './paths.ts';
 const CARD = /^t_[0-9a-f]{8}$/;
 const TAIL_BYTES = 512 * 1024;
 const EVIDENCE_MAX_FILES = 50;
-/** Les preuves de la gate sont rangées par passage : `gate/<n>/01-….txt`. */
+/** Gate proofs are stored per pass: `gate/<n>/01-….txt`. */
 const EVIDENCE_MAX_DEPTH = 3;
 
-/** Fin d'un fichier, sans tout charger : un log de carte peut peser des dizaines de Mo. */
+/** End of a file, without loading it all: a card log can weigh tens of MB. */
 function tail(path: string, bytes: number): string {
   const fd = openSync(path, 'r');
   try {
@@ -35,7 +35,7 @@ function tail(path: string, bytes: number): string {
   }
 }
 
-/** Log brut d'une carte (`board/logs/<carte>.log`), séquences ANSI gardées pour le rendu terminal. */
+/** Raw log of a card (`board/logs/<card>.log`), ANSI sequences kept for terminal rendering. */
 export function cardLog(boardDir: string, cardId: string): string[] | null {
   if (!CARD.test(cardId)) return null;
   const path = join(boardDir, 'logs', `${cardId}.log`);
@@ -43,7 +43,7 @@ export function cardLog(boardDir: string, cardId: string): string[] | null {
   return redactSecrets(tail(path, TAIL_BYTES)).split('\n');
 }
 
-/** Dossier de Claude Code pour un répertoire de travail : chaque caractère non alphanumérique devient `-`. */
+/** Claude Code directory for a workspace: each non-alphanumeric character becomes `-`. */
 export function claudeProjectDir(cwd: string): string {
   return cwd.replace(/[^a-zA-Z0-9]/g, '-');
 }
@@ -73,7 +73,7 @@ function clip(value: unknown, max = 20_000): string | null {
     : clean;
 }
 
-/** Lignes d'une transcription Claude Code (`~/.claude/projects/<dossier>/<session>.jsonl`). */
+/** Lines of a Claude Code transcript (`~/.claude/projects/<folder>/<session>.jsonl`). */
 export function parseClaudeTranscript(jsonl: string): ClaudeEntry[] {
   const entries: ClaudeEntry[] = [];
   jsonl.split('\n').forEach((line, index) => {
@@ -137,15 +137,22 @@ export function parseClaudeTranscript(jsonl: string): ClaudeEntry[] {
 }
 
 /**
- * Transcriptions Claude Code d'une carte : dossiers dont le nom commence par celui du workspace
- * (le CLI peut tourner dans un sous-dossier), fichiers modifiés pendant le run.
+ * Claude Code transcripts for a card: directories whose name starts with the workspace name
+ * (the CLI may run in a subdirectory), files modified during the run.
+ * Also returns the lane name (last custom-title) and time bounds.
  */
 export function claudeTranscriptFiles(
   projectsDir: string,
   workspacePath: string,
   fromMs: number,
   toMs: number,
-): string[] {
+): {
+  path: string;
+  mtime: number;
+  name: string | null;
+  startedAt: number | null;
+  endedAt: number | null;
+}[] {
   const prefix = claudeProjectDir(workspacePath);
   let dirs: string[];
   try {
@@ -155,17 +162,53 @@ export function claudeTranscriptFiles(
   } catch {
     return [];
   }
-  const files: { path: string; mtime: number }[] = [];
+  const files: {
+    path: string;
+    mtime: number;
+    name: string | null;
+    startedAt: number | null;
+    endedAt: number | null;
+  }[] = [];
   for (const dir of dirs) {
     for (const name of readdirSync(join(projectsDir, dir))) {
       if (!name.endsWith('.jsonl')) continue;
       const path = join(projectsDir, dir, name);
       const { mtimeMs, birthtimeMs } = statSync(path);
-      if (mtimeMs >= fromMs && (birthtimeMs || mtimeMs) <= toMs)
-        files.push({ path, mtime: mtimeMs });
+      if (mtimeMs >= fromMs && (birthtimeMs || mtimeMs) <= toMs) {
+        // Read the name and time bounds
+        let laneName: string | null = null;
+        let firstAt: number | null = null;
+        let lastAt: number | null = null;
+        try {
+          const content = readFileSync(path, 'utf8');
+          for (const line of content.split('\n')) {
+            if (!line.trim()) continue;
+            let record: Record<string, unknown>;
+            try {
+              record = JSON.parse(line) as Record<string, unknown>;
+            } catch {
+              continue;
+            }
+            // custom-title record
+            if (record['type'] === 'custom-title' && typeof record['title'] === 'string') {
+              laneName = record['title'];
+            }
+            // Timestamp of first/last dated record
+            const at =
+              typeof record['timestamp'] === 'string' ? Date.parse(record['timestamp']) || 0 : 0;
+            if (at > 0) {
+              if (firstAt === null || at < firstAt) firstAt = at;
+              if (lastAt === null || at > lastAt) lastAt = at;
+            }
+          }
+        } catch {
+          // Unreadable file: keep default values
+        }
+        files.push({ path, mtime: mtimeMs, name: laneName, startedAt: firstAt, endedAt: lastAt });
+      }
     }
   }
-  return files.sort((left, right) => left.mtime - right.mtime).map((file) => file.path);
+  return files.sort((left, right) => left.mtime - right.mtime);
 }
 
 export interface ClaudeCost {
@@ -173,7 +216,7 @@ export interface ClaudeCost {
   models: { model: string; inputTokens: number; outputTokens: number; costUsd: number }[];
 }
 
-/** Coût d'une session Claude Code : dernier enregistrement `cost-state` de la transcription. */
+/** Cost of a Claude Code session: last `cost-state` record of the transcript. */
 export function claudeCost(jsonl: string): ClaudeCost | null {
   let last: Record<string, unknown> | null = null;
   for (const line of jsonl.split('\n')) {
@@ -182,7 +225,7 @@ export function claudeCost(jsonl: string): ClaudeCost | null {
       const record = JSON.parse(line) as Record<string, unknown>;
       if (record['type'] === 'cost-state') last = record;
     } catch {
-      // ligne tronquée pendant l'écriture : la suivante fera foi
+      // truncated line during write: the next one will be valid
     }
   }
   if (!last || typeof last['totalCostUSD'] !== 'number') return null;
@@ -202,8 +245,8 @@ export function claudeCost(jsonl: string): ClaudeCost | null {
 }
 
 /**
- * Les fichiers d'un dossier de preuves, sous-dossiers compris, par ordre de nom : ni fichier caché
- * (marqueurs de la factory), ni lien, ni plus de 50 fichiers.
+ * Files in an evidence folder, subfolders included, sorted by name: no hidden file
+ * (factory markers), no symlink, no more than 50 files.
  */
 export function evidenceFiles(paths: HermesPaths, dir: string): EvidenceFile[] {
   const files: EvidenceFile[] = [];
@@ -224,7 +267,7 @@ export function evidenceFiles(paths: HermesPaths, dir: string): EvidenceFile[] {
           const stat = statSync(file);
           files.push({ name: entry.join('/'), bytes: stat.size, at: stat.mtimeMs / 1000 });
         } catch {
-          // supprimé entre la liste et la lecture : il n'est plus une preuve
+          // deleted between list and read: no longer a proof
         }
       } else if (entry.length < EVIDENCE_MAX_DEPTH && paths.evidenceEntry(dir, entry, 'dir')) {
         visit(entry);
@@ -235,7 +278,7 @@ export function evidenceFiles(paths: HermesPaths, dir: string): EvidenceFile[] {
   return files;
 }
 
-/** Fichiers de la factory lus pour l'interface : logs de cartes et transcriptions des lanes Claude Code. */
+/** Factory files read for the UI: card logs and Claude Code lane transcripts. */
 export class CardFiles implements CardFilesPort {
   private readonly boardDir: string;
   private readonly claudeProjects: string;
@@ -267,12 +310,17 @@ export class CardFiles implements CardFilesPort {
   }
 
   claudeTranscripts(workspacePath: string, fromMs: number, toMs: number): LaneTranscript[] {
-    return claudeTranscriptFiles(this.claudeProjects, workspacePath, fromMs, toMs).map((file) => {
-      const content = readFileSync(file, 'utf8');
-      return {
-        entries: parseClaudeTranscript(content),
-        costUsd: claudeCost(content)?.totalCostUsd ?? null,
-      };
-    });
+    return claudeTranscriptFiles(this.claudeProjects, workspacePath, fromMs, toMs).map(
+      (fileInfo) => {
+        const content = readFileSync(fileInfo.path, 'utf8');
+        return {
+          entries: parseClaudeTranscript(content),
+          name: fileInfo.name,
+          startedAt: fileInfo.startedAt,
+          endedAt: fileInfo.endedAt,
+          costUsd: claudeCost(content)?.totalCostUsd ?? null,
+        };
+      },
+    );
   }
 }

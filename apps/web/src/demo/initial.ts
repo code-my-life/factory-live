@@ -1540,6 +1540,10 @@ export function createInitialState(now: number): DemoState {
         runId: RUNS.teamImpl,
         source: 'hermes',
         title: msg('transcript.hermes', { profile: 'coder-claude', session: null }),
+        name: null,
+        startedAt: now - 11 * min * 1000,
+        endedAt: now - 7 * min * 1000,
+        costUsd: null,
         entries: [
           entry(ago(11 * min), 'user', `work kanban task ${CARDS.teamImpl}`),
           entry(
@@ -1638,6 +1642,10 @@ export function createInitialState(now: number): DemoState {
         runId: RUNS.teamImpl,
         source: 'claude-code',
         title: msg('transcript.claudeCode', { costUsd: null }),
+        name: null,
+        startedAt: now - 7 * min * 1000,
+        endedAt: now - 3 * min * 1000,
+        costUsd: null,
         entries: [
           entry(
             ago(7 * min),
@@ -1688,6 +1696,10 @@ export function createInitialState(now: number): DemoState {
         runId: RUNS.contactGate,
         source: 'hermes',
         title: msg('transcript.hermes', { profile: 'gate', session: null }),
+        name: null,
+        startedAt: now - 6 * min * 1000,
+        endedAt: null,
+        costUsd: null,
         entries: [
           entry(ago(6 * min), 'user', `work kanban task ${CARDS.contactImpl}`),
           entry(ago(6 * min - 4), 'tool_call', '{"name": "factory-gate"}', {
@@ -1721,6 +1733,10 @@ export function createInitialState(now: number): DemoState {
         runId: RUNS.teamBrief,
         source: 'hermes',
         title: msg('transcript.hermes', { profile: 'coordinator-claude', session: null }),
+        name: null,
+        startedAt: now - 38 * min * 1000,
+        endedAt: now - 31 * min * 1000,
+        costUsd: null,
         entries: [
           entry(ago(38 * min), 'user', `work kanban task ${CARDS.teamBrief}`),
           entry(ago(37 * min), 'tool_call', 'desktop/src/team', {

@@ -833,6 +833,13 @@ export const fr = {
     sourceLabel: 'Source de la transcription',
     rawLog: (runId: number) => `Log brut du run ${runId}`,
     redaction: 'Les secrets (jetons, clés, mots de passe) sont masqués avant affichage.',
+    legend: {
+      withRole: (role: string, name: string) => `${role} : ${name}`,
+      unnamed: (label: string) => label,
+      inProgress: (since: string) => `depuis ${since} (en cours)`,
+      noCost: 'coût inconnu',
+      withCost: (cost: string) => cost,
+    },
   },
 
   interventions: {

@@ -8,7 +8,7 @@ import {
   ToolsIcon,
 } from '@primer/octicons-react';
 import { SegmentedControl } from '@primer/react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranscripts } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { Messages } from '../../i18n/fr.ts';
@@ -29,19 +29,54 @@ const ROLE_ICON = {
 type ViewChoice =
   { kind: 'entries'; view: TranscriptView } | { kind: 'terminal'; view: TranscriptView };
 
+function labelForView(view: TranscriptView, t: Messages, unnamedIndex: number): string {
+  // If the lane has a name (custom-title), use it
+  if (view.name && view.name.trim()) {
+    // If the name contains a role (e.g., "Implementation: name"), extract the role
+    const colonIdx = view.name.indexOf(':');
+    if (colonIdx > 0 && colonIdx <= 20) {
+      return `Claude Code : ${view.name}`;
+    }
+    return view.name;
+  }
+  // Otherwise, generate a distinct label based on index
+  if (unnamedIndex === 0) return t.transcript.source['claude-code'];
+  return `${t.transcript.source['claude-code']} ${unnamedIndex + 1}`;
+}
+
 function choices(
   views: readonly TranscriptView[],
   t: Messages,
-): { label: string; choice: ViewChoice }[] {
-  const result: { label: string; choice: ViewChoice }[] = [];
-  for (const view of views) {
-    result.push({ label: t.transcript.source[view.source], choice: { kind: 'entries', view } });
+): { label: string; choice: ViewChoice; startedAt: number | null }[] {
+  // Sort by startedAt (launch time), nulls last
+  const sorted = [...views].sort((a, b) => {
+    if (a.startedAt === null && b.startedAt === null) return 0;
+    if (a.startedAt === null) return 1;
+    if (b.startedAt === null) return -1;
+    return a.startedAt - b.startedAt;
+  });
+
+  const result: { label: string; choice: ViewChoice; startedAt: number | null }[] = [];
+  let unnamedClaudeIndex = 0;
+  for (const view of sorted) {
+    if (view.source === 'hermes') {
+      result.push({
+        label: t.transcript.source.hermes,
+        choice: { kind: 'entries', view },
+        startedAt: view.startedAt,
+      });
+    } else if (view.source === 'claude-code' || view.source === 'opencode') {
+      const label = labelForView(view, t, unnamedClaudeIndex);
+      result.push({ label, choice: { kind: 'entries', view }, startedAt: view.startedAt });
+      unnamedClaudeIndex++;
+    }
   }
   const terminal = views.find((view) => view.terminal.length > 0);
   if (terminal)
     result.push({
       label: t.transcript.source.terminal,
       choice: { kind: 'terminal', view: terminal },
+      startedAt: terminal.startedAt,
     });
   return result;
 }
@@ -85,15 +120,15 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
   );
 }
 
-/** Transcription intégrale d'un run, à la demande : session Hermès, lane CLI, ou log brut. */
+/** Full transcript of a run, on demand: Hermès session, CLI lane, or raw log. */
 export function TranscriptPanel({ runId }: { runId: number }) {
   const { t, text } = useI18n();
   const views = useTranscripts(runId);
   const [index, setIndex] = useState(0);
+  const options = useMemo(() => choices(views ?? [], t), [views, t]);
   if (!views || views.length === 0) {
     return <p className={styles.muted}>{t.transcript.notKept}</p>;
   }
-  const options = choices(views, t);
   const current = options[Math.min(index, options.length - 1)];
   return (
     <div className={styles.transcript}>
@@ -105,7 +140,7 @@ export function TranscriptPanel({ runId }: { runId: number }) {
       >
         {options.map((option, optionIndex) => (
           <SegmentedControl.Button
-            key={option.label}
+            key={`${option.choice.kind}-${option.choice.view.source}-${optionIndex}`}
             selected={optionIndex === Math.min(index, options.length - 1)}
           >
             {option.label}
@@ -117,7 +152,7 @@ export function TranscriptPanel({ runId }: { runId: number }) {
       ) : current ? (
         <>
           <p className={styles.muted}>{text(current.choice.view.title)}</p>
-          {/* Le plus récent en haut, dans une boîte qui défile seule : la page ne s'allonge plus avec le run. */}
+          {/* Most recent at top, in a self-scrolling box: the page no longer grows with the run. */}
           <div
             className={styles.entriesFrame}
             role="region"

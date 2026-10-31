@@ -32,13 +32,23 @@ export const TranscriptEntry = z.object({
 export type TranscriptEntry = z.infer<typeof TranscriptEntry>;
 
 /**
- * Une transcription d'un run. Un run de lane en a deux : la session Hermès qui pilote
- * et la session du CLI (Claude Code ou OpenCode). `terminal` est le log brut de la carte (ANSI).
+ * A transcript of a run. A lane run has two: the Hermès session that drives
+ * it and the CLI session (Claude Code or OpenCode). `terminal` is the raw log of the card (ANSI).
+ * The fields `name`, `startedAt`, `endedAt`, `costUsd` come from the `custom-title` record
+ * (for the name) and the first/last dated records of the transcript.
  */
 export const TranscriptView = z.object({
   runId: z.number().int().positive(),
   source: z.enum(['hermes', 'claude-code', 'opencode']),
   title: Text,
+  /** Lane name read from the last `custom-title` record, or `null` without it. */
+  name: z.string().nullable(),
+  /** Start time (ms epoch) of the first dated record, or `null`. */
+  startedAt: z.number().int().nonnegative().nullable(),
+  /** End time (ms epoch) of the last dated record, or `null` if the lane is in progress. */
+  endedAt: z.number().int().nonnegative().nullable(),
+  /** Estimated cost in USD, or `null` if unknown. */
+  costUsd: z.number().nullable(),
   entries: z.array(TranscriptEntry),
   terminal: z.array(z.string()),
 });
