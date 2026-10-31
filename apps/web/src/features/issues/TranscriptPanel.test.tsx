@@ -3,10 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { TranscriptPanel } from './TranscriptPanel.tsx';
 
-// Simple text function for tests
 const testText = (value: string | { code: string; params: Record<string, unknown> }): string => {
   if (typeof value === 'string') return value;
-  // Simple resolution for test message codes
   if (value.code === 'transcript.hermes') {
     const profile = String((value.params.profile as string) ?? 'unknown');
     const sessionValue = value.params.session as string | null | undefined;
@@ -21,7 +19,6 @@ const testText = (value: string | { code: string; params: Record<string, unknown
   return value.code;
 };
 
-// Mock I18n
 vi.mock('../../i18n/I18nProvider.tsx', () => ({
   useI18n: () => ({
     t: {
@@ -60,13 +57,11 @@ vi.mock('../../i18n/I18nProvider.tsx', () => ({
   }),
 }));
 
-// Mock useTranscripts
 vi.mock('../../data/FactoryProvider.tsx', () => ({
   useTranscripts: () => mockTranscripts,
 }));
 
 let mockTranscripts: TranscriptView[] = [];
-
 const baseTime = Date.now();
 
 describe('TranscriptPanel', () => {
@@ -135,5 +130,49 @@ describe('TranscriptPanel', () => {
 
     // Order must be: Session Hermes, Implementation, Correction, Correction 2, Terminal
     // (based on lane name read from custom-title)
+  });
+
+  it('affiche le nom quand il ny a pas de role', () => {
+    // Test: name without colon gives the name as-is
+    mockTranscripts = [
+      {
+        runId: 1,
+        source: 'claude-code',
+        title: { code: 'transcript.claudeCode', params: { costUsd: null } },
+        name: 'Implémentation', // no colon, just a name
+        startedAt: baseTime - 8000,
+        endedAt: baseTime - 1000,
+        costUsd: null,
+        entries: [],
+        terminal: [],
+      },
+    ];
+    render(<TranscriptPanel runId={1} />);
+    // The label is just the name, not "Claude Code"
+    const buttons = screen.getAllByRole('button', { name: /Implémentation/ });
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]!.textContent).toBe('Implémentation');
+  });
+
+  it('affiche Claude Code : label quand le nom contient un role', () => {
+    // Test: name with colon at position 1-20 gives "Claude Code : <name>"
+    mockTranscripts = [
+      {
+        runId: 1,
+        source: 'claude-code',
+        title: { code: 'transcript.claudeCode', params: { costUsd: null } },
+        name: 'Fix : bug 123', // colon at position 4
+        startedAt: baseTime - 8000,
+        endedAt: baseTime - 1000,
+        costUsd: null,
+        entries: [],
+        terminal: [],
+      },
+    ];
+    render(<TranscriptPanel runId={1} />);
+    const buttons = screen.getAllByRole('button', { name: /Claude Code/ });
+    expect(buttons).toHaveLength(1);
+    // Colon at position 4 <= 20, so it should show "Claude Code : Fix : bug 123"
+    expect(buttons[0]!.textContent).toBe('Claude Code : Fix : bug 123');
   });
 });
