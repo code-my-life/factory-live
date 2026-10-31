@@ -74,7 +74,7 @@ describe('TranscriptPanel', () => {
     vi.clearAllMocks();
   });
 
-  it('each lane has a distinct label', () => {
+  it('chaque lane porte un libellé distinct', () => {
     // Three unnamed Claude Code lanes: must have distinct labels
     mockTranscripts = [
       {
