@@ -17,10 +17,10 @@ import type { HermesPaths } from './paths.ts';
 const CARD = /^t_[0-9a-f]{8}$/;
 const TAIL_BYTES = 512 * 1024;
 const EVIDENCE_MAX_FILES = 50;
-/** Les preuves de la gate sont rangées par passage : `gate/<n>/01-….txt`. */
+/** Gate proofs are stored per pass: `gate/<n>/01-….txt`. */
 const EVIDENCE_MAX_DEPTH = 3;
 
-/** Fin d'un fichier, sans tout charger : un log de carte peut peser des dizaines de Mo. */
+/** End of a file, without loading it all: a card log can weigh tens of MB. */
 function tail(path: string, bytes: number): string {
   const fd = openSync(path, 'r');
   try {
@@ -35,7 +35,7 @@ function tail(path: string, bytes: number): string {
   }
 }
 
-/** Log brut d'une carte (`board/logs/<carte>.log`), séquences ANSI gardées pour le rendu terminal. */
+/** Raw log of a card (`board/logs/<card>.log`), ANSI sequences kept for terminal rendering. */
 export function cardLog(boardDir: string, cardId: string): string[] | null {
   if (!CARD.test(cardId)) return null;
   const path = join(boardDir, 'logs', `${cardId}.log`);
@@ -43,7 +43,7 @@ export function cardLog(boardDir: string, cardId: string): string[] | null {
   return redactSecrets(tail(path, TAIL_BYTES)).split('\n');
 }
 
-/** Dossier de Claude Code pour un répertoire de travail : chaque caractère non alphanumérique devient `-`. */
+/** Claude Code directory for a workspace: each non-alphanumeric character becomes `-`. */
 export function claudeProjectDir(cwd: string): string {
   return cwd.replace(/[^a-zA-Z0-9]/g, '-');
 }
@@ -73,7 +73,7 @@ function clip(value: unknown, max = 20_000): string | null {
     : clean;
 }
 
-/** Lignes d'une transcription Claude Code (`~/.claude/projects/<dossier>/<session>.jsonl`). */
+/** Lines of a Claude Code transcript (`~/.claude/projects/<folder>/<session>.jsonl`). */
 export function parseClaudeTranscript(jsonl: string): ClaudeEntry[] {
   const entries: ClaudeEntry[] = [];
   jsonl.split('\n').forEach((line, index) => {
@@ -216,7 +216,7 @@ export interface ClaudeCost {
   models: { model: string; inputTokens: number; outputTokens: number; costUsd: number }[];
 }
 
-/** Coût d'une session Claude Code : dernier enregistrement `cost-state` de la transcription. */
+/** Cost of a Claude Code session: last `cost-state` record of the transcript. */
 export function claudeCost(jsonl: string): ClaudeCost | null {
   let last: Record<string, unknown> | null = null;
   for (const line of jsonl.split('\n')) {
@@ -225,7 +225,7 @@ export function claudeCost(jsonl: string): ClaudeCost | null {
       const record = JSON.parse(line) as Record<string, unknown>;
       if (record['type'] === 'cost-state') last = record;
     } catch {
-      // ligne tronquée pendant l'écriture : la suivante fera foi
+      // truncated line during write: the next one will be valid
     }
   }
   if (!last || typeof last['totalCostUSD'] !== 'number') return null;
@@ -245,8 +245,8 @@ export function claudeCost(jsonl: string): ClaudeCost | null {
 }
 
 /**
- * Les fichiers d'un dossier de preuves, sous-dossiers compris, par ordre de nom : ni fichier caché
- * (marqueurs de la factory), ni lien, ni plus de 50 fichiers.
+ * Files in an evidence folder, subfolders included, sorted by name: no hidden file
+ * (factory markers), no symlink, no more than 50 files.
  */
 export function evidenceFiles(paths: HermesPaths, dir: string): EvidenceFile[] {
   const files: EvidenceFile[] = [];
@@ -267,7 +267,7 @@ export function evidenceFiles(paths: HermesPaths, dir: string): EvidenceFile[] {
           const stat = statSync(file);
           files.push({ name: entry.join('/'), bytes: stat.size, at: stat.mtimeMs / 1000 });
         } catch {
-          // supprimé entre la liste et la lecture : il n'est plus une preuve
+          // deleted between list and read: no longer a proof
         }
       } else if (entry.length < EVIDENCE_MAX_DEPTH && paths.evidenceEntry(dir, entry, 'dir')) {
         visit(entry);
@@ -278,7 +278,7 @@ export function evidenceFiles(paths: HermesPaths, dir: string): EvidenceFile[] {
   return files;
 }
 
-/** Fichiers de la factory lus pour l'interface : logs de cartes et transcriptions des lanes Claude Code. */
+/** Factory files read for the UI: card logs and Claude Code lane transcripts. */
 export class CardFiles implements CardFilesPort {
   private readonly boardDir: string;
   private readonly claudeProjects: string;
