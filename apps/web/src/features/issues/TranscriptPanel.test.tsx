@@ -74,7 +74,7 @@ describe('TranscriptPanel', () => {
     vi.clearAllMocks();
   });
 
-  it('chaque lane porte un libellé distinct', () => {
+  it('each lane has a distinct label', () => {
     // Three unnamed Claude Code lanes: must have distinct labels
     mockTranscripts = [
       {
@@ -133,7 +133,7 @@ describe('TranscriptPanel', () => {
     const labels = buttons.map((btn) => btn.textContent);
     expect(new Set(labels).size).toBe(3);
 
-    // Order must be: Session Hermès, Implementation, Correction, Correction 2, Terminal
+    // Order must be: Session Hermes, Implementation, Correction, Correction 2, Terminal
     // (based on lane name read from custom-title)
   });
 });
