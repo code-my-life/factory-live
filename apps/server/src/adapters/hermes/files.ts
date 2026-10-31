@@ -146,7 +146,13 @@ export function claudeTranscriptFiles(
   workspacePath: string,
   fromMs: number,
   toMs: number,
-): { path: string; mtime: number; name: string | null; startedAt: number | null; endedAt: number | null }[] {
+): {
+  path: string;
+  mtime: number;
+  name: string | null;
+  startedAt: number | null;
+  endedAt: number | null;
+}[] {
   const prefix = claudeProjectDir(workspacePath);
   let dirs: string[];
   try {
@@ -156,7 +162,13 @@ export function claudeTranscriptFiles(
   } catch {
     return [];
   }
-  const files: { path: string; mtime: number; name: string | null; startedAt: number | null; endedAt: number | null }[] = [];
+  const files: {
+    path: string;
+    mtime: number;
+    name: string | null;
+    startedAt: number | null;
+    endedAt: number | null;
+  }[] = [];
   for (const dir of dirs) {
     for (const name of readdirSync(join(projectsDir, dir))) {
       if (!name.endsWith('.jsonl')) continue;
@@ -182,7 +194,8 @@ export function claudeTranscriptFiles(
               laneName = record['title'];
             }
             // Timestamp du premier/dernier enregistrement daté
-            const at = typeof record['timestamp'] === 'string' ? Date.parse(record['timestamp']) || 0 : 0;
+            const at =
+              typeof record['timestamp'] === 'string' ? Date.parse(record['timestamp']) || 0 : 0;
             if (at > 0) {
               if (firstAt === null || at < firstAt) firstAt = at;
               if (lastAt === null || at > lastAt) lastAt = at;
@@ -297,15 +310,17 @@ export class CardFiles implements CardFilesPort {
   }
 
   claudeTranscripts(workspacePath: string, fromMs: number, toMs: number): LaneTranscript[] {
-    return claudeTranscriptFiles(this.claudeProjects, workspacePath, fromMs, toMs).map((fileInfo) => {
-      const content = readFileSync(fileInfo.path, 'utf8');
-      return {
-        entries: parseClaudeTranscript(content),
-        name: fileInfo.name,
-        startedAt: fileInfo.startedAt,
-        endedAt: fileInfo.endedAt,
-        costUsd: claudeCost(content)?.totalCostUsd ?? null,
-      };
-    });
+    return claudeTranscriptFiles(this.claudeProjects, workspacePath, fromMs, toMs).map(
+      (fileInfo) => {
+        const content = readFileSync(fileInfo.path, 'utf8');
+        return {
+          entries: parseClaudeTranscript(content),
+          name: fileInfo.name,
+          startedAt: fileInfo.startedAt,
+          endedAt: fileInfo.endedAt,
+          costUsd: claudeCost(content)?.totalCostUsd ?? null,
+        };
+      },
+    );
   }
 }
