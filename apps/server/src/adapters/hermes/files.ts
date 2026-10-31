@@ -139,13 +139,14 @@ export function parseClaudeTranscript(jsonl: string): ClaudeEntry[] {
 /**
  * Transcriptions Claude Code d'une carte : dossiers dont le nom commence par celui du workspace
  * (le CLI peut tourner dans un sous-dossier), fichiers modifiés pendant le run.
+ * Retourne aussi le nom de la lane (dernier custom-title) et les bornes temporelles.
  */
 export function claudeTranscriptFiles(
   projectsDir: string,
   workspacePath: string,
   fromMs: number,
   toMs: number,
-): string[] {
+): { path: string; mtime: number; name: string | null; startedAt: number | null; endedAt: number | null }[] {
   const prefix = claudeProjectDir(workspacePath);
   let dirs: string[];
   try {
@@ -155,17 +156,46 @@ export function claudeTranscriptFiles(
   } catch {
     return [];
   }
-  const files: { path: string; mtime: number }[] = [];
+  const files: { path: string; mtime: number; name: string | null; startedAt: number | null; endedAt: number | null }[] = [];
   for (const dir of dirs) {
     for (const name of readdirSync(join(projectsDir, dir))) {
       if (!name.endsWith('.jsonl')) continue;
       const path = join(projectsDir, dir, name);
       const { mtimeMs, birthtimeMs } = statSync(path);
-      if (mtimeMs >= fromMs && (birthtimeMs || mtimeMs) <= toMs)
-        files.push({ path, mtime: mtimeMs });
+      if (mtimeMs >= fromMs && (birthtimeMs || mtimeMs) <= toMs) {
+        // Lire le nom et les bornes temporelles
+        let laneName: string | null = null;
+        let firstAt: number | null = null;
+        let lastAt: number | null = null;
+        try {
+          const content = readFileSync(path, 'utf8');
+          for (const line of content.split('\n')) {
+            if (!line.trim()) continue;
+            let record: Record<string, unknown>;
+            try {
+              record = JSON.parse(line) as Record<string, unknown>;
+            } catch {
+              continue;
+            }
+            // custom-title record
+            if (record['type'] === 'custom-title' && typeof record['title'] === 'string') {
+              laneName = record['title'];
+            }
+            // Timestamp du premier/dernier enregistrement daté
+            const at = typeof record['timestamp'] === 'string' ? Date.parse(record['timestamp']) || 0 : 0;
+            if (at > 0) {
+              if (firstAt === null || at < firstAt) firstAt = at;
+              if (lastAt === null || at > lastAt) lastAt = at;
+            }
+          }
+        } catch {
+          // Fichier illisible : on garde les valeurs par défaut
+        }
+        files.push({ path, mtime: mtimeMs, name: laneName, startedAt: firstAt, endedAt: lastAt });
+      }
     }
   }
-  return files.sort((left, right) => left.mtime - right.mtime).map((file) => file.path);
+  return files.sort((left, right) => left.mtime - right.mtime);
 }
 
 export interface ClaudeCost {
@@ -267,10 +297,13 @@ export class CardFiles implements CardFilesPort {
   }
 
   claudeTranscripts(workspacePath: string, fromMs: number, toMs: number): LaneTranscript[] {
-    return claudeTranscriptFiles(this.claudeProjects, workspacePath, fromMs, toMs).map((file) => {
-      const content = readFileSync(file, 'utf8');
+    return claudeTranscriptFiles(this.claudeProjects, workspacePath, fromMs, toMs).map((fileInfo) => {
+      const content = readFileSync(fileInfo.path, 'utf8');
       return {
         entries: parseClaudeTranscript(content),
+        name: fileInfo.name,
+        startedAt: fileInfo.startedAt,
+        endedAt: fileInfo.endedAt,
         costUsd: claudeCost(content)?.totalCostUsd ?? null,
       };
     });
