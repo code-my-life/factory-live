@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, symlinkSync } from 'node:fs';
+import { mkdirSync, utimesSync, writeFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { tempDir } from '../../test/hermes-fixtures.ts';
@@ -220,6 +220,69 @@ describe('CardFiles.evidence', () => {
       expect(result[0]!.name).toBe('Correction : early');
       expect(result[1]!.name).toBe('Implémentation : late');
     });
+
+    it('les lanes sont rangées par heure de début, même si la plus ancienne est modifiée en dernier', () => {
+      // C6: sort by startedAt even when the earlier lane was modified later
+      const earlySession = [
+        '{ "type": "custom-title", "customTitle": "Correction : early" }',
+        '{ "type": "user", "timestamp": "2026-10-30T10:00:00Z" }',
+      ].join('\n');
+      const lateSession = [
+        '{ "type": "custom-title", "customTitle": "Implémentation : late" }',
+        '{ "type": "user", "timestamp": "2026-10-30T11:00:00Z" }',
+      ].join('\n');
+      makeTranscriptFile(claudeProjects, 'myworkdir/session-early.jsonl', earlySession);
+      makeTranscriptFile(claudeProjects, 'myworkdir/session-late.jsonl', lateSession);
+
+      // The early-launched lane is modified LAST (newer mtime)
+      const earlyPath = join(claudeProjects, 'myworkdir', 'session-early.jsonl');
+      const latePath = join(claudeProjects, 'myworkdir', 'session-late.jsonl');
+      utimesSync(latePath, new Date(0), new Date(0));
+      utimesSync(earlyPath, new Date(Date.now() + 1000), new Date(Date.now() + 1000));
+
+      const result = claudeTranscriptFiles(claudeProjects, 'myworkdir', 0, Date.now() + 86400000);
+
+      expect(result).toHaveLength(2);
+      // Sorted by startedAt: early (10:00) before late (11:00), regardless of mtime
+      expect(result[0]!.name).toBe('Correction : early');
+      expect(result[1]!.name).toBe('Implémentation : late');
+    });
+
+    it('les lanes sans heure de début viennent en dernier', () => {
+      const noTimeSession = ['{ "type": "custom-title", "customTitle": "No timestamp" }'].join(
+        '\n',
+      );
+      const timedSession = [
+        '{ "type": "custom-title", "customTitle": "Timed" }',
+        '{ "type": "user", "timestamp": "2026-10-30T10:00:00Z" }',
+      ].join('\n');
+      makeTranscriptFile(claudeProjects, 'myworkdir/session-notime.jsonl', noTimeSession);
+      makeTranscriptFile(claudeProjects, 'myworkdir/session-timed.jsonl', timedSession);
+
+      const result = claudeTranscriptFiles(claudeProjects, 'myworkdir', 0, Date.now() + 86400000);
+
+      expect(result).toHaveLength(2);
+      expect(result[0]!.name).toBe('Timed');
+      expect(result[1]!.name).toBe('No timestamp');
+    });
+
+    it('masque un secret dans le nom d’une lane', () => {
+      // C5: the lane name goes through redactSecrets, like the transcription text
+      const key = 'sk-proj-' + 'q'.repeat(40);
+      const transcriptContent = [
+        '{ "type": "user", "timestamp": "2026-10-30T10:00:00Z" }',
+        `{ "type": "custom-title", "customTitle": "Correction : key ${key}" }`,
+        '{ "type": "assistant", "timestamp": "2026-10-30T10:01:00Z" }',
+      ].join('\n');
+      makeTranscriptFile(claudeProjects, 'myworkdir/session-secret.jsonl', transcriptContent);
+
+      const result = claudeTranscriptFiles(claudeProjects, 'myworkdir', 0, Date.now() + 86400000);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.name).not.toContain('q'.repeat(40));
+      expect(result[0]!.name).toContain('[secret masqué]');
+      expect(result[0]!.name).toContain('Correction :');
+    });
   });
 
   describe('CardFiles.claudeTranscripts', () => {
@@ -257,6 +320,35 @@ describe('CardFiles.evidence', () => {
       expect(result[0]!.endedAt).toBeGreaterThan(0);
       expect(result[0]!.entries).toHaveLength(0);
       expect(result[0]!.costUsd).toBeNull();
+    });
+  });
+
+  describe('claudeCost', () => {
+    it('extrait le coût et les modèles depuis un cost-state', () => {
+      const transcriptContent = [
+        '{ "type": "user", "timestamp": "2026-10-30T10:00:00Z" }',
+        '{ "type": "cost-state", "totalCostUSD": 0.41, "modelUsage": { "claude-3-opus": { "inputTokens": 1000, "outputTokens": 500, "costUSD": 0.41 } } }',
+      ].join('\n');
+      makeTranscriptFile(claudeProjects, 'myworkdir/session-cost.jsonl', transcriptContent);
+
+      const result = files.claudeTranscripts('myworkdir', 0, Date.now() + 86400000);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.costUsd).toBe(0.41);
+    });
+  });
+
+  describe('CardFiles.evidenceStamp', () => {
+    it('retourne "-" quand le dossier evidence n\'existe pas', () => {
+      const stamp = files.evidenceStamp('t_00000000');
+      expect(stamp).toBe('-');
+    });
+  });
+
+  describe('CardFiles.cardLog', () => {
+    it("retourne null quand le fichier de log n'existe pas", () => {
+      const log = files.cardLog('t_00000000');
+      expect(log).toBeNull();
     });
   });
 });
