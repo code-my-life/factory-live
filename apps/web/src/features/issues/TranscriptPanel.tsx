@@ -29,20 +29,24 @@ const ROLE_ICON = {
 type ViewChoice =
   { kind: 'entries'; view: TranscriptView } | { kind: 'terminal'; view: TranscriptView };
 
-function labelForView(view: TranscriptView, t: Messages, unnamedIndex: number): string {
-  // If the lane has a name (custom-title), use it
+function labelForView(view: TranscriptView, t: Messages, labelCounts: Map<string, number>): string {
+  // If the lane has a name (custom-title), extract the role
+  let base: string;
   if (view.name && view.name.trim()) {
-    // If the name contains a role (e.g., "Implementation: name"), extract the role
     const colonIdx = view.name.indexOf(':');
     if (colonIdx > 0 && colonIdx <= 20) {
-      return view.name.slice(0, colonIdx).trim();
+      base = view.name.slice(0, colonIdx).trim();
+    } else {
+      base = t.transcript.source['claude-code'];
     }
-    // Name without role (1-20 chars before colon): label is "Claude Code"
-    return t.transcript.source['claude-code'];
+  } else {
+    base = t.transcript.source['claude-code'];
   }
-  // Otherwise, generate a distinct label based on index
-  if (unnamedIndex === 0) return t.transcript.source['claude-code'];
-  return `${t.transcript.source['claude-code']} ${unnamedIndex + 1}`;
+
+  // Number duplicates globally across ALL labels
+  const count = labelCounts.get(base) ?? 0;
+  labelCounts.set(base, count + 1);
+  return count === 0 ? base : `${base} ${count + 1}`;
 }
 
 function legendForView(
@@ -52,6 +56,11 @@ function legendForView(
   currentIndex: number,
   fmt: ReturnType<typeof useI18n>['fmt'],
 ): string {
+  // Only claude-code/opencode lanes get the lane legend
+  if (view.source !== 'claude-code' && view.source !== 'opencode') {
+    return typeof view.title === 'string' ? view.title : view.title.code;
+  }
+
   // Count only claude-code lanes for ranking
   const claudeViews = allViews.filter((v) => v.source === 'claude-code' || v.source === 'opencode');
   const rank = claudeViews.findIndex((v) => v === view);
@@ -59,16 +68,11 @@ function legendForView(
 
   const parts: string[] = [];
 
-  // "Lane Claude Code X of Y" or "Lane Claude Code" (if only one)
+  // "Lane Claude Code" or "Lane Claude Code 2 sur 3"
   if (total === 1) {
-    parts.push(t.transcript.legend.unnamed(t.transcript.source['claude-code']));
+    parts.push(t.transcript.legend.single(t.transcript.source['claude-code']));
   } else {
-    parts.push(
-      t.transcript.legend.withRole(
-        `${t.transcript.source['claude-code']} ${rank + 1}`,
-        `${rank + 1} sur ${total}`,
-      ),
-    );
+    parts.push(t.transcript.legend.withRank(t.transcript.source['claude-code'], rank + 1, total));
   }
 
   // Lane name if present
@@ -111,7 +115,7 @@ function choices(
   });
 
   const result: { label: string; choice: ViewChoice; startedAt: number | null }[] = [];
-  let unnamedClaudeIndex = 0;
+  const labelCounts = new Map<string, number>();
   for (const view of sorted) {
     if (view.source === 'hermes') {
       result.push({
@@ -120,9 +124,8 @@ function choices(
         startedAt: view.startedAt,
       });
     } else if (view.source === 'claude-code' || view.source === 'opencode') {
-      const label = labelForView(view, t, unnamedClaudeIndex);
+      const label = labelForView(view, t, labelCounts);
       result.push({ label, choice: { kind: 'entries', view }, startedAt: view.startedAt });
-      unnamedClaudeIndex++;
     }
   }
   const terminal = views.find((view) => view.terminal.length > 0);
@@ -185,13 +188,18 @@ export function TranscriptPanel({ runId }: { runId: number }) {
   }
   const current = options[Math.min(index, options.length - 1)];
   const legend = current ? legendForView(current.choice.view, t, views ?? [], index, fmt) : '';
+  // C11: beyond 6 sources, full-width dropdown at all widths
+  const segmentVariant =
+    options.length > 6
+      ? { narrow: 'dropdown' as const, regular: 'dropdown' as const, wide: 'dropdown' as const }
+      : { narrow: 'dropdown' as const, regular: 'default' as const };
   return (
     <div className={styles.transcript}>
       <SegmentedControl
         aria-label={t.transcript.sourceLabel}
         className={styles.sources}
         size="small"
-        variant={{ narrow: 'dropdown', regular: 'default' }}
+        variant={segmentVariant}
         onChange={(next) => setIndex(next ?? 0)}
       >
         {options.map((option, optionIndex) => (

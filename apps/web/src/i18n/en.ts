@@ -768,6 +768,8 @@ export const en: Messages = {
     legend: {
       withRole: (role: string, name: string) => `${role}: ${name}`,
       unnamed: (label: string) => label,
+      withRank: (label: string, rank: number, total: number) => `Lane ${label} ${rank} of ${total}`,
+      single: (label: string) => `Lane ${label}`,
       inProgress: (since: string) => `${since} (in progress)`,
       noCost: 'cost unknown',
       withCost: (cost: string) => cost,

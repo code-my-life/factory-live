@@ -180,6 +180,46 @@ describe('CardFiles.evidence', () => {
       expect(result[0]!.startedAt).toBeGreaterThan(0);
       expect(result[0]!.endedAt).toBeGreaterThan(0);
     });
+
+    it('le nom de la lane vient de son enregistrement custom-title', () => {
+      // Test that the lane name is read from the custom-title record
+      const transcriptContent = [
+        '{ "type": "user", "timestamp": "2026-10-30T10:00:00Z" }',
+        '{ "type": "custom-title", "customTitle": "Implémentation : vue ÉQUIPE groupée par projet" }',
+        '{ "type": "assistant", "timestamp": "2026-10-30T10:01:00Z" }',
+      ].join('\n');
+      makeTranscriptFile(claudeProjects, 'myworkdir/session-custom-title.jsonl', transcriptContent);
+
+      const result = claudeTranscriptFiles(claudeProjects, 'myworkdir', 0, Date.now() + 86400000);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.name).toBe('Implémentation : vue ÉQUIPE groupée par projet');
+    });
+
+    it('les lanes sont rangées par heure de début', () => {
+      // Test that lanes are sorted by startedAt (launch time), not modification time
+      const earlySession = [
+        '{ "type": "custom-title", "customTitle": "Correction : early" }',
+        '{ "type": "user", "timestamp": "2026-10-30T10:00:00Z" }',
+      ].join('\n');
+      const lateSession = [
+        '{ "type": "custom-title", "customTitle": "Implémentation : late" }',
+        '{ "type": "user", "timestamp": "2026-10-30T11:00:00Z" }',
+      ].join('\n');
+      // Create early session file first (older mtime)
+      makeTranscriptFile(claudeProjects, 'myworkdir/session-late.jsonl', lateSession);
+      // Create late session file second (newer mtime)
+      makeTranscriptFile(claudeProjects, 'myworkdir/session-early.jsonl', earlySession);
+
+      const result = claudeTranscriptFiles(claudeProjects, 'myworkdir', 0, Date.now() + 86400000);
+
+      expect(result).toHaveLength(2);
+      // Should be sorted by startedAt (from timestamp), not mtime
+      // The early session has timestamp 10:00, late session has 11:00
+      // So early should come first despite being created second (newer mtime)
+      expect(result[0]!.name).toBe('Correction : early');
+      expect(result[1]!.name).toBe('Implémentation : late');
+    });
   });
 
   describe('CardFiles.claudeTranscripts', () => {

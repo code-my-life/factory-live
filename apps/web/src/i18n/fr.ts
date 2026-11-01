@@ -836,6 +836,9 @@ export const fr = {
     legend: {
       withRole: (role: string, name: string) => `${role} : ${name}`,
       unnamed: (label: string) => label,
+      withRank: (label: string, rank: number, total: number) =>
+        `Lane ${label} ${rank} sur ${total}`,
+      single: (label: string) => `Lane ${label}`,
       inProgress: (since: string) => `depuis ${since} (en cours)`,
       noCost: 'coût inconnu',
       withCost: (cost: string) => cost,

@@ -57,3 +57,40 @@ test('transcription : la session du plus récent au plus ancien, le terminal ouv
   expect(box.height).toBeLessThanOrEqual(box.viewport * 0.6 + 1);
   expect(box.fromBottom, 'ouvert sur la fin').toBeLessThanOrEqual(1);
 });
+
+test('transcription : les lanes nommées tiennent sur une ligne de 28 px', async ({ page }) => {
+  await page.goto('/issues/claude-cockpit/71');
+  await page
+    .getByRole('group', { name: "Graphe des cartes de l'issue" })
+    .getByRole('button', { name: /regrouper les cartes par projet/ })
+    .filter({ hasNotText: 'Vue ÉQUIPE' })
+    .click();
+  await page
+    .getByRole('button', { name: /Transcription/ })
+    .filter({ visible: true })
+    .first()
+    .click();
+  await expect(page.getByRole('link', { name: 'Transcription' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+
+  // Check that the source selector buttons have height 28px
+  const sourceButtons = page.getByRole('button', { name: /Claude Code/ });
+  const count = await sourceButtons.count();
+  expect(count).toBeGreaterThan(0);
+
+  for (const button of await sourceButtons.all()) {
+    const box = await button.boundingBox();
+    expect(box?.height).toBeCloseTo(28, 0);
+  }
+
+  // Also check the Hermès and Terminal buttons
+  const hermesButton = page.getByRole('button', { name: 'Session Hermès' });
+  const hermesBox = await hermesButton.boundingBox();
+  expect(hermesBox?.height).toBeCloseTo(28, 0);
+
+  const terminalButton = page.getByRole('button', { name: 'Terminal' });
+  const terminalBox = await terminalButton.boundingBox();
+  expect(terminalBox?.height).toBeCloseTo(28, 0);
+});
