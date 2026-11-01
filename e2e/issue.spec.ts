@@ -44,7 +44,20 @@ test('transcription : la session du plus récent au plus ancien, le terminal ouv
   expect(times.length).toBeGreaterThan(2);
   expect(times).toEqual([...times].sort().reverse());
 
-  await page.getByRole('button', { name: 'Terminal' }).click();
+  // On mobile (< 768px), Terminal is in a dropdown menu
+  const viewportWidth = page.viewportSize()?.width ?? 1440;
+  if (viewportWidth < 768) {
+    // Open the source selector dropdown
+    await page
+      .getByRole('button', { name: /Session Hermès|Claude Code|Terminal/ })
+      .first()
+      .click();
+    // Click Terminal in the dropdown
+    await page.getByRole('menuitemradio', { name: 'Terminal' }).click();
+  } else {
+    // On desktop, Terminal is a direct button
+    await page.getByRole('button', { name: 'Terminal' }).click();
+  }
   const log = page.getByRole('log', { name: /Log brut du run/ });
   await expect(log).toContainText('2 failing');
   const box = await log.evaluate((element) => ({
@@ -59,9 +72,15 @@ test('transcription : la session du plus récent au plus ancien, le terminal ouv
 });
 
 test('transcription : les lanes nommées tiennent sur une ligne de 28 px', async ({ page }) => {
+  // C8 applies to desktop only (>= 768px). On mobile, the selector is a dropdown.
+  const viewportWidth = page.viewportSize()?.width ?? 1440;
+  if (viewportWidth < 768) {
+    return;
+  }
+
   await page.goto('/issues/claude-cockpit/71');
   await page
-    .getByRole('group', { name: "Graphe des cartes de l'issue" })
+    .getByRole('group', { name: 'Graphe des cartes de l’issue' })
     .getByRole('button', { name: /regrouper les cartes par projet/ })
     .filter({ hasNotText: 'Vue ÉQUIPE' })
     .click();
@@ -75,8 +94,9 @@ test('transcription : les lanes nommées tiennent sur une ligne de 28 px', async
     'page',
   );
 
-  // Check that the source selector buttons have height 28px
-  const sourceButtons = page.getByRole('button', { name: /Claude Code/ });
+  // Check that the source selector buttons have height 28px (C8: 768 and 1440px)
+  // On desktop, SegmentedControl renders buttons with role="button"
+  const sourceButtons = page.getByRole('button', { name: /Session Hermès|Claude Code|Terminal/ });
   const count = await sourceButtons.count();
   expect(count).toBeGreaterThan(0);
 
@@ -84,13 +104,4 @@ test('transcription : les lanes nommées tiennent sur une ligne de 28 px', async
     const box = await button.boundingBox();
     expect(box?.height).toBeCloseTo(28, 0);
   }
-
-  // Also check the Hermès and Terminal buttons
-  const hermesButton = page.getByRole('button', { name: 'Session Hermès' });
-  const hermesBox = await hermesButton.boundingBox();
-  expect(hermesBox?.height).toBeCloseTo(28, 0);
-
-  const terminalButton = page.getByRole('button', { name: 'Terminal' });
-  const terminalBox = await terminalButton.boundingBox();
-  expect(terminalBox?.height).toBeCloseTo(28, 0);
 });

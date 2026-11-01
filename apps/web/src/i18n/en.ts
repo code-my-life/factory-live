@@ -773,6 +773,9 @@ export const en: Messages = {
       inProgress: (since: string) => `${since} (in progress)`,
       noCost: 'cost unknown',
       withCost: (cost: string) => cost,
+      nameWithQuotes: (name: string) => `"${name}"`,
+      timeRange: (from: string, to: string, duration: string) =>
+        `from ${from} to ${to} (${duration})`,
     },
   },
 

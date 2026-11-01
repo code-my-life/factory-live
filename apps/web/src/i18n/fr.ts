@@ -842,6 +842,8 @@ export const fr = {
       inProgress: (since: string) => `depuis ${since} (en cours)`,
       noCost: 'coût inconnu',
       withCost: (cost: string) => cost,
+      nameWithQuotes: (name: string) => `« ${name} »`,
+      timeRange: (from: string, to: string, duration: string) => `de ${from} à ${to} (${duration})`,
     },
   },
 

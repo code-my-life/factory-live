@@ -154,7 +154,7 @@ for (const { locale, name } of LANGUAGES) {
 test('sur téléphone, le choix de la source est un menu, sans débordement', async ({ page }) => {
   await page.goto('/issues/claude-cockpit/71');
   await page
-    .getByRole('group', { name: "Graphe des cartes de l'issue" })
+    .getByRole('group', { name: 'Graphe des cartes de l’issue' })
     .getByRole('button', { name: /regrouper les cartes par projet/ })
     .filter({ hasNotText: 'Vue ÉQUIPE' })
     .click();
