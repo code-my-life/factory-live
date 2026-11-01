@@ -265,14 +265,22 @@ export function transcripts(deps: ViewDeps, runId: number): TranscriptView[] | n
   if (task.workspacePath) {
     const from = run.startedAt * 1000 - 60_000;
     const to = (run.endedAt ?? deps.now() / 1000) * 1000 + 10 * 60_000;
-    for (const lane of deps.files.claudeTranscripts(task.workspacePath, from, to)) {
+    const lanes = deps.files.claudeTranscripts(task.workspacePath, from, to);
+    // When the run is still running, the last-launched lane is "en cours": its
+    // endedAt is null even though the file has a last timestamp.
+    const isRunning = run.endedAt === null;
+    const lastStarted = lanes.reduce<number | null>((acc, lane) => {
+      if (lane.startedAt === null) return acc;
+      return acc === null || lane.startedAt > acc ? lane.startedAt : acc;
+    }, null);
+    for (const lane of lanes) {
       views.push({
         runId,
         source: 'claude-code',
         title: msg('transcript.claudeCode', { costUsd: lane.costUsd }),
         name: lane.name,
         startedAt: lane.startedAt,
-        endedAt: lane.endedAt,
+        endedAt: isRunning && lane.startedAt === lastStarted ? null : lane.endedAt,
         costUsd: lane.costUsd,
         entries: lane.entries.map((entry) => ({ ...entry, at: iso(entry.at) })),
         terminal: [],
