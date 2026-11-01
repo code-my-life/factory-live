@@ -49,16 +49,17 @@ function labelForView(view: TranscriptView, t: Messages, labelCounts: Map<string
   return count === 0 ? base : `${base} ${count + 1}`;
 }
 
-function legendForView(
+export function legendForView(
   view: TranscriptView,
   t: Messages,
   allViews: readonly TranscriptView[],
   currentIndex: number,
   fmt: ReturnType<typeof useI18n>['fmt'],
+  text: ReturnType<typeof useI18n>['text'],
 ): string {
   // Only claude-code/opencode lanes get the lane legend
   if (view.source !== 'claude-code' && view.source !== 'opencode') {
-    return typeof view.title === 'string' ? view.title : view.title.code;
+    return text(view.title);
   }
 
   // Count only claude-code lanes for ranking
@@ -66,18 +67,17 @@ function legendForView(
   const rank = claudeViews.findIndex((v) => v === view);
   const total = claudeViews.length;
 
-  const parts: string[] = [];
+  // Build the legend parts
+  const firstPart =
+    total === 1
+      ? t.transcript.legend.single(t.transcript.source['claude-code'])
+      : t.transcript.legend.withRank(t.transcript.source['claude-code'], rank + 1, total);
 
-  // "Lane Claude Code" or "Lane Claude Code 2 sur 3"
-  if (total === 1) {
-    parts.push(t.transcript.legend.single(t.transcript.source['claude-code']));
-  } else {
-    parts.push(t.transcript.legend.withRank(t.transcript.source['claude-code'], rank + 1, total));
-  }
+  const parts: string[] = [firstPart];
 
   // Lane name if present
   if (view.name && view.name.trim()) {
-    parts.push(`« ${view.name.trim()} »`);
+    parts.push(t.transcript.legend.nameWithQuotes(view.name.trim()));
   }
 
   // Time range
@@ -88,9 +88,9 @@ function legendForView(
       const endIso = new Date(view.endedAt).toISOString();
       const end = fmt.clock(endIso);
       const duration = fmt.duration(view.endedAt - view.startedAt);
-      parts.push(`de ${start} à ${end} (${duration})`);
+      parts.push(t.transcript.legend.timeRange(start, end, duration));
     } else {
-      parts.push(`depuis ${start} (en cours)`);
+      parts.push(t.transcript.legend.inProgress(start));
     }
   }
 
@@ -99,7 +99,10 @@ function legendForView(
     parts.push(fmt.usd(view.costUsd));
   }
 
-  return parts.join(', ');
+  // Join with colon after rank, then comma for the rest
+  if (parts.length === 1) return parts[0] as string;
+  // First part is "Lane X sur Y" or "Lane X", join rest with ", "
+  return (parts[0] as string) + ': ' + parts.slice(1).join(', ');
 }
 
 function choices(
@@ -179,7 +182,7 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
 
 /** Full transcript of a run, on demand: Hermès session, CLI lane, or raw log. */
 export function TranscriptPanel({ runId }: { runId: number }) {
-  const { t, fmt } = useI18n();
+  const { t, fmt, text } = useI18n();
   const views = useTranscripts(runId);
   const [index, setIndex] = useState(0);
   const options = useMemo(() => choices(views ?? [], t), [views, t]);
@@ -187,7 +190,9 @@ export function TranscriptPanel({ runId }: { runId: number }) {
     return <p className={styles.muted}>{t.transcript.notKept}</p>;
   }
   const current = options[Math.min(index, options.length - 1)];
-  const legend = current ? legendForView(current.choice.view, t, views ?? [], index, fmt) : '';
+  const legend = current
+    ? legendForView(current.choice.view, t, views ?? [], index, fmt, text)
+    : '';
   // C11: beyond 6 sources, full-width dropdown at all widths
   const segmentVariant =
     options.length > 6
