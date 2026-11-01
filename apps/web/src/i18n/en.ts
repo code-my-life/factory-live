@@ -765,6 +765,20 @@ export const en: Messages = {
     sourceLabel: 'Transcript source',
     rawLog: (runId) => `Raw log of run ${runId}`,
     redaction: 'Secrets (tokens, keys, passwords) are masked before display.',
+    legend: {
+      withRole: (role: string, name: string) => `${role}: ${name}`,
+      unnamed: (label: string) => label,
+      withRank: (label: string, rank: number, total: number) => `Lane ${label} ${rank} of ${total}`,
+      single: (label: string) => `Lane ${label}`,
+      nameSeparator: ': ',
+      noNameSeparator: ', ',
+      inProgress: (since: string) => `since ${since} (in progress)`,
+      noCost: 'cost unknown',
+      withCost: (cost: string) => cost,
+      nameWithQuotes: (name: string) => `“${name}”`,
+      timeRange: (from: string, to: string, duration: string) =>
+        `from ${from} to ${to} (${duration})`,
+    },
   },
 
   interventions: {

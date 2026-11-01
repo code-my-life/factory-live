@@ -150,3 +150,37 @@ for (const { locale, name } of LANGUAGES) {
     });
   });
 }
+
+test('sur téléphone, le choix de la source est un menu, sans débordement', async ({ page }) => {
+  await page.goto('/issues/claude-cockpit/71');
+  await page
+    .getByRole('group', { name: 'Graphe des cartes de l’issue' })
+    .getByRole('button', { name: /regrouper les cartes par projet/ })
+    .filter({ hasNotText: 'Vue ÉQUIPE' })
+    .click();
+  await page
+    .getByRole('button', { name: /Transcription/ })
+    .filter({ visible: true })
+    .first()
+    .click();
+  await expect(page.getByRole('link', { name: 'Transcription' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+
+  // On mobile, the source selector should be a dropdown menu
+  const sourceSelector = page
+    .getByRole('button', { name: /Session Hermès|Claude Code|Terminal/ })
+    .first();
+  await expect(sourceSelector).toBeVisible();
+
+  // Click to open the dropdown
+  await sourceSelector.click();
+
+  // The dropdown menu should be visible
+  const menu = page.getByRole('menu');
+  await expect(menu).toBeVisible();
+
+  // Check that there's no horizontal overflow
+  await expectNoHorizontalOverflow(page);
+});

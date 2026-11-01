@@ -318,6 +318,13 @@
   max-width: 100%;
 }
 
+.legend {
+  font-size: var(--text-body-size-small);
+  color: var(--fgColor-muted);
+  margin-top: var(--base-size-4);
+  margin-bottom: var(--base-size-4);
+}
+
 .entriesFrame {
   max-height: 60dvh;
   overflow-y: auto;
