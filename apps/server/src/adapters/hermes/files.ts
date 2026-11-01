@@ -152,6 +152,7 @@ export function claudeTranscriptFiles(
   name: string | null;
   startedAt: number | null;
   endedAt: number | null;
+  content: string;
 }[] {
   const prefix = claudeProjectDir(workspacePath);
   let dirs: string[];
@@ -168,6 +169,7 @@ export function claudeTranscriptFiles(
     name: string | null;
     startedAt: number | null;
     endedAt: number | null;
+    content: string;
   }[] = [];
   for (const dir of dirs) {
     for (const name of readdirSync(join(projectsDir, dir))) {
@@ -179,8 +181,9 @@ export function claudeTranscriptFiles(
         let laneName: string | null = null;
         let firstAt: number | null = null;
         let lastAt: number | null = null;
+        let content = '';
         try {
-          const content = readFileSync(path, 'utf8');
+          content = readFileSync(path, 'utf8');
           for (const line of content.split('\n')) {
             if (!line.trim()) continue;
             let record: Record<string, unknown>;
@@ -191,7 +194,7 @@ export function claudeTranscriptFiles(
             }
             // custom-title record
             if (record['type'] === 'custom-title' && typeof record['customTitle'] === 'string') {
-              laneName = record['customTitle'];
+              laneName = redactSecrets(record['customTitle']);
             }
             // Timestamp of first/last dated record
             const at =
@@ -204,11 +207,22 @@ export function claudeTranscriptFiles(
         } catch {
           // Unreadable file: keep default values
         }
-        files.push({ path, mtime: mtimeMs, name: laneName, startedAt: firstAt, endedAt: lastAt });
+        files.push({
+          path,
+          mtime: mtimeMs,
+          name: laneName,
+          startedAt: firstAt,
+          endedAt: lastAt,
+          content,
+        });
       }
     }
   }
-  return files.sort((left, right) => left.mtime - right.mtime);
+  return files.sort((left, right) => {
+    const la = left.startedAt ?? Number.MAX_SAFE_INTEGER;
+    const ra = right.startedAt ?? Number.MAX_SAFE_INTEGER;
+    return la - ra;
+  });
 }
 
 export interface ClaudeCost {
@@ -311,16 +325,13 @@ export class CardFiles implements CardFilesPort {
 
   claudeTranscripts(workspacePath: string, fromMs: number, toMs: number): LaneTranscript[] {
     return claudeTranscriptFiles(this.claudeProjects, workspacePath, fromMs, toMs).map(
-      (fileInfo) => {
-        const content = readFileSync(fileInfo.path, 'utf8');
-        return {
-          entries: parseClaudeTranscript(content),
-          name: fileInfo.name,
-          startedAt: fileInfo.startedAt,
-          endedAt: fileInfo.endedAt,
-          costUsd: claudeCost(content)?.totalCostUsd ?? null,
-        };
-      },
+      (fileInfo) => ({
+        entries: parseClaudeTranscript(fileInfo.content),
+        name: fileInfo.name,
+        startedAt: fileInfo.startedAt,
+        endedAt: fileInfo.endedAt,
+        costUsd: claudeCost(fileInfo.content)?.totalCostUsd ?? null,
+      }),
     );
   }
 }
