@@ -1,7 +1,7 @@
 import type { TranscriptView } from '@factory-live/contracts';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { TranscriptPanel, legendForView } from './TranscriptPanel.tsx';
+import { TranscriptPanel, legendForView, sourceVariant } from './TranscriptPanel.tsx';
 import { i18nOf } from '../../i18n/i18n.ts';
 
 vi.mock('../../data/FactoryProvider.tsx', () => ({
@@ -27,7 +27,17 @@ describe('TranscriptPanel', () => {
         startedAt: baseTime - 10000,
         endedAt: baseTime,
         costUsd: null,
-        entries: [],
+        entries: [
+          {
+            id: 'entry-1',
+            at: '2026-10-31T11:15:22.000Z',
+            role: 'user',
+            text: 'Test entry text',
+            toolName: null,
+            model: null,
+            status: null,
+          },
+        ],
         terminal: [],
       },
       {
@@ -74,6 +84,9 @@ describe('TranscriptPanel', () => {
     // Labels must be distinct to avoid duplicate React keys
     const labels = buttons.map((btn) => btn.textContent);
     expect(new Set(labels).size).toBe(3);
+
+    // The displayed lane must render its entries (TranscriptPanel.tsx:230 coverage)
+    expect(screen.getByText('Test entry text')).toBeInTheDocument();
 
     // Order must be: Session Hermes, Implementation, Correction, Correction 2, Terminal
     // (based on lane name read from custom-title)
@@ -182,13 +195,13 @@ describe('TranscriptPanel', () => {
     const correctionView = views[1]!;
     const legendFr = legendForView(correctionView, fr.t, views, 1, fr.fmt, fr.text);
     expect(legendFr).toBe(
-      'Lane Claude Code 2 sur 3: « Correction : ordre des groupes par nom de projet », de 11:15:22 à 11:17:32 (2 min 10 s), 0,41 $US',
+      'Lane Claude Code 2 sur 3 : « Correction : ordre des groupes par nom de projet », de 11:15:22 à 11:17:32 (2 min 10 s), 0,41 $US',
     );
 
     // Test English - rank 2 of 3
     const legendEn = legendForView(correctionView, en.t, views, 1, en.fmt, en.text);
     expect(legendEn).toBe(
-      'Lane Claude Code 2 of 3: "Correction : ordre des groupes par nom de projet", from 11:15:22 AM to 11:17:32 AM (2m 10s), $0.41',
+      'Lane Claude Code 2 of 3: “Correction : ordre des groupes par nom de projet”, from 11:15:22 AM to 11:17:32 AM (2m 10s), $0.41',
     );
 
     // Test single lane (no rank)
@@ -205,11 +218,11 @@ describe('TranscriptPanel', () => {
     };
     const singleLegendFr = legendForView(singleView, fr.t, [singleView], 0, fr.fmt, fr.text);
     expect(singleLegendFr).toBe(
-      'Lane Claude Code: « Solo Lane », de 11:15:22 à 11:17:32 (2 min 10 s)',
+      'Lane Claude Code : « Solo Lane », de 11:15:22 à 11:17:32 (2 min 10 s)',
     );
     const singleLegendEn = legendForView(singleView, en.t, [singleView], 0, en.fmt, en.text);
     expect(singleLegendEn).toBe(
-      'Lane Claude Code: "Solo Lane", from 11:15:22 AM to 11:17:32 AM (2m 10s)',
+      'Lane Claude Code: “Solo Lane”, from 11:15:22 AM to 11:17:32 AM (2m 10s)',
     );
 
     // Test in-progress lane
@@ -233,7 +246,7 @@ describe('TranscriptPanel', () => {
       fr.text,
     );
     expect(inProgressLegendFr).toBe(
-      'Lane Claude Code: « In Progress Lane », depuis 11:15:22 (en cours)',
+      'Lane Claude Code : « In Progress Lane », depuis 11:15:22 (en cours)',
     );
     const inProgressLegendEn = legendForView(
       inProgressView,
@@ -244,7 +257,7 @@ describe('TranscriptPanel', () => {
       en.text,
     );
     expect(inProgressLegendEn).toBe(
-      'Lane Claude Code: "In Progress Lane", 11:15:22 AM (in progress)',
+      'Lane Claude Code: “In Progress Lane”, since 11:15:22 AM (in progress)',
     );
 
     // Test non-claude-code source (hermes) - should use text(view.title)
@@ -265,6 +278,14 @@ describe('TranscriptPanel', () => {
 
   it('au-delà de six sources le choix devient un menu à toute largeur', () => {
     // Test C11: with 7 sources, variant should be dropdown at all widths
+    // First verify the exported sourceVariant function
+    expect(sourceVariant(6)).toEqual({ narrow: 'dropdown', regular: 'default' });
+    expect(sourceVariant(7)).toEqual({
+      narrow: 'dropdown',
+      regular: 'dropdown',
+      wide: 'dropdown',
+    });
+
     mockTranscripts = [
       {
         runId: 1,
@@ -345,13 +366,14 @@ describe('TranscriptPanel', () => {
       },
     ];
     render(<TranscriptPanel runId={1} />);
-    // Just verify the component renders without error
+    // Verify the component renders without error
     const elements = screen.getAllByText('Session Hermès');
     expect(elements.length).toBeGreaterThan(0);
   });
 
   it('deux sources ne partagent jamais une clé', () => {
     // Test: React keys are unique for all sources
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockTranscripts = [
       {
         runId: 1,
@@ -399,8 +421,14 @@ describe('TranscriptPanel', () => {
       },
     ];
     render(<TranscriptPanel runId={1} />);
-    // Just verify the component renders without error
-    const elements = screen.getAllByText('Session Hermès');
-    expect(elements.length).toBeGreaterThan(0);
+    // Verify no duplicate React keys warning
+    const duplicateKeyWarning = consoleSpy.mock.calls.some((call) =>
+      call.some(
+        (arg) =>
+          typeof arg === 'string' && arg.includes('Encountered two children with the same key'),
+      ),
+    );
+    expect(duplicateKeyWarning).toBe(false);
+    consoleSpy.mockRestore();
   });
 });
