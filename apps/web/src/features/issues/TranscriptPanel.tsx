@@ -62,8 +62,15 @@ export function legendForView(
     return text(view.title);
   }
 
-  // Count only claude-code lanes for ranking
-  const claudeViews = allViews.filter((v) => v.source === 'claude-code' || v.source === 'opencode');
+  // Count only claude-code lanes for ranking, sorted by startedAt (same order as choices)
+  const claudeViews = allViews
+    .filter((v) => v.source === 'claude-code' || v.source === 'opencode')
+    .sort((a, b) => {
+      if (a.startedAt === null && b.startedAt === null) return 0;
+      if (a.startedAt === null) return 1;
+      if (b.startedAt === null) return -1;
+      return a.startedAt - b.startedAt;
+    });
   const rank = claudeViews.findIndex((v) => v === view);
   const total = claudeViews.length;
 
@@ -230,7 +237,7 @@ export function TranscriptPanel({ runId }: { runId: number }) {
       </SegmentedControl>
       {current ? (
         <>
-          <p className={styles.legend}>{legend}</p>
+          {current.choice.kind === 'entries' ? <p className={styles.legend}>{legend}</p> : null}
           {current.choice.kind === 'terminal' ? (
             <AnsiLog lines={current.choice.view.terminal} label={t.transcript.rawLog(runId)} />
           ) : (
