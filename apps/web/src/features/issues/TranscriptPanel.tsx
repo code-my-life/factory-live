@@ -76,11 +76,14 @@ export function legendForView(
   const parts: string[] = [firstPart];
 
   // Lane name if present
-  if (view.name && view.name.trim()) {
-    parts.push(t.transcript.legend.nameWithQuotes(view.name.trim()));
-  }
+  const name = view.name?.trim() ?? '';
+  const hasName = name.length > 0;
+  const separator = hasName
+    ? t.transcript.legend.nameSeparator
+    : t.transcript.legend.noNameSeparator;
 
   // Time range
+  let timePart: string | null = null;
   if (view.startedAt !== null) {
     const startIso = new Date(view.startedAt).toISOString();
     const start = fmt.clock(startIso);
@@ -88,21 +91,27 @@ export function legendForView(
       const endIso = new Date(view.endedAt).toISOString();
       const end = fmt.clock(endIso);
       const duration = fmt.duration(view.endedAt - view.startedAt);
-      parts.push(t.transcript.legend.timeRange(start, end, duration));
+      timePart = t.transcript.legend.timeRange(start, end, duration);
     } else {
-      parts.push(t.transcript.legend.inProgress(start));
+      timePart = t.transcript.legend.inProgress(start);
     }
   }
 
   // Cost if known
-  if (view.costUsd !== null) {
-    parts.push(fmt.usd(view.costUsd));
+  const costPart = view.costUsd !== null ? fmt.usd(view.costUsd) : null;
+
+  if (hasName) {
+    parts.push(t.transcript.legend.nameWithQuotes(name));
+  }
+  if (timePart) {
+    parts.push(timePart);
+  }
+  if (costPart) {
+    parts.push(costPart);
   }
 
-  // Join with colon after rank, then comma for the rest
   if (parts.length === 1) return parts[0] as string;
-  // First part is "Lane X sur Y" or "Lane X", join rest with ", "
-  return (parts[0] as string) + ': ' + parts.slice(1).join(', ');
+  return (parts[0] as string) + separator + parts.slice(1).join(', ');
 }
 
 function choices(
@@ -180,6 +189,12 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
   );
 }
 
+export function sourceVariant(count: number) {
+  return count > 6
+    ? { narrow: 'dropdown' as const, regular: 'dropdown' as const, wide: 'dropdown' as const }
+    : { narrow: 'dropdown' as const, regular: 'default' as const };
+}
+
 /** Full transcript of a run, on demand: Hermès session, CLI lane, or raw log. */
 export function TranscriptPanel({ runId }: { runId: number }) {
   const { t, fmt, text } = useI18n();
@@ -194,10 +209,7 @@ export function TranscriptPanel({ runId }: { runId: number }) {
     ? legendForView(current.choice.view, t, views ?? [], index, fmt, text)
     : '';
   // C11: beyond 6 sources, full-width dropdown at all widths
-  const segmentVariant =
-    options.length > 6
-      ? { narrow: 'dropdown' as const, regular: 'dropdown' as const, wide: 'dropdown' as const }
-      : { narrow: 'dropdown' as const, regular: 'default' as const };
+  const segmentVariant = sourceVariant(options.length);
   return (
     <div className={styles.transcript}>
       <SegmentedControl
