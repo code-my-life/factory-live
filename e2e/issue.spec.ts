@@ -47,9 +47,9 @@ test('transcription : la session du plus récent au plus ancien, le terminal ouv
   // On mobile (< 768px), Terminal is in a dropdown menu
   const viewportWidth = page.viewportSize()?.width ?? 1440;
   if (viewportWidth < 768) {
-    // Open the source selector dropdown
+    // Open the source selector dropdown by clicking the button showing "Session Hermès"
     await page
-      .getByRole('button', { name: /Session Hermès|Claude Code|Terminal/ })
+      .getByRole('button', { name: /Session Hermès/ })
       .first()
       .click();
     // Click Terminal in the dropdown
@@ -73,10 +73,8 @@ test('transcription : la session du plus récent au plus ancien, le terminal ouv
 
 test('transcription : les lanes nommées tiennent sur une ligne de 28 px', async ({ page }) => {
   // C8 applies to desktop only (>= 768px). On mobile, the selector is a dropdown.
-  const viewportWidth = page.viewportSize()?.width ?? 1440;
-  if (viewportWidth < 768) {
-    return;
-  }
+  const skipMobile = (page.viewportSize()?.width ?? 0) < 768;
+  if (skipMobile) return;
 
   await page.goto('/issues/claude-cockpit/71');
   await page
@@ -94,14 +92,26 @@ test('transcription : les lanes nommées tiennent sur une ligne de 28 px', async
     'page',
   );
 
-  // Check that the source selector buttons have height 28px (C8: 768 and 1440px)
-  // On desktop, SegmentedControl renders buttons with role="button"
-  const sourceButtons = page.getByRole('button', { name: /Session Hermès|Claude Code|Terminal/ });
-  const count = await sourceButtons.count();
-  expect(count).toBeGreaterThan(0);
+  // Verify the 5 source labels (C1)
+  const sourceList = page.getByRole('list', { name: 'Source de la transcription' });
+  const sourceButtons = sourceList.getByRole('button');
+  await expect(sourceButtons).toHaveCount(5);
+  await expect(sourceButtons).toHaveText([
+    'Session Hermès',
+    'Implémentation',
+    'Correction',
+    'Correction 2',
+    'Terminal',
+  ]);
 
-  for (const button of await sourceButtons.all()) {
-    const box = await button.boundingBox();
+  // Check that the source selector buttons have height 28px (C8: 768 and 1440px)
+  for (const width of [1440, 768]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const box = await sourceList.boundingBox();
     expect(box?.height).toBeCloseTo(28, 0);
+    for (const button of await sourceButtons.all()) {
+      const buttonBox = await button.boundingBox();
+      expect(buttonBox?.height).toBeCloseTo(28, 0);
+    }
   }
 });
