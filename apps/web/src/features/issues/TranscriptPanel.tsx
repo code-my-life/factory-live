@@ -8,7 +8,7 @@ import {
   ToolsIcon,
 } from '@primer/octicons-react';
 import { SegmentedControl } from '@primer/react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranscripts } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { Messages } from '../../i18n/fr.ts';
@@ -29,130 +29,19 @@ const ROLE_ICON = {
 type ViewChoice =
   { kind: 'entries'; view: TranscriptView } | { kind: 'terminal'; view: TranscriptView };
 
-function labelForView(view: TranscriptView, t: Messages, labelCounts: Map<string, number>): string {
-  // If the lane has a name (custom-title), extract the role
-  let base: string;
-  if (view.name && view.name.trim()) {
-    const colonIdx = view.name.indexOf(':');
-    if (colonIdx > 0 && colonIdx <= 20) {
-      base = view.name.slice(0, colonIdx).trim();
-    } else {
-      base = t.transcript.source['claude-code'];
-    }
-  } else {
-    base = t.transcript.source['claude-code'];
-  }
-
-  // Number duplicates globally across ALL labels
-  const count = labelCounts.get(base) ?? 0;
-  labelCounts.set(base, count + 1);
-  return count === 0 ? base : `${base} ${count + 1}`;
-}
-
-export function legendForView(
-  view: TranscriptView,
-  t: Messages,
-  allViews: readonly TranscriptView[],
-  currentIndex: number,
-  fmt: ReturnType<typeof useI18n>['fmt'],
-  text: ReturnType<typeof useI18n>['text'],
-): string {
-  // Only claude-code/opencode lanes get the lane legend
-  if (view.source !== 'claude-code' && view.source !== 'opencode') {
-    return text(view.title);
-  }
-
-  // Count only claude-code lanes for ranking, sorted by startedAt (same order as choices)
-  const claudeViews = allViews
-    .filter((v) => v.source === 'claude-code' || v.source === 'opencode')
-    .sort((a, b) => {
-      if (a.startedAt === null && b.startedAt === null) return 0;
-      if (a.startedAt === null) return 1;
-      if (b.startedAt === null) return -1;
-      return a.startedAt - b.startedAt;
-    });
-  const rank = claudeViews.findIndex((v) => v === view);
-  const total = claudeViews.length;
-
-  // Build the legend parts
-  const firstPart =
-    total === 1
-      ? t.transcript.legend.single(t.transcript.source['claude-code'])
-      : t.transcript.legend.withRank(t.transcript.source['claude-code'], rank + 1, total);
-
-  const parts: string[] = [firstPart];
-
-  // Lane name if present
-  const name = view.name?.trim() ?? '';
-  const hasName = name.length > 0;
-  const separator = hasName
-    ? t.transcript.legend.nameSeparator
-    : t.transcript.legend.noNameSeparator;
-
-  // Time range
-  let timePart: string | null = null;
-  if (view.startedAt !== null) {
-    const startIso = new Date(view.startedAt).toISOString();
-    const start = fmt.clock(startIso);
-    if (view.endedAt !== null) {
-      const endIso = new Date(view.endedAt).toISOString();
-      const end = fmt.clock(endIso);
-      const duration = fmt.duration(view.endedAt - view.startedAt);
-      timePart = t.transcript.legend.timeRange(start, end, duration);
-    } else {
-      timePart = t.transcript.legend.inProgress(start);
-    }
-  }
-
-  // Cost if known
-  const costPart = view.costUsd !== null ? fmt.usd(view.costUsd) : null;
-
-  if (hasName) {
-    parts.push(t.transcript.legend.nameWithQuotes(name));
-  }
-  if (timePart) {
-    parts.push(timePart);
-  }
-  if (costPart) {
-    parts.push(costPart);
-  }
-
-  if (parts.length === 1) return parts[0] as string;
-  return (parts[0] as string) + separator + parts.slice(1).join(', ');
-}
-
 function choices(
   views: readonly TranscriptView[],
   t: Messages,
-): { label: string; choice: ViewChoice; startedAt: number | null }[] {
-  // Sort by startedAt (launch time), nulls last
-  const sorted = [...views].sort((a, b) => {
-    if (a.startedAt === null && b.startedAt === null) return 0;
-    if (a.startedAt === null) return 1;
-    if (b.startedAt === null) return -1;
-    return a.startedAt - b.startedAt;
-  });
-
-  const result: { label: string; choice: ViewChoice; startedAt: number | null }[] = [];
-  const labelCounts = new Map<string, number>();
-  for (const view of sorted) {
-    if (view.source === 'hermes') {
-      result.push({
-        label: t.transcript.source.hermes,
-        choice: { kind: 'entries', view },
-        startedAt: view.startedAt,
-      });
-    } else if (view.source === 'claude-code' || view.source === 'opencode') {
-      const label = labelForView(view, t, labelCounts);
-      result.push({ label, choice: { kind: 'entries', view }, startedAt: view.startedAt });
-    }
+): { label: string; choice: ViewChoice }[] {
+  const result: { label: string; choice: ViewChoice }[] = [];
+  for (const view of views) {
+    result.push({ label: t.transcript.source[view.source], choice: { kind: 'entries', view } });
   }
   const terminal = views.find((view) => view.terminal.length > 0);
   if (terminal)
     result.push({
       label: t.transcript.source.terminal,
       choice: { kind: 'terminal', view: terminal },
-      startedAt: terminal.startedAt,
     });
   return result;
 }
@@ -196,62 +85,51 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
   );
 }
 
-export function sourceVariant(count: number) {
-  return count > 6
-    ? { narrow: 'dropdown' as const, regular: 'dropdown' as const, wide: 'dropdown' as const }
-    : { narrow: 'dropdown' as const, regular: 'default' as const };
-}
-
-/** Full transcript of a run, on demand: Hermès session, CLI lane, or raw log. */
+/** Transcription intégrale d'un run, à la demande : session Hermès, lane CLI, ou log brut. */
 export function TranscriptPanel({ runId }: { runId: number }) {
-  const { t, fmt, text } = useI18n();
+  const { t, text } = useI18n();
   const views = useTranscripts(runId);
   const [index, setIndex] = useState(0);
-  const options = useMemo(() => choices(views ?? [], t), [views, t]);
   if (!views || views.length === 0) {
     return <p className={styles.muted}>{t.transcript.notKept}</p>;
   }
+  const options = choices(views, t);
   const current = options[Math.min(index, options.length - 1)];
-  const legend = current
-    ? legendForView(current.choice.view, t, views ?? [], index, fmt, text)
-    : '';
-  // C11: beyond 6 sources, full-width dropdown at all widths
-  const segmentVariant = sourceVariant(options.length);
   return (
     <div className={styles.transcript}>
       <SegmentedControl
         aria-label={t.transcript.sourceLabel}
         className={styles.sources}
         size="small"
-        variant={segmentVariant}
         onChange={(next) => setIndex(next ?? 0)}
       >
         {options.map((option, optionIndex) => (
           <SegmentedControl.Button
-            key={`${option.choice.kind}-${option.choice.view.source}-${optionIndex}`}
+            key={option.label}
             selected={optionIndex === Math.min(index, options.length - 1)}
           >
             {option.label}
           </SegmentedControl.Button>
         ))}
       </SegmentedControl>
-      {current ? (
+      {current?.choice.kind === 'terminal' ? (
+        <AnsiLog lines={current.choice.view.terminal} label={t.transcript.rawLog(runId)} />
+      ) : current ? (
         <>
-          {current.choice.kind === 'entries' ? <p className={styles.legend}>{legend}</p> : null}
-          {current.choice.kind === 'terminal' ? (
-            <AnsiLog lines={current.choice.view.terminal} label={t.transcript.rawLog(runId)} />
-          ) : (
-            <>
-              {/* Most recent at top, in a self-scrolling box: the page no longer grows with the run. */}
-              <div className={styles.entriesFrame} role="region" aria-label={legend} tabIndex={0}>
-                <ol className={styles.entries} reversed>
-                  {[...current.choice.view.entries].reverse().map((entry) => (
-                    <Entry key={entry.id} entry={entry} />
-                  ))}
-                </ol>
-              </div>
-            </>
-          )}
+          <p className={styles.muted}>{text(current.choice.view.title)}</p>
+          {/* Le plus récent en haut, dans une boîte qui défile seule : la page ne s'allonge plus avec le run. */}
+          <div
+            className={styles.entriesFrame}
+            role="region"
+            aria-label={text(current.choice.view.title)}
+            tabIndex={0}
+          >
+            <ol className={styles.entries} reversed>
+              {[...current.choice.view.entries].reverse().map((entry) => (
+                <Entry key={entry.id} entry={entry} />
+              ))}
+            </ol>
+          </div>
         </>
       ) : null}
       <p className={styles.redaction}>{t.transcript.redaction}</p>

@@ -19,11 +19,11 @@ import type {
 } from '@factory-live/domain';
 
 /**
- * Application ports: what the hub and use cases expect from the outside world. Adapters
- * (`src/adapters`) implement them; the application knows none of them (rule enforced by dependency-cruiser).
+ * Ports de l'application : ce que le hub et les cas d'usage attendent du monde extérieur. Les adaptateurs
+ * (`src/adapters`) les implémentent ; l'application n'en connaît aucun (règle vérifiée par dependency-cruiser).
  */
 
-/** Structured logger (pino satisfies this). */
+/** Journal structuré (pino le satisfait). */
 export interface LoggerPort {
   info(context: object, message: string): void;
   warn(context: object, message: string): void;
@@ -33,12 +33,12 @@ export interface LoggerPort {
 
 // --- Kanban d'Hermès ---------------------------------------------------------------------------
 
-/** What changed in the kanban since the last read. */
+/** Ce qui a changé dans le kanban depuis la lecture précédente. */
 export interface KanbanDelta {
   tasks: Task[];
   runs: Run[];
   links: Link[];
-  /** New events only (heartbeats are excluded; `tasks.last_heartbeat_at` suffices). */
+  /** Nouveaux événements seulement (les battements de cœur sont écartés, `tasks.last_heartbeat_at` suffit). */
   events: TaskEvent[];
   comments: Comment[];
 }
@@ -50,7 +50,7 @@ export interface ModelLink {
   provider: string;
 }
 
-/** What matters from a profile's `config.yaml` for factory-live. */
+/** Ce qui compte d'un `config.yaml` de profil pour factory-live. */
 export interface ProfileConfig {
   model: ModelLink | null;
   baseUrl: string | null;
@@ -79,9 +79,9 @@ export interface ProfilesPort {
   repo(profile: string): ProfileConfig | null;
   manifest(): FactoryManifest;
   root(): RootSettings;
-  // In-service timeouts, repo value and plugin hooks, for diagnosis; null = unreadable config.
+  /** Délais en service, valeur du dépôt et hooks des plugins, pour le diagnostic ; null : config illisible. */
   facts(profile: string): ProfileFacts | null;
-  // Fingerprint of files read by `facts` (modification times); it changes when any of them changes.
+  /** Empreinte des fichiers lus par `facts` (dates de modification) : elle change quand l'un d'eux change. */
   factsStamp(profile: string): string;
 }
 
@@ -122,16 +122,16 @@ export interface TranscriptLine {
   status: 'ok' | 'error' | 'blocked' | null;
 }
 
-/** A card run, with what's needed to find its session without guessing. */
+/** Un run de la carte, avec ce qui permet de retrouver sa session sans la deviner. */
 export interface RunRef {
   id: number;
   taskId: string;
   /** Secondes epoch. */
   startedAt: number;
   endedAt: number | null;
-  // `metadata.worker_session_id`, recorded by Hermes.
+  /** `metadata.worker_session_id`, noté par Hermès. */
   workerSessionId: string | null;
-  // The `hermes --resume <sid>` session, found in the run's error or output.
+  /** La session de `hermes --resume <sid>`, relevée dans l'erreur ou la sortie du run. */
   resumeSessionId: string | null;
 }
 
@@ -144,11 +144,11 @@ export interface SessionsPort {
   usageSince(profile: string, since: number): (ModelUsageRow & { day: string })[];
   transcript(profile: string, sessionId: string): TranscriptLine[];
   /**
-   * Tool calls and results from these runs' sessions, for diagnosis. A run whose session
-   * cannot be found has none; `null` = unreadable agent database.
+   * Appels d'outils et résultats des sessions de ces runs, pour le diagnostic. Un run dont la session
+   * reste introuvable n'en a pas ; `null` : la base de l'agent est illisible.
    */
   runFacts(profile: string, runs: readonly RunRef[]): SessionFacts[] | null;
-  // Agent sessions open at this instant (epoch seconds); `null` = unreadable database.
+  /** Les sessions de l'agent ouvertes à cet instant (secondes epoch) ; `null` : base illisible. */
   sessionsActiveAt(profile: string, at: number): string[] | null;
 }
 
@@ -156,27 +156,24 @@ export interface SessionsPort {
 
 export interface LaneTranscript {
   entries: TranscriptLine[];
-  name: string | null;
-  startedAt: number | null;
-  endedAt: number | null;
   costUsd: number | null;
 }
 
 export interface CardFilesPort {
-  // Raw card log, ANSI sequences kept; `null` if absent.
+  /** Log brut d'une carte, séquences ANSI gardées ; null si absent. */
   cardLog(cardId: string): string[] | null;
-  // Claude Code transcripts launched from a card's workspace during a window (epoch ms).
+  /** Transcriptions Claude Code lancées depuis le workspace d'une carte pendant une fenêtre (ms epoch). */
   claudeTranscripts(workspacePath: string, fromMs: number, toMs: number): LaneTranscript[];
-  // `evidence/` files left by the agent; `null` = no readable evidence folder.
+  /** Les fichiers de `evidence/` laissés par l'agent ; `null` : aucun dossier de preuves lisible. */
   evidence(cardId: string): EvidenceFile[] | null;
-  // Evidence folder fingerprint: changes when a file is added or removed there.
+  /** Empreinte du dossier de preuves : elle change quand un fichier y est ajouté ou retiré. */
   evidenceStamp(cardId: string): string;
 }
 
 // --- Journal d'Hermès ----------------------------------------------------------------------------
 
 export interface AgentLogPort {
-  // Catalogued log lines of an agent between two instants (epoch seconds); `null` = unreadable.
+  /** Lignes cataloguées du journal d'un agent entre deux instants (secondes epoch) ; null : illisible. */
   facts(profile: string, from: number, to: number): LogFact[] | null;
 }
 
@@ -192,19 +189,19 @@ export interface IssueInfo {
 export interface TrackedIssue {
   key: string;
   prUrl: string | null;
-  // The work branch, to find the PR when no run recorded the link.
+  /** La branche du travail, pour retrouver la PR quand aucun run n'en a noté le lien. */
   branch?: string | null;
   active: boolean;
 }
 
 export interface GitHubStatus {
   ok: boolean;
-  // What health says about GitHub access, written by the client in its language.
+  /** Ce que la santé dit de l'accès à GitHub, écrit par le client dans sa langue. */
   detail: Text;
   checkedAt: number | null;
 }
 
-// Cached GitHub data, read by the hub at each projection.
+/** Données GitHub en cache, lues par le hub à chaque projection. */
 export interface GitHubReadPort {
   issueInfo(key: string): IssueInfo | null;
   pullRequest(key: string): PullRequestView | null;
@@ -213,7 +210,7 @@ export interface GitHubReadPort {
   readonly rateLimit: { remaining: number; limit: number } | null;
 }
 
-// Direct writes and reads needed for unblocking.
+/** Écritures et lectures directes nécessaires au déblocage. */
 export interface GitHubWritePort {
   comment(repo: string, number: number, body: string): Promise<{ id: number; url: string }>;
   reactions(repo: string, commentId: number): Promise<{ content: string; user: string }[]>;
@@ -257,7 +254,7 @@ export interface StationRecord {
   changedAt: number;
 }
 
-// A card's activity lines: only these kinds or statuses (one or the other), most recent.
+/** Les lignes du fil d'une carte : ces types ou ces statuts seulement (l'un ou l'autre), les plus récentes. */
 export interface ActivityFilter {
   limit?: number;
   kinds?: readonly string[];
@@ -270,7 +267,7 @@ export interface HistoryPort {
   appendActivity(events: readonly ActivityEvent[]): void;
   recentActivity(limit: number): ActivityEvent[];
   activityOfCards(cardIds: readonly string[], filter?: ActivityFilter): ActivityEvent[];
-  // Most recent lines of these kinds, across all cards (guard refusals).
+  /** Les lignes les plus récentes de ces types, toutes cartes confondues (refus des gardes). */
   activityOfKinds(kinds: readonly string[], limit: number): ActivityEvent[];
   addUsage(delta: UsageDelta): void;
   usageSince(day: string): UsageRow[];
@@ -291,7 +288,7 @@ export interface HistoryPort {
 
 // --- Notifications -------------------------------------------------------------------------------
 
-// A push, written by each device's service worker in the language chosen there.
+/** Un push, écrit par le service worker de chaque appareil dans la langue qui y est choisie. */
 export type PushMessage = PushPayload;
 
 export interface PushPort {

@@ -833,20 +833,6 @@ export const fr = {
     sourceLabel: 'Source de la transcription',
     rawLog: (runId: number) => `Log brut du run ${runId}`,
     redaction: 'Les secrets (jetons, clés, mots de passe) sont masqués avant affichage.',
-    legend: {
-      withRole: (role: string, name: string) => `${role} : ${name}`,
-      unnamed: (label: string) => label,
-      withRank: (label: string, rank: number, total: number) =>
-        `Lane ${label} ${rank} sur ${total}`,
-      single: (label: string) => `Lane ${label}`,
-      nameSeparator: ' : ',
-      noNameSeparator: ', ',
-      inProgress: (since: string) => `depuis ${since} (en cours)`,
-      noCost: 'coût inconnu',
-      withCost: (cost: string) => cost,
-      nameWithQuotes: (name: string) => `« ${name} »`,
-      timeRange: (from: string, to: string, duration: string) => `de ${from} à ${to} (${duration})`,
-    },
   },
 
   interventions: {
