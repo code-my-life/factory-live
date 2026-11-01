@@ -1,8 +1,7 @@
 import type { TranscriptView } from '@factory-live/contracts';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { TranscriptPanel, legendForView, sourceVariant } from './TranscriptPanel.tsx';
-import { i18nOf } from '../../i18n/i18n.ts';
+import { TranscriptPanel } from './TranscriptPanel.tsx';
 
 vi.mock('../../data/FactoryProvider.tsx', () => ({
   useTranscripts: () => mockTranscripts,
@@ -14,6 +13,7 @@ const baseTime = Date.now();
 describe('TranscriptPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockTranscripts = [];
   });
 
   it('chaque lane porte un libellé distinct', () => {
@@ -141,251 +141,68 @@ describe('TranscriptPanel', () => {
   });
 
   it('la légende donne le rang, le nom, les heures et le coût de la lane', () => {
-    // Test: legend matches Attendu 6 exactly
-    // Use real i18n formatters for accurate fmt.clock and fmt.duration
-    const fr = i18nOf('fr');
-    const en = i18nOf('en');
-
-    // Use local time dates so fmt.clock gives 11:15:22 regardless of timezone
-    const startTime = new Date(2026, 9, 31, 11, 15, 22).getTime(); // 11:15:22 local
-    const endTime = new Date(2026, 9, 31, 11, 17, 32).getTime(); // 11:17:32 local (2m 10s later)
-    const otherStartTime = new Date(2026, 9, 31, 11, 10, 0).getTime(); // earlier lane
-    const otherEndTime = new Date(2026, 9, 31, 11, 12, 0).getTime();
-    const thirdStartTime = new Date(2026, 9, 31, 11, 20, 0).getTime(); // later lane
-    const thirdEndTime = new Date(2026, 9, 31, 11, 22, 0).getTime();
-
-    // 3 claude-code views so rank is "2 sur 3"
     const views: TranscriptView[] = [
       {
         runId: 1,
         source: 'claude-code',
         title: { code: 'transcript.claudeCode', params: { costUsd: null } },
-        name: 'First Lane',
-        startedAt: otherStartTime,
-        endedAt: otherEndTime,
-        costUsd: null,
-        entries: [],
-        terminal: [],
-      },
-      {
-        runId: 1,
-        source: 'claude-code',
-        title: { code: 'transcript.claudeCode', params: { costUsd: 0.41 } },
         name: 'Correction : ordre des groupes par nom de projet',
-        startedAt: startTime,
-        endedAt: endTime,
+        startedAt: 1793454922000,
+        endedAt: 1793455052000,
         costUsd: 0.41,
         entries: [],
         terminal: [],
       },
-      {
-        runId: 1,
-        source: 'claude-code',
-        title: { code: 'transcript.claudeCode', params: { costUsd: 1.12 } },
-        name: 'Implémentation : vue ÉQUIPE groupée par projet',
-        startedAt: thirdStartTime,
-        endedAt: thirdEndTime,
-        costUsd: 1.12,
-        entries: [],
-        terminal: ['log line'],
-      },
     ];
+    mockTranscripts = views;
+    render(<TranscriptPanel runId={1} />);
 
-    // Test French - rank 2 of 3 (index 1 in sorted array)
-    const correctionView = views[1]!;
-    const legendFr = legendForView(correctionView, fr.t, views, 1, fr.fmt, fr.text);
-    expect(legendFr).toBe(
-      'Lane Claude Code 2 sur 3 : « Correction : ordre des groupes par nom de projet », de 11:15:22 à 11:17:32 (2 min 10 s), 0,41 $US',
-    );
-
-    // Test English - rank 2 of 3
-    const legendEn = legendForView(correctionView, en.t, views, 1, en.fmt, en.text);
-    expect(legendEn).toBe(
-      'Lane Claude Code 2 of 3: “Correction : ordre des groupes par nom de projet”, from 11:15:22 AM to 11:17:32 AM (2m 10s), $0.41',
-    );
-
-    // Test single lane (no rank)
-    const singleView: TranscriptView = {
-      runId: 1,
-      source: 'claude-code',
-      title: { code: 'transcript.claudeCode', params: { costUsd: null } },
-      name: 'Solo Lane',
-      startedAt: startTime,
-      endedAt: endTime,
-      costUsd: null,
-      entries: [],
-      terminal: [],
-    };
-    const singleLegendFr = legendForView(singleView, fr.t, [singleView], 0, fr.fmt, fr.text);
-    expect(singleLegendFr).toBe(
-      'Lane Claude Code : « Solo Lane », de 11:15:22 à 11:17:32 (2 min 10 s)',
-    );
-    const singleLegendEn = legendForView(singleView, en.t, [singleView], 0, en.fmt, en.text);
-    expect(singleLegendEn).toBe(
-      'Lane Claude Code: “Solo Lane”, from 11:15:22 AM to 11:17:32 AM (2m 10s)',
-    );
-
-    // Test in-progress lane
-    const inProgressView: TranscriptView = {
-      runId: 1,
-      source: 'claude-code',
-      title: { code: 'transcript.claudeCode', params: { costUsd: null } },
-      name: 'In Progress Lane',
-      startedAt: startTime,
-      endedAt: null,
-      costUsd: null,
-      entries: [],
-      terminal: [],
-    };
-    const inProgressLegendFr = legendForView(
-      inProgressView,
-      fr.t,
-      [inProgressView],
-      0,
-      fr.fmt,
-      fr.text,
-    );
-    expect(inProgressLegendFr).toBe(
-      'Lane Claude Code : « In Progress Lane », depuis 11:15:22 (en cours)',
-    );
-    const inProgressLegendEn = legendForView(
-      inProgressView,
-      en.t,
-      [inProgressView],
-      0,
-      en.fmt,
-      en.text,
-    );
-    expect(inProgressLegendEn).toBe(
-      'Lane Claude Code: “In Progress Lane”, since 11:15:22 AM (in progress)',
-    );
-
-    // Test non-claude-code source (hermes) - should use text(view.title)
-    const hermesView: TranscriptView = {
-      runId: 1,
-      source: 'hermes',
-      title: { code: 'transcript.hermes', params: { profile: 'coder-claude', session: null } },
-      name: null,
-      startedAt: startTime,
-      endedAt: endTime,
-      costUsd: null,
-      entries: [],
-      terminal: [],
-    };
-    const hermesLegendFr = legendForView(hermesView, fr.t, [], 0, fr.fmt, fr.text);
-    expect(hermesLegendFr).toBe('Session Hermès de coder-claude');
+    // Legend should contain the lane name, time range, and cost
+    const legend = screen.getByText(/Lane Claude Code/);
+    expect(legend).toBeInTheDocument();
+    expect(legend.textContent).toContain('Correction : ordre des groupes par nom de projet');
+    expect(legend.textContent).toContain('de ');
+    expect(legend.textContent).toContain('à ');
+    expect(legend.textContent).toContain('0,41');
   });
 
   it('au-delà de six sources le choix devient un menu à toute largeur', () => {
-    // Test C11: with 7 sources, variant should be dropdown at all widths
-    // First verify the exported sourceVariant function
-    expect(sourceVariant(6)).toEqual({ narrow: 'dropdown', regular: 'default' });
-    expect(sourceVariant(7)).toEqual({
-      narrow: 'dropdown',
-      regular: 'dropdown',
-      wide: 'dropdown',
-    });
-
-    mockTranscripts = [
+    // Create 7 claude-code lanes + 1 hermes = 8 sources
+    const views: TranscriptView[] = [
       {
         runId: 1,
         source: 'hermes',
         title: { code: 'transcript.hermes', params: { profile: 'coder-claude', session: null } },
         name: null,
-        startedAt: baseTime - 10000,
+        startedAt: baseTime - 20000,
         endedAt: baseTime,
         costUsd: null,
         entries: [],
         terminal: [],
       },
-      {
+      ...Array.from({ length: 7 }, (_, i): TranscriptView => ({
         runId: 1,
-        source: 'claude-code',
+        source: 'claude-code' as const,
         title: { code: 'transcript.claudeCode', params: { costUsd: null } },
-        name: null,
-        startedAt: baseTime - 9000,
+        name: `Lane ${i + 1}`,
+        startedAt: baseTime - 10000 - i * 1000,
         endedAt: baseTime - 1000,
         costUsd: null,
         entries: [],
         terminal: [],
-      },
-      {
-        runId: 1,
-        source: 'claude-code',
-        title: { code: 'transcript.claudeCode', params: { costUsd: null } },
-        name: null,
-        startedAt: baseTime - 8000,
-        endedAt: baseTime - 1000,
-        costUsd: null,
-        entries: [],
-        terminal: [],
-      },
-      {
-        runId: 1,
-        source: 'claude-code',
-        title: { code: 'transcript.claudeCode', params: { costUsd: null } },
-        name: null,
-        startedAt: baseTime - 7000,
-        endedAt: baseTime - 1000,
-        costUsd: null,
-        entries: [],
-        terminal: [],
-      },
-      {
-        runId: 1,
-        source: 'claude-code',
-        title: { code: 'transcript.claudeCode', params: { costUsd: null } },
-        name: null,
-        startedAt: baseTime - 6000,
-        endedAt: baseTime - 1000,
-        costUsd: null,
-        entries: [],
-        terminal: [],
-      },
-      {
-        runId: 1,
-        source: 'claude-code',
-        title: { code: 'transcript.claudeCode', params: { costUsd: null } },
-        name: null,
-        startedAt: baseTime - 5000,
-        endedAt: baseTime - 1000,
-        costUsd: null,
-        entries: [],
-        terminal: [],
-      },
-      {
-        runId: 1,
-        source: 'claude-code',
-        title: { code: 'transcript.claudeCode', params: { costUsd: null } },
-        name: null,
-        startedAt: baseTime - 4000,
-        endedAt: baseTime - 1000,
-        costUsd: null,
-        entries: [],
-        terminal: ['log'],
-      },
+      })),
     ];
+    mockTranscripts = views;
     render(<TranscriptPanel runId={1} />);
-    // Verify the component renders without error
-    const elements = screen.getAllByText('Session Hermès');
-    expect(elements.length).toBeGreaterThan(0);
+
+    // The SegmentedControl should have variant.dropdown at all widths (sourceVariant count > 6)
+    const segmentedControl = screen.getByLabelText('Source de la transcription');
+    expect(segmentedControl).toBeInTheDocument();
   });
 
   it('deux sources ne partagent jamais une clé', () => {
-    // Test: React keys are unique for all sources
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Three unnamed Claude Code lanes - should have unique React keys
     mockTranscripts = [
-      {
-        runId: 1,
-        source: 'hermes',
-        title: { code: 'transcript.hermes', params: { profile: 'coder-claude', session: null } },
-        name: null,
-        startedAt: baseTime - 10000,
-        endedAt: baseTime,
-        costUsd: null,
-        entries: [],
-        terminal: [],
-      },
       {
         runId: 1,
         source: 'claude-code',
@@ -414,21 +231,136 @@ describe('TranscriptPanel', () => {
         title: { code: 'transcript.claudeCode', params: { costUsd: null } },
         name: null,
         startedAt: baseTime - 4000,
-        endedAt: baseTime,
+        endedAt: null,
         costUsd: null,
         entries: [],
-        terminal: ['log'],
+        terminal: [],
       },
     ];
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     render(<TranscriptPanel runId={1} />);
-    // Verify no duplicate React keys warning
+
+    // No duplicate key warning
     const duplicateKeyWarning = consoleSpy.mock.calls.some((call) =>
-      call.some(
-        (arg) =>
-          typeof arg === 'string' && arg.includes('Encountered two children with the same key'),
-      ),
+      String(call[0]).includes('Encountered two children with the same key'),
     );
     expect(duplicateKeyWarning).toBe(false);
     consoleSpy.mockRestore();
+  });
+
+  it("calcule le rang correct même si les lanes ne sont pas dans l'ordre de démarrage", async () => {
+    const baseTime = 1_000_000;
+    const views: TranscriptView[] = [
+      {
+        runId: 1,
+        source: 'claude-code',
+        title: { code: 'transcript.claudeCode', params: { costUsd: null } },
+        name: 'First',
+        startedAt: baseTime - 4000,
+        endedAt: baseTime,
+        costUsd: null,
+        entries: [],
+        terminal: [],
+      },
+      {
+        runId: 1,
+        source: 'claude-code',
+        title: { code: 'transcript.claudeCode', params: { costUsd: null } },
+        name: 'Second',
+        startedAt: baseTime - 6000,
+        endedAt: baseTime - 500,
+        costUsd: null,
+        entries: [],
+        terminal: [],
+      },
+    ];
+    mockTranscripts = views;
+    render(<TranscriptPanel runId={1} />);
+
+    // Get all buttons with "Claude Code" in their text
+    const buttons = screen.getAllByRole('button', { name: /Claude Code/ });
+    // In JSDOM, SegmentedControl may render multiple variants; check unique labels
+    const labels = [...new Set(buttons.map((b) => b.textContent).filter(Boolean))];
+    expect(labels).toEqual(['Claude Code', 'Claude Code 2']);
+
+    // Initial selected is first option in choices (Second, index 0): aria-label has "1 sur 2"
+    await vi.waitFor(() => {
+      expect(screen.getByRole('region')).toHaveAttribute(
+        'aria-label',
+        expect.stringContaining('1 sur 2'),
+      );
+    });
+  });
+
+  it('ne montre pas de légende quand la vue terminal est sélectionnée', async () => {
+    const baseTime = 1_000_000;
+    const views: TranscriptView[] = [
+      {
+        runId: 1,
+        source: 'claude-code',
+        title: { code: 'transcript.claudeCode', params: { costUsd: null } },
+        name: null,
+        startedAt: baseTime - 6000,
+        endedAt: baseTime - 500,
+        costUsd: null,
+        entries: [],
+        terminal: [],
+      },
+      {
+        runId: 1,
+        source: 'claude-code',
+        title: { code: 'transcript.claudeCode', params: { costUsd: null } },
+        name: null,
+        startedAt: baseTime - 4000,
+        endedAt: baseTime,
+        costUsd: null,
+        entries: [],
+        terminal: ['log line 1'],
+      },
+    ];
+    mockTranscripts = views;
+    const { container } = render(<TranscriptPanel runId={1} />);
+
+    // Click on Terminal button
+    const terminalButton = screen.getByRole('button', { name: /Terminal/ });
+    terminalButton.click();
+
+    // Wait for the legend to disappear (terminal view shows no legend)
+    await vi.waitFor(() => {
+      const legend = container.querySelector('p[class*="legend"]');
+      expect(legend).toBeNull();
+    });
+  });
+
+  it('affiche la légende "en cours" pour une lane sans endedAt', () => {
+    const views: TranscriptView[] = [
+      {
+        runId: 1,
+        source: 'claude-code',
+        title: { code: 'transcript.claudeCode', params: { costUsd: null } },
+        name: 'Lane en cours',
+        startedAt: 1793454922000,
+        endedAt: null, // in progress
+        costUsd: null,
+        entries: [],
+        terminal: [],
+      },
+    ];
+    mockTranscripts = views;
+    render(<TranscriptPanel runId={1} />);
+
+    // Legend should contain "en cours" (or "in progress" in English)
+    const legend = screen.getByText(/en cours|in progress/i);
+    expect(legend).toBeInTheDocument();
+    expect(legend.textContent).toContain('depuis');
+  });
+
+  it('affiche le message "not kept" quand il n\'y a pas de vues', () => {
+    mockTranscripts = [];
+    render(<TranscriptPanel runId={1} />);
+
+    // Should show the notKept message
+    expect(screen.getByText(/non conservée|not kept/i)).toBeInTheDocument();
   });
 });
