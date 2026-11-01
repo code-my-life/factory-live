@@ -839,6 +839,8 @@ export const fr = {
       withRank: (label: string, rank: number, total: number) =>
         `Lane ${label} ${rank} sur ${total}`,
       single: (label: string) => `Lane ${label}`,
+      nameSeparator: ' : ',
+      noNameSeparator: ', ',
       inProgress: (since: string) => `depuis ${since} (en cours)`,
       noCost: 'coût inconnu',
       withCost: (cost: string) => cost,
