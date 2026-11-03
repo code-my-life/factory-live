@@ -55,6 +55,26 @@ export function pushActivity(state: DemoState, event: Omit<ActivityEvent, 'id'>)
   state.snapshot.activity.length = Math.min(state.snapshot.activity.length, ACTIVITY_LIMIT);
 }
 
+/**
+ * The journey of an issue that changes station, as the server works it out from the facts: the step
+ * left closes (gate red or green, changes requested or approval, main red or green) and the new
+ * station is added.
+ */
+function advance(
+  summary: IssueSummary,
+  station: IssueSummary['station'],
+  at: string,
+): IssueSummary['journey'] {
+  const steps = summary.journey.map((step) => ({ ...step }));
+  const last = steps.at(-1);
+  if (last?.station === 'gate') last.outcome = station === 'implementation' ? 'red' : 'ok';
+  else if (last?.station === 'review')
+    last.outcome = station === 'implementation' ? 'changes' : 'ok';
+  else if (last?.station === 'ci') last.outcome = station === 'review' ? 'red' : 'ok';
+  steps.push({ station, lane: station === 'gate' ? summary.lane : null, outcome: null, at });
+  return steps;
+}
+
 export function patchIssue(state: DemoState, key: IssueKey, patch: Partial<IssueSummary>): void {
   const summary = state.snapshot.issues.find((issue) => issue.key === key);
   if (!summary) throw new Error(`Issue de démo inconnue : ${key}`);
@@ -62,6 +82,7 @@ export function patchIssue(state: DemoState, key: IssueKey, patch: Partial<Issue
     // La liaison franchie s'anime côté écran à partir de ces deux champs.
     summary.previousStation = summary.station;
     summary.stationChangedAt = patch.updatedAt ?? new Date().toISOString();
+    summary.journey = advance(summary, patch.station, summary.stationChangedAt);
   }
   Object.assign(summary, patch);
   if (patch.pr) summary.prUrl = patch.pr.url;

@@ -6,15 +6,16 @@
   min-width: 0;
 }
 
+/* The title and its last event take the room; the pause stays on their right, even on a phone. */
 .pageHead {
   display: flex;
-  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--stack-gap-condensed) var(--stack-gap-normal);
 }
 
 .pageTitleBlock {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -26,6 +27,7 @@
 
 .pageTools {
   display: flex;
+  flex: none;
   align-items: center;
   gap: var(--stack-gap-condensed);
 }

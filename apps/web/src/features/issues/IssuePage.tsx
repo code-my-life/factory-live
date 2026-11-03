@@ -1,9 +1,9 @@
-import type { CardView, IssueDetail, RunView } from '@factory-live/contracts';
-import { ArrowLeftIcon, IssueOpenedIcon, LinkExternalIcon } from '@primer/octicons-react';
+import type { CardKind, CardView, IssueDetail, RunView } from '@factory-live/contracts';
+import { IssueOpenedIcon, LinkExternalIcon } from '@primer/octicons-react';
 import { Banner, Button, Heading, Link as PrimerLink, UnderlineNav } from '@primer/react';
 import { Blankslate, Table } from '@primer/react/experimental';
-import { useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router';
 import { useIssueDetail, useSnapshot } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { Messages } from '../../i18n/fr.ts';
@@ -15,9 +15,7 @@ import { IssueBadge, issueState } from '../../ui/badge/IssueBadge.tsx';
 import { PullRequestBadge } from '../../ui/badge/PullRequestBadge.tsx';
 import { SkillBadge } from '../../ui/badge/SkillBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
-import { StationMark } from '../../ui/flow/StationMark.tsx';
 import { ModelBadge } from '../../ui/ModelBadge.tsx';
-import { useMotion } from '../../ui/motion.tsx';
 import { ActivityTimeline } from '../../ui/timeline/ActivityTimeline.tsx';
 import { fromTimelineEntry } from '../../ui/timeline/rows.ts';
 import {
@@ -28,8 +26,7 @@ import {
   issueWorkState,
 } from '../../ui/work/workState.tsx';
 import { shortCardTitle } from './cardText.ts';
-import { IssueGraph } from './IssueGraph.tsx';
-import { issueKeyFromParams, prNumberOfUrl, repoOfKey } from '../../ui/paths.ts';
+import { prNumberOfUrl, repoOfKey } from '../../ui/paths.ts';
 import { PullRequestPanel, PullRequestState } from './PullRequestPanel.tsx';
 import { TranscriptPanel } from './TranscriptPanel.tsx';
 import styles from './issues.module.css';
@@ -198,38 +195,43 @@ function EvidenceFiles({ card }: { card: CardView | null }) {
   );
 }
 
-export function IssuePage() {
+/**
+ * The details of the issue open on the line, under the graph: the graph already shows where it
+ * stands and the way it took, so only what the graph cannot say lives here (facts, what waits for
+ * the owner, the runs and the transcript of the card at work, the tabs). The card shown is the one
+ * at work at the issue's station.
+ */
+export function IssuePage({
+  issueKey: key,
+  cardKind = null,
+}: {
+  issueKey: string;
+  cardKind?: CardKind | null;
+}) {
   const i18n = useI18n();
   const { t, fmt, text } = i18n;
-  const params = useParams();
   const navigate = useNavigate();
-  const key = issueKeyFromParams(params.repo, params.number);
-  const detail = useIssueDetail(key ?? 'inconnue#0');
+  const detail = useIssueDetail(key);
   const snapshot = useSnapshot();
   const [tab, setTab] = useState<Tab>('activity');
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
-  const cardPanel = useRef<HTMLDivElement | null>(null);
-  const motion = useMotion();
 
-  if (!key || !detail) {
-    // Le même état vide que la page introuvable : Blankslate de Primer, retour à la liste.
+  if (!detail) {
+    // The issue is not (or no longer) known: the same empty state as the not-found page, under the graph.
     return (
-      <Blankslate spacious>
+      <Blankslate>
         <Blankslate.Visual>
           <IssueOpenedIcon size="medium" />
         </Blankslate.Visual>
-        <Blankslate.Heading as="h1">{t.issue.notFound}</Blankslate.Heading>
-        <Blankslate.PrimaryAction onClick={() => void navigate('/issues')}>
-          {t.issue.backToList}
-        </Blankslate.PrimaryAction>
+        <Blankslate.Heading as="h2">{t.issue.notFound}</Blankslate.Heading>
       </Blankslate>
     );
   }
 
   const { issue } = detail;
   const selectedCard =
-    detail.cards.find((card) => card.id === selectedCardId) ?? defaultCard(detail);
+    (cardKind ? detail.cards.findLast((card) => card.kind === cardKind) : undefined) ??
+    defaultCard(detail);
   const runForTranscript =
     selectedRunId ??
     selectedCard?.runs.at(-1)?.id ??
@@ -238,40 +240,23 @@ export function IssuePage() {
   const interventions = snapshot.interventions.filter(
     (intervention) => intervention.issueKey === key && !intervention.resolvedAt,
   );
-  const agents = snapshot.agents.filter((agent) => agent.issueKey === key);
   const selectedCardIntervention =
     interventions.find((intervention) => intervention.cardId === selectedCard?.id) ?? null;
-  const causes = new Map(
-    interventions.flatMap((intervention) =>
-      intervention.cardId && intervention.diagnosis
-        ? [[intervention.cardId, interventionHeadline(intervention)] as const]
-        : [],
-    ),
-  );
   const elapsedEnd = issue.status === 'done' ? Date.parse(issue.updatedAt) : null;
   // A URL with no PR number is not a PR we can name: it is treated as no PR.
   const spottedNumber = issue.prUrl ? prNumberOfUrl(issue.prUrl) : null;
 
   return (
     <article className={styles.page}>
-      <nav aria-label={t.issue.breadcrumb}>
-        <Link to="/issues" className={styles.back}>
-          <ArrowLeftIcon size={14} /> {t.nav.issues}
-        </Link>
-      </nav>
-
       <header className={styles.issueHead}>
         <p className={styles.issueKey}>
           <IssueBadge issueKey={issue.key} state={issueState(issue.status)} />
         </p>
-        <Heading as="h1" variant="medium" className={styles.issueTitle}>
+        <Heading as="h2" variant="medium" className={styles.issueTitle}>
           {issue.title}
         </Heading>
         <div className={styles.issueMeta}>
-          <WorkStateLabel state={issueWorkState(issue, null, t)} />
-          <span className={styles.metaText}>
-            <StationMark station={issue.station} label={t.issue.stage(t.station[issue.station])} />
-          </span>
+          {/* The state and the station are the issue's row in the graph: said there only. */}
           {issue.labels.map((label) => (
             <GithubLabelBadge key={label.name} label={label} />
           ))}
@@ -376,38 +361,20 @@ export function IssuePage() {
         );
       })}
 
-      <section className={styles.section} aria-labelledby="graph-title">
-        <div className={styles.sectionHead}>
-          <h2 id="graph-title" className={styles.sectionTitle}>
-            {t.issue.cardsTitle}
-          </h2>
-          <span className={styles.muted}>{t.issue.cardsHint}</span>
-        </div>
-        <IssueGraph
-          cards={detail.cards}
-          agents={agents}
-          causes={causes}
-          selectedCardId={selectedCard?.id ?? null}
-          onSelectCard={(cardId) => {
-            setSelectedCardId(cardId);
-            setSelectedRunId(null);
-            // Sur téléphone, les runs s'affichent sous la voie, hors de l'écran : on les y amène.
-            requestAnimationFrame(() => {
-              const panel = cardPanel.current;
-              if (panel && panel.getBoundingClientRect().top > window.innerHeight * 0.7)
-                panel.scrollIntoView({
-                  block: 'start',
-                  behavior: motion.enabled && !motion.reduced ? 'smooth' : 'auto',
-                });
-            });
-          }}
-        />
+      <section className={styles.section} aria-label={t.issue.cardsTitle}>
         {selectedCard ? (
-          <div ref={cardPanel} className={styles.cardPanel}>
+          <div className={styles.cardPanel}>
             <h3 className={styles.cardPanelTitle}>{shortCardTitle(selectedCard, t)}</h3>
             <p className={styles.cardPanelMeta}>
               <CardBadge kind={selectedCard.kind} id={selectedCard.id} />
-              <WorkStateLabel state={cardWorkState(selectedCard, null, t)} />
+              {/* A card held for the owner's decision waits for them: one state, one hue, as on the map. */}
+              <WorkStateLabel
+                state={
+                  selectedCardIntervention
+                    ? issueWorkState(issue, null, t)
+                    : cardWorkState(selectedCard, null, t)
+                }
+              />
               {selectedCard.assignee ? (
                 <AgentBadge profile={selectedCard.assignee} />
               ) : (

@@ -122,7 +122,8 @@ for (const { locale, name } of LANGUAGES) {
         const labels = page
           .getByRole('navigation', { name: 'Navigation', exact: true })
           .locator('[class*="tabLabel"]');
-        await expect(labels).toHaveCount(5);
+        // The line, the interventions, the agents, then « Plus »: the issues live on the line.
+        await expect(labels).toHaveCount(4);
         for (const label of await labels.all()) {
           const cut = await label.evaluate((element) => element.scrollWidth - element.clientWidth);
           expect(cut, `${width} px : « ${await label.innerText()} » tronqué`).toBeLessThanOrEqual(
@@ -153,11 +154,6 @@ for (const { locale, name } of LANGUAGES) {
 
 test('sur téléphone, le choix de la source est un menu, sans débordement', async ({ page }) => {
   await page.goto('/issues/claude-cockpit/71');
-  await page
-    .getByRole('group', { name: 'Graphe des cartes de l’issue' })
-    .getByRole('button', { name: /regrouper les cartes par projet/ })
-    .filter({ hasNotText: 'Vue ÉQUIPE' })
-    .click();
   await page
     .getByRole('button', { name: /Transcription/ })
     .filter({ visible: true })

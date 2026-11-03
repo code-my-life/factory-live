@@ -1,8 +1,9 @@
 import type {
   AgentState,
   ApiErrorCode,
+  GateLane,
+  IssueType,
   BlockKind,
-  CardKind,
   ChecksState,
   ConfigField,
   HealthStatus,
@@ -35,11 +36,27 @@ const station = {
   brief: 'Brief',
   implementation: 'Implémentation',
   gate: 'Gate',
+  review: 'Ta revue',
+  merge: 'Fusion',
+  ci: 'CI de main',
+  deploy: 'Déploiement',
   release: 'Release',
   done: 'Terminé',
   stopped: 'Arrêté',
+  diagnostic: 'Diagnostic',
   side: 'Voie annexe',
 } satisfies Record<StationId, string>;
+
+/** The factory's issue types (ADR 0017), as its labels and forms name them. */
+const issueType = {
+  bug: 'Bug',
+  interface: 'Interface',
+  fonctionnalite: 'Fonctionnalité',
+  diagnostic: 'Diagnostic',
+  tests: 'Tests',
+  maintenance: 'Maintenance',
+  documentation: 'Documentation',
+} satisfies Record<IssueType, string>;
 
 const intervention = {
   needs_input: 'Décision attendue',
@@ -486,11 +503,17 @@ export const fr = {
     brief: 'Le coordinateur écrit le brief et le graphe de cartes',
     implementation: 'Test qui échoue, correctif, preuves, PR en brouillon',
     gate: 'Vérification indépendante, CI verte exigée',
+    review: 'La gate est verte : tu approuves la PR',
+    merge: 'GitHub fusionne la PR approuvée',
+    ci: 'Les workflows de main tournent sur le sha fusionné',
+    deploy: 'factory-deploy.py déploie le sha fusionné',
     release: 'Ton approbation, merge, tag, CI de main',
     done: 'Mergé, workflows de main verts',
     stopped: 'Arrêté ou PR fermée',
+    diagnostic: 'Un agent cherche la cause et écrit le test qui la reproduit, sans PR',
     side: 'Triage, watch, onboarding',
   } satisfies Record<StationId, string>,
+  issueType,
   agentState: {
     idle: 'Au repos',
     queued: 'En file',
@@ -508,27 +531,6 @@ export const fr = {
     stopped: 'Arrêtée',
   } satisfies Record<IssueStatus, string>,
   intervention,
-  /** Ce qu'on fait d'une intervention, depuis la boîte de l'issue sur la ligne d'usine. */
-  interventionAction: {
-    needs_input: 'Répondre',
-    capability: 'Répondre',
-    transient: 'Débloquer',
-    gave_up: 'Débloquer',
-    triage_loop: 'Voir la procédure',
-    held_active_pr: 'Voir les commandes',
-    pr_approval: 'Approuver la PR',
-    main_red: 'Voir les runs',
-    service_down: 'Voir la santé',
-  } satisfies Record<InterventionKind, string>,
-  cardKind: {
-    brief: 'Brief',
-    impl: 'Implémentation',
-    release: 'Release',
-    diagnostic: 'Diagnostic',
-    watch: 'Surveillance',
-    onboarding: 'Onboarding',
-    other: 'Autre',
-  } satisfies Record<CardKind, string>,
   cardStatus,
   runOutcome,
   runRole: {
@@ -576,8 +578,6 @@ export const fr = {
     free: 'gratuit',
     unknown: '?',
     lane: 'lane',
-    issueCount: (count: number) => `${count} ${f.plural(count, 'issue', 'issues')}`,
-    cardCount: (count: number) => `${count} ${f.plural(count, 'carte', 'cartes')}`,
     /** Une issue ou une carte qui attend une place : le plafond du dispatcher. */
     waitingForSlot: (max: number) =>
       `Attend une place : ${max} ${f.plural(max, 'carte', 'cartes')} en cours au plus`,
@@ -586,7 +586,6 @@ export const fr = {
   nav: {
     line: 'Ligne d’usine',
     lineShort: 'Ligne',
-    issues: 'Issues',
     interventions: 'Interventions',
     agents: 'Agents',
     health: 'Santé',
@@ -634,32 +633,92 @@ export const fr = {
     title: 'Ligne d’usine',
     openIssues: (count: number) => `${count} ${f.plural(count, 'issue', 'issues')} en cours`,
     lastEvent: 'dernier événement',
-    blockersWaiting: (count: number) =>
-      count > 1 ? `${count} blocages t’attendent` : `${count} blocage t’attend`,
-    blockerItem: (where: string | null, title: string) => `${where ?? 'carte'} : ${title}`,
-    seeInterventions: 'Voir les interventions',
-    label: 'Ligne d’usine : les étapes d’une issue, de l’intake au merge',
-    /** Ajouté au titre d'une étape, pour les lecteurs d'écran. */
-    stepIssues: (count: number) => ` : ${count} ${f.plural(count, 'issue', 'issues')}`,
-    issuesAt: (station: string) => `Issues à l’étape ${station}`,
-    crewOf: (station: string) => `Agents de l’étape ${station}`,
-    now: 'En ce moment',
-    allAgents: 'Tous les agents',
-    noAgent: 'Aucun agent au travail : la ligne attend une issue labellisée factory.',
+    graph: {
+      label: 'La ligne d’usine',
+      nothingWaits: 'Rien ne t’attend',
+      waits: 'T’attend',
+      reviews: (count: number) => `${count} ${f.plural(count, 'revue', 'revues')}`,
+      blockers: (count: number) => `${count} ${f.plural(count, 'blocage', 'blocages')}`,
+      decisions: (count: number) => `${count} ${f.plural(count, 'décision', 'décisions')}`,
+      empty: 'Aucune issue',
+      /** How long ago an issue finished, on its row in Terminé: « il y a 3 j ». */
+      finishedAgo: (span: string) => `il y a ${span}`,
+      more: (count: number) => `et ${count} ${f.plural(count, 'autre', 'autres')}`,
+      kind: {
+        ai: 'IA',
+        script: 'Script',
+        github: 'GitHub',
+        owner: 'Toi',
+      },
+      kindHint: {
+        ai: 'Un agent appelle un modèle : le résultat varie d’un run à l’autre',
+        script: 'Du code, sans modèle : mêmes entrées, même verdict',
+        github: 'GitHub le fait, sans modèle',
+        owner: 'Ton jugement : la seule décision humaine de la ligne',
+      },
+      gateHint: 'factory-gate.py : une preuve par type d’issue',
+      lane: {
+        failfirst: 'Fail-first',
+        sabotage: 'Sabotages',
+        invariance: 'Invariance',
+        documents: 'Documents',
+      } satisfies Record<GateLane, string>,
+      providers: 'Fournisseurs',
+      providersHint: 'accès aux modèles',
+      providersTitle: 'Les fournisseurs donnent aux agents l’accès aux modèles',
+      serves: (stations: string, agents: string) => `${stations} · ${agents}`,
+      calls: (agent: string, model: string) => `${agent} · ${model}`,
+      atStation: {
+        gate: 'La gate juge la PR',
+        review: 'Gate verte : à toi d’approuver la PR',
+        merge: 'Fusion automatique armée',
+        ci: 'Workflows de main en cours',
+        deploy: 'Déploiement en cours',
+      },
+      selectHint:
+        'Touche une issue dans le graphe pour voir son parcours et ouvrir ses détails ici.',
+      search: 'Rechercher une issue',
+      searchPlaceholder: 'Rechercher : #71, titre, modèle…',
+      clearSearch: 'Effacer la recherche',
+      filter: {
+        type: 'Type',
+        state: 'État',
+        repo: 'Dépôt',
+        model: 'Modèle',
+      },
+      found: (count: number, total: number) =>
+        `${count} ${f.plural(count, 'issue', 'issues')} sur ${total}`,
+      clear: 'Effacer',
+      zoom: 'Zoom du graphe',
+      fit: 'Voir toute la ligne',
+      zoomOut: 'Dézoomer',
+      zoomIn: 'Zoomer',
+      legend: 'Légende',
+      legendLinks: 'Légende des liens',
+      legendMotion: 'Légende des animations',
+      vector: {
+        line: 'Ligne principale',
+        failfirst: 'Preuve fail-first',
+        sabotage: 'Preuve par sabotages',
+        invariance: 'Preuve d’invariance',
+        documents: 'Preuve documents',
+        diagnostic: 'Diagnostic, sans PR',
+        gateRed: 'Retour : gate rouge',
+        changes: 'Retour : changements demandés',
+        revert: 'Revert : main rouge',
+        models: 'Accès aux modèles',
+      },
+      motion: {
+        travel: 'Une carte qui glisse sur un lien : l’issue change de poste',
+        comets: 'Des comètes qui défilent : le parcours de l’issue ouverte',
+        points: 'Des points qui montent d’un fournisseur : un modèle répond à un agent',
+        idle: 'Un lien pâle : rien n’y passe en ce moment',
+        taken: 'Un retour pris : rouge après un échec, jaune sur une demande',
+      },
+    },
   },
 
   activity: {
-    title: 'Activité',
-    filterLabel: 'Filtrer l’activité',
-    filters: {
-      all: 'Tout',
-      tools: 'Outils',
-      models: 'Modèles',
-      kanban: 'Kanban',
-      github: 'GitHub',
-    },
-    empty: 'Rien pour ce filtre pour l’instant.',
-    label: 'Activité de la factory',
     running: 'en cours',
     kind: {
       tool: 'Outil',
@@ -694,19 +753,8 @@ export const fr = {
       `${lane ? `${lane} : ` : ''}${model}${provider ? ` via ${provider}` : ''}${source ? `, ${source}` : ''}`,
   },
 
-  issues: {
-    title: 'Issues',
-    filterLabel: 'Filtrer les issues',
-    filters: { open: 'Ouvertes', finished: 'Terminées', all: 'Toutes' },
-    interventions: (count: number) => ` ${f.plural(count, 'intervention', 'interventions')}`,
-    updated: 'mise à jour',
-  },
-
   issue: {
     notFound: 'Issue introuvable',
-    backToList: 'Revenir à la liste des issues',
-    breadcrumb: 'Fil d’Ariane',
-    stage: (station: string) => `Étape : ${station}`,
     onGitHub: 'Issue sur GitHub',
     facts: {
       harness: 'Harnais',
@@ -726,7 +774,6 @@ export const fr = {
     seeDiagnosis: 'Voir le diagnostic',
     cardCause: 'Pourquoi elle bloque',
     cardsTitle: 'Cartes de l’issue',
-    cardsHint: 'Choisis une carte pour voir ses runs.',
     forcedSkills: 'Skills forcées :',
     unassigned: 'non assignée',
     tabsLabel: 'Détails de l’issue',
@@ -769,11 +816,7 @@ export const fr = {
         : bytes < 1024 * 1024
           ? `${f.integer(Math.round(bytes / 1024))} Ko`
           : `${f.integer(Math.round(bytes / (1024 * 1024)))} Mo`,
-    graph: 'Graphe des cartes de l’issue',
-    cardsOf: (title: string) => `Cartes : ${title}`,
     releaseTitle: 'Merge, tag et surveillance de main',
-    testsPassed: (passed: number, total: number) => `${passed} tests réussis sur ${total}`,
-    tests: (passed: number, total: number) => `${passed}/${total} tests`,
     files: (count: number) => `${count} ${f.plural(count, 'fichier', 'fichiers')}`,
   },
 

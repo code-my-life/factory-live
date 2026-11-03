@@ -1,18 +1,46 @@
 import { expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 
-/** La boîte d'une issue sur la ligne : un élément d'une liste d'étape, dont le lien mène à l'issue. */
+/** The row of an issue in the graph of the factory line. */
 export function issueJob(page: Page, key: string): Locator {
-  const [repo, number] = key.split('#');
-  return page
-    .getByRole('list', { name: /^Issues à l’étape/ })
-    .getByRole('listitem')
-    .filter({ has: page.locator(`a[href="/issues/${repo}/${number}"]`) });
+  return page.locator(`[data-issue="${key}"]`);
 }
 
-/** La liste des issues d'une station de la ligne. */
-export function stationJobs(page: Page, station: string): Locator {
-  return page.getByRole('list', { name: `Issues à l’étape ${station}` });
+/** The box of a station of the graph: `implementation`, `gate:failfirst`, `review`, `models`… */
+export function stationJobs(page: Page, box: string): Locator {
+  return page.locator(`[data-box="${box}"]`);
+}
+
+/** The graph's scale, read on the transform of its canvas. */
+export async function graphScale(page: Page): Promise<number> {
+  return page
+    .locator('[class*="_canvas_"]')
+    .evaluate((element) => new DOMMatrixReadOnly(getComputedStyle(element).transform).a);
+}
+
+/**
+ * Pinches with two fingers around (x, y), from one spread to the other, by real touch events
+ * (Chromium, CDP).
+ */
+export async function pinch(
+  page: Page,
+  x: number,
+  y: number,
+  from: number,
+  to: number,
+): Promise<void> {
+  const client = await page.context().newCDPSession(page);
+  const fingers = (gap: number) => [
+    { x: x - gap / 2, y, id: 1 },
+    { x: x + gap / 2, y, id: 2 },
+  ];
+  await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: fingers(from) });
+  for (let step = 1; step <= 10; step += 1)
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: fingers(from + ((to - from) * step) / 10),
+    });
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
 
 /** Aucune page ne doit défiler de côté (débordement d'un titre, d'un chemin, d'un tableau). */

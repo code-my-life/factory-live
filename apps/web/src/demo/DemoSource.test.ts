@@ -38,7 +38,8 @@ describe('DemoSource', () => {
     expect(station(KEYS.contact)).toBe('gate');
     expect(station(KEYS.team)).toBe('implementation');
     vi.advanceTimersByTime(25_000);
-    expect(station(KEYS.contact)).toBe('release');
+    // The gate is green: the PR waits for its approval, at Ta revue.
+    expect(station(KEYS.contact)).toBe('review');
     vi.advanceTimersByTime(26_000);
     expect(station(KEYS.team)).toBe('gate');
   });

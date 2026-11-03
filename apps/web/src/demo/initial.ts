@@ -2,9 +2,13 @@ import { msg } from '@factory-live/contracts';
 import type {
   AgentActivity,
   CardView,
+  GateLane,
   Intervention,
   IssueDetail,
+  IssueLabel,
   IssueSummary,
+  IssueType,
+  JourneyStep,
   PullRequestView,
   RunView,
   TimelineEntry,
@@ -135,8 +139,39 @@ function pr(
     additions: 0,
     deletions: 0,
     changedFiles: 0,
+    reviews: [],
+    mergedAt: null,
+    mainChecks: null,
+    deployment: null,
     ...patch,
   };
+}
+
+/** The type labels of the factory (config/types.yaml), on the repositories with the types standard. */
+const TYPE_LABEL = {
+  bug: { name: 'type:bug', color: 'd73a4a' },
+  interface: { name: 'type:interface', color: '1d76db' },
+  fonctionnalite: { name: 'type:fonctionnalite', color: 'a2eeef' },
+  diagnostic: { name: 'type:diagnostic', color: 'fbca04' },
+  tests: { name: 'type:tests', color: '0e8a16' },
+  maintenance: { name: 'type:maintenance', color: 'c5def5' },
+  documentation: { name: 'type:documentation', color: '0075ca' },
+} as const satisfies Record<IssueType, IssueLabel>;
+
+type Step = readonly [JourneyStep['station'], number, JourneyStep['outcome']?];
+
+/** A journey of the demo: the stations passed, oldest first, each at its time (seconds ago). */
+function trail(
+  ago: (seconds: number) => string,
+  lane: GateLane | null,
+  steps: readonly Step[],
+): JourneyStep[] {
+  return steps.map(([station, secondsAgo, outcome]) => ({
+    station,
+    lane: station === 'gate' ? lane : null,
+    outcome: outcome ?? null,
+    at: ago(secondsAgo),
+  }));
 }
 
 function card(
@@ -235,6 +270,7 @@ function withPrUrl(summaries: Omit<IssueSummary, 'prUrl'>[]): IssueSummary[] {
 export function createInitialState(now: number): DemoState {
   const ago = (seconds: number) => iso(now - seconds * 1000);
   const min = 60;
+  const DAY = 24 * 60 * min;
 
   const summaries: IssueSummary[] = withPrUrl([
     {
@@ -243,7 +279,7 @@ export function createInitialState(now: number): DemoState {
       number: 71,
       title: 'Vue ÉQUIPE : regrouper les cartes par projet',
       url: issueUrl(KEYS.team),
-      labels: [FACTORY_LABEL, { name: 'claude:opus', color: 'd4c5f9' }],
+      labels: [TYPE_LABEL.interface, FACTORY_LABEL, { name: 'claude:opus', color: 'd4c5f9' }],
       station: 'implementation',
       previousStation: null,
       stationChangedAt: null,
@@ -255,6 +291,13 @@ export function createInitialState(now: number): DemoState {
       interventionIds: [],
       startedAt: ago(38 * min),
       updatedAt: ago(6),
+      type: 'interface',
+      lane: 'failfirst',
+      journey: trail(ago, 'failfirst', [
+        ['intake', 38 * min],
+        ['brief', 36 * min],
+        ['implementation', 30 * min],
+      ]),
     },
     {
       key: KEYS.contact,
@@ -279,6 +322,14 @@ export function createInitialState(now: number): DemoState {
       interventionIds: [],
       startedAt: ago(82 * min),
       updatedAt: ago(12),
+      type: null,
+      lane: 'failfirst',
+      journey: trail(ago, 'failfirst', [
+        ['intake', 82 * min],
+        ['brief', 80 * min],
+        ['implementation', 70 * min],
+        ['gate', 2 * min],
+      ]),
     },
     {
       key: KEYS.shortcut,
@@ -286,7 +337,7 @@ export function createInitialState(now: number): DemoState {
       number: 73,
       title: 'Raccourci clavier pour répondre à la dernière question',
       url: issueUrl(KEYS.shortcut),
-      labels: [FACTORY_LABEL],
+      labels: [TYPE_LABEL.fonctionnalite, FACTORY_LABEL],
       station: 'brief',
       previousStation: null,
       stationChangedAt: null,
@@ -298,6 +349,12 @@ export function createInitialState(now: number): DemoState {
       interventionIds: [],
       startedAt: ago(4 * min),
       updatedAt: ago(4 * min),
+      type: 'fonctionnalite',
+      lane: 'failfirst',
+      journey: trail(ago, 'failfirst', [
+        ['intake', 4 * min],
+        ['brief', 4 * min],
+      ]),
     },
     {
       key: KEYS.projects,
@@ -317,6 +374,12 @@ export function createInitialState(now: number): DemoState {
       interventionIds: [],
       startedAt: ago(26 * min),
       updatedAt: ago(14 * min),
+      type: null,
+      lane: 'failfirst',
+      journey: trail(ago, 'failfirst', [
+        ['intake', 20 * min],
+        ['brief', 18 * min],
+      ]),
     },
     {
       key: KEYS.tags,
@@ -324,8 +387,8 @@ export function createInitialState(now: number): DemoState {
       number: 68,
       title: 'Tag automatique des versions sur main',
       url: issueUrl(KEYS.tags),
-      labels: [FACTORY_LABEL],
-      station: 'release',
+      labels: [TYPE_LABEL.maintenance, FACTORY_LABEL],
+      station: 'review',
       previousStation: null,
       stationChangedAt: null,
       status: 'waiting_human',
@@ -345,6 +408,15 @@ export function createInitialState(now: number): DemoState {
       interventionIds: [],
       startedAt: ago(3 * 60 * min),
       updatedAt: ago(22 * min),
+      type: 'maintenance',
+      lane: 'invariance',
+      journey: trail(ago, 'invariance', [
+        ['intake', 90 * min],
+        ['brief', 88 * min],
+        ['implementation', 80 * min],
+        ['gate', 30 * min, 'ok'],
+        ['review', 25 * min],
+      ]),
     },
     {
       key: KEYS.footer,
@@ -369,6 +441,13 @@ export function createInitialState(now: number): DemoState {
       interventionIds: [],
       startedAt: ago(2 * 60 * min),
       updatedAt: ago(42 * min),
+      type: null,
+      lane: 'failfirst',
+      journey: trail(ago, 'failfirst', [
+        ['intake', 60 * min],
+        ['brief', 58 * min],
+        ['implementation', 50 * min],
+      ]),
     },
     {
       key: KEYS.hook,
@@ -376,7 +455,7 @@ export function createInitialState(now: number): DemoState {
       number: 2,
       title: 'Réglages : la version de factory-live est écrite en dur au lieu de celle du serveur',
       url: issueUrl(KEYS.hook),
-      labels: [FACTORY_LABEL],
+      labels: [TYPE_LABEL.bug, FACTORY_LABEL],
       station: 'implementation',
       previousStation: null,
       stationChangedAt: null,
@@ -388,6 +467,13 @@ export function createInitialState(now: number): DemoState {
       interventionIds: [],
       startedAt: ago(80 * min),
       updatedAt: ago(22 * min),
+      type: 'bug',
+      lane: 'failfirst',
+      journey: trail(ago, 'failfirst', [
+        ['intake', 100 * min],
+        ['brief', 96 * min],
+        ['implementation', 90 * min],
+      ]),
     },
     {
       key: KEYS.loop,
@@ -395,7 +481,7 @@ export function createInitialState(now: number): DemoState {
       number: 76,
       title: "E2E PR 3 : raccourcis clavier de l'île",
       url: issueUrl(KEYS.loop),
-      labels: [FACTORY_LABEL],
+      labels: [TYPE_LABEL.tests, FACTORY_LABEL],
       station: 'implementation',
       previousStation: null,
       stationChangedAt: null,
@@ -407,6 +493,13 @@ export function createInitialState(now: number): DemoState {
       interventionIds: [],
       startedAt: ago(170 * min),
       updatedAt: ago(9 * min),
+      type: 'tests',
+      lane: 'sabotage',
+      journey: trail(ago, 'sabotage', [
+        ['intake', 70 * min],
+        ['brief', 66 * min],
+        ['implementation', 60 * min],
+      ]),
     },
     {
       key: KEYS.breaker,
@@ -426,6 +519,14 @@ export function createInitialState(now: number): DemoState {
       interventionIds: [],
       startedAt: ago(95 * min),
       updatedAt: ago(4 * min),
+      type: null,
+      lane: 'failfirst',
+      journey: trail(ago, 'failfirst', [
+        ['intake', 50 * min],
+        ['brief', 46 * min],
+        ['implementation', 40 * min],
+        ['gate', 9 * min],
+      ]),
     },
     {
       key: KEYS.e2e,
@@ -433,7 +534,7 @@ export function createInitialState(now: number): DemoState {
       number: 42,
       title: 'E2E PR 2 : actions des cartes et lanceur',
       url: issueUrl(KEYS.e2e),
-      labels: [FACTORY_LABEL],
+      labels: [TYPE_LABEL.tests, FACTORY_LABEL],
       station: 'done',
       previousStation: null,
       stationChangedAt: null,
@@ -452,7 +553,24 @@ export function createInitialState(now: number): DemoState {
       activeProfiles: [],
       interventionIds: [],
       startedAt: ago(9 * 24 * 60 * min),
-      updatedAt: ago(8 * 24 * 60 * min),
+      updatedAt: ago(3 * DAY - 5 * min),
+      type: 'tests',
+      lane: 'sabotage',
+      journey: trail(ago, 'sabotage', [
+        ['intake', 3 * DAY],
+        ['brief', 3 * DAY - 30 * min],
+        ['implementation', 3 * DAY - 25 * min],
+        ['gate', 3 * DAY - 20 * min, 'red'],
+        ['implementation', 3 * DAY - 19 * min],
+        ['gate', 3 * DAY - 15 * min, 'ok'],
+        ['review', 3 * DAY - 14 * min, 'changes'],
+        ['implementation', 3 * DAY - 12 * min],
+        ['gate', 3 * DAY - 9 * min, 'ok'],
+        ['review', 3 * DAY - 8 * min, 'ok'],
+        ['merge', 3 * DAY - 7 * min],
+        ['ci', 3 * DAY - 6 * min, 'ok'],
+        ['done', 3 * DAY - 5 * min],
+      ]),
     },
     {
       key: KEYS.overlap,
@@ -460,7 +578,7 @@ export function createInitialState(now: number): DemoState {
       number: 52,
       title: "Île : le bouton Détails chevauche l'encart d'autorisation",
       url: issueUrl(KEYS.overlap),
-      labels: [FACTORY_LABEL, { name: 'claude', color: 'd97757' }],
+      labels: [TYPE_LABEL.diagnostic, FACTORY_LABEL, { name: 'claude', color: 'd97757' }],
       station: 'done',
       previousStation: null,
       stationChangedAt: null,
@@ -479,7 +597,15 @@ export function createInitialState(now: number): DemoState {
       activeProfiles: [],
       interventionIds: [],
       startedAt: ago(8 * 24 * 60 * min + 3 * 60 * min),
-      updatedAt: ago(8 * 24 * 60 * min),
+      updatedAt: ago(5 * DAY - 5 * min),
+      type: 'diagnostic',
+      lane: null,
+      journey: trail(ago, null, [
+        ['intake', 5 * DAY],
+        ['brief', 5 * DAY - 20 * min],
+        ['diagnostic', 5 * DAY - 15 * min],
+        ['done', 5 * DAY - 5 * min],
+      ]),
     },
     {
       key: KEYS.codeowners,
@@ -506,7 +632,19 @@ export function createInitialState(now: number): DemoState {
       activeProfiles: [],
       interventionIds: [],
       startedAt: ago(11 * 24 * 60 * min + 96 * min),
-      updatedAt: ago(11 * 24 * 60 * min),
+      updatedAt: ago(6 * DAY - 6 * min),
+      type: null,
+      lane: 'failfirst',
+      journey: trail(ago, 'failfirst', [
+        ['intake', 6 * DAY],
+        ['brief', 6 * DAY - 20 * min],
+        ['implementation', 6 * DAY - 15 * min],
+        ['gate', 6 * DAY - 10 * min, 'ok'],
+        ['review', 6 * DAY - 9 * min, 'ok'],
+        ['merge', 6 * DAY - 8 * min],
+        ['ci', 6 * DAY - 7 * min, 'ok'],
+        ['done', 6 * DAY - 6 * min],
+      ]),
     },
   ]);
 

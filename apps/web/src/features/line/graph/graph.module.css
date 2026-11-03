@@ -1,0 +1,642 @@
+/*
+ * The factory line as a run graph: a panel, a canvas on the inset background, cards on the default
+ * background joined by curved arrows. Each kind of connector keeps one colour (`palette.ts`, set in
+ * `style`) and one look. A connector with nothing going through it steps back; red is kept for
+ * problems.
+ */
+.panel {
+  overflow: hidden;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  background-color: var(--bgColor-default);
+}
+
+/*
+ * The marks of the connectors: the lines, their ports, the comets running on them. Their colour is
+ * their branch's (`palette.ts`), set in `style`.
+ */
+
+/* A connector at rest steps back without vanishing; one in use draws itself over it. */
+.edge {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.75;
+  opacity: 0.42;
+}
+
+.overlay {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.5;
+}
+
+.port {
+  fill: var(--bgColor-default);
+  stroke-width: 2;
+  opacity: 0.55;
+  transition: opacity var(--base-duration-300) var(--base-easing-easeInOut);
+}
+
+.port[data-active] {
+  opacity: 1;
+}
+
+/*
+ * Data running along a connector in its direction: a comet of the branch's colour on the open
+ * issue's journey, a point of what moves up a feed whose model answers. Under the cards, so that
+ * it slips into them at the ends.
+ */
+.comet {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: 18px;
+  height: 4px;
+  border-radius: var(--borderRadius-full);
+  offset-anchor: center;
+  pointer-events: none;
+}
+
+.comet[data-kind='model'] {
+  width: 6px;
+  height: 6px;
+}
+
+.proofSwatch {
+  flex: none;
+  width: 12px;
+  height: 4px;
+  border-radius: var(--borderRadius-full);
+}
+
+.legendLine {
+  fill: none;
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.legendLine[data-idle] {
+  opacity: 0.42;
+}
+
+.legendComet {
+  width: 16px;
+  height: 3px;
+  border-radius: var(--borderRadius-full);
+}
+
+.legendPoint {
+  width: 6px;
+  height: 6px;
+  /* As wide as the comet above it. */
+  margin-inline: calc((var(--base-size-16) - var(--base-size-6)) / 2);
+  border-radius: var(--borderRadius-full);
+}
+
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--base-size-8) var(--base-size-24);
+  padding: var(--base-size-12) var(--base-size-16);
+  border-block-end: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+
+.panelSummary {
+  margin: 0;
+  color: var(--fgColor-default);
+  font: var(--text-body-shorthand-medium);
+}
+
+/* The quick search and its filters, on one row that wraps on a phone. */
+.filters {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--base-size-4) var(--base-size-8);
+  min-width: 0;
+}
+
+.search {
+  flex: 0 1 17rem;
+  min-width: 12rem;
+}
+
+.found {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-4);
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+  font-variant-numeric: tabular-nums;
+}
+
+/* On a phone (after the rules it overrides): what waits for the owner, then the search across, then the filters from the left. */
+@media (max-width: 767.98px) {
+  .panelHead {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--base-size-8);
+  }
+
+  .filters {
+    justify-content: flex-start;
+  }
+
+  .search {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+}
+
+.viewport {
+  position: relative;
+  background-color: var(--bgColor-inset);
+}
+
+/* One finger scrolls the graph natively; two fingers zoom it (the browser does not zoom the page). */
+.scroller {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  touch-action: pan-x pan-y;
+}
+
+/* Zoomed out narrower than the panel, the graph sits in its middle. */
+.sizer {
+  position: relative;
+  margin-inline: auto;
+}
+
+.canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/*
+ * Above the cards: the connectors and their comets, then the ports, then a travelling card. The
+ * gate's frame and the cards stay under, so that every connector is seen plugging into them.
+ */
+.edges,
+.ports {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.edges {
+  z-index: 2;
+}
+
+.ports {
+  z-index: 3;
+}
+
+/* An issue's card on its way: an overlay, the one thing that floats over the graph. */
+.traveller {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-6);
+  padding: var(--base-size-4) var(--base-size-8);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-full);
+  background-color: var(--bgColor-default);
+  box-shadow: var(--shadow-floating-small);
+  white-space: nowrap;
+  offset-anchor: center;
+  pointer-events: none;
+}
+
+/* The gate: one card grouping its four proofs, its title on top. */
+.gateFrame {
+  position: absolute;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-large);
+  background-color: var(--bgColor-muted);
+}
+
+.gateTitle {
+  position: absolute;
+  top: var(--base-size-8);
+  right: var(--base-size-8);
+  left: var(--base-size-12);
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-6);
+  height: var(--base-size-20);
+}
+
+/* A station: its head, then its issues, one row each, like the jobs of a matrix. */
+.box {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  background-color: var(--bgColor-default);
+  transition: border-color var(--motion-transition-stateChange);
+}
+
+.box[data-tone='attention'] {
+  border-color: var(--borderColor-attention-emphasis);
+}
+
+.box[data-tone='danger'] {
+  border-color: var(--borderColor-danger-emphasis);
+}
+
+.head {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 var(--base-size-8) 0 var(--base-size-12);
+  border-block-end: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+
+.box[data-proof] .head {
+  justify-content: flex-start;
+  padding-block-start: var(--base-size-8);
+}
+
+.headLine {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-6);
+  min-width: 0;
+  height: 18px;
+}
+
+.headIcon {
+  flex: none;
+  color: var(--fgColor-muted);
+}
+
+.headName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fgColor-default);
+  font: var(--text-body-shorthand-medium);
+  font-weight: var(--base-text-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headTypes {
+  overflow: hidden;
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.box[data-proof] .headTypes {
+  /* Under the name, past the swatch and its gap. */
+  padding-inline-start: calc(var(--base-size-12) + var(--base-size-6));
+}
+
+/* Who works at the station: an agent with a model, a script, GitHub, or the owner. */
+.kind {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--base-size-4);
+  height: var(--base-size-20);
+  margin-inline-start: auto;
+  padding: 0 var(--base-size-6);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-full);
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+  font-weight: var(--base-text-weight-semibold);
+  white-space: nowrap;
+}
+
+/* An agent with a model is told apart from code at first glance: its label is drawn in blue. */
+.kind[data-kind='ai'] {
+  border-color: var(--borderColor-accent-emphasis);
+  color: var(--fgColor-accent);
+}
+
+.kind[data-kind='owner'] {
+  border-color: var(--borderColor-attention-emphasis);
+  color: var(--fgColor-attention);
+}
+
+.body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* The line between two issues is drawn inside the row's height: the box keeps its measure. */
+.slot + .slot > .row {
+  border-block-start: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+
+.empty,
+.more {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0 var(--base-size-12);
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+}
+
+.empty {
+  box-sizing: border-box;
+  height: 34px;
+}
+
+.more {
+  box-sizing: border-box;
+  height: 30px;
+  border-block-start: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+
+/* An issue: its state and badge, its title, its type and age, then who holds it or why it waits. */
+.row {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 var(--base-size-8) 0 var(--base-size-12);
+  background-color: var(--bgColor-default);
+  transition:
+    opacity var(--base-duration-300) var(--base-easing-easeOut),
+    background-color var(--motion-transition-stateChange);
+}
+
+/* The box does not clip its rows: the last one follows its rounded corners. */
+.body > :last-child,
+.body > .slot:last-child > .row {
+  border-end-start-radius: var(--borderRadius-medium);
+  border-end-end-radius: var(--borderRadius-medium);
+}
+
+/*
+ * What waits for the owner or blocks is seen from afar: the row takes the state's tint and its box
+ * the state's border, as a job box does. The open issue's row is ringed in blue.
+ */
+.row[data-tone='attention'] {
+  background-color: var(--bgColor-attention-muted);
+}
+
+.row[data-tone='danger'] {
+  background-color: var(--bgColor-danger-muted);
+}
+
+/* The card has just set down: a ring of what moves fades from the row. */
+.row[data-landed] {
+  outline: var(--borderWidth-thick) solid transparent;
+  outline-offset: calc(var(--borderWidth-thick) * -1);
+  animation: landed var(--base-duration-1000) var(--base-easing-easeOut);
+}
+
+@keyframes landed {
+  from {
+    outline-color: var(--borderColor-accent-emphasis);
+  }
+}
+
+/* After the landing ring, so that the open issue keeps its own. */
+.row[data-selected] {
+  outline: var(--borderWidth-thick) solid var(--borderColor-accent-emphasis);
+  outline-offset: calc(var(--borderWidth-thick) * -1);
+  background-color: var(--bgColor-accent-muted);
+}
+
+/* The row of an issue whose card is still on its way: it shows once the card arrives. */
+.row[data-arriving] {
+  opacity: 0;
+}
+
+/* An issue the search leaves out steps back, in place: the graph does not move. */
+.row[data-dimmed] {
+  opacity: 0.32;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .row:has(.rowTitle:hover):not([data-selected]) {
+    background-color: var(--bgColor-muted);
+  }
+}
+
+.rowHead {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-6);
+  min-width: 0;
+}
+
+.since {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+  font-variant-numeric: tabular-nums;
+}
+
+.rowTitle {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fgColor-default);
+  font: var(--text-body-shorthand-medium);
+  font-weight: var(--base-text-weight-semibold);
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/* The whole row is pressed, not only its title. */
+.rowTitle::after {
+  position: absolute;
+  content: '';
+  inset: 0;
+}
+
+.rowTitle:focus-visible {
+  outline: none;
+}
+
+.rowTitle:focus-visible::after {
+  outline: var(--focus-outline);
+  outline-offset: calc(var(--focus-outline-width) * -1);
+}
+
+.rowFoot {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-6);
+  min-width: 0;
+}
+
+/* The state of an issue without a type, where its type would stand. */
+.state {
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+}
+
+.note {
+  min-width: 0;
+  min-height: 16px;
+  overflow: hidden;
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note[data-tone='attention'] {
+  color: var(--fgColor-attention);
+}
+
+.note[data-tone='danger'] {
+  color: var(--fgColor-danger);
+}
+
+/* The models node: a provider per row, tinted while an agent calls it. */
+.providers {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.provider {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 34px;
+  padding: 0 var(--base-size-8) 0 var(--base-size-12);
+  transition: background-color var(--motion-transition-stateChange);
+}
+
+.provider + .provider {
+  border-block-start: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+
+/* The model keeps its badge whole as far as it can; what it serves gives way first. */
+.provider > :first-child {
+  flex: 0 0 auto;
+  max-width: 60%;
+}
+
+.serves {
+  min-width: 0;
+  margin-inline-start: auto;
+  padding-inline-start: var(--base-size-12);
+  overflow: hidden;
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider[data-busy] {
+  background-color: var(--bgColor-accent-muted);
+}
+
+/* Under the graph: the legend's toggle on the left, the zoom on the right, never over the graph. */
+.panelFoot {
+  border-block-start: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+
+.footBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--base-size-8);
+  padding: var(--base-size-4) var(--base-size-8) var(--base-size-4) var(--base-size-8);
+}
+
+.zoom {
+  display: flex;
+  gap: 2px;
+}
+
+/* On a touch screen, every control of the panel is a 44 px target: the search, the filters, the legend, the zoom. */
+@media (pointer: coarse) {
+  .control {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .search {
+    min-height: 44px;
+  }
+}
+
+.legendDrawer {
+  overflow: hidden;
+}
+
+/* Every kind of connector, then what each animation means. */
+.legendBar {
+  display: grid;
+  gap: var(--base-size-8);
+  padding: var(--base-size-4) var(--base-size-16) var(--base-size-12);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-6) var(--base-size-16);
+  margin: 0;
+  padding: 0;
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+  list-style: none;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-6);
+}
+
+.legendCard {
+  width: 22px;
+  height: 12px;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-full);
+  background-color: var(--bgColor-default);
+  box-shadow: var(--shadow-floating-small);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .port,
+  .row {
+    transition: none;
+  }
+
+  .row[data-landed] {
+    animation: none;
+  }
+}
