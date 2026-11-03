@@ -54,7 +54,8 @@ On ne voyait ni où était une issue, ni par où elle était passée. Une premi�
 - Dans une ligne du graphe, l'état est l'icône d'état et la teinte de la ligne, pour tenir sur la ligne ; le `Label` d'état reste celui des détails de l'issue. Quand aucun texte visible ne dit l'état (ligne compacte, type à sa place), un texte caché le dit aux lecteurs d'écran.
 - La station Déploiement lit les déploiements GitHub du sha fusionné :
   - `factory-deploy.py` (dépôt de la factory) poste un déploiement et son état, avec la permission « Deployments » en écriture de l'App de la factory ;
-  - l'App de lecture de factory-live gagne « Deployments » en lecture, en plus des permissions de l'ADR 0003 : son manifeste la demande, une App déjà créée l'ajoute dans ses réglages ;
+  - factory-live ne lit que l'environnement `local` de ces déploiements : GitHub Pages déploie aussi chaque commit de main, dans l'environnement `github-pages` ;
+  - sur un dépôt public, les déploiements se lisent sans permission ; pour un dépôt privé, l'App de lecture de factory-live gagne « Deployments » en lecture, en plus des permissions de l'ADR 0003 (son manifeste la demande, une App déjà créée l'ajoute dans ses réglages) ;
   - une lecture refusée laisse le déploiement inconnu sans gêner le reste.
     Sans déploiement lisible, une issue fusionnée à main verte passe à Terminé.
 - Le serveur lit en plus les revues d'une PR, sa date et son commit de fusion, les checks de main sur ce commit et son déploiement.

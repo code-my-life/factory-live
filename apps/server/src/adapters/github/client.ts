@@ -11,6 +11,9 @@ import type { TokenSource } from './app.ts';
 
 export type { IssueInfo };
 
+/** The environment of the deployments `factory-deploy.py` posts for the factory's local deployments. */
+export const DEPLOY_ENVIRONMENT = 'local';
+
 export class GitHubError extends Error {
   readonly status: number;
   /** Refus décidé par factory-live avant d'appeler GitHub : aucun accès, ou connexion requise. */
@@ -218,11 +221,14 @@ export class GitHubClient implements GitHubWritePort {
     };
   }
 
-  /** The last GitHub deployment of a sha (posted by the factory's `factory-deploy.py`) and its status. */
+  /**
+   * The last GitHub deployment of a sha that the factory's `factory-deploy.py` posted (environment
+   * `local`), and its status. GitHub Pages deploys every commit of main too: those are not the app's.
+   */
   async deployment(repo: string, sha: string): Promise<DeploymentState> {
     const deployments = (await this.request(
       'GET',
-      this.path(repo, `/deployments?sha=${sha}&per_page=1`),
+      this.path(repo, `/deployments?sha=${sha}&environment=${DEPLOY_ENVIRONMENT}&per_page=1`),
     )) as Json[];
     const latest = Array.isArray(deployments) ? deployments[0] : undefined;
     if (!latest) return 'none';

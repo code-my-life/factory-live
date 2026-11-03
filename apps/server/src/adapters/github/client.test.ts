@@ -148,6 +148,26 @@ describe('GitHubClient', () => {
     expect(client.rateLimit).toMatchObject({ remaining: 4812, limit: 5000 });
   });
 
+  it('lit le déploiement local du sha fusionné, jamais celui de GitHub Pages', async () => {
+    // GitHub Pages deploys every commit of main too (environment « github-pages »): only the
+    // deployments factory-deploy.py posts (environment « local ») tell the Déploiement station.
+    const { impl, calls } = fakeFetch({
+      '/repos/code-my-life/factory-live/deployments?sha=c0ffee1&environment=local&per_page=1': () =>
+        json([{ id: 11, environment: 'local' }]),
+      '/repos/code-my-life/factory-live/deployments/11/statuses?per_page=1': () =>
+        json([{ state: 'in_progress' }]),
+      '/repos/code-my-life/factory-live/deployments?sha=c0ffee1&per_page=1': () =>
+        json([{ id: 99, environment: 'github-pages' }]),
+      '/repos/code-my-life/factory-live/deployments/99/statuses?per_page=1': () =>
+        json([{ state: 'success' }]),
+    });
+    const client = new GitHubClient('jeton', 'code-my-life', 'https://api.github.com', impl);
+    expect(await client.deployment('factory-live', 'c0ffee1')).toBe('pending');
+    expect(calls.map((call) => call.url)).not.toContain(
+      'https://api.github.com/repos/code-my-life/factory-live/deployments?sha=c0ffee1&per_page=1',
+    );
+  });
+
   it('retrouve la PR d’une branche du dépôt, ou rien', async () => {
     const { impl, calls } = fakeFetch({
       'head=code-my-life%3Afix%2F2-server-version-in-settings&state=all&sort=created&direction=desc&per_page=1':
