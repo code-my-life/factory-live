@@ -32,6 +32,8 @@ export class GitHubCache implements GitHubReadPort {
   private readonly fetchedOnce = new Set<string>();
   /** Issues introuvables sur GitHub (cartes de test, dépôt supprimé) : relues une fois l'heure. */
   private readonly missing = new Map<string, number>();
+  /** Optional reads GitHub has refused once (a permission the App lacks): told once in the log. */
+  private readonly refused = new Set<string>();
   status: GitHubStatus = { ok: false, detail: msg('health.github.notYet'), checkedAt: null };
   lastDelivery: { at: number; status: number } | null = null;
 
@@ -88,11 +90,16 @@ export class GitHubCache implements GitHubReadPort {
             pr.number,
           );
           // Merged: main's CI and the deployment of the merged sha tell how far the delivery has gone.
+          // Each is read apart: one GitHub refuses stays unknown, and the PR and the next issues go on.
           const view: PullRequestView = mergeSha
             ? {
                 ...fetched,
-                mainChecks: await this.client.mainChecks(pr.repo, mergeSha),
-                deployment: await this.client.deployment(pr.repo, mergeSha),
+                mainChecks: await this.optional('mainChecks', () =>
+                  this.client.mainChecks(pr.repo, mergeSha),
+                ),
+                deployment: await this.optional('deployment', () =>
+                  this.client.deployment(pr.repo, mergeSha),
+                ),
               }
             : fetched;
           if (JSON.stringify(view) !== JSON.stringify(this.prs.get(issue.key))) {
@@ -135,6 +142,20 @@ export class GitHubCache implements GitHubReadPort {
       }
     }
     return changed;
+  }
+
+  /** A read that GitHub may refuse without the rest failing: `null` then, told once in the log. */
+  private async optional<T>(what: string, read: () => Promise<T>): Promise<T | null> {
+    try {
+      return await read();
+    } catch (error) {
+      if (!this.refused.has(what)) {
+        this.refused.add(what);
+        const status = error instanceof GitHubError ? error.status : 0;
+        this.log.warn({ what, status }, 'lecture GitHub refusée, laissée inconnue');
+      }
+      return null;
+    }
   }
 
   private async pullRequestOfBranch(

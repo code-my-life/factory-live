@@ -40,6 +40,55 @@ describe('GitHubCache', () => {
     expect(logger.info).toHaveBeenCalledOnce();
   });
 
+  it('un déploiement que GitHub refuse de lire ne fait perdre ni la PR fusionnée ni les issues suivantes', async () => {
+    const { client, issue } = fakeClient();
+    const pullRequest = vi.fn((repo: string, number: number) =>
+      Promise.resolve({
+        number,
+        url: `https://github.com/code-my-life/${repo}/pull/${number}`,
+        title: 'feat: ligne',
+        state: 'merged' as const,
+        checks: 'success' as const,
+        reviewDecision: 'approved' as const,
+        autoMerge: false,
+        additions: 1,
+        deletions: 1,
+        changedFiles: 1,
+        reviews: [],
+        mergedAt: '2026-11-03T18:00:00.000Z',
+        mainChecks: null,
+        deployment: null,
+        headSha: 'b055de5',
+        mergeSha: 'c0ffee1',
+      }),
+    );
+    const mainChecks = vi.fn(() => Promise.resolve('success' as const));
+    // The App lacks the Deployments permission: GitHub answers 403 on the deployments.
+    const deployment = vi.fn(() =>
+      Promise.reject(new GitHubError(403, 'Resource not accessible by integration')),
+    );
+    Object.assign(client, { pullRequest, mainChecks, deployment });
+    const cache = new GitHubCache(client, 'code-my-life', log(), () => 'App reliée');
+    await cache.refresh(
+      [
+        {
+          key: 'factory-live#18',
+          prUrl: 'https://github.com/code-my-life/factory-live/pull/19',
+          active: true,
+        },
+        { key: 'cv-site#49', prUrl: null, active: true },
+      ],
+      0,
+    );
+    expect(cache.pullRequest('factory-live#18')).toMatchObject({
+      state: 'merged',
+      mainChecks: 'success',
+      deployment: null,
+    });
+    expect(issue.mock.calls.filter(([, number]) => number === 49)).toHaveLength(1);
+    expect(cache.status).toMatchObject({ ok: true });
+  });
+
   it('retrouve la PR par sa branche quand aucun run n’en a noté le lien', async () => {
     const { client } = fakeClient();
     const pullRequestOfBranch = vi.fn(() => Promise.resolve(3));
