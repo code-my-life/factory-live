@@ -144,14 +144,22 @@ export class GitHubCache implements GitHubReadPort {
     return changed;
   }
 
-  /** A read that GitHub may refuse without the rest failing: `null` then, told once in the log. */
+  /**
+   * A read the App may not be allowed (403) or GitHub may not have (404): `null` then, told once in
+   * the log, and the rest goes on. Any other failure (a timeout, a 5xx, a 403 of a rate limit) is
+   * thrown: the issue keeps its last view and is read again at the next pass, so that a deployment
+   * under way is not taken for done.
+   */
   private async optional<T>(what: string, read: () => Promise<T>): Promise<T | null> {
     try {
       return await read();
     } catch (error) {
+      const status = error instanceof GitHubError ? error.status : 0;
+      const refused =
+        status === 404 || (status === 403 && !/rate limit/i.test((error as Error).message));
+      if (!refused) throw error;
       if (!this.refused.has(what)) {
         this.refused.add(what);
-        const status = error instanceof GitHubError ? error.status : 0;
         this.log.warn({ what, status }, 'lecture GitHub refusée, laissée inconnue');
       }
       return null;
