@@ -103,6 +103,7 @@ export function Particle({
     <motion.span
       className={styles.comet}
       data-kind={kind}
+      data-edge={edge.id}
       data-loop=""
       style={{
         offsetPath: `path("${edge.d}")`,
@@ -132,6 +133,7 @@ export function Traveller({
   return (
     <motion.div
       className={styles.traveller}
+      data-traveller={issue.key}
       style={{ offsetPath: `path("${path}")`, offsetRotate: '0deg' }}
       initial={{ offsetDistance: '0%', opacity: 0, scale: 0.92 }}
       animate={{ offsetDistance: '100%', opacity: [0, 1, 1, 0], scale: [0.92, 1, 1, 0.96] }}

@@ -2,6 +2,7 @@ import type { IssueSummary } from '@factory-live/contracts';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../../i18n/I18nProvider.tsx';
+import { MotionProvider } from '../../../ui/motion.tsx';
 import { FactoryGraph } from './FactoryGraph.tsx';
 import { boxOf } from './model.ts';
 import type { LineIssue } from './model.ts';
@@ -156,6 +157,53 @@ describe('FactoryGraph', () => {
     await waitFor(() => expect(done(container)).toEqual(['cv-site#3', 'cv-site#1']));
     expect(row(container, 'cv-site#3')).not.toHaveAttribute('data-dimmed');
     expect(screen.getByText('et 2 autres')).toBeInTheDocument();
+  });
+
+  it('une issue qui change de poste voyage le long des liens et paraît à l’arrivée ; en pause, sans trajet', () => {
+    const at = (station: IssueSummary['station']) => ({
+      station,
+      lane: null,
+      outcome: null,
+      at: '2026-11-03T17:00:00Z',
+    });
+    const moving = (station: IssueSummary['station'], stations: IssueSummary['station'][]) => {
+      const summary = {
+        ...issue('cv-site#46', 'CODEOWNERS sur main', station),
+        journey: stations.map(at),
+      };
+      return [{ issue: summary, box: boxOf(summary), agent: null, intervention: null }];
+    };
+    const view = (items: LineIssue[]) => (
+      <I18nProvider>
+        <MotionProvider>
+          <FactoryGraph
+            items={items}
+            providers={[]}
+            selectedKey={null}
+            onSelect={() => undefined}
+            now={NOW}
+            maxInProgress={2}
+          />
+        </MotionProvider>
+      </I18nProvider>
+    );
+
+    // Merged: the issue leaves Fusion for CI de main, as a card along the line's connector.
+    const live = render(view(moving('merge', ['review', 'merge'])));
+    live.rerender(view(moving('ci', ['review', 'merge', 'ci'])));
+    const card = live.container.querySelector('[data-traveller="cv-site#46"]') as HTMLElement;
+    expect(card.style.offsetPath).toMatch(/^path\("M /);
+    const arriving = (container: HTMLElement) =>
+      container.querySelector('[data-box="ci"] [data-issue="cv-site#46"]') as HTMLElement;
+    expect(arriving(live.container)).toHaveAttribute('data-arriving');
+    live.unmount();
+
+    // Paused: the issue changes box at once, without a trip.
+    localStorage.setItem('factory-live:motion', 'paused');
+    const paused = render(view(moving('merge', ['review', 'merge'])));
+    paused.rerender(view(moving('ci', ['review', 'merge', 'ci'])));
+    expect(paused.container.querySelector('[data-traveller]')).toBeNull();
+    expect(arriving(paused.container)).not.toHaveAttribute('data-arriving');
   });
 
   it('place chaque issue dans une seule boîte, celle de sa station', () => {
