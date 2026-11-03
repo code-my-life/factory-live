@@ -1,128 +1,63 @@
-import type { IssueSummary, StationId } from '@factory-live/contracts';
-import { BellIcon, PeopleIcon } from '@primer/octicons-react';
-import { Banner, Button, Heading, VisuallyHidden } from '@primer/react';
-import { LayoutGroup } from 'motion/react';
-import { Link, useNavigate } from 'react-router';
+import type { CardKind, StationId } from '@factory-live/contracts';
+import { Heading } from '@primer/react';
+import { useMemo, useState } from 'react';
+import { useParams } from 'react-router';
 import { useSnapshot } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
-import { AgentBadge } from '../../ui/badge/AgentBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
-import { FlowLine } from '../../ui/flow/FlowLine.tsx';
-import type { LineStep } from '../../ui/flow/FlowLine.tsx';
 import { MotionToggle } from '../../ui/motion.tsx';
+import { issueKeyFromParams } from '../../ui/paths.ts';
 import { useNow } from '../../ui/useNow.ts';
-import { LINE_STATIONS } from '../../ui/vocabulary.ts';
-import { JobList } from '../../ui/work/JobBox.tsx';
-import {
-  WorkStateLabel,
-  cardWorkState,
-  interventionHeadline,
-  interventionTone,
-} from '../../ui/work/workState.tsx';
-import { IssueJob } from './IssueJob.tsx';
-import { LiveActivity } from './LiveActivity.tsx';
-import { LiveAgents } from './LiveAgents.tsx';
-import { STATION_ICON } from '../../ui/flow/StationMark.tsx';
-import { StationCounter, StationCrew, stationTone } from './stations.tsx';
+import { IssuePage } from '../issues/IssuePage.tsx';
+import { FactoryGraph } from './graph/FactoryGraph.tsx';
+import { lineIssues, providerRows } from './graph/model.ts';
 import styles from './line.module.css';
 
-/** Une issue qui vient de changer de station : le compteur de la station d'arrivée bat une fois. */
-const ARRIVAL_WINDOW_MS = 1_500;
-const WORKING = new Set(['thinking', 'tool', 'cli']);
-/** Stations de bord : leurs issues se résument en tête et titre. */
-const COMPACT = new Set<StationId>(['intake', 'done']);
-/** Issues les plus urgentes d'abord : ce qui t'attend, ce qui bloque, puis ce qui avance. */
-const ISSUE_ORDER: Record<IssueSummary['status'], number> = {
-  waiting_human: 0,
-  blocked: 1,
-  active: 2,
-  queued: 3,
-  done: 4,
-  stopped: 5,
+/** The card at work at a station: its runs open under the graph. */
+const CARD_AT: Partial<Record<StationId, CardKind>> = {
+  intake: 'brief',
+  brief: 'brief',
+  implementation: 'impl',
+  gate: 'impl',
+  review: 'impl',
+  merge: 'release',
+  ci: 'release',
+  deploy: 'release',
+  release: 'release',
+  done: 'release',
+  diagnostic: 'diagnostic',
 };
 
-function recentlyMoved(issue: IssueSummary, now: number): boolean {
-  return Boolean(
-    issue.previousStation &&
-    issue.stationChangedAt &&
-    now - Date.parse(issue.stationChangedAt) < ARRIVAL_WINDOW_MS,
-  );
-}
-
+/**
+ * The line page: the factory as a graph of its stations, and under it the open issue's details only.
+ * A link to an issue (`/issues/:repo/:number`) opens the line on that issue; otherwise, what waits for
+ * the owner opens first.
+ */
 export function FactoryLinePage() {
-  const { t, text } = useI18n();
+  const { t } = useI18n();
   const snapshot = useSnapshot();
-  const navigate = useNavigate();
   const now = useNow();
-  const stations = LINE_STATIONS.flatMap((id) =>
-    snapshot.stations.filter((station) => station.id === id),
-  );
-  const issuesAt = (id: StationId) => snapshot.issues.filter((issue) => issue.station === id);
-  const agentsAt = (id: StationId) => snapshot.agents.filter((agent) => agent.station === id);
-  const arrivedAt = (id: StationId) => issuesAt(id).some((issue) => recentlyMoved(issue, now));
+  const params = useParams();
+  const fromLink = issueKeyFromParams(params.repo, params.number);
+  const items = useMemo(() => lineIssues(snapshot), [snapshot]);
+  const providers = useMemo(() => providerRows(snapshot.agents), [snapshot.agents]);
 
-  const steps: LineStep[] = stations.map((station, index) => {
-    const agents = agentsAt(station.id);
-    const issues = issuesAt(station.id).sort(
-      (left, right) =>
-        ISSUE_ORDER[left.status] - ISSUE_ORDER[right.status] ||
-        right.updatedAt.localeCompare(left.updatedAt),
-    );
-    const following = stations[index + 1];
-    const compact = COMPACT.has(station.id);
-    const label = t.station[station.id];
-    return {
-      id: station.id,
-      icon: STATION_ICON[station.id],
-      tone: stationTone(station.id, agents, issues),
-      compact,
-      aside: <StationCounter count={issues.length} arrived={arrivedAt(station.id)} />,
-      title: (
-        <>
-          {label}
-          <VisuallyHidden>{t.line.stepIssues(issues.length)}</VisuallyHidden>
-        </>
-      ),
-      meta: <StationCrew station={station} agents={agents} />,
-      flowing: following ? agentsAt(following.id).some((agent) => WORKING.has(agent.state)) : false,
-      children:
-        issues.length > 0 ? (
-          <JobList label={t.line.issuesAt(label)}>
-            {issues.map((issue) => (
-              <IssueJob
-                key={issue.key}
-                issue={issue}
-                agent={
-                  snapshot.agents.find(
-                    (agent) => agent.issueKey === issue.key && agent.state !== 'idle',
-                  ) ?? null
-                }
-                intervention={
-                  snapshot.interventions.find(
-                    (intervention) =>
-                      !intervention.resolvedAt && issue.interventionIds.includes(intervention.id),
-                  ) ?? null
-                }
-                maxInProgress={snapshot.factory.maxInProgress}
-                compact={compact}
-                now={now}
-              />
-            ))}
-          </JobList>
-        ) : null,
-    };
-  });
+  // The owner's pick holds for the link it was made on; until then, or after another link, the
+  // link's issue opens, else the first that waits for the owner. `null`: the owner closed it.
+  const [choice, setChoice] = useState<{ link: string | null; key: string | null } | null>(null);
+  const selected =
+    choice && choice.link === fromLink
+      ? choice.key
+      : (fromLink ??
+        items.find((item) => item.issue.status === 'waiting_human')?.issue.key ??
+        null);
+  const open = items.find((item) => item.issue.key === selected) ?? null;
 
-  const pushable = snapshot.interventions.filter(
-    (intervention) => intervention.push && !intervention.resolvedAt,
-  );
-  // Rouge si l'une des interventions bloque, jaune si elles ne sont qu'à traiter.
-  const blocking = pushable.some((intervention) => interventionTone(intervention) === 'danger');
   const lastEvent = [...snapshot.activity].sort((left, right) =>
     right.at.localeCompare(left.at),
   )[0];
-  const open = snapshot.issues.filter(
-    (issue) => issue.status !== 'done' && issue.status !== 'stopped',
+  const running = items.filter(
+    (item) => item.issue.status !== 'done' && item.issue.status !== 'stopped',
   ).length;
 
   return (
@@ -133,7 +68,7 @@ export function FactoryLinePage() {
             {t.line.title}
           </Heading>
           <p className={styles.pageSubtitle}>
-            {t.line.openIssues(open)}
+            {t.line.openIssues(running)}
             {lastEvent ? (
               <>
                 {' · '}
@@ -147,85 +82,24 @@ export function FactoryLinePage() {
         </div>
       </header>
 
-      {pushable.length > 0 ? (
-        <Banner
-          variant={blocking ? 'critical' : 'warning'}
-          title={t.line.blockersWaiting(pushable.length)}
-          description={
-            <ul className={styles.blockers}>
-              {pushable.map((intervention) => (
-                <li key={intervention.id}>
-                  {t.line.blockerItem(
-                    intervention.issueKey,
-                    text(interventionHeadline(intervention)),
-                  )}
-                </li>
-              ))}
-            </ul>
-          }
-          primaryAction={
-            <Banner.PrimaryAction
-              leadingVisual={BellIcon}
-              onClick={() => void navigate('/interventions')}
-            >
-              {t.line.seeInterventions}
-            </Banner.PrimaryAction>
-          }
+      <FactoryGraph
+        items={items}
+        providers={providers}
+        selectedKey={selected}
+        onSelect={(key) => setChoice({ link: fromLink, key: selected === key ? null : key })}
+        now={now}
+        maxInProgress={snapshot.factory.maxInProgress}
+      />
+
+      {open ? (
+        <IssuePage
+          key={open.issue.key}
+          issueKey={open.issue.key}
+          cardKind={CARD_AT[open.issue.station] ?? null}
         />
-      ) : null}
-
-      <LayoutGroup>
-        <FlowLine steps={steps} label={t.line.label} />
-      </LayoutGroup>
-
-      <div className={styles.columns}>
-        <section className={styles.panel} aria-labelledby="live-title">
-          <header className={styles.panelHead}>
-            <h2 id="live-title" className={styles.panelTitle}>
-              {t.line.now}
-            </h2>
-            <Button
-              as={Link}
-              to="/agents"
-              size="small"
-              variant="invisible"
-              leadingVisual={PeopleIcon}
-            >
-              {t.line.allAgents}
-            </Button>
-          </header>
-          <LiveAgents agents={snapshot.agents} maxInProgress={snapshot.factory.maxInProgress} />
-        </section>
-        <LiveActivity events={snapshot.activity} />
-      </div>
-
-      {snapshot.sideCards.length > 0 ? (
-        <section className={styles.panel} aria-labelledby="side-title">
-          <header className={styles.panelHead}>
-            <h2 id="side-title" className={styles.panelTitle}>
-              {t.station.side}
-            </h2>
-          </header>
-          <ul className={styles.sideList}>
-            {snapshot.sideCards.map((card) => (
-              <li key={card.id} className={styles.sideItem}>
-                <span className={styles.sideText}>
-                  <span className={styles.sideTitle}>{card.title}</span>
-                  <span className={styles.sideMeta}>
-                    <WorkStateLabel state={cardWorkState(card, null, t)} />
-                    {card.assignee ? <AgentBadge profile={card.assignee} /> : null}
-                    <span>
-                      {card.assignee ? null : `${t.issue.unassigned} · `}
-                      <Elapsed since={card.openedAt} mode="age" />
-                    </span>
-                  </span>
-                  {card.note ? <span className={styles.sideNote}>{card.note}</span> : null}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      ) : (
+        <p className={styles.pageSubtitle}>{t.line.graph.selectHint}</p>
+      )}
     </div>
   );
 }

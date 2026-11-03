@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { GitHubClient, GitHubError, checksOf, reviewDecisionOf } from './client.ts';
+import {
+  GitHubClient,
+  GitHubError,
+  checksOf,
+  deploymentStateOf,
+  reviewDecisionOf,
+  reviewsOf,
+} from './client.ts';
 
 interface Call {
   url: string;
@@ -71,6 +78,38 @@ describe('reviewDecisionOf', () => {
   });
 });
 
+describe('reviewsOf', () => {
+  it('garde les revues tranchées, de la plus ancienne à la plus récente', () => {
+    expect(
+      reviewsOf([
+        { user: { login: 'cddev' }, state: 'APPROVED', submitted_at: '2026-11-03T10:05:00Z' },
+        { user: { login: 'cddev' }, state: 'COMMENTED', submitted_at: '2026-11-03T10:01:00Z' },
+        {
+          user: { login: 'cddev' },
+          state: 'CHANGES_REQUESTED',
+          submitted_at: '2026-11-03T10:00:00Z',
+        },
+      ]),
+    ).toEqual([
+      { state: 'changes_requested', at: '2026-11-03T10:00:00.000Z' },
+      { state: 'approved', at: '2026-11-03T10:05:00.000Z' },
+    ]);
+  });
+});
+
+describe('deploymentStateOf', () => {
+  it('lit le dernier statut du dernier déploiement du sha', () => {
+    expect(deploymentStateOf([], [])).toBe('none');
+    expect(deploymentStateOf([{ id: 7 }], [])).toBe('pending');
+    expect(deploymentStateOf([{ id: 7 }], [{ state: 'in_progress' }])).toBe('pending');
+    expect(deploymentStateOf([{ id: 7 }], [{ state: 'success' }, { state: 'queued' }])).toBe(
+      'success',
+    );
+    expect(deploymentStateOf([{ id: 7 }], [{ state: 'error' }])).toBe('failure');
+    expect(deploymentStateOf([{ id: 7 }], [{ state: 'inactive' }])).toBe('success');
+  });
+});
+
 describe('GitHubClient', () => {
   it('lit une issue avec le jeton, et relit par ETag sans consommer le quota', async () => {
     let first = true;
@@ -107,6 +146,26 @@ describe('GitHubClient', () => {
     expect(new Headers(calls[0]?.init.headers).get('authorization')).toBe('Bearer jeton');
     expect(new Headers(calls[1]?.init.headers).get('if-none-match')).toBe('W/"abc"');
     expect(client.rateLimit).toMatchObject({ remaining: 4812, limit: 5000 });
+  });
+
+  it('lit le déploiement local du sha fusionné, jamais celui de GitHub Pages', async () => {
+    // GitHub Pages deploys every commit of main too (environment « github-pages »): only the
+    // deployments factory-deploy.py posts (environment « local ») tell the Déploiement station.
+    const { impl, calls } = fakeFetch({
+      '/repos/code-my-life/factory-live/deployments?sha=c0ffee1&environment=local&per_page=1': () =>
+        json([{ id: 11, environment: 'local' }]),
+      '/repos/code-my-life/factory-live/deployments/11/statuses?per_page=1': () =>
+        json([{ state: 'in_progress' }]),
+      '/repos/code-my-life/factory-live/deployments?sha=c0ffee1&per_page=1': () =>
+        json([{ id: 99, environment: 'github-pages' }]),
+      '/repos/code-my-life/factory-live/deployments/99/statuses?per_page=1': () =>
+        json([{ state: 'success' }]),
+    });
+    const client = new GitHubClient('jeton', 'code-my-life', 'https://api.github.com', impl);
+    expect(await client.deployment('factory-live', 'c0ffee1')).toBe('pending');
+    expect(calls.map((call) => call.url)).not.toContain(
+      'https://api.github.com/repos/code-my-life/factory-live/deployments?sha=c0ffee1&per_page=1',
+    );
   });
 
   it('retrouve la PR d’une branche du dépôt, ou rien', async () => {

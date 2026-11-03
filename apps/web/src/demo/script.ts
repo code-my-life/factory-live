@@ -341,7 +341,7 @@ export function buildScript(): ScenarioStep[] {
         });
         const pr = state.details[KEYS.contact]?.issue.pr;
         patchIssue(state, KEYS.contact, {
-          station: 'release',
+          station: 'review',
           status: 'waiting_human',
           activeProfiles: [],
           updatedAt: iso(now),
@@ -587,6 +587,10 @@ export function buildScript(): ScenarioStep[] {
             additions: 184,
             deletions: 23,
             changedFiles: 3,
+            reviews: [],
+            mergedAt: null,
+            mainChecks: null,
+            deployment: null,
           },
           updatedAt: iso(now),
         });

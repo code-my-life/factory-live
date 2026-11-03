@@ -297,6 +297,10 @@ describe('DiagnosisService, branche et PR', () => {
                 additions: 10,
                 deletions: 2,
                 changedFiles: 4,
+                reviews: [],
+                mergedAt: null,
+                mainChecks: null,
+                deployment: null,
               }
             : null,
       },

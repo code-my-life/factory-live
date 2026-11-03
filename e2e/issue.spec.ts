@@ -1,17 +1,13 @@
 import { expect, test } from '@playwright/test';
 
-test('le graphe d’une issue montre ses cartes ; en choisir une donne ses runs, puis sa transcription', async ({
+test('la ligne ouverte sur une issue montre sous le graphe les runs de la carte au travail, puis sa transcription', async ({
   page,
 }) => {
   await page.goto('/issues/claude-cockpit/71');
-  const graph = page.getByRole('group', { name: 'Graphe des cartes de l’issue' });
-  for (const step of ['Brief', 'Implémentation', 'Release'])
-    await expect(graph).toContainText(step);
-  const brief = graph.getByRole('button', { name: /Vue ÉQUIPE/ });
-  await brief.click();
-  await expect(brief).toHaveAttribute('aria-pressed', 'true');
-  // Ordinateur : le tableau des runs ; téléphone : leurs fiches. Seul ce qui est visible compte.
-  await expect(page.getByText('#181').filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: /Vue ÉQUIPE/ })).toBeVisible();
+  // The issue is at Implémentation: its implementation card and its running run open.
+  // Computer: the table of runs; phone: their cards. Only what is visible counts.
+  await expect(page.getByText('#184').filter({ visible: true }).first()).toBeVisible();
   await page
     .getByRole('button', { name: /Transcription/ })
     .filter({ visible: true })
@@ -27,11 +23,6 @@ test('transcription : la session du plus récent au plus ancien, le terminal ouv
   page,
 }) => {
   await page.goto('/issues/claude-cockpit/71');
-  await page
-    .getByRole('group', { name: 'Graphe des cartes de l’issue' })
-    .getByRole('button', { name: /regrouper les cartes par projet/ })
-    .filter({ hasNotText: 'Vue ÉQUIPE' })
-    .click();
   await page
     .getByRole('button', { name: /Transcription/ })
     .filter({ visible: true })
@@ -77,11 +68,6 @@ test('transcription : les lanes nommées tiennent sur une ligne de 28 px', async
   if (skipMobile) return;
 
   await page.goto('/issues/claude-cockpit/71');
-  await page
-    .getByRole('group', { name: 'Graphe des cartes de l’issue' })
-    .getByRole('button', { name: /regrouper les cartes par projet/ })
-    .filter({ hasNotText: 'Vue ÉQUIPE' })
-    .click();
   await page
     .getByRole('button', { name: /Transcription/ })
     .filter({ visible: true })

@@ -19,6 +19,7 @@ import { DiagnosisService } from './application/diagnosis.ts';
 import { Hub } from './application/hub.ts';
 import { createLogger } from './logger.ts';
 import { notifyOpened } from './application/notify.ts';
+import { KEEP_FINISHED_MS } from './application/projection.ts';
 import { trackUnblockReactions } from './application/unblock.ts';
 
 /** Racine de composition : configuration, adaptateurs, hub, minuteries, serveur HTTP. */
@@ -98,7 +99,7 @@ const hub = new Hub(
     dashboardUrl: config.DASHBOARD_URL,
     addresses: config.addresses,
     heldAfterSeconds: config.HELD_AFTER_MINUTES * 60,
-    keepFinishedMs: 24 * 3600_000,
+    keepFinishedMs: KEEP_FINISHED_MS,
   },
   { store, profiles, github, diagnoses, log: log.child({ component: 'hub' }), now },
 );

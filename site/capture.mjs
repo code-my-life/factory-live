@@ -50,17 +50,25 @@ const SHOTS = [
   },
   { name: 'line-tablet', device: TABLET, route: '/' },
   { name: 'line-phone', device: PHONE, route: '/' },
+  // The graph opens on the whole factory, smaller than life: its crop is taken at a higher density.
   {
     name: 'live',
-    device: DESKTOP,
+    device: { ...DESKTOP, deviceScaleFactor: 4 },
     route: '/',
-    clip: (page) => box(page, ['section[aria-labelledby="live-title"]']),
+    // The stations where an agent calls a model, whole, and the providers that feed them.
+    clip: (page) =>
+      box(page, [
+        '[data-box="brief"]',
+        '[data-box="implementation"]',
+        '[data-box="diagnostic"]',
+        '[data-box="models"]',
+      ]),
   },
   {
     name: 'issue-cards',
     device: DESKTOP,
     route: '/issues/claude-cockpit/71',
-    clip: (page) => box(page, ['section[aria-labelledby="graph-title"]']),
+    clip: (page) => box(page, ['main article > header', 'main article table']),
   },
   {
     name: 'intervention',

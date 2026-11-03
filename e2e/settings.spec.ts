@@ -43,7 +43,7 @@ test('la langue se choisit dans Réglages : l’interface change tout de suite e
   await expect(html).toHaveAttribute('lang', 'en');
   await page.goto('/');
   await expect(title).toHaveText('Factory line');
-  await expect(page.getByRole('group', { name: /^Factory line: the stages/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'The factory line' })).toBeVisible();
   await page.goto('/health');
   await expect(title).toHaveText('Health');
 

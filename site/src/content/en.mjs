@@ -6,7 +6,7 @@ export default {
     description:
       'A real-time window on a software factory run by Hermes Agent: the factory line, every card of every issue, agents and models, and the interventions you answer from your smartphone. A Progressive Web App, installed from the browser.',
     ogAlt:
-      'The factory line of factory-live: six stations, a box for each issue, its state and its agent.',
+      'The factory line of factory-live: a graph of its stations from intake to done, a row for each issue with its state and its agent.',
   },
   skip: 'Skip to content',
   nav: {
@@ -26,7 +26,7 @@ export default {
     cta: 'Try the live demo',
     source: 'Source on GitHub',
     note: 'It installs from the browser on a computer, a tablet or a smartphone, with no store. The demo replays an afternoon of the factory in your browser; the interface is in French.',
-    alt: 'The factory line in factory-live: six stations from intake to done, a box for each issue with its state and its agent, and two blockers waiting for a decision.',
+    alt: 'The factory line in factory-live: a graph of nine stations from intake to done, the four proofs of the gate, a row for each issue with its state and its agent, and what waits for your decision.',
   },
   screens: {
     title: 'One app, every screen',
@@ -35,17 +35,17 @@ export default {
       {
         id: 'desktop',
         label: 'Computer',
-        alt: 'factory-live on a computer screen: the navigation on the left, the factory line, what each agent is doing now and the live activity.',
+        alt: 'factory-live on a computer screen: the navigation on the left, the whole factory line as a graph of its stations, and under it the details of the open issue.',
       },
       {
         id: 'tablet',
         label: 'Tablet',
-        alt: 'factory-live on a tablet in portrait: the factory line runs from top to bottom, with the issue boxes side by side.',
+        alt: 'factory-live on a tablet in portrait: the whole factory line across the screen, and under it the details of the open issue.',
       },
       {
         id: 'phone',
         label: 'Smartphone',
-        alt: 'factory-live on a smartphone: the factory line runs down the screen, with the tab bar at the bottom.',
+        alt: 'factory-live on a smartphone: the whole factory line on the screen, zoomed in with two fingers, with the tab bar at the bottom.',
       },
     ],
     text: 'factory-live is a Progressive Web App: it installs from the browser, with no store. Installed, it has its icon on the home screen, opens full screen, sends a push notification when a blocker waits for you, and opens offline on the last state it received.',
@@ -65,16 +65,16 @@ export default {
       {
         id: 'live',
         title: 'Right now',
-        text: 'Every agent at work: the tool it runs, the file it edits, the model that answered.',
+        text: 'Each issue with the agent on it and the model it calls: the feed from a provider flows while its model answers.',
         view: 'ligne',
-        alt: 'What each agent does right now: coder-claude edits a file through Claude Code, gate runs the tests, coordinator waits for a free slot.',
+        alt: 'The stations where an agent calls a model, Brief, Implementation and Diagnosis, and the model providers that feed them: each issue with its state, the agent on it and its model.',
       },
       {
         id: 'issue',
-        title: 'An issue, card by card',
-        text: 'Its card graph, every run with the model it really used, the full transcript, the pull request and its CI.',
+        title: 'An issue and its journey',
+        text: 'Touch an issue: its journey runs along the connectors, and under the graph open its runs with the model really used, the full transcript, the pull request and its CI.',
         view: 'issues',
-        alt: 'The cards of the issue claude-cockpit#71: brief done, implementation running in a Claude Code lane, release waiting, and the runs of the selected card.',
+        alt: 'The details of the issue claude-cockpit#71 under the graph: its harness, model and pull request, and the runs of its card at work.',
       },
       {
         id: 'intervention',

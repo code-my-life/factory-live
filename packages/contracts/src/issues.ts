@@ -7,6 +7,17 @@ import { Text } from './messages.ts';
 export const ChecksState = z.enum(['none', 'pending', 'success', 'failure']);
 export type ChecksState = z.infer<typeof ChecksState>;
 
+/** A decided review of the PR: approved or changes requested. */
+export const PullRequestReview = z.object({
+  state: z.enum(['approved', 'changes_requested']),
+  at: Timestamp,
+});
+export type PullRequestReview = z.infer<typeof PullRequestReview>;
+
+/** The last GitHub deployment of the merged sha. */
+export const DeploymentState = z.enum(['none', 'pending', 'success', 'failure']);
+export type DeploymentState = z.infer<typeof DeploymentState>;
+
 export const PullRequestView = z.object({
   number: z.number().int().positive(),
   url: z.url(),
@@ -18,6 +29,13 @@ export const PullRequestView = z.object({
   additions: z.number().int().nonnegative(),
   deletions: z.number().int().nonnegative(),
   changedFiles: z.number().int().nonnegative(),
+  /** The decided reviews, from the oldest to the most recent: the journey reads its returns there. */
+  reviews: z.array(PullRequestReview).default([]),
+  mergedAt: Timestamp.nullable().default(null),
+  /** Main's workflows on the merged sha; `null` until the PR is merged. */
+  mainChecks: ChecksState.nullable().default(null),
+  /** The last GitHub deployment of the merged sha; `null` until the PR is merged. */
+  deployment: DeploymentState.nullable().default(null),
 });
 export type PullRequestView = z.infer<typeof PullRequestView>;
 
@@ -37,6 +55,31 @@ export const IssueLabel = z.object({
   color: z.string().regex(/^[0-9a-fA-F]{6}$/),
 });
 export type IssueLabel = z.infer<typeof IssueLabel>;
+
+/** The factory's issue types (ADR 0017 of hermes-software-factory), read on the `type:*` label. */
+export const IssueType = z.enum([
+  'bug',
+  'interface',
+  'fonctionnalite',
+  'diagnostic',
+  'tests',
+  'maintenance',
+  'documentation',
+]);
+export type IssueType = z.infer<typeof IssueType>;
+
+/** The gate's proofs, one per family of types. */
+export const GateLane = z.enum(['failfirst', 'sabotage', 'invariance', 'documents']);
+export type GateLane = z.infer<typeof GateLane>;
+
+/** A step of the issue on the line, worked out from the facts (cards, gate verdicts, reviews, main). */
+export const JourneyStep = z.object({
+  station: StationId,
+  lane: GateLane.nullable(),
+  outcome: z.enum(['ok', 'red', 'changes']).nullable(),
+  at: Timestamp,
+});
+export type JourneyStep = z.infer<typeof JourneyStep>;
 
 /** Une issue GitHub traitée par la factory, résumée pour la ligne d'usine et les listes. */
 export const IssueSummary = z.object({
@@ -60,6 +103,12 @@ export const IssueSummary = z.object({
   interventionIds: z.array(z.string()),
   startedAt: Timestamp,
   updatedAt: Timestamp,
+  /** The type read on the `type:*` label; `null` without a type label. */
+  type: IssueType.nullable().default(null),
+  /** The proof the PR goes through at the gate; `null` for a diagnosis. */
+  lane: GateLane.nullable().default(null),
+  /** The stations passed, in order, up to the current one. */
+  journey: z.array(JourneyStep).default([]),
 });
 export type IssueSummary = z.infer<typeof IssueSummary>;
 

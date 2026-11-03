@@ -6,6 +6,7 @@ export * from './gateVerdicts.ts';
 export * from './hermes.ts';
 export * from './interventions.ts';
 export * from './issues.ts';
+export * from './journey.ts';
 export * from './messages.ts';
 export * from './models.ts';
 export * from './redact.ts';

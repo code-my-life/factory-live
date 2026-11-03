@@ -1,7 +1,7 @@
 import type { IssueLabel } from '@factory-live/contracts';
 import type { Run, Task } from '@factory-live/domain';
 import { describe, expect, it } from 'vitest';
-import { projectIssues } from './projection.ts';
+import { KEEP_FINISHED_MS, projectIssues } from './projection.ts';
 import type { ProjectionInput } from './projection.ts';
 
 const CARD = 't_49a1b2c3';
@@ -92,5 +92,47 @@ describe('projectIssues', () => {
     const [summary] = projectIssues(input({ claude_model: 'claude-opus-5-5' }), []);
 
     expect(summary?.claudeModel).toBe('claude-opus-5-5');
+  });
+});
+
+describe('projectIssues, Terminé', () => {
+  const finished = (daysAgo: number): ProjectionInput => {
+    const done = { ...task(), status: 'done' as const, completedAt: T0 };
+    const release: Task = {
+      ...task(),
+      id: 't_rel',
+      title: 'release cv-site#49',
+      status: 'done',
+      completedAt: T0,
+    };
+    return {
+      ...input({}),
+      now: (T0 + daysAgo * 86_400) * 1000,
+      board: { tasks: [done, release], runs: [], events: [], links: [], comments: [] },
+      keepFinishedMs: KEEP_FINISHED_MS,
+    };
+  };
+
+  it('une issue finie il y a 6 jours reste dans Terminé, une de 8 jours en sort', () => {
+    const kept = projectIssues(finished(6), []);
+    expect(kept.map((issue) => [issue.key, issue.station])).toEqual([['cv-site#49', 'done']]);
+    expect(projectIssues(finished(8), [])).toEqual([]);
+  });
+});
+
+describe('projectIssues, type, preuve et trajet', () => {
+  it('lit le type sur l’étiquette, en tire la preuve de la gate et finit le trajet sur la station', () => {
+    const typed: ProjectionInput = {
+      ...input({}),
+      issueInfo: () => ({
+        title: 'titre',
+        url: 'https://github.com/code-my-life/cv-site/issues/49',
+        labels: [...LABELS, { name: 'type:maintenance', color: 'c5def5' }],
+      }),
+    };
+    const [issue] = projectIssues(typed, []);
+    expect(issue?.type).toBe('maintenance');
+    expect(issue?.lane).toBe('invariance');
+    expect(issue?.journey.at(-1)?.station).toBe(issue?.station);
   });
 });

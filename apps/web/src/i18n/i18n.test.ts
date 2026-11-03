@@ -69,8 +69,8 @@ describe('pluriels et nombres dans les textes', () => {
     expect(french.line.openIssues(3)).toBe('3 issues en cours');
     expect(english.line.openIssues(0)).toBe('0 issues in progress');
     expect(english.line.openIssues(1)).toBe('1 issue in progress');
-    expect(french.line.blockersWaiting(2)).toBe('2 blocages t’attendent');
-    expect(english.line.blockersWaiting(1)).toBe('1 blocker waiting for you');
+    expect(french.line.graph.blockers(2)).toBe('2 blocages');
+    expect(english.line.graph.blockers(1)).toBe('1 blocker');
     expect(french.shell.running(1, 2)).toBe('1 carte en cours sur 2');
     expect(english.shell.running(1, 2)).toBe('1 of 2 cards running');
   });

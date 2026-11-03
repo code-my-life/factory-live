@@ -32,6 +32,8 @@ export class GitHubCache implements GitHubReadPort {
   private readonly fetchedOnce = new Set<string>();
   /** Issues introuvables sur GitHub (cartes de test, dépôt supprimé) : relues une fois l'heure. */
   private readonly missing = new Map<string, number>();
+  /** Optional reads GitHub has refused once (a permission the App lacks): told once in the log. */
+  private readonly refused = new Set<string>();
   status: GitHubStatus = { ok: false, detail: msg('health.github.notYet'), checkedAt: null };
   lastDelivery: { at: number; status: number } | null = null;
 
@@ -83,7 +85,23 @@ export class GitHubCache implements GitHubReadPort {
           parsePrUrl(issue.prUrl) ??
           (issue.branch ? await this.pullRequestOfBranch(repo, issue.branch) : null);
         if (pr && pr.owner === this.owner) {
-          const { headSha, ...view } = await this.client.pullRequest(pr.repo, pr.number);
+          const { headSha, mergeSha, ...fetched } = await this.client.pullRequest(
+            pr.repo,
+            pr.number,
+          );
+          // Merged: main's CI and the deployment of the merged sha tell how far the delivery has gone.
+          // Each is read apart: one GitHub refuses stays unknown, and the PR and the next issues go on.
+          const view: PullRequestView = mergeSha
+            ? {
+                ...fetched,
+                mainChecks: await this.optional('mainChecks', () =>
+                  this.client.mainChecks(pr.repo, mergeSha),
+                ),
+                deployment: await this.optional('deployment', () =>
+                  this.client.deployment(pr.repo, mergeSha),
+                ),
+              }
+            : fetched;
           if (JSON.stringify(view) !== JSON.stringify(this.prs.get(issue.key))) {
             this.prs.set(issue.key, view);
             changed = true;
@@ -124,6 +142,28 @@ export class GitHubCache implements GitHubReadPort {
       }
     }
     return changed;
+  }
+
+  /**
+   * A read the App may not be allowed (403) or GitHub may not have (404): `null` then, told once in
+   * the log, and the rest goes on. Any other failure (a timeout, a 5xx, a 403 of a rate limit) is
+   * thrown: the issue keeps its last view and is read again at the next pass, so that a deployment
+   * under way is not taken for done.
+   */
+  private async optional<T>(what: string, read: () => Promise<T>): Promise<T | null> {
+    try {
+      return await read();
+    } catch (error) {
+      const status = error instanceof GitHubError ? error.status : 0;
+      const refused =
+        status === 404 || (status === 403 && !/rate limit/i.test((error as Error).message));
+      if (!refused) throw error;
+      if (!this.refused.has(what)) {
+        this.refused.add(what);
+        this.log.warn({ what, status }, 'lecture GitHub refusée, laissée inconnue');
+      }
+      return null;
+    }
   }
 
   private async pullRequestOfBranch(

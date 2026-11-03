@@ -4,7 +4,6 @@ import {
   GearIcon,
   GraphIcon,
   HistoryIcon,
-  IssueOpenedIcon,
   KebabHorizontalIcon,
   ProjectIcon,
   PulseIcon,
@@ -56,7 +55,6 @@ interface Destination {
 
 const PRIMARY: Destination[] = [
   { to: '/', label: 'line', icon: WorkflowIcon },
-  { to: '/issues', label: 'issues', icon: IssueOpenedIcon },
   { to: '/interventions', label: 'interventions', icon: BellIcon },
   { to: '/agents', label: 'agents', icon: AgentIcon },
 ];
@@ -132,9 +130,6 @@ export function AppShell() {
     if (source.kind === 'live' && connection === 'open') setAppBadge(waiting);
   }, [source.kind, connection, waiting]);
   const unhealthy = snapshot.health.filter((service) => needsWatch(service.status)).length;
-  const activeIssues = snapshot.issues.filter(
-    (issue) => !['done', 'stopped'].includes(issue.status),
-  ).length;
   const secondaryCurrent = SECONDARY.some((destination) =>
     location.pathname.startsWith(destination.to),
   );
@@ -227,20 +222,17 @@ export function AppShell() {
         <nav className={styles.sidebar} aria-label={t.nav.main}>
           <div className={styles.sidebarInner}>
             <NavList>
+              {/* The line shows its issues itself: no count here, so no figure disagrees with the map. */}
               <SideNavItem destination={PRIMARY[0] as Destination} />
               <SideNavItem
                 destination={PRIMARY[1] as Destination}
-                trailing={<CounterLabel>{activeIssues}</CounterLabel>}
-              />
-              <SideNavItem
-                destination={PRIMARY[2] as Destination}
                 trailing={
                   openInterventions > 0 ? (
                     <CounterLabel variant="primary">{openInterventions}</CounterLabel>
                   ) : null
                 }
               />
-              <SideNavItem destination={PRIMARY[3] as Destination} />
+              <SideNavItem destination={PRIMARY[2] as Destination} />
               <NavList.Divider />
               <SideNavItem
                 destination={SECONDARY[0] as Destination}

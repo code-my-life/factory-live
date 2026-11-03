@@ -194,31 +194,31 @@ describe('l’écran d’une issue, en badges', () => {
   const source = new TestSource();
   const issues = source.getSnapshot().issues;
 
-  it('montre le poste, l’agent, la PR, la CI et les étiquettes GitHub dans leurs teintes', () => {
+  it('montre l’agent, la PR, la CI et les étiquettes GitHub dans leurs teintes, sans répéter le poste que le graphe montre', () => {
     const withPr = issues.find((issue) => issue.pr) ?? issues[0];
     expect(withPr).toBeDefined();
     const key = (withPr as (typeof issues)[number]).key;
     const { container } = renderPage(
-      <IssuePage />,
+      <IssuePage issueKey={key} />,
       route(key),
       '/issues/:repo/:number',
       new TestSource(),
     );
-    expect(badges(container, 'poste').length).toBeGreaterThan(0);
+    expect(badges(container, 'poste')).toHaveLength(0);
     expect(badges(container, 'étiquette').length).toBeGreaterThan(0);
     for (const label of badges(container, 'étiquette')) expect(label).toHaveAttribute('data-tint');
     expect(container.querySelector('[data-hue]')).not.toBeNull();
   });
 
-  it('rend chaque issue de la démo, avec ou sans PR connue', () => {
+  it('rend les détails de chaque issue de la démo, avec ou sans PR connue', () => {
     for (const issue of issues) {
       const { container, unmount } = renderPage(
-        <IssuePage />,
+        <IssuePage issueKey={issue.key} />,
         route(issue.key),
         '/issues/:repo/:number',
         new TestSource(),
       );
-      expect(badges(container, 'poste').length).toBeGreaterThan(0);
+      expect(container.querySelector('h2')).toHaveTextContent(issue.title);
       expect(container.querySelector('[data-overflow="wrap"]')).toBeNull();
       unmount();
     }

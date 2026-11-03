@@ -14,10 +14,13 @@ import type {
 } from '@factory-live/contracts';
 import {
   cardKindOf,
+  gateLaneOf,
   groupByIssue,
   interventionsOf,
-  issueStationOf,
   issueStatusOf,
+  issueTypeOf,
+  journeyOf,
+  lineStationOf,
   profileStation,
   pullRequestUrl,
   runRoleOf,
@@ -26,6 +29,7 @@ import type {
   ActivityLine,
   Board,
   Comment,
+  DeliveryFacts,
   Intervention as FoundIntervention,
   LiveAgent,
   Run,
@@ -77,15 +81,37 @@ export interface ProjectionInput {
   resolved: readonly ResolvedIntervention[];
 }
 
-/** Les stations de la ligne, dans l'ordre ; le client les nomme dans sa langue. */
+/** The stations of the line, in order, then the Diagnostic branch; the client names them in its language. */
 const LINE_STATIONS: readonly StationId[] = [
   'intake',
   'brief',
   'implementation',
   'gate',
-  'release',
+  'review',
+  'merge',
+  'ci',
+  'deploy',
   'done',
+  'diagnostic',
 ];
+
+/** A finished issue (delivered or stopped) stays 7 days in Terminé. */
+export const KEEP_FINISHED_MS = 7 * 86_400_000;
+
+const seconds = (value: string): number => Math.floor(Date.parse(value) / 1000);
+
+/** What GitHub says of the delivery, in the domain's units (epoch seconds). */
+function deliveryOf(pr: PullRequestView | null): DeliveryFacts | null {
+  if (!pr) return null;
+  return {
+    state: pr.state,
+    reviewDecision: pr.reviewDecision,
+    reviews: pr.reviews.map((review) => ({ state: review.state, at: seconds(review.at) })),
+    mergedAt: pr.mergedAt ? seconds(pr.mergedAt) : null,
+    mainChecks: pr.mainChecks,
+    deployment: pr.deployment,
+  };
+}
 
 export const iso = (ms: number): string => new Date(ms).toISOString();
 const isoSeconds = (seconds: number): string => iso(seconds * 1000);
@@ -181,7 +207,9 @@ export function projectIssues(
 ): IssueSummary[] {
   const summaries: IssueSummary[] = [];
   for (const [key, tasks] of groupByIssue(input.board)) {
-    const station = issueStationOf(tasks, input.board);
+    const pr = input.pullRequest(key);
+    const delivery = deliveryOf(pr);
+    const station = lineStationOf(tasks, input.board, delivery);
     const ids = new Set(tasks.map((task) => task.id));
     const updated = Math.max(
       ...tasks.map((task) =>
@@ -206,6 +234,8 @@ export function projectIssues(
     const open = interventions.filter((item) => item.issueKey === key && !item.resolvedAt);
     const implementer = latestImplementerRun(tasks, input.board);
     const labels = info?.labels ?? [];
+    const type = issueTypeOf(labels);
+    const lane = gateLaneOf(type);
     const memory = input.stations.get(key);
     summaries.push({
       key,
@@ -225,7 +255,7 @@ export function projectIssues(
         null,
       harness:
         text(implementer?.metadata['harness'])?.split(' (')[0] ?? implementer?.profile ?? null,
-      pr: input.pullRequest(key),
+      pr,
       prUrl: pullRequestUrl(tasks, input.board),
       activeProfiles: [
         ...new Set(
@@ -237,6 +267,12 @@ export function projectIssues(
       interventionIds: open.map((item) => item.id),
       startedAt: isoSeconds(Math.min(...tasks.map((task) => task.createdAt))),
       updatedAt: isoSeconds(updated),
+      type,
+      lane,
+      journey: journeyOf(tasks, input.board, delivery, lane, station).map((step) => ({
+        ...step,
+        at: isoSeconds(step.at),
+      })),
     });
   }
   return summaries.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));

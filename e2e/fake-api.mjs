@@ -42,7 +42,7 @@ function snapshot() {
         number: 52,
         title: 'Pied de page : liens vers les réseaux',
         url: 'https://github.com/code-my-life/cv-site/issues/52',
-        labels: ['factory'],
+        labels: [{ name: 'factory', color: '0e8a16' }],
         station: 'implementation',
         previousStation: null,
         stationChangedAt: null,
@@ -55,6 +55,14 @@ function snapshot() {
         interventionIds: [],
         startedAt: now,
         updatedAt: now,
+        // What the server's projection adds to every issue: its type, its proof at the gate, its journey.
+        type: null,
+        lane: 'failfirst',
+        journey: [
+          { station: 'intake', lane: null, outcome: null, at: now },
+          { station: 'brief', lane: null, outcome: null, at: now },
+          { station: 'implementation', lane: null, outcome: null, at: now },
+        ],
       },
     ],
     sideCards: [],

@@ -6,7 +6,7 @@ export default {
     description:
       'La factory Hermès en temps réel : la ligne d’usine, chaque carte de chaque issue, les agents et leurs modèles, et les interventions auxquelles tu réponds depuis ton smartphone. Une Progressive Web App, installée depuis le navigateur.',
     ogAlt:
-      'La ligne d’usine de factory-live : six stations, une boîte par issue, son état et son agent.',
+      'La ligne d’usine de factory-live : un graphe de ses stations de l’intake à terminé, une ligne par issue avec son état et son agent.',
   },
   skip: 'Aller au contenu',
   nav: {
@@ -26,7 +26,7 @@ export default {
     cta: 'Essayer la démo',
     source: 'Le code sur GitHub',
     note: 'Elle s’installe depuis le navigateur sur ordinateur, tablette ou smartphone, sans store. La démo rejoue un après-midi de la factory dans ton navigateur, sans serveur.',
-    alt: 'La ligne d’usine de factory-live : six stations de l’intake à terminé, une boîte par issue avec son état et son agent, et deux blocages qui attendent une décision.',
+    alt: 'La ligne d’usine de factory-live : un graphe de neuf stations de l’intake à terminé, les quatre preuves de la gate, une ligne par issue avec son état et son agent, et ce qui attend ta décision.',
   },
   screens: {
     title: 'Une app, tous tes écrans',
@@ -35,17 +35,17 @@ export default {
       {
         id: 'desktop',
         label: 'Ordinateur',
-        alt: 'factory-live sur un écran d’ordinateur : la navigation à gauche, la ligne d’usine, ce que fait chaque agent et l’activité en direct.',
+        alt: 'factory-live sur un écran d’ordinateur : la navigation à gauche, la ligne d’usine entière en graphe de ses stations, et dessous les détails de l’issue ouverte.',
       },
       {
         id: 'tablet',
         label: 'Tablette',
-        alt: 'factory-live sur une tablette en portrait : la ligne d’usine descend l’écran, les boîtes des issues côte à côte.',
+        alt: 'factory-live sur une tablette en portrait : la ligne d’usine entière en travers de l’écran, et dessous les détails de l’issue ouverte.',
       },
       {
         id: 'phone',
         label: 'Smartphone',
-        alt: 'factory-live sur un smartphone : la ligne d’usine descend l’écran, la barre d’onglets en bas.',
+        alt: 'factory-live sur un smartphone : la ligne d’usine entière à l’écran, qui se zoome à deux doigts, la barre d’onglets en bas.',
       },
     ],
     text: 'factory-live est une Progressive Web App : elle s’installe depuis le navigateur, sans store. Installée, elle a son icône sur l’écran d’accueil, s’ouvre en plein écran, t’envoie une notification push quand un blocage t’attend, et s’ouvre hors ligne sur le dernier état reçu.',
@@ -65,16 +65,16 @@ export default {
       {
         id: 'live',
         title: 'En ce moment',
-        text: 'Chaque agent au travail : l’outil lancé, le fichier modifié, le modèle qui a répondu.',
+        text: 'Chaque issue avec l’agent qui la tient et le modèle qu’il appelle : le flux d’un fournisseur coule tant que son modèle répond.',
         view: 'ligne',
-        alt: 'Ce que fait chaque agent en ce moment : coder-claude modifie un fichier par Claude Code, gate lance les tests, coordinator attend une place.',
+        alt: 'Les stations où un agent appelle un modèle, Brief, Implémentation et Diagnostic, et les fournisseurs de modèles qui les alimentent : chaque issue avec son état, l’agent qui la tient et son modèle.',
       },
       {
         id: 'issue',
-        title: 'Une issue, carte par carte',
-        text: 'Son graphe de cartes, chaque run avec le modèle réellement servi, la transcription intégrale, la PR et sa CI.',
+        title: 'Une issue et son trajet',
+        text: 'Touche une issue : son trajet court sur les liens, et sous le graphe s’ouvrent ses runs avec le modèle réellement servi, la transcription intégrale, la PR et sa CI.',
         view: 'issues',
-        alt: 'Les cartes de l’issue claude-cockpit#71 : brief terminé, implémentation en cours dans une lane Claude Code, release en attente, et les runs de la carte choisie.',
+        alt: 'Les détails de l’issue claude-cockpit#71 sous le graphe : son harnais, son modèle et sa PR, et les runs de sa carte au travail.',
       },
       {
         id: 'intervention',

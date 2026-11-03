@@ -111,6 +111,8 @@ const PERMISSIONS = {
   statuses: 'read',
   contents: 'read',
   repository_hooks: 'read',
+  // The deployments of a merged sha: the line's Déploiement station.
+  deployments: 'read',
 } as const;
 
 function base64url(input: Buffer | string): string {

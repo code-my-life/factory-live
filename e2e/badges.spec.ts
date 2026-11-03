@@ -10,6 +10,7 @@ import {
   expectVisibleMarks,
   hueTint,
   issueJob,
+  stationJobs,
   pauseMotion,
 } from './helpers.ts';
 
@@ -77,8 +78,8 @@ test('un modèle de 70 caractères est tronqué proprement, son nom entier reste
   page,
 }) => {
   await page.goto('/');
-  // coder-claude, en lane CLI, passe en tête de « En ce moment » ; son pilote tourne sur le modèle local.
-  const card = page.getByRole('region', { name: 'En ce moment' }).getByRole('listitem').first();
+  // The providers of the line: coder-claude's driver runs on the local model.
+  const card = stationJobs(page, 'models').getByRole('listitem').filter({ hasText: QWEN }).first();
   const live = card.locator('[data-badge]', { hasText: QWEN });
   await expect(live).toBeVisible();
   await expect(live).toHaveAttribute('title', new RegExp(`^${QWEN} via llama\\.cpp`));
@@ -111,48 +112,27 @@ test('sur la page Agents, le nom long reste sur une ligne, coupé au milieu', as
   await expect(badge.locator('[data-split] > span').nth(2)).toHaveText('-MTP-Q8_0');
 });
 
-test('une issue a le même badge partout : ligne, liste, page, activité', async ({ page }) => {
-  await page.goto('/');
-  await expect(issueJob(page, 'claude-cockpit#71').locator('[data-badge]').first()).toHaveAttribute(
-    'title',
-    'claude-cockpit#71',
-  );
-  await page
-    .getByRole('region', { name: 'En ce moment' })
-    .getByRole('link', { name: 'claude-cockpit#71' })
-    .click();
-  await expect(page).toHaveURL(/\/issues\/claude-cockpit\/71$/);
-  await expect(page.getByRole('main').locator('header [data-badge]').first()).toHaveAttribute(
-    'title',
-    'claude-cockpit#71',
-  );
-  await page.goto('/issues');
-  await expect(
-    // The row now also carries the station badge: the issue badge comes first.
-    page
-      .getByRole('link', { name: /Vue ÉQUIPE/ })
-      .locator('[data-badge]')
-      .first(),
-  ).toHaveAttribute('title', 'claude-cockpit#71');
-});
-
-test('un état a la même couleur partout : « Bloquée » est rouge sur la ligne, la liste et l’issue', async ({
+test('une issue a le même badge partout : sa ligne dans le graphe et ses détails', async ({
   page,
 }) => {
   await page.goto('/');
-  await expect(issueJob(page, 'cv-site#44').getByText('Bloquée')).toHaveAttribute(
-    'data-variant',
-    'danger',
-  );
-  await page.goto('/issues');
+  const row = issueJob(page, 'claude-cockpit#71');
+  await expect(row.locator('[data-badge]').first()).toHaveAttribute('title', 'claude-cockpit#71');
+  await row.getByRole('button').click();
   await expect(
-    page.getByRole('link', { name: /Pied de page/ }).getByText('Bloquée'),
-  ).toHaveAttribute('data-variant', 'danger');
+    page.getByRole('main').locator('article header [data-badge]').first(),
+  ).toHaveAttribute('title', 'claude-cockpit#71');
+});
+
+test('un état a la même couleur partout : « Bloquée » est rouge sur la ligne et dans les détails', async ({
+  page,
+}) => {
   await page.goto('/issues/cv-site/44');
-  await expect(page.getByRole('main').locator('header').getByText('Bloquée')).toHaveAttribute(
-    'data-variant',
-    'danger',
-  );
+  await expect(issueJob(page, 'cv-site#44').locator('[data-tone="danger"]').first()).toBeVisible();
+  await expect(stationJobs(page, 'implementation')).toHaveAttribute('data-tone', 'danger');
+  await expect(
+    page.getByRole('main').locator('article').getByText('Bloquée').first(),
+  ).toHaveAttribute('data-variant', 'danger');
 });
 
 test('une intervention a la même couleur partout : rouge quand elle bloque, jaune sinon', async ({
@@ -236,7 +216,7 @@ test('un modèle porte le logo de son éditeur et les couleurs de son fournisseu
   page,
 }) => {
   await page.goto('/');
-  const now = page.getByRole('region', { name: 'En ce moment' });
+  const now = stationJobs(page, 'models');
   const qwen = now.locator('[data-badge]', { hasText: QWEN });
   await expect(qwen.locator('[data-segment="label"] svg')).toBeVisible();
   await expect(qwen.locator('[data-segment="value"] svg')).toBeVisible();
@@ -244,7 +224,7 @@ test('un modèle porte le logo de son éditeur et les couleurs de son fournisseu
     now.locator('[data-badge]', { hasText: 'claude-opus-5-5' }).locator('[data-segment="label"]'),
   ).toHaveAttribute('data-brand', 'Claude');
   await expect(
-    now.locator('[data-badge]', { hasText: 'nemotron-3-super' }).locator('[data-segment="label"]'),
+    now.locator('[data-badge]', { hasText: 'nemotron-3-ultra' }).locator('[data-segment="label"]'),
   ).toHaveAttribute('data-brand', 'NVIDIA');
 });
 
@@ -274,12 +254,9 @@ test('la CI teinte sa valeur de la couleur de l’état, avec le logo de GitHub 
 });
 
 test('une issue porte l’icône de GitHub à la couleur de son état', async ({ page }) => {
-  await page.goto('/issues');
+  await page.goto('/issues/cv-site/49');
   await expect(
-    page
-      .getByRole('link', { name: /Page Projets/ })
-      .locator('[data-segment="label"]')
-      .first(),
+    page.getByRole('main').locator('article header [data-segment="label"]').first(),
   ).toHaveAttribute('data-icon-tone', 'success');
   await page.goto('/history');
   await expect(
@@ -328,10 +305,7 @@ test('un même service a la même image partout : GitHub et ses webhooks, NVIDIA
   const nvidia = await logo('API NVIDIA').getAttribute('d');
   await page.goto('/');
   await expect(
-    page
-      .getByRole('region', { name: 'En ce moment' })
-      .locator('[data-brand="NVIDIA"] svg path')
-      .first(),
+    stationJobs(page, 'models').locator('[data-brand="NVIDIA"] svg path').first(),
   ).toHaveAttribute('d', nvidia ?? '');
   expect(await expectVisibleMarks(page)).toBeGreaterThan(0);
 });
@@ -350,20 +324,25 @@ for (const scheme of ['light', 'dark'] as const) {
       }, scheme);
     });
 
-    test('l’écran d’une issue avec PR : issue, poste, agent, PR, CI et étiquette GitHub', async ({
+    test('l’écran d’une issue avec PR : issue à son poste, agent, PR, CI et étiquette GitHub', async ({
       page,
     }) => {
       await page.goto('/issues/claude-cockpit/68');
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
       const main = page.getByRole('main');
-      const header = main.locator('header');
-      const facts = main.locator('dl').first();
-      // The repo's hue: issue and PR; the station's hue: release; the agent's: coder.
+      // The issue stands at its station: its row is in the graph's box of Ta revue (drawn at the
+      // graph's zoom, so its badges are measured below, in the details that open under the graph).
+      await expect(
+        main.locator('[data-box="review"] [data-issue="claude-cockpit#68"]'),
+      ).toBeVisible();
+      const details = main.locator('article');
+      const header = details.locator('header');
+      const facts = details.locator('dl').first();
+      // The repo's hue: issue and PR; the agent's: coder.
       await expectStandardBadge(
         header.locator('[data-badge][title="claude-cockpit#68"]'),
         hueTint('coral'),
       );
-      await expectStandardBadge(badge(page, header, 'poste', 'Release'), hueTint('coral'));
       await expectStandardBadge(badge(page, facts, 'agent', 'coder'), hueTint('green'));
       await expectStandardBadge(facts.locator('[data-badge][title="#74"]'), hueTint('coral'));
       await expectStandardBadge(badge(page, facts, 'CI', 'réussie'), {

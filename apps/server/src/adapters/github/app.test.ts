@@ -159,6 +159,7 @@ describe('création de l’App par manifeste', () => {
         statuses: 'read',
         contents: 'read',
         repository_hooks: 'read',
+        deployments: 'read',
       },
     });
     expect(String(manifest['name']).length).toBeLessThanOrEqual(34);
