@@ -411,7 +411,7 @@
 .row[data-landed] {
   outline: var(--borderWidth-thick) solid transparent;
   outline-offset: calc(var(--borderWidth-thick) * -1);
-  animation: landed var(--base-duration-1000) var(--base-easing-easeOut);
+  animation: landed var(--base-duration-500) var(--base-easing-easeOut);
 }
 
 @keyframes landed {

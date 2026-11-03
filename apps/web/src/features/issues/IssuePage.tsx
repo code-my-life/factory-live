@@ -44,6 +44,25 @@ function defaultCard(detail: IssueDetail): CardView | null {
   );
 }
 
+/** A run picked in a card's table, kept with its card. */
+interface PickedRun {
+  cardId: string;
+  runId: number;
+}
+
+/**
+ * The run whose transcript shows: the one picked on the card at work, else that card's last run,
+ * else the issue's last. A run picked on another card gives way when the issue moves on.
+ */
+export function transcriptRun(
+  detail: Pick<IssueDetail, 'cards'>,
+  card: CardView | null,
+  picked: PickedRun | null,
+): number | null {
+  if (card && picked?.cardId === card.id) return picked.runId;
+  return card?.runs.at(-1)?.id ?? detail.cards.flatMap((each) => each.runs).at(-1)?.id ?? null;
+}
+
 function RunsTable({
   card,
   selectedRunId,
@@ -214,7 +233,7 @@ export function IssuePage({
   const detail = useIssueDetail(key);
   const snapshot = useSnapshot();
   const [tab, setTab] = useState<Tab>('activity');
-  const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
+  const [picked, setPicked] = useState<PickedRun | null>(null);
 
   if (!detail) {
     // The issue is not (or no longer) known: the same empty state as the not-found page, under the graph.
@@ -232,11 +251,8 @@ export function IssuePage({
   const selectedCard =
     (cardKind ? detail.cards.findLast((card) => card.kind === cardKind) : undefined) ??
     defaultCard(detail);
-  const runForTranscript =
-    selectedRunId ??
-    selectedCard?.runs.at(-1)?.id ??
-    detail.cards.flatMap((card) => card.runs).at(-1)?.id ??
-    null;
+  const selectedRunId = selectedCard && picked?.cardId === selectedCard.id ? picked.runId : null;
+  const runForTranscript = transcriptRun(detail, selectedCard, picked);
   const interventions = snapshot.interventions.filter(
     (intervention) => intervention.issueKey === key && !intervention.resolvedAt,
   );
@@ -405,7 +421,7 @@ export function IssuePage({
               card={selectedCard}
               selectedRunId={selectedRunId}
               onSelectRun={(runId) => {
-                setSelectedRunId(runId);
+                setPicked({ cardId: selectedCard.id, runId });
                 setTab('transcript');
               }}
             />

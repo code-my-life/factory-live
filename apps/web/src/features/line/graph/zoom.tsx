@@ -26,7 +26,7 @@ const FIT_FOOT = 56;
  * The graph's zoom: two fingers on a phone, the buttons or Ctrl and the wheel on a computer. The
  * point under the fingers (or the centre of the view) stays put while the scale changes; one finger
  * still scrolls the page and the graph natively. The page opens on the whole factory, and keeps
- * showing it when the window changes, until the owner zooms.
+ * showing it when the window or the graph changes size, until the owner zooms.
  */
 export function useZoom(contentWidth: number, contentHeight: number): Zoom {
   const scroller = useRef<HTMLDivElement | null>(null);
@@ -34,7 +34,7 @@ export function useZoom(contentWidth: number, contentHeight: number): Zoom {
   const scale = useMotionValue(1);
   const widthBase = useMotionValue(contentWidth);
   const heightBase = useMotionValue(contentHeight);
-  useEffect(() => {
+  useLayoutEffect(() => {
     widthBase.set(contentWidth);
     heightBase.set(contentHeight);
   }, [contentWidth, contentHeight, widthBase, heightBase]);
@@ -112,6 +112,11 @@ export function useZoom(contentWidth: number, contentHeight: number): Zoom {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, [actions, scale]);
+
+  // A graph that grows or shrinks (the first snapshot of the live page) is fitted again, unless zoomed.
+  useLayoutEffect(() => {
+    if (!zoomed.current) scale.set(actions.fitScale());
+  }, [contentWidth, contentHeight, actions, scale]);
 
   useEffect(() => {
     const element = scroller.current;

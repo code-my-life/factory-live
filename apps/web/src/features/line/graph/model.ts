@@ -104,8 +104,10 @@ export function providerRows(agents: readonly AgentActivity[]): ProviderRow[] {
 }
 
 /** The stations whose feed from the providers flows: an agent there calls its model right now. */
-export function callingStations(items: readonly LineIssue[]): Set<StationBox> {
-  const calling = new Set<StationBox>();
+export function callingStations(
+  items: readonly LineIssue[],
+): Set<'brief' | 'implementation' | 'diagnostic'> {
+  const calling = new Set<'brief' | 'implementation' | 'diagnostic'>();
   for (const item of items) {
     if (!calledModel(item.agent)) continue;
     if (item.box === 'brief' || item.box === 'implementation' || item.box === 'diagnostic')

@@ -159,7 +159,7 @@ describe('FactoryGraph', () => {
     expect(screen.getByText('et 2 autres')).toBeInTheDocument();
   });
 
-  it('une issue qui change de poste voyage le long des liens et paraît à l’arrivée ; en pause, sans trajet', () => {
+  it('une issue qui change de poste voyage le long des liens et paraît à l’arrivée ; en pause ou sans lien à suivre, sans trajet', () => {
     const at = (station: IssueSummary['station']) => ({
       station,
       lane: null,
@@ -204,6 +204,18 @@ describe('FactoryGraph', () => {
     paused.rerender(view(moving('ci', ['review', 'merge', 'ci'])));
     expect(paused.container.querySelector('[data-traveller]')).toBeNull();
     expect(arriving(paused.container)).not.toHaveAttribute('data-arriving');
+    paused.unmount();
+    localStorage.removeItem('factory-live:motion');
+
+    // Approved, then changes requested by another reviewer: back from Fusion to Ta revue, a step no
+    // connector draws. The row stays in sight, without a trip.
+    const back = render(view(moving('merge', ['review', 'merge'])));
+    back.rerender(view(moving('review', ['review', 'merge', 'review'])));
+    expect(back.container.querySelector('[data-traveller]')).toBeNull();
+    const returned = back.container.querySelector(
+      '[data-box="review"] [data-issue="cv-site#46"]',
+    ) as HTMLElement;
+    expect(returned).not.toHaveAttribute('data-arriving');
   });
 
   it('une ligne dit ce que fait l’agent : l’outil qu’il lance, ou le modèle qu’il appelle, celui de sa lane en CLI', () => {
@@ -254,6 +266,9 @@ describe('FactoryGraph', () => {
       const facts = {
         row: row(view.container, 'cv-site#52').textContent ?? '',
         busy: [...view.container.querySelectorAll('[data-busy]')].map((line) => line.textContent),
+        feeds: [...view.container.querySelectorAll('[data-active-edge^="models:"]')].map((edge) =>
+          edge.getAttribute('data-active-edge'),
+        ),
       };
       view.unmount();
       return facts;
@@ -264,16 +279,34 @@ describe('FactoryGraph', () => {
     expect(tool.row).toContain('terminal · npm test');
     expect(tool.row).not.toContain('agnes-2.5-flash');
     expect(tool.busy).toEqual([]);
+    expect(tool.feeds).toEqual([]);
     // The agent thinks: its own model answers.
     const thinking = show('thinking');
     expect(thinking.row).toContain('coder-claude · agnes-2.5-flash');
     expect(thinking.busy).toHaveLength(1);
     expect(thinking.busy[0]).toContain('agnes-2.5-flash');
+    // The feed from the providers to Implémentation flows.
+    expect(thinking.feeds).toEqual(['models:implementation']);
     // It drives its Claude Code lane: the lane's model answers.
     const cli = show('cli');
     expect(cli.row).toContain('coder-claude · claude-opus-5-5');
     expect(cli.busy).toHaveLength(1);
     expect(cli.busy[0]).toContain('claude-opus-5-5');
+  });
+
+  it('une ligne typée dit encore son état aux lecteurs d’écran, que le badge du type remplace à l’écran', () => {
+    const summary = {
+      ...issue('claude-cockpit#76', 'E2E PR 3 : raccourcis clavier de l’île', 'implementation'),
+      type: 'tests' as const,
+      status: 'blocked' as const,
+    };
+    renderGraph([{ issue: summary, box: boxOf(summary), agent: null, intervention: null }]);
+    const line = screen.getByText('E2E PR 3 : raccourcis clavier de l’île').closest('[data-issue]');
+    const shown = [...(line?.querySelectorAll('[data-badge]') ?? [])].map(
+      (badge) => badge.textContent,
+    );
+    expect(shown.join(' | ')).toContain('Tests');
+    expect(within(line as HTMLElement).getByText('Bloquée')).toHaveClass('fl-visually-hidden');
   });
 
   it('place chaque issue dans une seule boîte, celle de sa station', () => {

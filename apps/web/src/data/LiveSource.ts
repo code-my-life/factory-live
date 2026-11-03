@@ -4,7 +4,9 @@ import type {
   HistoryStats,
   IssueDetail,
   IssueKey,
+  IssueSummary,
   ProfileView,
+  PullRequestView,
   Snapshot,
   StreamEvent,
   TranscriptView,
@@ -52,8 +54,18 @@ const STORAGE_KEY = 'factory-live:last-snapshot';
 
 interface Saved {
   receivedAt: number;
-  snapshot: Snapshot;
+  snapshot: SavedSnapshot;
 }
+
+/** The fields added to an issue and its PR since 0.3: a snapshot saved before lacks them. */
+type IssueAdded = 'type' | 'lane' | 'journey';
+type PullRequestAdded = 'reviews' | 'mergedAt' | 'mainChecks' | 'deployment';
+type SavedPullRequest = Omit<PullRequestView, PullRequestAdded> &
+  Partial<Pick<PullRequestView, PullRequestAdded>>;
+type SavedIssue = Omit<IssueSummary, IssueAdded | 'pr'> &
+  Partial<Pick<IssueSummary, IssueAdded>> & { pr: SavedPullRequest | null };
+/** A snapshot as some version saved it on the device. */
+type SavedSnapshot = Omit<Snapshot, 'issues'> & { issues: SavedIssue[] };
 
 function defaultStorage(): Pick<Storage, 'getItem' | 'setItem'> | null {
   try {
@@ -172,7 +184,7 @@ export class LiveSource implements FactoryDataSource {
       if (!raw) return;
       const saved = JSON.parse(raw) as Saved;
       if (!saved.snapshot?.stations) return;
-      this.snapshot = saved.snapshot;
+      this.snapshot = upgradeSaved(saved.snapshot);
       this.lastUpdate = saved.receivedAt;
     } catch {
       // Sauvegarde illisible : on attend simplement le flux.
@@ -489,4 +501,32 @@ export class LiveSource implements FactoryDataSource {
     );
     if (!response.ok) throw await refusal(response, 'unblock');
   }
+}
+
+/**
+ * A snapshot saved on the device by an earlier version lacks the fields added since: they get the
+ * defaults the server's contracts give them (an issue without type, proof nor journey; a PR without
+ * reviews nor delivery facts), so that no screen reads a missing field before the stream answers.
+ */
+export function upgradeSaved(snapshot: SavedSnapshot): Snapshot {
+  return {
+    ...snapshot,
+    issues: snapshot.issues.map(({ type = null, lane = null, journey = [], pr, ...issue }) => ({
+      ...issue,
+      type,
+      lane,
+      journey,
+      pr: pr ? upgradePullRequest(pr) : null,
+    })),
+  };
+}
+
+function upgradePullRequest({
+  reviews = [],
+  mergedAt = null,
+  mainChecks = null,
+  deployment = null,
+  ...pr
+}: SavedPullRequest): PullRequestView {
+  return { ...pr, reviews, mergedAt, mainChecks, deployment };
 }

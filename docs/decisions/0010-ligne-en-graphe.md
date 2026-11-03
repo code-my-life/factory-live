@@ -50,7 +50,8 @@ On ne voyait ni où était une issue, ni par où elle était passée. Une premi�
 
 ## Conséquences
 
-- La règle de mouvement d'AGENTS.md (500 ms au plus) garde une exception : le trajet d'une carte sur les liens dure selon sa longueur. C'est un déplacement le long d'un chemin, pas une transition d'état, et l'information qu'il accompagne est déjà en place.
+- La règle de mouvement d'AGENTS.md (500 ms au plus) garde une exception : ce qui court ou se dessine le long d'un lien. Une carte voyage selon la longueur de son trajet, un lien se dessine en 0,7 s. C'est un déplacement le long d'un chemin, pas une transition d'état, et l'information qu'il accompagne est déjà en place.
+- Dans une ligne du graphe, l'état est l'icône d'état et la teinte de la ligne, pour tenir sur la ligne ; le `Label` d'état reste celui des détails de l'issue. Quand aucun texte visible ne dit l'état (ligne compacte, type à sa place), un texte caché le dit aux lecteurs d'écran.
 - La station Déploiement lit les déploiements GitHub du sha fusionné : `factory-deploy.py` (dépôt de la factory) doit poster un déploiement et son état, avec la permission « Deployments » de l'App. Sans déploiement, une issue fusionnée à main verte passe à Terminé.
 - Le serveur lit en plus les revues d'une PR, sa date et son commit de fusion, les checks de main sur ce commit et son déploiement.
 - Les captures de référence, celles du site et du README montrent le graphe.

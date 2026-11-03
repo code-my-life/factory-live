@@ -281,6 +281,10 @@ function IssueRow({
     >
       <span className={styles.rowHead}>
         <WorkStateIcon state={state} />
+        {/* The icon is the state on screen when no text says it (a compact row, a type in its place). */}
+        {row === 'compact' || issue.type ? (
+          <span className="fl-visually-hidden">{state.label}</span>
+        ) : null}
         <IssueBadge issueKey={issue.key} icon={false} />
       </span>
       <button

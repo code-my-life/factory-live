@@ -169,6 +169,10 @@ function route(points: readonly Point[]): string {
   return d;
 }
 
+/** The connector from the models node up to a station whose agent calls a model. */
+export const feedOf = (station: 'brief' | 'implementation' | 'diagnostic'): string =>
+  `models:${station}`;
+
 export function layout(fills: Record<BoxId, Fill>): Layout {
   const box = (id: BoxId, x: number, y: number, w = COLUMN_W, head = HEAD_H): Box => ({
     id,
@@ -304,10 +308,10 @@ export function layout(fills: Record<BoxId, Fill>): Layout {
   edge('loop:review', 'back', arch(reviewFrom, reviewTo, ARCH_REVIEW).d, reviewFrom, reviewTo);
   edge('loop:revert', 'back', bulge(right(ci), right(review), 30), right(ci), right(review));
 
-  // The models node feeds, from below, the stations where an agent calls a model.
+  // The models node feeds, from below, the stations where an agent calls a model: `feedOf(station)`.
   const implFeed = impl.x + impl.w / 2;
   edge(
-    'models:impl',
+    feedOf('implementation'),
     'models',
     up([implFeed, models.y], bottomAt(impl, implFeed)),
     [implFeed, models.y],
@@ -315,7 +319,7 @@ export function layout(fills: Record<BoxId, Fill>): Layout {
   );
   const diagFeed = X.first + COLUMN_W / 2 + 40;
   edge(
-    'models:diagnostic',
+    feedOf('diagnostic'),
     'models',
     up([diagFeed, models.y], bottomAt(diagnostic, diagFeed)),
     [diagFeed, models.y],
@@ -330,7 +334,7 @@ export function layout(fills: Record<BoxId, Fill>): Layout {
     [briefFeed, brief.y + brief.h + 30],
     bottomAt(brief, briefFeed),
   ];
-  edge('models:brief', 'models', route(toBrief), toBrief[0] as Point, toBrief[3] as Point);
+  edge(feedOf('brief'), 'models', route(toBrief), toBrief[0] as Point, toBrief[3] as Point);
 
   return { width: CANVAS_W, height: bottom + 36, boxes, edges, gate };
 }

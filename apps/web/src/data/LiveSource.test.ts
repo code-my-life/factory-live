@@ -307,6 +307,55 @@ describe('LiveSource : lien et dernier état connu', () => {
     expect(next.source.getLastUpdate()).toBe(1_000_000);
     expect(next.source.getConnection()).toBe('connecting');
   });
+
+  it('s’ouvre sur un état gardé par une version d’avant le trajet des issues, complété des champs nouveaux', () => {
+    // Saved by 0.3: no type, proof nor journey on the issue, no reviews nor delivery facts on its PR.
+    const old = {
+      key: 'cv-site#47',
+      repo: 'cv-site',
+      number: 47,
+      title: 'Formulaire de contact',
+      url: 'https://github.com/code-my-life/cv-site/issues/47',
+      labels: [],
+      station: 'gate',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'active',
+      claudeModel: null,
+      harness: null,
+      pr: {
+        number: 74,
+        url: 'https://github.com/code-my-life/cv-site/pull/74',
+        title: 'feat: contact',
+        state: 'open',
+        checks: 'success',
+        reviewDecision: null,
+        autoMerge: false,
+        additions: 1,
+        deletions: 1,
+        changedFiles: 1,
+      },
+      prUrl: null,
+      activeProfiles: [],
+      interventionIds: [],
+      startedAt: '2026-10-28T17:00:00.000Z',
+      updatedAt: '2026-10-28T17:30:00.000Z',
+    };
+    const storage = {
+      getItem: () =>
+        JSON.stringify({ receivedAt: 1_000_000, snapshot: { ...SNAPSHOT, issues: [old] } }),
+      setItem: () => undefined,
+    };
+    const [issue] = setup({}, { storage, now: () => 2_000_000 }).source.getSnapshot().issues;
+    expect(issue).toMatchObject({ key: 'cv-site#47', type: null, lane: null, journey: [] });
+    expect(issue?.pr).toMatchObject({
+      number: 74,
+      reviews: [],
+      mergedAt: null,
+      mainChecks: null,
+      deployment: null,
+    });
+  });
 });
 
 describe('LiveSource : accès GitHub', () => {

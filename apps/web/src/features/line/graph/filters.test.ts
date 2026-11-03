@@ -55,4 +55,19 @@ describe('filters', () => {
     ]);
     expect(filtering({ ...NO_FILTERS, repos: new Set(['cv-site']) })).toBe(true);
   });
+
+  it('la recherche et le filtre Modèle trouvent aussi le modèle de la lane qu’une ligne affiche', () => {
+    const lane = item('claude-cockpit#71', { type: 'interface', status: 'active' }, 'llama.cpp');
+    lane.agent = {
+      ...(lane.agent as AgentActivity),
+      state: 'cli',
+      laneModel: { provider: 'anthropic', model: 'claude-opus-5-5', source: 'live' },
+    };
+    const keeps = (filters: Partial<Filters>) =>
+      matches(lane, { ...NO_FILTERS, ...filters }, String);
+    expect(keeps({ query: 'opus' })).toBe(true);
+    expect(keeps({ providers: new Set(['anthropic']) })).toBe(true);
+    expect(keeps({ providers: new Set(['llama.cpp']) })).toBe(true);
+    expect(keeps({ providers: new Set(['nvidia']) })).toBe(false);
+  });
 });

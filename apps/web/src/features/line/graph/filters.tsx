@@ -25,6 +25,10 @@ export const NO_FILTERS: Filters = {
 
 const fold = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
+/** The models behind an issue's agent: its own, and the one of the CLI lane it drives. */
+const modelsOf = (item: LineIssue) =>
+  [item.agent?.model, item.agent?.laneModel].filter((model) => model != null);
+
 export const filtering = (filters: Filters): boolean =>
   filters.query.trim() !== '' ||
   filters.types.size + filters.states.size + filters.repos.size + filters.providers.size > 0;
@@ -39,8 +43,11 @@ export function matches(
   if (filters.types.size > 0 && !(issue.type && filters.types.has(issue.type))) return false;
   if (filters.states.size > 0 && !filters.states.has(issue.status)) return false;
   if (filters.repos.size > 0 && !filters.repos.has(issue.repo)) return false;
-  const provider = agent?.model?.provider ?? null;
-  if (filters.providers.size > 0 && !(provider && filters.providers.has(provider))) return false;
+  if (
+    filters.providers.size > 0 &&
+    !modelsOf(item).some((model) => model.provider && filters.providers.has(model.provider))
+  )
+    return false;
   const query = fold(filters.query.trim());
   if (!query) return true;
   const haystack = fold(
@@ -49,7 +56,7 @@ export function matches(
       issue.title,
       issue.type ? typeName(issue.type) : '',
       agent?.profile ?? '',
-      agent?.model ? `${agent.model.provider ?? ''} ${agent.model.model}` : '',
+      ...modelsOf(item).map((model) => `${model.provider ?? ''} ${model.model}`),
     ].join(' '),
   );
   return query.split(/\s+/).every((word) => haystack.includes(word));
@@ -70,9 +77,7 @@ export function GraphFilters({
   const { t } = useI18n();
   const repos = [...new Set(items.map((item) => item.issue.repo))].sort();
   const providers = [
-    ...new Set(
-      items.flatMap((item) => (item.agent?.model?.provider ? [item.agent.model.provider] : [])),
-    ),
+    ...new Set(items.flatMap((item) => modelsOf(item).flatMap((model) => model.provider ?? []))),
   ].sort();
   const toggle = <T,>(set: ReadonlySet<T>, value: T): ReadonlySet<T> => {
     const next = new Set(set);

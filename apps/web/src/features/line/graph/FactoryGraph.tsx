@@ -17,7 +17,7 @@ import {
   travelDuration,
   useFlowClock,
 } from './flow.tsx';
-import { DONE_SHOWN, INTAKE_SHOWN, LANES, journeyEdges, layout } from './layout.ts';
+import { DONE_SHOWN, INTAKE_SHOWN, LANES, feedOf, journeyEdges, layout } from './layout.ts';
 import type { BoxId, Fill } from './layout.ts';
 import { Legend } from './Legend.tsx';
 import { callingStations, finishedAt } from './model.ts';
@@ -58,7 +58,7 @@ interface Transit {
   id: string;
 }
 
-const LANDING_MS = 900;
+const LANDING_MS = 500;
 
 /**
  * The factory line as a run graph: one box per station holding its issues, joined by curved
@@ -135,12 +135,11 @@ export function FactoryGraph({
     const fresh: Transit[] = [];
     for (const { issue } of items) {
       const steps = before.get(issue.key);
-      if (steps !== undefined && steps > 0 && issue.journey.length > steps)
-        fresh.push({
-          key: issue.key,
-          id: `${issue.key}:${issue.journey.length}`,
-          edges: journeyEdges(issue.journey.slice(steps - 1)),
-        });
+      if (steps === undefined || steps === 0 || issue.journey.length <= steps) continue;
+      // A step no connector draws (back from Fusion to Ta revue) makes no trip: the row shows at once.
+      const edges = journeyEdges(issue.journey.slice(steps - 1)).filter((id) => edgesById.has(id));
+      if (edges.length > 0)
+        fresh.push({ key: issue.key, id: `${issue.key}:${issue.journey.length}`, edges });
     }
     if (fresh.length > 0 && enabled)
       setTransits((current) => [
@@ -193,9 +192,7 @@ export function FactoryGraph({
   // a model answering an agent. The others step back.
   const active = new Map<string, 'travel' | 'journey' | 'model'>();
   for (const id of journey) active.set(id, 'journey');
-  for (const edge of geometry.edges)
-    if (edge.branch === 'models' && calling.has(edge.id.slice('models:'.length) as never))
-      active.set(edge.id, 'model');
+  for (const station of calling) active.set(feedOf(station), 'model');
   for (const transit of transits) for (const id of transit.edges) active.set(id, 'travel');
 
   const shown = filtering(filters)
