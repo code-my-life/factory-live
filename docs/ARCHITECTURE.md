@@ -52,7 +52,7 @@ Les règles sont vérifiées en CI par dependency-cruiser (`.dependency-cruiser.
 ## Front
 
 - Une seule interface de données (`apps/web/src/data/source.ts`) : la démo (`DemoSource`) et l'API (REST + SSE) la réalisent.
-- Primer React pour les composants, jetons Primer pour les styles, une voie en CSS (`FlowLine`) pour la ligne d'usine comme pour le graphe d'une issue, Motion pour le glissement des issues entre stations.
+- Primer React pour les composants, jetons Primer pour les styles. La ligne d'usine est un graphe (`features/line/graph`, ADR 0010) : boîtes des stations placées par une géométrie pure (`layout.ts`), liens courbes en SVG, et Motion pour les cartes qui voyagent sur les liens, le trajet de l'issue ouverte et le zoom.
 - Langues (ADR 0008) : français et anglais, dictionnaires typés (`apps/web/src/i18n`) et API Intl. Le serveur n'écrit pas de phrases pour la PWA : ce qu'il fabrique circule en codes et paramètres (`Message`, `Text` dans les contrats), écrits par la PWA et par le service worker dans la langue choisie sur l'appareil.
 
 ## Diagnostic des blocages (ADR 0009)
