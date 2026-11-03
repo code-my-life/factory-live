@@ -84,8 +84,8 @@ export function issueStationOf(tasks: readonly Task[], board: Board): Station {
 }
 
 /**
- * Les postes de la ligne d'usine : ceux du kanban, puis la livraison que GitHub raconte (Ta revue,
- * Fusion, CI de main, Déploiement), et la branche Diagnostic, qui va du brief à Terminé sans PR.
+ * The stations of the factory line: the kanban's, then the delivery GitHub tells (Ta revue, Fusion,
+ * CI de main, Déploiement), and the Diagnostic branch, which goes from the brief to Terminé without a PR.
  */
 export type LineStation =
   | 'intake'
@@ -100,11 +100,11 @@ export type LineStation =
   | 'stopped'
   | 'diagnostic';
 
-/** Les types d'issue de la factory (ADR 0017 de hermes-software-factory), lus sur l'étiquette `type:*`. */
+/** The factory's issue types (ADR 0017 of hermes-software-factory), read on the `type:*` label. */
 export type IssueType =
   'bug' | 'interface' | 'fonctionnalite' | 'diagnostic' | 'tests' | 'maintenance' | 'documentation';
 
-/** Les preuves de la gate : une par famille de types (`proof` de `config/types.yaml` de la factory). */
+/** The gate's proofs: one per family of types (`proof` in the factory's `config/types.yaml`). */
 export type GateLane = 'failfirst' | 'sabotage' | 'invariance' | 'documents';
 
 const LANE_OF_TYPE: Readonly<Record<IssueType, GateLane | null>> = {
@@ -119,7 +119,7 @@ const LANE_OF_TYPE: Readonly<Record<IssueType, GateLane | null>> = {
 
 const TYPE_LABEL = /^type:(.+)$/;
 
-/** Le type d'une issue d'après son étiquette `type:*` ; `null` sans étiquette connue. */
+/** The type of an issue from its `type:*` label; `null` without a known label. */
 export function issueTypeOf(labels: readonly { name: string }[]): IssueType | null {
   for (const label of labels) {
     const found = TYPE_LABEL.exec(label.name)?.[1];
@@ -129,33 +129,33 @@ export function issueTypeOf(labels: readonly { name: string }[]): IssueType | nu
 }
 
 /**
- * La preuve que passe la PR d'une issue à la gate. Sans type (dépôt hors du standard des types),
- * le fail-first, la preuve par défaut de la factory ; un diagnostic n'a ni PR ni gate.
+ * The proof the PR of an issue goes through at the gate. Without a type (a repository outside the
+ * standard of types), the fail-first, the factory's default proof; a diagnosis has neither PR nor gate.
  */
 export function gateLaneOf(type: IssueType | null): GateLane | null {
   return type ? LANE_OF_TYPE[type] : 'failfirst';
 }
 
-/** Ce que GitHub dit de la livraison d'une issue : sa PR, ses revues, main et le déploiement. */
+/** What GitHub says of the delivery of an issue: its PR, its reviews, main and the deployment. */
 export interface DeliveryFacts {
   state: 'draft' | 'open' | 'merged' | 'closed';
   reviewDecision: 'approved' | 'changes_requested' | 'review_required' | null;
-  /** Les revues tranchées de la PR, de la plus ancienne à la plus récente (secondes epoch). */
+  /** The decided reviews of the PR, from the oldest to the most recent (epoch seconds). */
   reviews: readonly { state: 'approved' | 'changes_requested'; at: number }[];
-  /** Secondes epoch. */
+  /** Epoch seconds. */
   mergedAt: number | null;
-  /** Les workflows de main sur le sha fusionné ; `null` tant que la PR n'est pas fusionnée. */
+  /** Main's workflows on the merged sha; `null` until the PR is merged. */
   mainChecks: 'none' | 'pending' | 'success' | 'failure' | null;
-  /** Le dernier déploiement GitHub du sha fusionné ; `null` ou `none` sans déploiement. */
+  /** The last GitHub deployment of the merged sha; `null` or `none` without a deployment. */
   deployment: 'none' | 'pending' | 'success' | 'failure' | null;
 }
 
 const isDiagnostic = (task: Task) => cardKindOf(task) === 'diagnostic';
 
 /**
- * Le poste d'une issue sur la ligne : l'étape du kanban, puis, une fois la gate passée, ce que GitHub
- * dit de sa PR. Gate verte : Ta revue ; PR approuvée : Fusion ; fusionnée : CI de main ; main rouge :
- * la PR de revert repasse par Ta revue ; main verte et déploiement en cours : Déploiement.
+ * The station of an issue on the line: the kanban's step, then, once past the gate, what GitHub says
+ * of its PR. Gate green: Ta revue; PR approved: Fusion; merged: CI de main; main red: the revert PR
+ * goes back through Ta revue; main green and a deployment under way: Déploiement.
  */
 export function lineStationOf(
   tasks: readonly Task[],
@@ -180,7 +180,7 @@ export function lineStationOf(
   if (delivery.mainChecks !== 'success') return 'ci';
   if (delivery.deployment === 'pending' || delivery.deployment === 'failure') return 'deploy';
   if (delivery.deployment === 'success' || station === 'done') return 'done';
-  // Main est verte, la release n'a pas encore fermé sa carte : l'issue finit sa CI de main.
+  // Main is green but the release has not closed its card yet: the issue ends its main CI.
   return 'ci';
 }
 

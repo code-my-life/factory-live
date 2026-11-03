@@ -87,7 +87,7 @@ export class GitHubCache implements GitHubReadPort {
             pr.repo,
             pr.number,
           );
-          // Fusionnée : la CI de main et le déploiement du sha fusionné disent où en est la livraison.
+          // Merged: main's CI and the deployment of the merged sha tell how far the delivery has gone.
           const view: PullRequestView = mergeSha
             ? {
                 ...fetched,

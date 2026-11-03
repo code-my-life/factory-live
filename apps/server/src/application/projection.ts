@@ -81,7 +81,7 @@ export interface ProjectionInput {
   resolved: readonly ResolvedIntervention[];
 }
 
-/** Les stations de la ligne, dans l'ordre, puis la branche Diagnostic ; le client les nomme dans sa langue. */
+/** The stations of the line, in order, then the Diagnostic branch; the client names them in its language. */
 const LINE_STATIONS: readonly StationId[] = [
   'intake',
   'brief',
@@ -95,12 +95,12 @@ const LINE_STATIONS: readonly StationId[] = [
   'diagnostic',
 ];
 
-/** Une issue finie (livrée ou arrêtée) reste 7 jours dans Terminé. */
+/** A finished issue (delivered or stopped) stays 7 days in Terminé. */
 export const KEEP_FINISHED_MS = 7 * 86_400_000;
 
 const seconds = (value: string): number => Math.floor(Date.parse(value) / 1000);
 
-/** Ce que GitHub dit de la livraison, dans les unités du domaine (secondes epoch). */
+/** What GitHub says of the delivery, in the domain's units (epoch seconds). */
 function deliveryOf(pr: PullRequestView | null): DeliveryFacts | null {
   if (!pr) return null;
   return {

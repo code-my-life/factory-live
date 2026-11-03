@@ -210,7 +210,7 @@ export class GitHubClient implements GitHubWritePort {
       changedFiles: Number(data['changed_files'] ?? 0),
       reviews: reviewsOf(reviews),
       mergedAt: merged && data['merged_at'] ? new Date(str(data['merged_at'])).toISOString() : null,
-      // La CI de main et le déploiement du sha fusionné se lisent à part (`mainChecks`, `deployment`).
+      // Main's CI and the deployment of the merged sha are read apart (`mainChecks`, `deployment`).
       mainChecks: null,
       deployment: null,
       headSha,
@@ -218,7 +218,7 @@ export class GitHubClient implements GitHubWritePort {
     };
   }
 
-  /** Le dernier déploiement GitHub d'un sha (posé par `factory-deploy.py` de la factory) et son statut. */
+  /** The last GitHub deployment of a sha (posted by the factory's `factory-deploy.py`) and its status. */
   async deployment(repo: string, sha: string): Promise<DeploymentState> {
     const deployments = (await this.request(
       'GET',
@@ -315,7 +315,7 @@ export function checksOf(runs: readonly Json[]): ChecksState {
   return 'success';
 }
 
-/** Les revues tranchées d'une PR (approuvée, changements demandés), de la plus ancienne à la plus récente. */
+/** The decided reviews of a PR (approved, changes requested), from the oldest to the most recent. */
 export function reviewsOf(reviews: readonly Json[]): PullRequestReview[] {
   return reviews
     .flatMap((review): PullRequestReview[] => {
@@ -331,9 +331,9 @@ export function reviewsOf(reviews: readonly Json[]): PullRequestReview[] {
 }
 
 /**
- * L'état d'un déploiement d'après son dernier statut (le plus récent en tête, comme l'API les rend) :
- * sans déploiement, `none` ; sans statut, en attente ; `inactive` veut dire remplacé par un plus récent,
- * donc réussi.
+ * The state of a deployment from its last status (the most recent first, as the API returns them):
+ * no deployment, `none`; no status, pending; `inactive` means replaced by a more recent one, so it
+ * succeeded.
  */
 export function deploymentStateOf(
   deployments: readonly Json[],

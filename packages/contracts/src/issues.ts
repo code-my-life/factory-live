@@ -7,14 +7,14 @@ import { Text } from './messages.ts';
 export const ChecksState = z.enum(['none', 'pending', 'success', 'failure']);
 export type ChecksState = z.infer<typeof ChecksState>;
 
-/** Une revue tranchée de la PR : approuvée ou changements demandés. */
+/** A decided review of the PR: approved or changes requested. */
 export const PullRequestReview = z.object({
   state: z.enum(['approved', 'changes_requested']),
   at: Timestamp,
 });
 export type PullRequestReview = z.infer<typeof PullRequestReview>;
 
-/** Le dernier déploiement GitHub du sha fusionné. */
+/** The last GitHub deployment of the merged sha. */
 export const DeploymentState = z.enum(['none', 'pending', 'success', 'failure']);
 export type DeploymentState = z.infer<typeof DeploymentState>;
 
@@ -29,12 +29,12 @@ export const PullRequestView = z.object({
   additions: z.number().int().nonnegative(),
   deletions: z.number().int().nonnegative(),
   changedFiles: z.number().int().nonnegative(),
-  /** Les revues tranchées, de la plus ancienne à la plus récente : le trajet y lit les retours. */
+  /** The decided reviews, from the oldest to the most recent: the journey reads its returns there. */
   reviews: z.array(PullRequestReview).default([]),
   mergedAt: Timestamp.nullable().default(null),
-  /** Les workflows de main sur le sha fusionné ; `null` tant que la PR n'est pas fusionnée. */
+  /** Main's workflows on the merged sha; `null` until the PR is merged. */
   mainChecks: ChecksState.nullable().default(null),
-  /** Le dernier déploiement GitHub du sha fusionné ; `null` tant que la PR n'est pas fusionnée. */
+  /** The last GitHub deployment of the merged sha; `null` until the PR is merged. */
   deployment: DeploymentState.nullable().default(null),
 });
 export type PullRequestView = z.infer<typeof PullRequestView>;
@@ -56,7 +56,7 @@ export const IssueLabel = z.object({
 });
 export type IssueLabel = z.infer<typeof IssueLabel>;
 
-/** Les types d'issue de la factory (ADR 0017 de hermes-software-factory), lus sur l'étiquette `type:*`. */
+/** The factory's issue types (ADR 0017 of hermes-software-factory), read on the `type:*` label. */
 export const IssueType = z.enum([
   'bug',
   'interface',
@@ -68,11 +68,11 @@ export const IssueType = z.enum([
 ]);
 export type IssueType = z.infer<typeof IssueType>;
 
-/** Les preuves de la gate, une par famille de types. */
+/** The gate's proofs, one per family of types. */
 export const GateLane = z.enum(['failfirst', 'sabotage', 'invariance', 'documents']);
 export type GateLane = z.infer<typeof GateLane>;
 
-/** Un passage de l'issue sur la ligne, déduit des faits (cartes, verdicts de la gate, revues, main). */
+/** A step of the issue on the line, worked out from the facts (cards, gate verdicts, reviews, main). */
 export const JourneyStep = z.object({
   station: StationId,
   lane: GateLane.nullable(),
@@ -103,11 +103,11 @@ export const IssueSummary = z.object({
   interventionIds: z.array(z.string()),
   startedAt: Timestamp,
   updatedAt: Timestamp,
-  /** Le type lu sur l'étiquette `type:*` ; `null` sans étiquette de type. */
+  /** The type read on the `type:*` label; `null` without a type label. */
   type: IssueType.nullable().default(null),
-  /** La preuve que la PR passe à la gate ; `null` pour un diagnostic. */
+  /** The proof the PR goes through at the gate; `null` for a diagnosis. */
   lane: GateLane.nullable().default(null),
-  /** Les postes passés, dans l'ordre, jusqu'à la station courante. */
+  /** The stations passed, in order, up to the current one. */
   journey: z.array(JourneyStep).default([]),
 });
 export type IssueSummary = z.infer<typeof IssueSummary>;

@@ -3,15 +3,15 @@ import { scriptedVerdicts } from './gateVerdicts.ts';
 import type { Board, Task } from './hermes.ts';
 import type { DeliveryFacts, GateLane, LineStation } from './issues.ts';
 
-/** Comment s'est fini un passage : vert, rouge (gate, main), changements demandés à la revue. */
+/** How a step ended: green, red (gate, main), changes requested at the review. */
 export type JourneyOutcome = 'ok' | 'red' | 'changes';
 
 export interface JourneyStep {
   station: LineStation;
-  /** La preuve passée, pour un passage à la gate. */
+  /** The proof gone through, for a step at the gate. */
   lane: GateLane | null;
   outcome: JourneyOutcome | null;
-  /** Secondes epoch. */
+  /** Epoch seconds. */
   at: number;
 }
 
@@ -19,7 +19,7 @@ type Fact =
   | { at: number; kind: 'verdict'; passed: boolean }
   | { at: number; kind: 'review'; state: 'approved' | 'changes_requested' };
 
-/** Le premier run d'une carte d'un de ces types, en secondes epoch. */
+/** The first run of a card of one of these kinds, in epoch seconds. */
 function firstRun(tasks: readonly Task[], board: Board, kind: string): number | null {
   const ids = new Set(tasks.filter((task) => cardKindOf(task) === kind).map((task) => task.id));
   const starts = board.runs.filter((run) => ids.has(run.taskId)).map((run) => run.startedAt);
@@ -27,10 +27,10 @@ function firstRun(tasks: readonly Task[], board: Board, kind: string): number | 
 }
 
 /**
- * Le trajet d'une issue sur la ligne, déduit des faits et jamais d'une mémoire : le premier run de
- * chaque carte, les verdicts de la gate scriptée (un rouge renvoie à l'implémentation), les revues de
- * la PR (une demande de changements aussi), la fusion, la CI de main (rouge : revert, retour à Ta
- * revue) et le déploiement. Il finit toujours sur la station courante.
+ * The journey of an issue on the line, worked out from the facts and never from a memory: the first
+ * run of each card, the verdicts of the scripted gate (a red one sends back to the implementation),
+ * the PR's reviews (a request for changes too), the merge, main's CI (red: revert, back to Ta revue)
+ * and the deployment. It always ends on the current station.
  */
 export function journeyOf(
   tasks: readonly Task[],
