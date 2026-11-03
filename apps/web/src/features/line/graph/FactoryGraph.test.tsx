@@ -1,10 +1,10 @@
-import type { IssueSummary } from '@factory-live/contracts';
+import type { AgentActivity, IssueSummary } from '@factory-live/contracts';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../../i18n/I18nProvider.tsx';
 import { MotionProvider } from '../../../ui/motion.tsx';
 import { FactoryGraph } from './FactoryGraph.tsx';
-import { boxOf } from './model.ts';
+import { boxOf, providerRows } from './model.ts';
 import type { LineIssue } from './model.ts';
 
 class NoResizeObserver {
@@ -204,6 +204,76 @@ describe('FactoryGraph', () => {
     paused.rerender(view(moving('ci', ['review', 'merge', 'ci'])));
     expect(paused.container.querySelector('[data-traveller]')).toBeNull();
     expect(arriving(paused.container)).not.toHaveAttribute('data-arriving');
+  });
+
+  it('une ligne dit ce que fait l’agent : l’outil qu’il lance, ou le modèle qu’il appelle, celui de sa lane en CLI', () => {
+    const agent = (state: AgentActivity['state']): AgentActivity =>
+      ({
+        profile: 'coder-claude',
+        state,
+        issueKey: null,
+        cardId: null,
+        model: { model: 'agnes-2.5-flash', provider: 'freellmapi', source: 'live' },
+        laneModel: { model: 'claude-opus-5-5', provider: 'anthropic', source: 'live' },
+        action:
+          state === 'tool'
+            ? {
+                kind: 'tool',
+                label: 'terminal',
+                detail: 'npm test',
+                startedAt: '2026-11-03T17:59:00Z',
+              }
+            : null,
+      }) as AgentActivity;
+    const at = (state: AgentActivity['state']) => {
+      const summary = issue(
+        'cv-site#52',
+        'Pied de page : liens vers les réseaux',
+        'implementation',
+      );
+      const worker = { ...agent(state), issueKey: summary.key };
+      return {
+        items: [{ issue: summary, box: boxOf(summary), agent: worker, intervention: null }],
+        providers: providerRows([worker]),
+      };
+    };
+    const show = (state: AgentActivity['state']) => {
+      const { items, providers } = at(state);
+      const view = render(
+        <I18nProvider>
+          <FactoryGraph
+            items={items}
+            providers={providers}
+            selectedKey={null}
+            onSelect={() => undefined}
+            now={NOW}
+            maxInProgress={2}
+          />
+        </I18nProvider>,
+      );
+      const facts = {
+        row: row(view.container, 'cv-site#52').textContent ?? '',
+        busy: [...view.container.querySelectorAll('[data-busy]')].map((line) => line.textContent),
+      };
+      view.unmount();
+      return facts;
+    };
+
+    // A tool runs: the row says which, and no provider answers.
+    const tool = show('tool');
+    expect(tool.row).toContain('terminal · npm test');
+    expect(tool.row).not.toContain('agnes-2.5-flash');
+    expect(tool.busy).toEqual([]);
+    // The agent thinks: its own model answers.
+    const thinking = show('thinking');
+    expect(thinking.row).toContain('coder-claude · agnes-2.5-flash');
+    expect(thinking.busy).toHaveLength(1);
+    expect(thinking.busy[0]).toContain('agnes-2.5-flash');
+    // It drives its Claude Code lane: the lane's model answers.
+    const cli = show('cli');
+    expect(cli.row).toContain('coder-claude · claude-opus-5-5');
+    expect(cli.busy).toHaveLength(1);
+    expect(cli.busy[0]).toContain('claude-opus-5-5');
   });
 
   it('place chaque issue dans une seule boîte, celle de sa station', () => {

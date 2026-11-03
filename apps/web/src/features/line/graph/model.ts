@@ -7,8 +7,15 @@ import type {
 } from '@factory-live/contracts';
 import type { BoxId, StationBox } from './layout.ts';
 
-/** An agent busy right now calls its model: the states where a worker turns. */
-const WORKING = new Set<AgentActivity['state']>(['thinking', 'tool', 'cli']);
+/**
+ * The model an agent calls right now: its own while it thinks, its lane's while it drives a CLI lane
+ * (Claude Code, OpenCode); none while a tool runs.
+ */
+export function calledModel(agent: AgentActivity | null): ModelRef | null {
+  if (agent?.state === 'thinking') return agent.model;
+  if (agent?.state === 'cli') return agent.laneModel ?? agent.model;
+  return null;
+}
 
 /** An issue as the graph shows it: the box it stands in, the agent on it, what waits for the owner. */
 export interface LineIssue {
@@ -90,8 +97,7 @@ export function providerRows(agents: readonly AgentActivity[]): ProviderRow[] {
   for (const agent of agents) {
     if (servedStations(agent.profile).length === 0) continue;
     // The agent's own model, and the model of the CLI lane it drives (Claude Code, OpenCode).
-    if (agent.model)
-      add(agent, agent.model, false, WORKING.has(agent.state) && agent.state !== 'cli');
+    if (agent.model) add(agent, agent.model, false, agent.state === 'thinking');
     if (agent.laneModel) add(agent, agent.laneModel, true, agent.state === 'cli');
   }
   return [...rows.values()];
@@ -101,7 +107,7 @@ export function providerRows(agents: readonly AgentActivity[]): ProviderRow[] {
 export function callingStations(items: readonly LineIssue[]): Set<StationBox> {
   const calling = new Set<StationBox>();
   for (const item of items) {
-    if (!item.agent || !WORKING.has(item.agent.state)) continue;
+    if (!calledModel(item.agent)) continue;
     if (item.box === 'brief' || item.box === 'implementation' || item.box === 'diagnostic')
       calling.add(item.box);
   }

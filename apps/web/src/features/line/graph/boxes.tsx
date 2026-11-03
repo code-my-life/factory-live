@@ -29,7 +29,7 @@ import {
 } from '../../../ui/work/workState.tsx';
 import { DONE_SHOWN, INTAKE_SHOWN, ROW_H } from './layout.ts';
 import type { Box, BoxId, RowKind, StationBox as Station } from './layout.ts';
-import { finishedAt } from './model.ts';
+import { calledModel, finishedAt } from './model.ts';
 import type { LineIssue, ProviderRow } from './model.ts';
 import { BRANCH_COLOR } from './palette.ts';
 import styles from './graph.module.css';
@@ -216,10 +216,15 @@ function useDetail(
   if (issue.status === 'queued')
     return { text: t.common.waitingForSlot(maxInProgress), tone: 'muted' };
   // Only an agent at an AI station calls a model; at the gate and beyond, scripts and GitHub work.
+  // What the agent does: the model it calls, or else the tool it runs.
   const atAi = item.box === 'brief' || item.box === 'implementation' || item.box === 'diagnostic';
-  if (atAi && agent?.model && ['thinking', 'tool', 'cli'].includes(agent.state))
-    return { text: t.line.graph.calls(agent.profile, agent.model.model), tone: 'muted' };
-  if (atAi && agent?.action) return { text: text(agent.action.label), tone: 'muted' };
+  const called = atAi ? calledModel(agent) : null;
+  if (agent && called)
+    return { text: t.line.graph.calls(agent.profile, called.model), tone: 'muted' };
+  if (atAi && agent?.action) {
+    const { label, detail } = agent.action;
+    return { text: `${text(label)}${detail ? ` · ${detail}` : ''}`, tone: 'muted' };
+  }
   if (issue.status === 'active' && STATION_TEXT.has(issue.station))
     return {
       text: t.line.graph.atStation[issue.station as 'gate' | 'review' | 'merge' | 'ci' | 'deploy'],
