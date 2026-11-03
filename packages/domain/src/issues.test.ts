@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { groupByIssue, issueStationOf, issueStatusOf, profileStation } from './issues.ts';
+import {
+  gateLaneOf,
+  groupByIssue,
+  issueStationOf,
+  issueStatusOf,
+  issueTypeOf,
+  lineStationOf,
+  profileStation,
+} from './issues.ts';
+import type { DeliveryFacts } from './issues.ts';
 import { aLink, aRun, aTask, anEvent } from './fixtures.test-helpers.ts';
 import type { Board, Task } from './hermes.ts';
 
@@ -123,6 +132,112 @@ describe('issueStationOf', () => {
     expect(at([brief({ status: 'done' }), impl({ status: 'review' }), second, release()])).toBe(
       'implementation',
     );
+  });
+});
+
+describe('lineStationOf', () => {
+  const runs = [aRun({ id: 1, taskId: 't_impl', outcome: 'review_requested', endedAt: 1_500 })];
+  const green = {
+    id: 1,
+    taskId: 't_impl',
+    author: 'factory-gate',
+    body: '✅ Gate verte sur `56045fb` (https://github.com/o/r/pull/9) : en attente',
+    createdAt: 2_000,
+  };
+  const pr = (patch: Partial<DeliveryFacts> = {}): DeliveryFacts => ({
+    state: 'open',
+    reviewDecision: 'review_required',
+    reviews: [],
+    mergedAt: null,
+    mainChecks: null,
+    deployment: null,
+    ...patch,
+  });
+  const atGreen = (delivery: DeliveryFacts | null) => {
+    const tasks = [brief({ status: 'done' }), impl({ status: 'review' }), release()];
+    return lineStationOf(tasks, board(tasks, { runs, comments: [green] }), delivery);
+  };
+  const shipped = (delivery: DeliveryFacts | null) => {
+    const tasks = [
+      brief({ status: 'done' }),
+      impl({ status: 'done' }),
+      release({ status: 'done' }),
+    ];
+    return lineStationOf(tasks, board(tasks), delivery);
+  };
+  const releasing = (delivery: DeliveryFacts | null) => {
+    const tasks = [
+      brief({ status: 'done' }),
+      impl({ status: 'done' }),
+      release({ status: 'running' }),
+    ];
+    return lineStationOf(tasks, board(tasks), delivery);
+  };
+
+  it("la station suit Ta revue, Fusion, CI de main puis Déploiement d'après la PR, main et le déploiement", () => {
+    expect(atGreen(pr())).toBe('review');
+    expect(atGreen(pr({ reviewDecision: 'approved' }))).toBe('merge');
+    expect(releasing(pr({ state: 'merged', mergedAt: 3_000, mainChecks: 'pending' }))).toBe('ci');
+    expect(
+      shipped(
+        pr({ state: 'merged', mergedAt: 3_000, mainChecks: 'success', deployment: 'pending' }),
+      ),
+    ).toBe('deploy');
+    expect(
+      shipped(
+        pr({ state: 'merged', mergedAt: 3_000, mainChecks: 'success', deployment: 'success' }),
+      ),
+    ).toBe('done');
+  });
+
+  it('sans déploiement, main verte mène à Terminé ; main rouge renvoie la PR de revert à Ta revue', () => {
+    expect(shipped(pr({ state: 'merged', mergedAt: 3_000, mainChecks: 'success' }))).toBe('done');
+    expect(releasing(pr({ state: 'merged', mergedAt: 3_000, mainChecks: 'failure' }))).toBe(
+      'review',
+    );
+  });
+
+  it('sans GitHub, le vert de la gate attend à Ta revue et la release faite est terminée', () => {
+    expect(atGreen(null)).toBe('review');
+    expect(shipped(null)).toBe('done');
+  });
+
+  it('une carte de diagnostic ouverte met l’issue sur la branche Diagnostic', () => {
+    const diagnostic = aTask({
+      id: 't_diag',
+      title: 'diagnostic claude-cockpit#52 : bouton Détails',
+      status: 'running',
+    });
+    const tasks = [brief({ status: 'done' }), diagnostic];
+    expect(lineStationOf(tasks, board(tasks), null)).toBe('diagnostic');
+  });
+
+  it('les autres étapes restent celles du kanban', () => {
+    const tasks = [brief({ status: 'ready' })];
+    expect(lineStationOf(tasks, board(tasks), null)).toBe('intake');
+    const archived = [brief({ status: 'archived' }), impl({ status: 'archived' })];
+    expect(lineStationOf(archived, board(archived), null)).toBe('stopped');
+  });
+});
+
+describe('gateLaneOf', () => {
+  it('une issue Tests passe la gate par la preuve des sabotages', () => {
+    expect(gateLaneOf(issueTypeOf([{ name: 'factory' }, { name: 'type:tests' }]))).toBe('sabotage');
+  });
+
+  it('chaque type a sa preuve ; le diagnostic n’en a pas, une issue sans type passe le fail-first', () => {
+    expect(gateLaneOf('bug')).toBe('failfirst');
+    expect(gateLaneOf('interface')).toBe('failfirst');
+    expect(gateLaneOf('fonctionnalite')).toBe('failfirst');
+    expect(gateLaneOf('maintenance')).toBe('invariance');
+    expect(gateLaneOf('documentation')).toBe('documents');
+    expect(gateLaneOf('diagnostic')).toBeNull();
+    expect(gateLaneOf(null)).toBe('failfirst');
+  });
+
+  it('le type se lit sur l’étiquette type:*, rien sans elle', () => {
+    expect(issueTypeOf([{ name: 'type:fonctionnalite' }])).toBe('fonctionnalite');
+    expect(issueTypeOf([{ name: 'type:inconnu' }, { name: 'bug' }])).toBeNull();
   });
 });
 

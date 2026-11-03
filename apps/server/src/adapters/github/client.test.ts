@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { GitHubClient, GitHubError, checksOf, reviewDecisionOf } from './client.ts';
+import {
+  GitHubClient,
+  GitHubError,
+  checksOf,
+  deploymentStateOf,
+  reviewDecisionOf,
+  reviewsOf,
+} from './client.ts';
 
 interface Call {
   url: string;
@@ -68,6 +75,38 @@ describe('reviewDecisionOf', () => {
     ).toBe('changes_requested');
     expect(reviewDecisionOf([review('cddev', 'COMMENTED')], true)).toBe('review_required');
     expect(reviewDecisionOf([], false)).toBeNull();
+  });
+});
+
+describe('reviewsOf', () => {
+  it('garde les revues tranchées, de la plus ancienne à la plus récente', () => {
+    expect(
+      reviewsOf([
+        { user: { login: 'cddev' }, state: 'APPROVED', submitted_at: '2026-11-03T10:05:00Z' },
+        { user: { login: 'cddev' }, state: 'COMMENTED', submitted_at: '2026-11-03T10:01:00Z' },
+        {
+          user: { login: 'cddev' },
+          state: 'CHANGES_REQUESTED',
+          submitted_at: '2026-11-03T10:00:00Z',
+        },
+      ]),
+    ).toEqual([
+      { state: 'changes_requested', at: '2026-11-03T10:00:00.000Z' },
+      { state: 'approved', at: '2026-11-03T10:05:00.000Z' },
+    ]);
+  });
+});
+
+describe('deploymentStateOf', () => {
+  it('lit le dernier statut du dernier déploiement du sha', () => {
+    expect(deploymentStateOf([], [])).toBe('none');
+    expect(deploymentStateOf([{ id: 7 }], [])).toBe('pending');
+    expect(deploymentStateOf([{ id: 7 }], [{ state: 'in_progress' }])).toBe('pending');
+    expect(deploymentStateOf([{ id: 7 }], [{ state: 'success' }, { state: 'queued' }])).toBe(
+      'success',
+    );
+    expect(deploymentStateOf([{ id: 7 }], [{ state: 'error' }])).toBe('failure');
+    expect(deploymentStateOf([{ id: 7 }], [{ state: 'inactive' }])).toBe('success');
   });
 });
 

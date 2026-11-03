@@ -10,9 +10,14 @@ export const StationId = z.enum([
   'brief',
   'implementation',
   'gate',
+  'review',
+  'merge',
+  'ci',
+  'deploy',
   'release',
   'done',
   'stopped',
+  'diagnostic',
   'side',
 ]);
 export type StationId = z.infer<typeof StationId>;

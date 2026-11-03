@@ -1,4 +1,10 @@
-import type { ChecksState, IssueLabel, PullRequestView } from '@factory-live/contracts';
+import type {
+  ChecksState,
+  DeploymentState,
+  IssueLabel,
+  PullRequestReview,
+  PullRequestView,
+} from '@factory-live/contracts';
 import type { GitHubWritePort, IssueInfo } from '../../application/ports.ts';
 import { StaticTokenSource } from './app.ts';
 import type { TokenSource } from './app.ts';
@@ -163,7 +169,10 @@ export class GitHubClient implements GitHubWritePort {
     };
   }
 
-  async pullRequest(repo: string, number: number): Promise<PullRequestView & { headSha: string }> {
+  async pullRequest(
+    repo: string,
+    number: number,
+  ): Promise<PullRequestView & { headSha: string; mergeSha: string | null }> {
     const data = (await this.request('GET', this.path(repo, `/pulls/${number}`))) as Json;
     const reviews = (await this.request(
       'GET',
@@ -176,18 +185,18 @@ export class GitHubClient implements GitHubWritePort {
           this.path(repo, `/actions/runs?head_sha=${headSha}&per_page=50`),
         )) as Json)
       : {};
+    const merged = data['merged'] === true || Boolean(data['merged_at']);
     return {
       number,
       url: str(data['html_url']),
       title: str(data['title']),
-      state:
-        data['merged'] === true || data['merged_at']
-          ? 'merged'
-          : data['state'] === 'closed'
-            ? 'closed'
-            : data['draft'] === true
-              ? 'draft'
-              : 'open',
+      state: merged
+        ? 'merged'
+        : data['state'] === 'closed'
+          ? 'closed'
+          : data['draft'] === true
+            ? 'draft'
+            : 'open',
       checks: checksOf(
         (Array.isArray(runs['workflow_runs']) ? runs['workflow_runs'] : []) as Json[],
       ),
@@ -199,8 +208,29 @@ export class GitHubClient implements GitHubWritePort {
       additions: Number(data['additions'] ?? 0),
       deletions: Number(data['deletions'] ?? 0),
       changedFiles: Number(data['changed_files'] ?? 0),
+      reviews: reviewsOf(reviews),
+      mergedAt: merged && data['merged_at'] ? new Date(str(data['merged_at'])).toISOString() : null,
+      // La CI de main et le déploiement du sha fusionné se lisent à part (`mainChecks`, `deployment`).
+      mainChecks: null,
+      deployment: null,
       headSha,
+      mergeSha: merged ? str(data['merge_commit_sha']) || null : null,
     };
+  }
+
+  /** Le dernier déploiement GitHub d'un sha (posé par `factory-deploy.py` de la factory) et son statut. */
+  async deployment(repo: string, sha: string): Promise<DeploymentState> {
+    const deployments = (await this.request(
+      'GET',
+      this.path(repo, `/deployments?sha=${sha}&per_page=1`),
+    )) as Json[];
+    const latest = Array.isArray(deployments) ? deployments[0] : undefined;
+    if (!latest) return 'none';
+    const statuses = (await this.request(
+      'GET',
+      this.path(repo, `/deployments/${String(latest['id'])}/statuses?per_page=1`),
+    )) as Json[];
+    return deploymentStateOf([latest], Array.isArray(statuses) ? statuses : []);
   }
 
   /** La PR la plus récente dont la tête est cette branche du dépôt ; `null` s'il n'y en a pas. */
@@ -283,6 +313,38 @@ export function checksOf(runs: readonly Json[]): ChecksState {
   )
     return 'failure';
   return 'success';
+}
+
+/** Les revues tranchées d'une PR (approuvée, changements demandés), de la plus ancienne à la plus récente. */
+export function reviewsOf(reviews: readonly Json[]): PullRequestReview[] {
+  return reviews
+    .flatMap((review): PullRequestReview[] => {
+      const state = String(review['state']);
+      const at = review['submitted_at'];
+      if (typeof at !== 'string') return [];
+      if (state === 'APPROVED') return [{ state: 'approved', at: new Date(at).toISOString() }];
+      if (state === 'CHANGES_REQUESTED')
+        return [{ state: 'changes_requested', at: new Date(at).toISOString() }];
+      return [];
+    })
+    .sort((left, right) => left.at.localeCompare(right.at));
+}
+
+/**
+ * L'état d'un déploiement d'après son dernier statut (le plus récent en tête, comme l'API les rend) :
+ * sans déploiement, `none` ; sans statut, en attente ; `inactive` veut dire remplacé par un plus récent,
+ * donc réussi.
+ */
+export function deploymentStateOf(
+  deployments: readonly Json[],
+  statuses: readonly Json[],
+): DeploymentState {
+  if (deployments.length === 0) return 'none';
+  const latest = statuses[0]?.['state'];
+  const state = typeof latest === 'string' ? latest : 'pending';
+  if (state === 'success' || state === 'inactive') return 'success';
+  if (state === 'failure' || state === 'error') return 'failure';
+  return 'pending';
 }
 
 /** Décision de revue (l'API REST ne la donne pas) : dernier avis de chaque relecteur. */

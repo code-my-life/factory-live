@@ -109,8 +109,12 @@ describe('instantané', () => {
       'brief',
       'implementation',
       'gate',
-      'release',
+      'review',
+      'merge',
+      'ci',
+      'deploy',
       'done',
+      'diagnostic',
     ]);
     expect(data.agents.map((agent) => agent.profile)).toEqual([
       'coordinator',

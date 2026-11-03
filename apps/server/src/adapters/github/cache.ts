@@ -83,7 +83,18 @@ export class GitHubCache implements GitHubReadPort {
           parsePrUrl(issue.prUrl) ??
           (issue.branch ? await this.pullRequestOfBranch(repo, issue.branch) : null);
         if (pr && pr.owner === this.owner) {
-          const { headSha, ...view } = await this.client.pullRequest(pr.repo, pr.number);
+          const { headSha, mergeSha, ...fetched } = await this.client.pullRequest(
+            pr.repo,
+            pr.number,
+          );
+          // Fusionnée : la CI de main et le déploiement du sha fusionné disent où en est la livraison.
+          const view: PullRequestView = mergeSha
+            ? {
+                ...fetched,
+                mainChecks: await this.client.mainChecks(pr.repo, mergeSha),
+                deployment: await this.client.deployment(pr.repo, mergeSha),
+              }
+            : fetched;
           if (JSON.stringify(view) !== JSON.stringify(this.prs.get(issue.key))) {
             this.prs.set(issue.key, view);
             changed = true;

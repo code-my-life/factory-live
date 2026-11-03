@@ -83,6 +83,107 @@ export function issueStationOf(tasks: readonly Task[], board: Board): Station {
   return 'done';
 }
 
+/**
+ * Les postes de la ligne d'usine : ceux du kanban, puis la livraison que GitHub raconte (Ta revue,
+ * Fusion, CI de main, Déploiement), et la branche Diagnostic, qui va du brief à Terminé sans PR.
+ */
+export type LineStation =
+  | 'intake'
+  | 'brief'
+  | 'implementation'
+  | 'gate'
+  | 'review'
+  | 'merge'
+  | 'ci'
+  | 'deploy'
+  | 'done'
+  | 'stopped'
+  | 'diagnostic';
+
+/** Les types d'issue de la factory (ADR 0017 de hermes-software-factory), lus sur l'étiquette `type:*`. */
+export type IssueType =
+  'bug' | 'interface' | 'fonctionnalite' | 'diagnostic' | 'tests' | 'maintenance' | 'documentation';
+
+/** Les preuves de la gate : une par famille de types (`proof` de `config/types.yaml` de la factory). */
+export type GateLane = 'failfirst' | 'sabotage' | 'invariance' | 'documents';
+
+const LANE_OF_TYPE: Readonly<Record<IssueType, GateLane | null>> = {
+  bug: 'failfirst',
+  interface: 'failfirst',
+  fonctionnalite: 'failfirst',
+  tests: 'sabotage',
+  maintenance: 'invariance',
+  documentation: 'documents',
+  diagnostic: null,
+};
+
+const TYPE_LABEL = /^type:(.+)$/;
+
+/** Le type d'une issue d'après son étiquette `type:*` ; `null` sans étiquette connue. */
+export function issueTypeOf(labels: readonly { name: string }[]): IssueType | null {
+  for (const label of labels) {
+    const found = TYPE_LABEL.exec(label.name)?.[1];
+    if (found && Object.hasOwn(LANE_OF_TYPE, found)) return found as IssueType;
+  }
+  return null;
+}
+
+/**
+ * La preuve que passe la PR d'une issue à la gate. Sans type (dépôt hors du standard des types),
+ * le fail-first, la preuve par défaut de la factory ; un diagnostic n'a ni PR ni gate.
+ */
+export function gateLaneOf(type: IssueType | null): GateLane | null {
+  return type ? LANE_OF_TYPE[type] : 'failfirst';
+}
+
+/** Ce que GitHub dit de la livraison d'une issue : sa PR, ses revues, main et le déploiement. */
+export interface DeliveryFacts {
+  state: 'draft' | 'open' | 'merged' | 'closed';
+  reviewDecision: 'approved' | 'changes_requested' | 'review_required' | null;
+  /** Les revues tranchées de la PR, de la plus ancienne à la plus récente (secondes epoch). */
+  reviews: readonly { state: 'approved' | 'changes_requested'; at: number }[];
+  /** Secondes epoch. */
+  mergedAt: number | null;
+  /** Les workflows de main sur le sha fusionné ; `null` tant que la PR n'est pas fusionnée. */
+  mainChecks: 'none' | 'pending' | 'success' | 'failure' | null;
+  /** Le dernier déploiement GitHub du sha fusionné ; `null` ou `none` sans déploiement. */
+  deployment: 'none' | 'pending' | 'success' | 'failure' | null;
+}
+
+const isDiagnostic = (task: Task) => cardKindOf(task) === 'diagnostic';
+
+/**
+ * Le poste d'une issue sur la ligne : l'étape du kanban, puis, une fois la gate passée, ce que GitHub
+ * dit de sa PR. Gate verte : Ta revue ; PR approuvée : Fusion ; fusionnée : CI de main ; main rouge :
+ * la PR de revert repasse par Ta revue ; main verte et déploiement en cours : Déploiement.
+ */
+export function lineStationOf(
+  tasks: readonly Task[],
+  board: Board,
+  delivery: DeliveryFacts | null,
+): LineStation {
+  const station = issueStationOf(tasks, board);
+  const live = tasks.filter((task) => task.status !== 'archived' && task.status !== 'done');
+  if (
+    station === 'implementation' &&
+    live.some(isDiagnostic) &&
+    !live.some((task) => cardKindOf(task) === 'impl')
+  )
+    return 'diagnostic';
+  if (station !== 'release' && station !== 'done') return station;
+  if (!delivery) return station === 'release' ? 'review' : 'done';
+  if (delivery.state !== 'merged') {
+    if (station === 'done') return 'done';
+    return delivery.reviewDecision === 'approved' ? 'merge' : 'review';
+  }
+  if (delivery.mainChecks === 'failure') return station === 'done' ? 'done' : 'review';
+  if (delivery.mainChecks !== 'success') return 'ci';
+  if (delivery.deployment === 'pending' || delivery.deployment === 'failure') return 'deploy';
+  if (delivery.deployment === 'success' || station === 'done') return 'done';
+  // Main est verte, la release n'a pas encore fermé sa carte : l'issue finit sa CI de main.
+  return 'ci';
+}
+
 export type IssueStatus = 'active' | 'queued' | 'waiting_human' | 'blocked' | 'done' | 'stopped';
 
 /**
@@ -91,7 +192,7 @@ export type IssueStatus = 'active' | 'queued' | 'waiting_human' | 'blocked' | 'd
  */
 export function issueStatusOf(
   tasks: readonly Task[],
-  station: Station,
+  station: Station | LineStation,
   openInterventions: number,
 ): IssueStatus {
   if (station === 'done' || station === 'stopped') return station;
