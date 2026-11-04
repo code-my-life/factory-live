@@ -8,6 +8,8 @@ import {
   graphAcceptance,
   tagsAcceptance,
 } from '../../demo/acceptance.ts';
+import { FactoryProvider } from '../../data/FactoryProvider.tsx';
+import type { FactoryDataSource } from '../../data/source.ts';
 import { AcceptanceBoard } from './AcceptanceBoard.tsx';
 
 const AT = '2026-11-04T10:00:00.000Z';
@@ -265,6 +267,50 @@ describe('recette d’une PR', () => {
       .getAllByRole('link')
       .find((link) => within(link).queryByRole('img', { name: 'Réussi' }));
     await waitFor(() => expect(firstGreen).toHaveFocus());
+  });
+
+  it('la disposition suit le serveur : lue au chargement, enregistrée après un changement, par type d’écran', async () => {
+    const user = userEvent.setup();
+    const saved = {
+      order: ['twins', 'criteria', 'checks', 'tests', 'proofs', 'threads'],
+      pinned: ['twins'],
+      collapsed: ['criteria'],
+      half: [],
+    } as const;
+    const getAcceptanceLayout = vi.fn(() =>
+      Promise.resolve({
+        ...saved,
+        order: [...saved.order],
+        pinned: [...saved.pinned],
+        collapsed: [...saved.collapsed],
+        half: [],
+      }),
+    );
+    const saveAcceptanceLayout = vi.fn(() => Promise.resolve());
+    const source = {
+      subscribe: () => () => undefined,
+      getAcceptanceLayout,
+      saveAcceptanceLayout,
+    } as unknown as FactoryDataSource;
+    const { container } = render(
+      <FactoryProvider source={source}>
+        <AcceptanceBoard issue={issue(44)} view={footerAcceptance(AT)} />
+      </FactoryProvider>,
+    );
+    // The server's layout for this type of screen (a desktop here) replaces the device's copy.
+    expect(getAcceptanceLayout).toHaveBeenCalledWith('desktop');
+    await waitFor(() => expect(widgetOrder()[0]).toBe('Déplacer « Jumeaux interactifs »'));
+    // A change goes to the server once it settles, for this type of screen.
+    await user.click(
+      within(widget(container, 'checks')).getByRole('button', { name: 'Épingler en tête' }),
+    );
+    await waitFor(() => expect(saveAcceptanceLayout).toHaveBeenCalledOnce(), { timeout: 3000 });
+    expect(saveAcceptanceLayout).toHaveBeenCalledWith('desktop', {
+      order: ['twins', 'checks', 'criteria', 'tests', 'proofs', 'threads'],
+      pinned: ['twins', 'checks'],
+      collapsed: ['criteria'],
+      half: [],
+    });
   });
 
   it('les jumeaux : les surfaces de la PR, le miroir des gestes, et la divergence qui propose de piloter séparément', async () => {

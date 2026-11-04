@@ -384,3 +384,47 @@ describe('LiveSource : accès GitHub', () => {
     expect(calls.filter((call) => call.url.endsWith('/api/github/status'))).toHaveLength(2);
   });
 });
+
+describe('disposition de la recette', () => {
+  const layout = {
+    order: ['twins', 'criteria', 'checks', 'tests', 'proofs', 'threads'] as const,
+    pinned: ['twins'] as const,
+    collapsed: [] as const,
+    half: [] as const,
+  };
+  const saved = {
+    order: [...layout.order],
+    pinned: [...layout.pinned],
+    collapsed: [],
+    half: [],
+  };
+
+  it('lit la disposition du serveur pour un type d’écran, et l’écrit avec l’en-tête anti-CSRF', async () => {
+    const { source, calls } = setup({
+      '/api/preferences/acceptance-layout?device=phone': {
+        device: 'phone',
+        layout: saved,
+        updatedAt: '2026-11-04T10:00:00.000Z',
+      },
+    });
+    expect(await source.getAcceptanceLayout('phone')).toEqual(saved);
+    // Nothing kept for the desktop yet, or an answer that is no layout: nothing.
+    expect(await source.getAcceptanceLayout('desktop')).toBeNull();
+    await expect(source.saveAcceptanceLayout('phone', saved)).resolves.toBeUndefined();
+    const put = calls.at(-1)!;
+    expect(put.url).toMatch(/\/api\/preferences\/acceptance-layout\?device=phone$/);
+    expect(put.init?.method).toBe('PUT');
+    expect(new Headers(put.init?.headers).get('x-factory-live')).toBe('1');
+    expect(JSON.parse(put.init?.body as string)).toEqual(saved);
+  });
+
+  it('une réponse qui n’est pas une disposition ne remplace rien', async () => {
+    const { source } = setup({
+      '/api/preferences/acceptance-layout?device=phone': {
+        device: 'phone',
+        layout: { order: ['secrets'] },
+      },
+    });
+    expect(await source.getAcceptanceLayout('phone')).toBeNull();
+  });
+});
