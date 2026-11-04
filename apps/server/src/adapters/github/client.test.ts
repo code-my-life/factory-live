@@ -211,3 +211,48 @@ describe('GitHubClient', () => {
     await expect(client.issue('cv-site', 1)).rejects.toMatchObject({ status: 404 });
   });
 });
+
+describe('lectures de la recette', () => {
+  /** Two tokens, as with the App: the installation's reads, the owner's writes. */
+  const tokens = {
+    token: (kind: 'read' | 'write') => Promise.resolve(kind === 'read' ? 'lecture' : 'ecriture'),
+    rejected: () => undefined,
+  };
+
+  it('lit les fils de revue par GraphQL avec le jeton de lecture, et un refus de GraphQL est un 403', async () => {
+    const { impl, calls } = fakeFetch({
+      '/graphql': () => json({ data: { repository: { pullRequest: null } } }),
+    });
+    const client = new GitHubClient(tokens, 'code-my-life', 'https://api.github.com', impl);
+    await client.reviewThreads('factory-live', 24);
+    const headers = calls[0]!.init.headers as Record<string, string>;
+    expect(calls[0]!.init.method).toBe('POST');
+    expect(headers['Authorization']).toBe('Bearer lecture');
+    expect(JSON.parse(calls[0]!.init.body as string)).toMatchObject({
+      variables: { owner: 'code-my-life', name: 'factory-live', number: 24 },
+    });
+
+    const refused = fakeFetch({
+      '/graphql': () => json({ data: null, errors: [{ type: 'FORBIDDEN', message: 'non' }] }),
+    });
+    const denied = new GitHubClient(tokens, 'code-my-life', 'https://api.github.com', refused.impl);
+    await expect(denied.reviewThreads('factory-live', 24)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('lit un fichier à un commit, brut, et refuse un fichier trop gros', async () => {
+    const { impl, calls } = fakeFetch({
+      '/contents/e2e/captures%20x.png?ref=abc1234': () =>
+        new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47]), { status: 200 }),
+      '/actions/artifacts/7/zip': () =>
+        new Response('x', { status: 200, headers: { 'content-length': String(60 * 1024 * 1024) } }),
+    });
+    const client = new GitHubClient(tokens, 'code-my-life', 'https://api.github.com', impl);
+    expect(await client.fileAt('factory-live', 'e2e/captures x.png', 'abc1234')).toEqual(
+      new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+    );
+    expect((calls[0]!.init.headers as Record<string, string>)['Accept']).toBe(
+      'application/vnd.github.raw',
+    );
+    await expect(client.artifactZip('factory-live', 7)).rejects.toMatchObject({ status: 413 });
+  });
+});

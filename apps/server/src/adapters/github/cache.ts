@@ -1,13 +1,19 @@
+import { createHash } from 'node:crypto';
 import { msg } from '@factory-live/contracts';
 import type { PullRequestView, Text } from '@factory-live/contracts';
 import type {
+  AcceptanceSource,
   GitHubReadPort,
   GitHubStatus,
   LoggerPort,
   TrackedIssue,
 } from '../../application/ports.ts';
+import { GATE_CONTEXT, gateOf, gateRulesOf, headChecksOf, threadsOf } from './acceptance.ts';
+import type { WorkflowRunJson } from './acceptance.ts';
 import { GitHubError } from './client.ts';
 import type { GitHubClient, IssueInfo } from './client.ts';
+import { junitFiles, readJUnit, testResultsOf, testSuitesOf } from './junit.ts';
+import type { JUnitReport } from './junit.ts';
 
 const PR_URL = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/;
 
@@ -25,6 +31,22 @@ export function parsePrUrl(
  * toutes les 30 s, les autres une fois. Sans jeton, tout reste vide et l'interface se rabat sur le kanban.
  */
 const MISSING_RETRY_MS = 3_600_000;
+/** Artifacts whose reports are kept, and pictures kept for the recette's thumbnails. */
+const REPORTS_KEPT = 50;
+const IMAGES_KEPT = 24;
+
+/** The address factory-live serves a picture of a PR at: no token in it, the server reads GitHub. */
+function captureUrl(repo: string, pr: number, path: string, side: 'base' | 'head'): string {
+  return `/api/acceptance/${repo}/${pr}/capture?path=${encodeURIComponent(path)}&side=${side}`;
+}
+
+/** Forget the oldest entries of a map past its size. */
+function bound<K, V>(map: Map<K, V>, size: number): void {
+  for (const key of map.keys()) {
+    if (map.size <= size) return;
+    map.delete(key);
+  }
+}
 
 export class GitHubCache implements GitHubReadPort {
   private readonly issues = new Map<string, IssueInfo>();
@@ -34,6 +56,12 @@ export class GitHubCache implements GitHubReadPort {
   private readonly missing = new Map<string, number>();
   /** Optional reads GitHub has refused once (a permission the App lacks): told once in the log. */
   private readonly refused = new Set<string>();
+  /** The recette's GitHub side of each issue's PR (#22). */
+  private readonly acceptances = new Map<string, AcceptanceSource>();
+  /** The JUnit reports of each artifact read: an artifact never changes. */
+  private readonly reports = new Map<number, JUnitReport[]>();
+  /** The last pictures served, by commit and path. */
+  private readonly images = new Map<string, Uint8Array>();
   status: GitHubStatus = { ok: false, detail: msg('health.github.notYet'), checkedAt: null };
   lastDelivery: { at: number; status: number } | null = null;
 
@@ -60,6 +88,30 @@ export class GitHubCache implements GitHubReadPort {
 
   pullRequest(key: string): PullRequestView | null {
     return this.prs.get(key) ?? null;
+  }
+
+  acceptance(key: string): AcceptanceSource | null {
+    return this.acceptances.get(key) ?? null;
+  }
+
+  async capture(
+    repo: string,
+    pr: number,
+    path: string,
+    side: 'base' | 'head',
+  ): Promise<Uint8Array | null> {
+    const source = [...this.acceptances.values()].find(
+      (each) => each.pr === pr && parsePrUrl(each.prUrl)?.repo === repo,
+    );
+    // Only a picture the PR modifies: any other path of the repository is never read.
+    if (!source?.captures?.some((capture) => capture.path === path)) return null;
+    const sha = side === 'base' ? source.base : source.head;
+    const known = this.images.get(`${sha}:${path}`);
+    if (known) return known;
+    const image = await this.client.fileAt(repo, path, sha);
+    this.images.set(`${sha}:${path}`, image);
+    bound(this.images, IMAGES_KEPT);
+    return image;
   }
 
   get rateLimit() {
@@ -104,6 +156,12 @@ export class GitHubCache implements GitHubReadPort {
             : fetched;
           if (JSON.stringify(view) !== JSON.stringify(this.prs.get(issue.key))) {
             this.prs.set(issue.key, view);
+            changed = true;
+          }
+          // The recette (#22): each part read apart, one GitHub refuses stays without data.
+          const source = await this.readAcceptance(pr.repo, pr.number, repo, Number(number));
+          if (JSON.stringify(source) !== JSON.stringify(this.acceptances.get(issue.key))) {
+            this.acceptances.set(issue.key, source);
             changed = true;
           }
         }
@@ -164,6 +222,106 @@ export class GitHubCache implements GitHubReadPort {
       }
       return null;
     }
+  }
+
+  /** The recette of a PR as GitHub gives it: the texts, the head's checks, the gate, the tests, the threads. */
+  private async readAcceptance(
+    repo: string,
+    number: number,
+    issueRepo: string,
+    issueNumber: number,
+  ): Promise<AcceptanceSource> {
+    const text = await this.client.pullRequestText(repo, number);
+    const head = text.head;
+    const commitUrl = `${text.url.replace(/\/pull\/\d+$/, '')}/commit/${head}`;
+    const issueBody = await this.optional('issueBody', () =>
+      this.client.issueBody(issueRepo, issueNumber),
+    );
+    const runs = await this.optional('checkRuns', () => this.client.checkRuns(repo, head));
+    const statuses = await this.optional('statuses', () => this.client.statuses(repo, head));
+    const workflows = await this.optional('workflowRuns', () =>
+      this.client.workflowRuns(repo, head),
+    );
+    const comments = await this.optional('comments', () => this.client.issueComments(repo, number));
+    const files = await this.optional('pullFiles', () => this.client.pullFiles(repo, number));
+    const answer = await this.optional('reviewThreads', () =>
+      this.client.reviewThreads(repo, number),
+    );
+    const tests = await this.optional('testReports', () =>
+      this.testReports(repo, head, workflows ?? []),
+    );
+    // The gate's last verdict: its last comment that the gate wrote (a person's copy is not one).
+    const verdict =
+      [...(comments ?? [])]
+        .reverse()
+        .find((comment) => comment.user?.type === 'Bot' && gateRulesOf(comment.body) !== null) ??
+      null;
+    const threads = answer ? threadsOf(answer) : null;
+    return {
+      pr: number,
+      prUrl: text.url,
+      head,
+      base: text.base,
+      issueBody,
+      prBody: text.body,
+      checks:
+        runs || statuses
+          ? headChecksOf(runs ?? [], statuses ?? [], workflows ?? [], commitUrl)
+          : null,
+      gate: gateOf(
+        statuses?.find((status) => status.context === GATE_CONTEXT) ?? null,
+        verdict,
+        head,
+        commitUrl,
+      ),
+      tests,
+      captures: files
+        ? files
+            .filter((file) => file.status === 'modified' && /\.png$/i.test(file.filename))
+            .map((file) => ({
+              path: file.filename,
+              before: captureUrl(repo, number, file.filename, 'base'),
+              after: captureUrl(repo, number, file.filename, 'head'),
+              url: `${text.url}/files#diff-${createHash('sha256').update(file.filename).digest('hex')}`,
+            }))
+        : null,
+      threads: threads?.threads ?? null,
+      reviewRounds: threads?.reviewRounds ?? 0,
+    };
+  }
+
+  /**
+   * The head's test reports: the artifacts named `junit…` of its workflow runs, each read once (an
+   * artifact never changes). `null` while no run has published any.
+   */
+  private async testReports(
+    repo: string,
+    head: string,
+    workflows: WorkflowRunJson[],
+  ): Promise<AcceptanceSource['tests']> {
+    let found = false;
+    const tests: NonNullable<AcceptanceSource['tests']> = { suites: [], results: [] };
+    for (const run of workflows) {
+      const artifacts = (await this.client.artifacts(repo, run.id)).filter((artifact) =>
+        /^junit/i.test(artifact.name),
+      );
+      if (artifacts.length === 0) continue;
+      found = true;
+      const reports: JUnitReport[] = [];
+      for (const artifact of artifacts) {
+        let read = this.reports.get(artifact.id);
+        if (!read) {
+          read = junitFiles(await this.client.artifactZip(repo, artifact.id)).map(readJUnit);
+          this.reports.set(artifact.id, read);
+          bound(this.reports, REPORTS_KEPT);
+        }
+        reports.push(...read);
+      }
+      const at = { repo: `${this.owner}/${repo}`, head, url: run.html_url };
+      tests.suites.push(...testSuitesOf(reports, at));
+      tests.results.push(...testResultsOf(reports, at));
+    }
+    return found ? tests : null;
   }
 
   private async pullRequestOfBranch(

@@ -1,5 +1,6 @@
 import { inflateRawSync } from 'node:zlib';
 import type { AcceptanceTestSuite } from '@factory-live/contracts';
+import type { AcceptanceTestResult } from '../../application/ports.ts';
 
 /**
  * The JUnit reports the CI publishes as artifacts (Vitest, Playwright), read without any dependency:
@@ -216,4 +217,28 @@ export function testSuitesOf(
       })),
     };
   });
+}
+
+/**
+ * Every test of one run's reports, for the criteria that name them: a failure leads to its line, a
+ * Vitest file to the file at the head; otherwise (a Playwright file is named from its `testDir`) to
+ * the run that ran it.
+ */
+export function testResultsOf(
+  reports: JUnitReport[],
+  at: { repo: string; head: string; url: string },
+): AcceptanceTestResult[] {
+  return reports.flatMap((report) =>
+    report.tests.map((test) => ({
+      file: test.file,
+      name: test.name,
+      project: test.project,
+      outcome: test.outcome,
+      url: test.location
+        ? `https://github.com/${at.repo}/blob/${at.head}/${repoPath(test.location.path, at.repo)}#L${test.location.line}`
+        : report.runner === 'vitest' && test.file.includes('/')
+          ? `https://github.com/${at.repo}/blob/${at.head}/${test.file}`
+          : at.url,
+    })),
+  );
 }

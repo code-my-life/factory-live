@@ -1,4 +1,8 @@
 import type {
+  AcceptanceCheck,
+  AcceptanceGate,
+  AcceptanceTestSuite,
+  AcceptanceThread,
   ActivityEvent,
   IssueLabel,
   PullRequestView,
@@ -205,9 +209,51 @@ export interface GitHubStatus {
 }
 
 // Cached GitHub data, read by the hub at each projection.
+/** A test of the head's JUnit reports, as the criteria that name it need it (#22). */
+export interface AcceptanceTestResult {
+  /** The file as the report names it. */
+  file: string;
+  /** The full name, describe blocks included (« recette > un critère vert »). */
+  name: string;
+  project: string | null;
+  outcome: 'passed' | 'failed' | 'skipped';
+  /** The test at the head, or the run that ran it when the report does not say where it is. */
+  url: string;
+}
+
+/**
+ * The recette of an issue's PR as GitHub gives it (#22), before the factory's evidence joins it. A
+ * part GitHub refused, or could not give, is `null`: the recette shows that part without data.
+ */
+export interface AcceptanceSource {
+  pr: number;
+  prUrl: string;
+  head: string;
+  base: string;
+  issueBody: string | null;
+  prBody: string | null;
+  checks: AcceptanceCheck[] | null;
+  gate: AcceptanceGate | null;
+  /** The head's test reports, as suites and test by test; `null` while none is published. */
+  tests: { suites: AcceptanceTestSuite[]; results: AcceptanceTestResult[] } | null;
+  /** The pictures the PR modifies, served by factory-live before (base) and after (head). */
+  captures: { path: string; before: string; after: string; url: string }[] | null;
+  threads: AcceptanceThread[] | null;
+  reviewRounds: number;
+}
+
 export interface GitHubReadPort {
   issueInfo(key: string): IssueInfo | null;
   pullRequest(key: string): PullRequestView | null;
+  /** The recette's GitHub side for the issue's PR; `null` while there is no PR (or not read yet). */
+  acceptance(key: string): AcceptanceSource | null;
+  /** A picture the PR modifies, at its base or its head; `null` when the PR does not modify it. */
+  capture(
+    repo: string,
+    pr: number,
+    path: string,
+    side: 'base' | 'head',
+  ): Promise<Uint8Array | null>;
   readonly status: GitHubStatus;
   readonly lastDelivery: { at: number; status: number } | null;
   readonly rateLimit: { remaining: number; limit: number } | null;
