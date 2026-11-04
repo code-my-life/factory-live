@@ -14,6 +14,7 @@ import { PushNotifier } from '../adapters/push/webpush.ts';
 import type { StoredSubscription } from '../adapters/store/history.ts';
 import { HistoryStore } from '../adapters/store/history.ts';
 import { createApp } from '../http/app.ts';
+import type { TwinBench } from '../adapters/twins/bench.ts';
 import { StreamBuffer } from '../http/stream.ts';
 import { DiagnosisService } from '../application/diagnosis.ts';
 import { Hub } from '../application/hub.ts';
@@ -62,6 +63,8 @@ export function harness(
     streamPingMs?: number;
     /** More answers of GitHub, by the end of the address, read before the built-in ones. */
     githubRoutes?: Record<string, () => Response>;
+    /** The factory's twin bench (#23). */
+    twins?: TwinBench;
   } = {},
 ): Harness {
   const dir = tempDir();
@@ -291,6 +294,7 @@ export function harness(
     unblock,
     notifier,
     githubAuth,
+    ...(options.twins ? { twins: options.twins } : {}),
     hookSecret: SECRET,
     origins: ORIGINS,
     allowedHosts: allowedHosts(8446, ORIGINS),

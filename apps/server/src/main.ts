@@ -8,6 +8,7 @@ import { AgentLogReader } from './adapters/hermes/agentLog.ts';
 import { CardFiles } from './adapters/hermes/files.ts';
 import { KanbanReader } from './adapters/hermes/kanban.ts';
 import { HermesPaths } from './adapters/hermes/paths.ts';
+import { TwinBench } from './adapters/twins/bench.ts';
 import { ProfileConfigReader } from './adapters/hermes/profiles.ts';
 import { SessionReader } from './adapters/hermes/sessions.ts';
 import { PushNotifier, vapidKeys } from './adapters/push/webpush.ts';
@@ -172,6 +173,11 @@ const timers = [
 ];
 void refreshGitHub();
 
+// The factory's twin bench (#23, ADR 0013): the pair's state on the board, its ports on this PC.
+const twins = new TwinBench({
+  file: (repo, pr) => paths.twins(repo, pr),
+  host: config.TWINS_HOST,
+});
 const app = createApp({
   hub,
   buffer,
@@ -183,6 +189,7 @@ const app = createApp({
     profiles,
     github,
     files,
+    twins,
     agentLog,
     owner: config.GITHUB_OWNER,
     boardName: config.HERMES_BOARD,
@@ -193,6 +200,7 @@ const app = createApp({
   unblock: unblockDeps,
   notifier,
   githubAuth,
+  twins,
   hookSecret: config.secrets.hookSecret,
   origins: config.PUBLIC_ORIGINS,
   allowedHosts: config.allowedHosts,

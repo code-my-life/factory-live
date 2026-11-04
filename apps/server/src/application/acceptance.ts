@@ -2,6 +2,7 @@ import type {
   AcceptanceCriterion,
   AcceptanceGateRule,
   AcceptanceProof,
+  AcceptanceTwins,
   AcceptanceView,
 } from '@factory-live/contracts';
 import type { AcceptanceSource, AcceptanceTestResult, GateProof } from './ports.ts';
@@ -199,9 +200,14 @@ function declared(body: string | null): string[] {
 
 /**
  * The recette of the issue's PR: the GitHub side read by the cache, the gate's proofs of the head
- * read in the card's evidence. A part GitHub refused stays empty; the rest still shows.
+ * read in the card's evidence, its twins on the factory's bench. A part GitHub refused stays empty;
+ * the rest still shows.
  */
-export function acceptanceOf(source: AcceptanceSource, proofs: GateProof[]): AcceptanceView {
+export function acceptanceOf(
+  source: AcceptanceSource,
+  proofs: GateProof[],
+  twins: AcceptanceTwins | null = null,
+): AcceptanceView {
   const asked = criteriaLines(section(source.issueBody, "Critères d'acceptation"));
   const given = criteriaLines(section(source.prBody, 'Critères'));
   const criteria = [...asked].map(([id, text]) => judge(id, text, given.get(id) ?? null, source));
@@ -247,8 +253,8 @@ export function acceptanceOf(source: AcceptanceSource, proofs: GateProof[]): Acc
     proofs: [...textual, ...captures, ...unproven],
     threads: source.threads ?? [],
     reviewRounds: source.reviewRounds,
-    // The factory's twin bench does not exist yet (hermes-software-factory#26).
-    twins: null,
-    twinsAbsent: 'no_build',
+    // The pair the factory's bench runs for this PR (#23); without one, the bench does not serve it.
+    twins,
+    twinsAbsent: twins ? null : 'no_build',
   };
 }

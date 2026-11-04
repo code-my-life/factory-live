@@ -31,6 +31,10 @@ services:
       DASHBOARD_URL: ${DASHBOARD_URL:-}
       # Le journal d'Hermès note l'heure locale de ce PC sans fuseau ; le conteneur, lui, est en UTC.
       HERMES_TZ: ${HERMES_TZ:-Europe/Paris}
+      # Le banc de jumeaux de la factory publie ses ports sur ce PC (ADR 0013).
+      TWINS_HOST: host.docker.internal
+    extra_hosts:
+      - host.docker.internal:host-gateway
     volumes:
       - factory-live-data:/data
       # Bases d'Hermès : dossiers en écriture pour le seul `-shm` de SQLite (lecteur WAL), bases ouvertes en lecture seule.

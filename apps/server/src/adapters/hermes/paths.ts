@@ -115,6 +115,16 @@ export class HermesPaths {
       .sort((left, right) => left.order - right.order);
   }
 
+  /**
+   * The state of a PR's twin pair (#23, ADR 0013): `twins/<repo>-<pr>.json` of the board, written by the
+   * factory (hermes-software-factory#29).
+   */
+  twins(repo: string, pr: number): string | null {
+    return NAME.test(repo) && Number.isSafeInteger(pr) && pr > 0
+      ? real(this.boardDir, ['twins', `${repo}-${pr}.json`], 'file')
+      : null;
+  }
+
   /** Un fichier sous un dossier rendu par `evidenceDir`, sans lien ni sortie du dossier. */
   evidenceEntry(dir: string, parts: readonly string[], kind: 'file' | 'dir'): string | null {
     return parts.every((part) => part !== '' && part !== '.' && part !== '..')

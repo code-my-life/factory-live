@@ -1,5 +1,6 @@
 import { msg } from '@factory-live/contracts';
 import type {
+  AcceptanceTwins,
   CardView,
   HistoryStats,
   IssueDetail,
@@ -50,6 +51,8 @@ export interface ViewDeps {
   profiles: ProfilesPort;
   github: GitHubReadPort | null;
   files: CardFilesPort;
+  /** The factory's twin bench (#23): a PR's pair, as the recette shows it; absent without a bench. */
+  twins?: { view(repo: string, pr: number): AcceptanceTwins | null } | null;
   /** Hermes agent log: hook timeouts, per guard. */
   agentLog: AgentLogPort | null;
   owner: string;
@@ -242,9 +245,16 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
       ? acceptanceOf(
           source,
           ids.flatMap((id) => deps.files.gateProofs(id, source.head.slice(0, 7))),
+          twinsOf(deps, source.prUrl, source.pr),
         )
       : null,
   };
+}
+
+/** The PR's twin pair on the factory's bench (#23), by its repository read in the PR's address. */
+function twinsOf(deps: ViewDeps, prUrl: string, pr: number): AcceptanceTwins | null {
+  const repo = /^https:\/\/github\.com\/[^/]+\/([^/]+)\/pull\/\d+/.exec(prUrl)?.[1];
+  return repo ? (deps.twins?.view(repo, pr) ?? null) : null;
 }
 
 /** Transcripts of a run: Hermes session (with card raw log), then Claude Code lane if any. */
