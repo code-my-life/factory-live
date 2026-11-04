@@ -43,8 +43,8 @@ const SCREENS = [
  * rester propres dans l'une comme dans l'autre. Les onglets d'une issue qui portent des badges.
  */
 const LANGUAGES = [
-  { locale: 'fr-FR', lang: 'fr', name: 'français', tabs: ['PR et CI', 'Coûts', 'Transcription'] },
-  { locale: 'en-US', lang: 'en', name: 'anglais', tabs: ['PR and CI', 'Costs', 'Transcript'] },
+  { locale: 'fr-FR', lang: 'fr', name: 'français', tabs: ['Coûts', 'Transcription'] },
+  { locale: 'en-US', lang: 'en', name: 'anglais', tabs: ['Costs', 'Transcript'] },
 ];
 
 for (const { locale, lang, name, tabs } of LANGUAGES) {

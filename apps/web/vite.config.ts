@@ -36,6 +36,8 @@ export default defineConfig({
       injectManifest: {
         // La police (Mona Sans) aussi : hors ligne, l'app garde son apparence.
         globPatterns: ['**/*.{js,css,html,svg,png,webmanifest,woff2}'],
+        // The demo's twins (a site imitated for the acceptance) are not part of the installed app.
+        globIgnores: ['demo/**'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
       includeAssets: ['icons/icon.svg', 'icons/apple-touch-icon-180.png'],

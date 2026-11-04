@@ -780,7 +780,6 @@ export const fr = {
     tabs: {
       activity: 'Activité',
       transcript: 'Transcription',
-      pr: 'PR et CI',
       costs: 'Coûts',
       evidence: 'Preuves',
     },
@@ -821,17 +820,7 @@ export const fr = {
   },
 
   pr: {
-    checks: [
-      { name: 'Tests', detail: 'Windows, macOS, Ubuntu × Node 22 et 24' },
-      { name: 'E2E', detail: 'Electron, scénarios des cartes' },
-      { name: 'GitHub Pages', detail: 'Site de présentation' },
-    ],
-    spottedBefore: 'PR ',
-    spottedAfter:
-      ' relevée par la factory ; son état, ses revues et sa CI s’afficheront une fois GitHub relié (Réglages, GitHub).',
-    none: 'Pas encore de PR : elle s’ouvre en brouillon à la fin de l’implémentation.',
     state: { draft: 'Brouillon', merged: 'Fusionnée', closed: 'Fermée', open: 'Ouverte' },
-    /** L'état de la CI d'une PR, après « CI ». */
     /** Le badge de la CI d'une PR : son étiquette, puis l'état des workflows. */
     ciLabel: 'CI',
     ci: {
@@ -839,20 +828,191 @@ export const fr = {
       success: 'réussie',
       failure: 'en échec',
     } satisfies Record<Exclude<ChecksState, 'none'>, string>,
-    changes: 'Changements',
-    review: 'Revue',
-    reviewDecision: {
-      approved: 'Approuvée',
-      changes_requested: 'Changements demandés',
-      review_required: 'Ton approbation est attendue',
-      none: 'Pas encore demandée',
-    },
-    autoMerge: 'Auto-merge',
-    autoMergeOn: 'Armé : le merge part dès ton approbation',
-    autoMergeOff: 'Non (dépôt privé ou PR en brouillon)',
-    workflows: 'Workflows de la PR',
     approve: 'Approuver sur GitHub',
     open: 'Ouvrir la PR sur GitHub',
+  },
+
+  /** The acceptance of a PR (« la recette ») : its widgets, their verdicts, the owner's layout. */
+  acceptance: {
+    title: (pr: number) => `Recette de la PR #${pr}`,
+    intro:
+      'Ce que la PR livre, prouvé par les critères de l’issue, la CI, la gate, les tests et l’app elle-même. Aucun code à lire.',
+    status: {
+      ok: 'OK',
+      nok: 'NOK',
+      pending: 'En cours',
+      info: 'À voir',
+      none: 'Sans objet',
+    } satisfies Record<'ok' | 'nok' | 'pending' | 'info' | 'none', string>,
+    widget: {
+      criteria: 'Critères d’acceptation',
+      checks: 'CI et gate',
+      tests: 'Tests unitaires et de bout en bout',
+      proofs: 'Preuves',
+      threads: 'Retours de revue',
+      twins: 'Jumeaux interactifs',
+    } satisfies Record<'criteria' | 'checks' | 'tests' | 'proofs' | 'threads' | 'twins', string>,
+    /** A widget's share of OK, NOK, running and to see, read by screen readers on its bar. */
+    tallyOf: (ok: number, nok: number, pending: number, info: number, total: number) =>
+      `${ok} OK, ${nok} NOK, ${pending} en cours, ${info} à voir, sur ${total}`,
+    /** « 1 NOK · 4 à voir · 14 OK », the counts of a widget, what needs the owner first, zeros left out. */
+    tally: (ok: number, nok: number, pending: number, info = 0) =>
+      [
+        nok ? `${nok} NOK` : '',
+        pending ? `${pending} en cours` : '',
+        info ? `${info} à voir` : '',
+        ok ? `${ok} OK` : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    /** A count of the header that leads to its first element. */
+    goTo: (count: string) => `Aller à : ${count}`,
+    layout: {
+      menu: 'Disposition de la recette',
+      reset: 'Rétablir la disposition par défaut',
+      pinnedMark: 'Épinglé',
+      move: (name: string) => `Déplacer « ${name} »`,
+      moveHint: 'Glisse la poignée, ou utilise les flèches haut et bas.',
+      actions: (name: string) => `Actions de « ${name} »`,
+      up: 'Monter',
+      down: 'Descendre',
+      pin: 'Épingler en tête',
+      unpin: 'Désépingler',
+      collapse: 'Replier',
+      expand: 'Déplier',
+      onGitHub: 'Voir sur GitHub',
+      half: 'Demi-largeur',
+      full: 'Pleine largeur',
+      moved: (name: string, position: number, count: number) =>
+        `${name} : position ${position} sur ${count}`,
+      pinned: (name: string) => `${name} : épinglé en tête`,
+      unpinned: (name: string) => `${name} : n’est plus épinglé`,
+      resetDone: 'Disposition par défaut rétablie',
+    },
+    criteria: {
+      reason: {
+        proven: 'Prouvé',
+        unproven: 'Non prouvé, la PR le dit',
+        failing: 'Sa preuve échoue',
+        running: 'CI en cours',
+      } satisfies Record<'proven' | 'unproven' | 'failing' | 'running', string>,
+      none: 'L’issue ne numérote aucun critère.',
+    },
+    checks: {
+      ci: 'Checks de la tête',
+      gate: 'Gate de la factory',
+      gateOn: (sha: string) => `sur ${sha}`,
+      status: {
+        success: 'Réussi',
+        failure: 'En échec',
+        pending: 'En cours',
+        skipped: 'Ignoré',
+      } satisfies Record<'success' | 'failure' | 'pending' | 'skipped', string>,
+      none: 'Aucun check sur la tête pour l’instant.',
+      noGate: 'La gate n’a pas encore jugé cette tête.',
+      info: 'Information',
+      passed: (count: number) => `${count} ${f.plural(count, 'check réussi', 'checks réussis')}`,
+      okRules: (count: number) => `${count} ${f.plural(count, 'règle verte', 'règles vertes')}`,
+    },
+    tests: {
+      kind: { unit: 'Unitaires', e2e: 'Bout en bout' } satisfies Record<'unit' | 'e2e', string>,
+      passed: (count: number) => `${count} ${f.plural(count, 'réussi', 'réussis')}`,
+      failed: (count: number) => `${count} ${f.plural(count, 'échec', 'échecs')}`,
+      skipped: (count: number) => `${count} ${f.plural(count, 'ignoré', 'ignorés')}`,
+      running: 'En cours',
+      none: 'Aucun rapport de tests sur la tête pour l’instant.',
+    },
+    proofs: {
+      kind: {
+        failfirst: 'Fail-first',
+        sabotage: 'Sabotages',
+        invariance: 'Invariance',
+        documents: 'Documents',
+        build: 'Build hors ligne',
+        coverage: 'Couverture du diff',
+        run: 'Exécution',
+        measure: 'Mesure',
+        capture: 'Capture',
+        unproven: 'Non prouvé',
+      } satisfies Record<
+        | 'failfirst'
+        | 'sabotage'
+        | 'invariance'
+        | 'documents'
+        | 'build'
+        | 'coverage'
+        | 'run'
+        | 'measure'
+        | 'capture'
+        | 'unproven',
+        string
+      >,
+      textual: 'Preuves textuelles',
+      visual: (count: number) => `${count} ${f.plural(count, 'capture', 'captures')} avant / après`,
+      declared: 'Ce que la PR dit ne pas prouver',
+      showAll: (lines: number) => `Tout afficher (${lines} lignes)`,
+      showLess: 'Réduire',
+      hidden: (count: number) =>
+        `⋯ ${count} ${f.plural(count, 'ligne masquée', 'lignes masquées')}`,
+      enlarge: 'Agrandir',
+      before: 'Avant',
+      after: 'Après',
+      captureOf: (side: string, detail: string) => `${side} : ${detail}`,
+      none: 'Aucune preuve publiée pour l’instant.',
+    },
+    threads: {
+      resolved: 'Résolu',
+      open: 'À traiter',
+      rounds: (count: number) =>
+        `${count} ${f.plural(count, 'revue postée', 'revues postées')} sur la PR`,
+      resolvedGroup: (count: number) =>
+        `${count} ${f.plural(count, 'retour résolu', 'retours résolus')}`,
+      none: 'Aucun retour de revue sur cette PR.',
+    },
+    twins: {
+      preview:
+        'Aperçu : la démo ne diffuse aucun flux. Les jumeaux vivants viendront du banc de la factory, par Neko.',
+      surfaces: 'Surfaces de la PR',
+      kind: {
+        web: 'App web',
+        desktop: 'App de bureau',
+        terminal: 'Terminal',
+        api: 'API',
+        site: 'Site',
+        docs: 'Documentation',
+      } satisfies Record<'web' | 'desktop' | 'terminal' | 'api' | 'site' | 'docs', string>,
+      unchanged: (label: string) => `${label}, inchangée par la PR`,
+      base: 'Avant',
+      head: 'Après',
+      baseOf: (sha: string) => `base ${sha}`,
+      headOf: (sha: string) => `PR ${sha}`,
+      view: 'Vue des jumeaux',
+      side: 'Côte à côte',
+      overlay: 'Superposés',
+      split: 'Partage entre avant et après',
+      mirror: 'Miroir de tes gestes',
+      mirrorOn: 'Tes gestes sur un jumeau sont rejoués sur l’autre.',
+      mirrorOff: 'Tu pilotes chaque jumeau séparément.',
+      drive: 'Piloter séparément',
+      resync: 'Resynchroniser',
+      divergence: 'Le miroir attend',
+      differences: (count: number) =>
+        count === 0
+          ? 'Aucune différence sur cet écran'
+          : `${count} ${f.plural(count, 'différence', 'différences')} sur cet écran`,
+      state: {
+        starting: 'Le banc démarre les jumeaux',
+        ready: 'Jumeaux prêts sur le banc',
+        stopped: 'Jumeaux arrêtés',
+      } satisfies Record<'starting' | 'ready' | 'stopped', string>,
+      noStill: 'Pas encore d’image de cet écran.',
+      screen: (side: string, sha: string) => `L’écran ${side}, ${sha}`,
+      absent: {
+        no_screen:
+          'Cette PR ne change aucun écran : rien à comparer. Sa preuve est l’invariance, dans Preuves.',
+        no_build: 'Le banc de jumeaux ne sert pas encore ce projet.',
+      } satisfies Record<'no_screen' | 'no_build', string>,
+    },
   },
 
   transcript: {

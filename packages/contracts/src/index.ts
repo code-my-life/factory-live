@@ -1,6 +1,7 @@
 export * from './common.ts';
 export * from './messages.ts';
 export * from './agents.ts';
+export * from './acceptance.ts';
 export * from './issues.ts';
 export * from './diagnosis.ts';
 export * from './interventions.ts';

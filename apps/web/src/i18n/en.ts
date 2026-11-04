@@ -719,7 +719,6 @@ export const en: Messages = {
     tabs: {
       activity: 'Activity',
       transcript: 'Transcript',
-      pr: 'PR and CI',
       costs: 'Costs',
       evidence: 'Evidence',
     },
@@ -760,32 +759,166 @@ export const en: Messages = {
   },
 
   pr: {
-    checks: [
-      { name: 'Tests', detail: 'Windows, macOS, Ubuntu × Node 22 and 24' },
-      { name: 'E2E', detail: 'Electron, card scenarios' },
-      { name: 'GitHub Pages', detail: 'Showcase site' },
-    ],
-    spottedBefore: 'PR ',
-    spottedAfter:
-      ' spotted by the factory; its state, reviews and CI will show once GitHub is connected (Settings, GitHub).',
-    none: 'No PR yet: it opens as a draft at the end of implementation.',
     state: { draft: 'Draft', merged: 'Merged', closed: 'Closed', open: 'Open' },
     ciLabel: 'CI',
     ci: { pending: 'pending', success: 'passing', failure: 'failing' },
-    changes: 'Changes',
-    review: 'Review',
-    reviewDecision: {
-      approved: 'Approved',
-      changes_requested: 'Changes requested',
-      review_required: 'Waiting for your approval',
-      none: 'Not requested yet',
-    },
-    autoMerge: 'Auto-merge',
-    autoMergeOn: 'Enabled: the merge goes through as soon as you approve',
-    autoMergeOff: 'No (private repository or draft PR)',
-    workflows: 'PR workflows',
     approve: 'Approve on GitHub',
     open: 'Open the PR on GitHub',
+  },
+
+  acceptance: {
+    title: (pr: number) => `Acceptance of PR #${pr}`,
+    intro:
+      'What the PR delivers, proven by the issue’s criteria, the CI, the gate, the tests and the app itself. No code to read.',
+    status: { ok: 'OK', nok: 'NOK', pending: 'Running', info: 'To see', none: 'Not applicable' },
+    widget: {
+      criteria: 'Acceptance criteria',
+      checks: 'CI and gate',
+      tests: 'Unit and end-to-end tests',
+      proofs: 'Proofs',
+      threads: 'Review threads',
+      twins: 'Interactive twins',
+    },
+    tallyOf: (ok: number, nok: number, pending: number, info: number, total: number) =>
+      `${ok} OK, ${nok} NOK, ${pending} running, ${info} to see, out of ${total}`,
+    tally: (ok: number, nok: number, pending: number, info = 0) =>
+      [
+        nok ? `${nok} NOK` : '',
+        pending ? `${pending} running` : '',
+        info ? `${info} to see` : '',
+        ok ? `${ok} OK` : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    goTo: (count: string) => `Go to: ${count}`,
+    layout: {
+      menu: 'Acceptance layout',
+      reset: 'Restore the default layout',
+      pinnedMark: 'Pinned',
+      move: (name: string) => `Move “${name}”`,
+      moveHint: 'Drag the handle, or use the up and down arrows.',
+      actions: (name: string) => `Actions for “${name}”`,
+      up: 'Move up',
+      down: 'Move down',
+      pin: 'Pin to the top',
+      unpin: 'Unpin',
+      collapse: 'Collapse',
+      expand: 'Expand',
+      onGitHub: 'See on GitHub',
+      half: 'Half width',
+      full: 'Full width',
+      moved: (name: string, position: number, count: number) =>
+        `${name}: position ${position} of ${count}`,
+      pinned: (name: string) => `${name}: pinned to the top`,
+      unpinned: (name: string) => `${name}: no longer pinned`,
+      resetDone: 'Default layout restored',
+    },
+    criteria: {
+      reason: {
+        proven: 'Proven',
+        unproven: 'Not proven, the PR says so',
+        failing: 'Its proof fails',
+        running: 'CI running',
+      },
+      none: 'The issue numbers no criterion.',
+    },
+    checks: {
+      ci: 'Checks on the head',
+      gate: 'Factory gate',
+      gateOn: (sha: string) => `on ${sha}`,
+      status: { success: 'Passed', failure: 'Failing', pending: 'Running', skipped: 'Skipped' },
+      none: 'No check on the head yet.',
+      noGate: 'The gate has not judged this head yet.',
+      info: 'Information',
+      passed: (count: number) => `${count} ${f.plural(count, 'check passed', 'checks passed')}`,
+      okRules: (count: number) => `${count} green ${f.plural(count, 'rule', 'rules')}`,
+    },
+    tests: {
+      kind: { unit: 'Unit', e2e: 'End to end' },
+      passed: (count: number) => `${count} passed`,
+      failed: (count: number) => `${count} ${f.plural(count, 'failure', 'failures')}`,
+      skipped: (count: number) => `${count} skipped`,
+      running: 'Running',
+      none: 'No test report on the head yet.',
+    },
+    proofs: {
+      kind: {
+        failfirst: 'Fail-first',
+        sabotage: 'Sabotages',
+        invariance: 'Invariance',
+        documents: 'Documents',
+        build: 'Offline build',
+        coverage: 'Diff coverage',
+        run: 'Run',
+        measure: 'Measure',
+        capture: 'Capture',
+        unproven: 'Not proven',
+      },
+      textual: 'Textual proofs',
+      visual: (count: number) =>
+        `${count} before / after ${f.plural(count, 'capture', 'captures')}`,
+      declared: 'What the PR says it does not prove',
+      showAll: (lines: number) => `Show all (${lines} lines)`,
+      showLess: 'Show less',
+      hidden: (count: number) => `⋯ ${count} ${f.plural(count, 'line hidden', 'lines hidden')}`,
+      enlarge: 'Enlarge',
+      before: 'Before',
+      after: 'After',
+      captureOf: (side: string, detail: string) => `${side}: ${detail}`,
+      none: 'No proof published yet.',
+    },
+    threads: {
+      resolved: 'Resolved',
+      open: 'To handle',
+      rounds: (count: number) =>
+        `${count} ${f.plural(count, 'review', 'reviews')} posted on the PR`,
+      resolvedGroup: (count: number) => `${count} resolved ${f.plural(count, 'thread', 'threads')}`,
+      none: 'No review thread on this PR.',
+    },
+    twins: {
+      preview:
+        'Preview: the demo streams nothing. The live twins will come from the factory’s twin bench, through Neko.',
+      surfaces: 'Surfaces of the PR',
+      kind: {
+        web: 'Web app',
+        desktop: 'Desktop app',
+        terminal: 'Terminal',
+        api: 'API',
+        site: 'Site',
+        docs: 'Docs',
+      },
+      unchanged: (label: string) => `${label}, unchanged by the PR`,
+      base: 'Before',
+      head: 'After',
+      baseOf: (sha: string) => `base ${sha}`,
+      headOf: (sha: string) => `PR ${sha}`,
+      view: 'Twins view',
+      side: 'Side by side',
+      overlay: 'Overlaid',
+      split: 'Split between before and after',
+      mirror: 'Mirror your gestures',
+      mirrorOn: 'Your gestures on one twin are replayed on the other.',
+      mirrorOff: 'You drive each twin on its own.',
+      drive: 'Drive separately',
+      resync: 'Resynchronize',
+      divergence: 'The mirror is waiting',
+      differences: (count: number) =>
+        count === 0
+          ? 'No difference on this screen'
+          : `${count} ${f.plural(count, 'difference', 'differences')} on this screen`,
+      state: {
+        starting: 'The bench is starting the twins',
+        ready: 'Twins ready on the bench',
+        stopped: 'Twins stopped',
+      },
+      noStill: 'No picture of this screen yet.',
+      screen: (side: string, sha: string) => `The screen ${side}, ${sha}`,
+      absent: {
+        no_screen:
+          'This PR changes no screen: nothing to compare. Its proof is the invariance, in Proofs.',
+        no_build: 'The twin bench does not serve this project yet.',
+      },
+    },
   },
 
   transcript: {

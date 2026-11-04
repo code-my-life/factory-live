@@ -25,6 +25,12 @@ import {
   model,
 } from './catalog.ts';
 import {
+  contactAcceptance,
+  footerAcceptance,
+  graphAcceptance,
+  tagsAcceptance,
+} from './acceptance.ts';
+import {
   BREAKER,
   HOOK_INCIDENT,
   PROTOCOL_VIOLATION_ERROR,
@@ -56,6 +62,7 @@ export const KEYS = {
   e2e: 'claude-cockpit#42',
   overlap: 'claude-cockpit#52',
   codeowners: 'cv-site#46',
+  graph: 'factory-live#18',
 } as const;
 
 export const CARDS = {
@@ -81,6 +88,7 @@ export const CARDS = {
   overlapImpl: 't_d6702099',
   overlapRelease: 't_b7c03d7b',
   codeownersImpl: 't_70e1b2c9',
+  graphImpl: 't_19a4b7c2',
   hookBrief: HOOK_INCIDENT.brief,
   hookImpl: HOOK_INCIDENT.impl,
   hookRelease: HOOK_INCIDENT.release,
@@ -646,6 +654,47 @@ export function createInitialState(now: number): DemoState {
         ['done', 6 * DAY - 6 * min],
       ]),
     },
+    {
+      // Real: the line in a graph (factory-live#18), built in a Claude Code session, merged as PR #19.
+      key: KEYS.graph,
+      repo: 'factory-live',
+      number: 18,
+      title: 'Ligne d’usine : le graphe des 9 postes, des branches et des trajets',
+      url: issueUrl(KEYS.graph),
+      labels: [TYPE_LABEL.interface],
+      station: 'done',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'done',
+      claudeModel: 'claude-opus-5-5',
+      harness: 'coder-claude',
+      pr: pr('factory-live', 19, {
+        title:
+          'interface: la ligne d’usine en graphe, ses 9 postes, ses branches et le trajet de chaque issue',
+        state: 'merged',
+        checks: 'success',
+        reviewDecision: 'approved',
+        additions: 5105,
+        deletions: 2086,
+        changedFiles: 104,
+      }),
+      activeProfiles: [],
+      interventionIds: [],
+      startedAt: ago(DAY + 4 * 60 * min),
+      updatedAt: ago(13 * 60 * min),
+      type: 'interface',
+      lane: 'failfirst',
+      journey: trail(ago, 'failfirst', [
+        ['intake', DAY + 4 * 60 * min],
+        ['brief', DAY + 3 * 60 * min],
+        ['implementation', DAY],
+        ['gate', 14 * 60 * min, 'ok'],
+        ['review', 14 * 60 * min - 30 * min, 'ok'],
+        ['merge', 13 * 60 * min + 3 * min],
+        ['ci', 13 * 60 * min + 2 * min, 'ok'],
+        ['done', 13 * 60 * min],
+      ]),
+    },
   ]);
 
   const opus = model('anthropic', 'claude-opus-5-5', 'live');
@@ -758,6 +807,7 @@ export function createInitialState(now: number): DemoState {
 
   details[KEYS.contact] = {
     issue: find(KEYS.contact),
+    acceptance: contactAcceptance('judging', null),
     tokens: 286_000,
     costUsd: 0,
     cards: [
@@ -953,6 +1003,7 @@ export function createInitialState(now: number): DemoState {
 
   details[KEYS.tags] = {
     issue: find(KEYS.tags),
+    acceptance: tagsAcceptance(ago(31 * min)),
     tokens: 198_000,
     costUsd: 0,
     cards: [
@@ -1009,6 +1060,7 @@ export function createInitialState(now: number): DemoState {
 
   details[KEYS.footer] = {
     issue: find(KEYS.footer),
+    acceptance: footerAcceptance(ago(61 * min)),
     tokens: 94_000,
     costUsd: 0,
     cards: [
@@ -1387,6 +1439,23 @@ export function createInitialState(now: number): DemoState {
     233_000,
     1.94,
   );
+  doneDetail(
+    KEYS.graph,
+    [
+      card(CARDS.graphImpl, `impl ${KEYS.graph} : la ligne en graphe`, {
+        kind: 'impl',
+        status: 'done',
+        assignee: 'coder-claude',
+        station: 'gate',
+        testsPassed: 672,
+        testsTotal: 672,
+      }),
+    ],
+    9_400_000,
+    41.2,
+  );
+  const graph = details[KEYS.graph];
+  if (graph) graph.acceptance = graphAcceptance();
   doneDetail(
     KEYS.codeowners,
     [
