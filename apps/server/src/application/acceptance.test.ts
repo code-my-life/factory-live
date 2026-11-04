@@ -191,6 +191,44 @@ describe('la recette d’une PR', () => {
     });
   });
 
+  it('une ligne de preuve se lit comme un auteur l’écrit : un nom de test dit ce qu’il veut, une parenthèse commente', () => {
+    const results: AcceptanceTestResult[] = [
+      result(
+        'apps/server/src/application/acceptance.test.ts',
+        'la recette > une ligne non prouvé de la PR rend son critère NOK',
+        'passed',
+      ),
+      result(
+        'apps/server/src/adapters/github/acceptance.test.ts',
+        'la recette lue sur GitHub > liste chaque check de la tête',
+        'passed',
+      ),
+      result(
+        'apps/server/src/adapters/github/acceptance.test.ts',
+        'hors des cas > un statut de commit est un check',
+        'passed',
+      ),
+    ];
+    const view = acceptanceOf(
+      source({
+        tests: { suites: [], results },
+        prBody: [
+          '## Critères',
+          '',
+          // A test whose name says « non prouvé » proves its criterion like any other.
+          '- C1 : `apps/server/src/application/acceptance.test.ts` « une ligne non prouvé de la PR rend son critère NOK »',
+          // A note in parentheses names no test, even between quotes; the next test keeps the file before it.
+          '- C2 : `apps/server/src/adapters/github/acceptance.test.ts` « liste chaque check de la tête » (« Conventions », lancé trois fois, n’y est qu’une fois) ; « un statut de commit est un check »',
+          '- C3 : non prouvé (la démo le montre)',
+        ].join('\n'),
+      }),
+      [],
+    );
+    expect(criterion(view, 'C1')).toMatchObject({ status: 'ok', reason: 'proven' });
+    expect(criterion(view, 'C2')).toMatchObject({ status: 'ok', reason: 'proven' });
+    expect(criterion(view, 'C3')).toMatchObject({ status: 'nok', reason: 'unproven' });
+  });
+
   it("tant qu'un check tourne sans rapport, les critères sont en cours", () => {
     const running = source({
       tests: null,

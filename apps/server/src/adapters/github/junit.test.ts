@@ -79,3 +79,24 @@ describe('rapports JUnit de la CI', () => {
     expect(readJUnit('<html>pas un rapport</html>').tests).toEqual([]);
   });
 });
+
+describe('rapports JUnit publiés par la CI de factory-live', () => {
+  const read = (path: string) =>
+    readFileSync(new URL(`../../../../../${path}`, import.meta.url), 'utf8');
+
+  it('la CI publie ses rapports JUnit (Vitest, Playwright) à chaque exécution, verte comprise', () => {
+    const ci = read('.github/workflows/ci.yml');
+    // Each report is written by its runner...
+    expect(ci).toMatch(/--reporter=junit --outputFile\.junit=reports\/junit\/vitest\.xml/);
+    expect(read('playwright.config.ts')).toMatch(
+      /\['junit', \{ outputFile: 'reports\/junit\/playwright\.xml' \}\]/,
+    );
+    // ...then published whatever the outcome, under the name the cache reads (`junit…`).
+    for (const name of ['junit-unit', 'junit-e2e']) {
+      const step = new RegExp(
+        `if: always\\(\\)[^\\n]*\\n\\s+uses: actions/upload-artifact@[0-9a-f]{40}[^\\n]*\\n\\s+with:\\n\\s+name: ${name}\\n\\s+path: reports/junit/`,
+      );
+      expect(ci, name).toMatch(step);
+    }
+  });
+});

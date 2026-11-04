@@ -17,7 +17,10 @@ const CRITERION =
   /^[ \t]*(?:[-*+][ \t]+)?(?:\[[ xX]\][ \t]+)?\**C(\d+)\**[ \t]*[:.)-][ \t]*(.*)$/gm;
 const HEADING = /^(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$/;
 /** A test the PR names: « its name », after its file in backquotes. */
-const NAMED = /(?:`([^`\s]+\.[A-Za-z0-9]+)`[^«“"`]*)?(?:«\s*([^»]+?)\s*»|“([^”\n]+)”|"([^"\n]+)")/g;
+/** A test the PR names: « its name » (or between double quotes). */
+const QUOTED = /«\s*([^»]+?)\s*»|“([^”\n]+)”|"([^"\n]+)"/g;
+/** A test's file, in backquotes, before the names it holds. */
+const FILE_OR_NAME = /`([^`\s]+\.[A-Za-z0-9]+)`|\uE000(\d+)\uE001/g;
 const UNPROVEN = /non[ \t]+prouvé/i;
 
 /** The labels of the gate's rules (`LABELS` of `factory-gate.py`), to find a proof's rule. */
@@ -81,12 +84,39 @@ function criteriaLines(lines: string[]): Map<string, string> {
   return found;
 }
 
-/** The tests a proof names, each with its file when the proof gives it. */
+/**
+ * A proof line as its author writes it: the names of its tests, set aside so that what they say counts
+ * for nothing else (a test may be named « … non prouvé … »), and the rest of the line without its
+ * notes in parentheses (a note quoting a word names no test).
+ */
+function proofParts(proof: string): { names: string[]; rest: string } {
+  const names: string[] = [];
+  let rest = proof.replace(QUOTED, (_whole, angled?: string, curly?: string, straight?: string) => {
+    names.push((angled ?? curly ?? straight ?? '').trim());
+    return `\uE000${names.length - 1}\uE001`;
+  });
+  for (let previous = ''; previous !== rest;) {
+    previous = rest;
+    rest = rest.replace(/\([^()]*\)/g, ' ');
+  }
+  return { names, rest };
+}
+
+/** The tests a proof names, each with the file written before it, when there is one. */
 function namedTests(proof: string): { file: string | null; name: string }[] {
-  return [...proof.matchAll(NAMED)].map((match) => ({
-    file: match[1] ?? null,
-    name: (match[2] ?? match[3] ?? match[4] ?? '').trim(),
-  }));
+  const { names, rest } = proofParts(proof);
+  const tests: { file: string | null; name: string }[] = [];
+  let file: string | null = null;
+  for (const token of rest.matchAll(FILE_OR_NAME)) {
+    if (token[1]) file = token[1];
+    else tests.push({ file, name: names[Number(token[2])] ?? '' });
+  }
+  return tests;
+}
+
+/** The PR says it does not prove the criterion: « non prouvé » outside the names of its tests. */
+function saysUnproven(proof: string): boolean {
+  return UNPROVEN.test(proofParts(proof).rest.replace(/\uE000\d+\uE001/g, ' '));
 }
 
 /** Two paths name the same file when one ends the other at a folder's edge. */
@@ -125,7 +155,7 @@ function judge(
     proof,
     url: source.prUrl,
   } as const;
-  if (proof === null || UNPROVEN.test(proof)) return unproven;
+  if (proof === null || saysUnproven(proof)) return unproven;
   const named = namedTests(proof);
   if (named.length === 0) return unproven;
   const running = (source.checks ?? []).some((check) => check.status === 'pending');
