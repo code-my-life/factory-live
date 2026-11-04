@@ -43,11 +43,23 @@ const SCREENS = [
  * rester propres dans l'une comme dans l'autre. Les onglets d'une issue qui portent des badges.
  */
 const LANGUAGES = [
-  { locale: 'fr-FR', lang: 'fr', name: 'français', tabs: ['Coûts', 'Transcription'] },
-  { locale: 'en-US', lang: 'en', name: 'anglais', tabs: ['Costs', 'Transcript'] },
+  {
+    locale: 'fr-FR',
+    lang: 'fr',
+    name: 'français',
+    tabs: ['Coûts', 'Transcription'],
+    gone: 'PR et CI',
+  },
+  {
+    locale: 'en-US',
+    lang: 'en',
+    name: 'anglais',
+    tabs: ['Costs', 'Transcript'],
+    gone: 'PR and CI',
+  },
 ];
 
-for (const { locale, lang, name, tabs } of LANGUAGES) {
+for (const { locale, lang, name, tabs, gone } of LANGUAGES) {
   test.describe(`en ${name}`, () => {
     test.use({ locale });
 
@@ -70,6 +82,8 @@ for (const { locale, lang, name, tabs } of LANGUAGES) {
         await expectCleanBadges(page);
         await expectNoHorizontalOverflow(page);
       }
+      // The PR's tab gave way to the acceptance board (ADR 0011).
+      await expect(page.getByRole('link', { name: gone, exact: true })).toHaveCount(0);
     });
   });
 }
