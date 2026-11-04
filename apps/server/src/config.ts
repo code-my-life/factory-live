@@ -70,6 +70,11 @@ const Env = z.object({
     .union([z.literal(''), z.url()])
     .default('')
     .transform((value) => value || null),
+  /**
+   * Where this server reaches the twin bench's ports, published on this PC (hermes-software-factory#26):
+   * `host.docker.internal` from the container (docker/compose.yaml).
+   */
+  TWINS_HOST: z.string().default('127.0.0.1'),
   FREELLMAPI_URL: z.string().default(''),
   HELD_AFTER_MINUTES: z.coerce.number().int().positive().default(30),
   /**

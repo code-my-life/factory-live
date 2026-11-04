@@ -1,4 +1,10 @@
-import type { AcceptanceSurface, AcceptanceTwin, AcceptanceView } from '@factory-live/contracts';
+import type {
+  AcceptanceSurface,
+  AcceptanceTwin,
+  AcceptanceView,
+  TwinSide,
+  TwinsBenchState,
+} from '@factory-live/contracts';
 import {
   BookIcon,
   BrowserIcon,
@@ -9,9 +15,20 @@ import {
   TerminalIcon,
 } from '@primer/octicons-react';
 import { Banner, Button, SegmentedControl, ToggleSwitch } from '@primer/react';
-import { useId, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type KeyboardEvent,
+  type PointerEvent,
+} from 'react';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import styles from './acceptance.module.css';
+import { type StreamStatus, TwinsApi, keysymOf, pointOn, watchTwin } from './neko.ts';
 
 type View = 'side' | 'overlay' | 'base' | 'head';
 
@@ -54,12 +71,228 @@ function Screen({ twin, name }: { twin: AcceptanceTwin; name: string }) {
   );
 }
 
+/** A dropped stream is joined again after this long. */
+const RETRY_MS = 5000;
+/** How often the bench's state is read while the widget is open. */
+const STATE_EVERY_MS = 1000;
+
+/** The last frame of a video, kept as an image when its stream drops; `null` if there is none. */
+function frameOf(video: HTMLVideoElement): string | null {
+  if (!video.videoWidth) return null;
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.8);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A twin's screen, live (#23): its Neko stream, its last image until the stream plays, and the owner's
+ * gestures sent to the bench in the twin's own pixels, the pointer at most once a frame.
+ */
+function LiveScreen({ api, side, name }: { api: TwinsApi; side: TwinSide; name: string }) {
+  const { t } = useI18n();
+  const video = useRef<HTMLVideoElement>(null);
+  const [status, setStatus] = useState<StreamStatus>('connecting');
+  const [kept, setKept] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const moving = useRef<{ x: number; y: number } | null>(null);
+  const frame = useRef(0);
+
+  useEffect(() => {
+    const element = video.current;
+    if (!element) return;
+    let leave = () => {};
+    let gone = false;
+    const onStatus = (next: StreamStatus) => {
+      if (gone) return;
+      if (next === 'lost') setKept((previous) => frameOf(element) ?? previous);
+      if (next === 'live') setKept(null);
+      setStatus(next);
+    };
+    api
+      .session(side)
+      .then((session) => {
+        if (!gone) leave = watchTwin(session, element, onStatus);
+      })
+      .catch(() => onStatus('lost'));
+    return () => {
+      gone = true;
+      leave();
+    };
+  }, [api, side, attempt]);
+
+  // A failed retry stays « lost »: each attempt schedules the next one.
+  useEffect(() => {
+    if (status !== 'lost') return;
+    const retry = setTimeout(() => setAttempt((count) => count + 1), RETRY_MS);
+    return () => clearTimeout(retry);
+  }, [status, attempt]);
+
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+
+  // What the owner holds down on the twin: released on every way out, so nothing stays pressed there.
+  // Keys by their physical key (`event.code`): with Shift released first, « A » is let go as « a ».
+  const held = useRef({ buttons: new Set<number>(), keys: new Map<string, number>() });
+  const releaseAll = useCallback(() => {
+    for (const code of held.current.buttons)
+      api.gesture({ side, event: 'control/buttonup', payload: { code } });
+    for (const keysym of held.current.keys.values())
+      api.gesture({ side, event: 'control/keyup', payload: { keysym } });
+    held.current.buttons.clear();
+    held.current.keys.clear();
+  }, [api, side]);
+  useEffect(() => {
+    if (status !== 'live') releaseAll();
+  }, [status, releaseAll]);
+  useEffect(() => releaseAll, [releaseAll]);
+
+  const at = (event: { clientX: number; clientY: number }) =>
+    video.current ? pointOn(video.current, event.clientX, event.clientY) : null;
+  const move = (point: { x: number; y: number }) =>
+    api.gesture({ side, event: 'control/move', payload: point });
+
+  const onPointerMove = (event: PointerEvent) => {
+    const point = at(event);
+    if (!point || status !== 'live') return;
+    // The pointer goes once a frame: the latest place, never a queue of old ones.
+    if (!moving.current) {
+      frame.current = requestAnimationFrame(() => {
+        if (moving.current) move(moving.current);
+        moving.current = null;
+      });
+    }
+    moving.current = point;
+  };
+  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    const point = at(event);
+    if (!point || status !== 'live') return;
+    event.preventDefault();
+    event.currentTarget.focus();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    move(point);
+    held.current.buttons.add(event.button + 1);
+    api.gesture({ side, event: 'control/buttondown', payload: { code: event.button + 1 } });
+  };
+  // A release always goes, live or not, as long as its press went.
+  const onPointerUp = (event: PointerEvent) => {
+    const code = event.button + 1;
+    if (!held.current.buttons.delete(code)) return;
+    api.gesture({ side, event: 'control/buttonup', payload: { code } });
+  };
+  const onKey = (event: KeyboardEvent) => {
+    if (event.type === 'keydown') {
+      const keysym = keysymOf(event.key);
+      if (!keysym || status !== 'live') return;
+      event.preventDefault();
+      held.current.keys.set(event.code || event.key, keysym);
+      api.gesture({ side, event: 'control/keydown', payload: { keysym } });
+      return;
+    }
+    // The release of the key pressed, as it was pressed, whatever it reads as now.
+    const keysym = held.current.keys.get(event.code || event.key);
+    if (!keysym) return;
+    held.current.keys.delete(event.code || event.key);
+    event.preventDefault();
+    api.gesture({ side, event: 'control/keyup', payload: { keysym } });
+  };
+
+  // The wheel scrolls the twin, not the page: a listener that may cancel it (React's is passive).
+  const screenRef = useRef<HTMLDivElement>(null);
+  const live = useRef(false);
+  useEffect(() => {
+    live.current = status === 'live';
+  }, [status]);
+  useEffect(() => {
+    const element = screenRef.current;
+    if (!element) return;
+    const onWheel = (event: globalThis.WheelEvent) => {
+      if (!live.current) return;
+      event.preventDefault();
+      const step = (delta: number) =>
+        Math.max(-10, Math.min(10, Math.round(delta / 40))) || Math.sign(delta);
+      api.gesture({
+        side,
+        event: 'control/scroll',
+        payload: { delta_x: step(event.deltaX), delta_y: step(event.deltaY) },
+      });
+    };
+    element.addEventListener('wheel', onWheel, { passive: false });
+    return () => element.removeEventListener('wheel', onWheel);
+  }, [api, side]);
+
+  const still = kept ?? api.shot(side);
+  return (
+    <div
+      ref={screenRef}
+      className={styles.live}
+      data-status={status}
+      role="application"
+      aria-label={name}
+      aria-roledescription={t.acceptance.twins.liveScreen}
+      tabIndex={0}
+      onPointerMove={onPointerMove}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={releaseAll}
+      onBlur={releaseAll}
+      onKeyDown={onKey}
+      onKeyUp={onKey}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      <video ref={video} className={styles.liveVideo} autoPlay muted playsInline />
+      {status === 'live' ? null : (
+        <>
+          <img src={still} alt="" className={styles.liveStill} />
+          <p className={styles.liveStatus} role="status">
+            {status === 'lost' ? t.acceptance.twins.lost : t.acceptance.twins.connecting}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** The bench's mirror, read every second while the widget shows a live pair. */
+function useBenchState(api: TwinsApi | null): TwinsBenchState | null {
+  const [state, setState] = useState<TwinsBenchState | null>(null);
+  useEffect(() => {
+    if (!api) return;
+    let gone = false;
+    const read = () =>
+      api
+        .state()
+        .then((next) => {
+          if (!gone) setState(next);
+        })
+        .catch(() => undefined);
+    void read();
+    const every = setInterval(read, STATE_EVERY_MS);
+    return () => {
+      gone = true;
+      clearInterval(every);
+    };
+  }, [api]);
+  return state;
+}
+
 /**
  * The app before and after the PR, both alive in the factory's twin bench, surface by surface: the
  * reviewer uses either one, the bench replays the gesture on the other and marks what differs. When a
  * gesture has no counterpart, the mirror waits: drive each twin separately, or start both again.
  */
-export function TwinsWidget({ view }: { view: AcceptanceView }) {
+export function TwinsWidget({
+  view,
+  fetchImpl,
+}: {
+  view: AcceptanceView;
+  /** The server's side of the bench (tests); the browser's `fetch` otherwise. */
+  fetchImpl?: typeof fetch;
+}) {
   const { t } = useI18n();
   const narrow = useNarrow();
   const mirrorId = useId();
@@ -69,6 +302,10 @@ export function TwinsWidget({ view }: { view: AcceptanceView }) {
   const [mirror, setMirror] = useState(true);
   const [split, setSplit] = useState(50);
   const [diverged, setDiverged] = useState(true);
+  const live = view.twins?.surfaces.find((each) => each.head.stream ?? each.base.stream);
+  const streamOf = live ? (live.head.stream ?? live.base.stream) : null;
+  const api = useMemo(() => TwinsApi.of(streamOf, fetchImpl), [streamOf, fetchImpl]);
+  const bench = useBenchState(api);
 
   if (!twins) {
     return (
@@ -93,12 +330,31 @@ export function TwinsWidget({ view }: { view: AcceptanceView }) {
     base: t.acceptance.twins.screen(t.acceptance.twins.base, surface.base.sha),
     head: t.acceptance.twins.screen(t.acceptance.twins.head, surface.head.sha),
   };
-  const waiting = mirror && diverged && twins.divergence;
+  // Live, the bench says whether the mirror is on and what it waits on; in the demo, this screen does.
+  const mirrorOn = api ? (bench?.mirror ?? true) : mirror;
+  const divergence = api ? (bench?.divergence ?? null) : twins.divergence;
+  const waiting = api ? divergence : mirror && diverged && twins.divergence;
+  const setMirrorOn = (on: boolean) => {
+    if (api) void api.mirror(on);
+    else setMirror(on);
+  };
+  const resync = () => {
+    if (api) void api.resync();
+    else {
+      setDiverged(false);
+      setMirror(true);
+    }
+  };
 
   return (
     <div className={styles.twins}>
       <p className={styles.twinsNote}>
-        {t.acceptance.twins.state[twins.state]}. {t.acceptance.twins.preview}
+        {t.acceptance.twins.state[twins.state]}.{' '}
+        {api
+          ? bench?.lagMs != null
+            ? t.acceptance.twins.lag(bench.lagMs)
+            : ''
+          : t.acceptance.twins.preview}
       </p>
 
       <div className={styles.twinsTools}>
@@ -136,15 +392,15 @@ export function TwinsWidget({ view }: { view: AcceptanceView }) {
           <ToggleSwitch
             aria-labelledby={mirrorId}
             size="small"
-            checked={mirror}
-            onChange={setMirror}
+            checked={mirrorOn}
+            onChange={setMirrorOn}
             statusLabelPosition="end"
           />
         </span>
       </div>
 
       <p className={styles.twinsNote}>
-        {mirror ? t.acceptance.twins.mirrorOn : t.acceptance.twins.mirrorOff}
+        {mirrorOn ? t.acceptance.twins.mirrorOn : t.acceptance.twins.mirrorOff}
         {surface.differences !== null
           ? ` ${t.acceptance.twins.differences(surface.differences)}.`
           : ''}
@@ -155,12 +411,12 @@ export function TwinsWidget({ view }: { view: AcceptanceView }) {
           <Banner
             variant="warning"
             title={t.acceptance.twins.divergence}
-            description={twins.divergence}
+            description={divergence ?? ''}
           />
           {/* The two ways out sit under the message: on a phone, a banner's own actions overflow. */}
           <div className={styles.divergenceActions}>
-            <Button onClick={() => setMirror(false)}>{t.acceptance.twins.drive}</Button>
-            <Button leadingVisual={SyncIcon} onClick={() => setDiverged(false)}>
+            <Button onClick={() => setMirrorOn(false)}>{t.acceptance.twins.drive}</Button>
+            <Button leadingVisual={SyncIcon} onClick={resync}>
               {t.acceptance.twins.resync}
             </Button>
           </div>
@@ -198,7 +454,11 @@ export function TwinsWidget({ view }: { view: AcceptanceView }) {
               </span>
             </figcaption>
             <div className={styles.screen}>
-              <Screen twin={surface[side]} name={names[side]} />
+              {api && surface[side].stream ? (
+                <LiveScreen api={api} side={side} name={names[side]} />
+              ) : (
+                <Screen twin={surface[side]} name={names[side]} />
+              )}
             </div>
           </figure>
         ))}
@@ -223,8 +483,8 @@ export function TwinsWidget({ view }: { view: AcceptanceView }) {
         />
       ) : null}
 
-      {!mirror ? (
-        <Button size="small" leadingVisual={SyncIcon} onClick={() => setMirror(true)}>
+      {!mirrorOn ? (
+        <Button size="small" leadingVisual={SyncIcon} onClick={resync}>
           {t.acceptance.twins.resync}
         </Button>
       ) : null}

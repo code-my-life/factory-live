@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { type Locator, expect, test } from '@playwright/test';
 import { expectNoHorizontalOverflow } from './helpers.ts';
 
 /** The acceptance board of an issue's PR, under the graph of the line. */
@@ -7,6 +7,32 @@ const BOARD = 'section:has(> header + ol [data-widget])';
 
 /** A big real PR (factory-live#18, PR #19) and a red one (cv-site#44, PR #50). */
 const ROUTES = ['/issues/factory-live/18', '/issues/cv-site/44'];
+
+/**
+ * The controls of `root` under 44 px on a touch screen. Primer widens its small controls (segmented
+ * control, switch) by an absolute `::before` of 44 px: that is their target.
+ */
+function smallTargets(root: Locator): Promise<string[]> {
+  return root.evaluate((element) =>
+    [...element.querySelectorAll<HTMLElement>('button, a, input, select, [role="slider"]')]
+      .map((control) => {
+        const box = control.getBoundingClientRect();
+        const before = getComputedStyle(control, '::before');
+        const widened = before.content !== 'none' && before.position === 'absolute';
+        const reach = (size: string) => (widened ? Number.parseFloat(size) || 0 : 0);
+        return {
+          control,
+          width: Math.max(box.width, reach(before.minWidth)),
+          height: Math.max(box.height, reach(before.minHeight)),
+        };
+      })
+      .filter(({ width, height }) => width > 0 && (width < 44 || height < 44))
+      .map(({ control, width, height }) => {
+        const name = (control.getAttribute('aria-label') ?? control.textContent ?? '').trim();
+        return `${control.tagName.toLowerCase()} « ${name.slice(0, 40)} » ${Math.round(width)}x${Math.round(height)}`;
+      }),
+  );
+}
 
 for (const route of ROUTES) {
   test(`recette dépliée : aucun défilement de côté, et 44 px par cible au toucher : ${route}`, async ({
@@ -26,25 +52,7 @@ for (const route of ROUTES) {
       // Every control of the board on a touch screen: its header, the head and the body of each widget.
       // Primer widens its small controls (segmented control, switch) by an absolute `::before` of 44 px:
       // that is their target.
-      const small = await board.evaluate((root) =>
-        [...root.querySelectorAll<HTMLElement>('button, a, input, select, [role="slider"]')]
-          .map((element) => {
-            const box = element.getBoundingClientRect();
-            const before = getComputedStyle(element, '::before');
-            const widened = before.content !== 'none' && before.position === 'absolute';
-            const reach = (size: string) => (widened ? Number.parseFloat(size) || 0 : 0);
-            return {
-              element,
-              width: Math.max(box.width, reach(before.minWidth)),
-              height: Math.max(box.height, reach(before.minHeight)),
-            };
-          })
-          .filter(({ width, height }) => width > 0 && (width < 44 || height < 44))
-          .map(({ element, width, height }) => {
-            const name = (element.getAttribute('aria-label') ?? element.textContent ?? '').trim();
-            return `${element.tagName.toLowerCase()} « ${name.slice(0, 40)} » ${Math.round(width)}x${Math.round(height)}`;
-          }),
-      );
+      const small = await smallTargets(board);
       expect(small, 'cibles de moins de 44 px').toEqual([]);
     }
   });
@@ -71,6 +79,25 @@ for (const route of ROUTES) {
     ).toEqual([]);
   });
 }
+
+test('jumeaux dépliés : aucun défilement de côté, et 44 px par cible au toucher', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/issues/factory-live/18');
+  const twins = page.locator('[data-widget="twins"]');
+  await expect(twins).toBeVisible();
+  const fold = twins.locator('button[aria-expanded="false"]').first();
+  if ((await fold.count()) > 0) await fold.click();
+  // Each view of the twins: one at a time, side by side, overlaid with its slider.
+  const views = twins.getByRole('list', { name: 'Vue des jumeaux' }).getByRole('button');
+  await expect(views.first()).toBeVisible();
+  for (let index = 0; index < (await views.count()); index += 1) {
+    await views.nth(index).click();
+    await expectNoHorizontalOverflow(page);
+    if (testInfo.project.name.includes('iphone'))
+      expect(await smallTargets(twins), 'cibles de moins de 44 px').toEqual([]);
+  }
+});
 
 test('un widget glissé par sa poignée annonce sa nouvelle place', async ({ page }) => {
   await page.goto('/issues/cv-site/44');

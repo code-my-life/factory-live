@@ -20,6 +20,8 @@ import {
   STREAM_PING_EVERY_MS,
   Snapshot,
   TranscriptView,
+  TwinGesture,
+  TwinSide,
   UnblockProgress,
   UnblockRequest,
   UsageReport,
@@ -32,6 +34,7 @@ import { z } from 'zod';
 import { GitHubAuthError } from '../adapters/github/app.ts';
 import type { GitHubAppAuth } from '../adapters/github/app.ts';
 import type { PushNotifier } from '../adapters/push/webpush.ts';
+import type { TwinBench } from '../adapters/twins/bench.ts';
 import type { HistoryStore } from '../adapters/store/history.ts';
 import { toHookEvent } from '../ingest/hermes.ts';
 import { ReplayGuard, verifySignature } from '../ingest/signature.ts';
@@ -60,6 +63,8 @@ export interface AppDeps {
   unblock: UnblockDeps;
   notifier: PushNotifier | null;
   githubAuth: GitHubAppAuth | null;
+  /** The factory's twin bench (#23, ADR 0013); `null` in the demo and the tests that do not use it. */
+  twins?: TwinBench | null;
   hookSecret: string | null;
   origins: readonly string[];
   /** Valeurs de l'en-tête `Host` acceptées (configuration) ; tout autre hôte reçoit 421. */
@@ -96,24 +101,35 @@ const MIME: Readonly<Record<string, string>> = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-const CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https://avatars.githubusercontent.com",
-  "connect-src 'self'",
-  "font-src 'self'",
-  "manifest-src 'self'",
-  "worker-src 'self'",
-  "frame-ancestors 'none'",
-  "base-uri 'none'",
-  "form-action 'self'",
-].join('; ');
+/**
+ * The page's policy. Besides this server, the PWA only connects to the twins of the factory's bench
+ * (#23, ADR 0013): their Neko WebSocket, at the hosts the PWA is served by, on the port of each twin.
+ */
+export function contentSecurityPolicy(origins: readonly string[]): string {
+  const twins = origins.map((origin) => {
+    const url = new URL(origin);
+    return `${url.protocol === 'https:' ? 'wss' : 'ws'}://${url.hostname}:*`;
+  });
+  return [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https://avatars.githubusercontent.com",
+    ["connect-src 'self'", ...new Set(twins)].join(' '),
+    "font-src 'self'",
+    "manifest-src 'self'",
+    "worker-src 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+  ].join('; ');
+}
 
 /** Journal du front : 60 envois par minute au plus, tous appareils confondus (la PWA en fait 5 au plus). */
 const CLIENT_LOGS_PER_MINUTE = 60;
 
 export function createApp(deps: AppDeps) {
+  const csp = contentSecurityPolicy(deps.origins);
   const app = new OpenAPIHono<{ Variables: { actor: string } }>({
     defaultHook: (result, c) => {
       if (!result.success)
@@ -133,6 +149,12 @@ export function createApp(deps: AppDeps) {
     tailscaleLogins: deps.tailscaleLogins,
     now: deps.now,
   });
+  const twinsGuard = writeGuard({
+    origins: deps.origins,
+    tailscaleLogins: deps.tailscaleLogins,
+    now: deps.now,
+    perMinute: 6000,
+  });
   const replay = new ReplayGuard();
   const decoder = new TextDecoder();
 
@@ -140,7 +162,7 @@ export function createApp(deps: AppDeps) {
     await next();
     c.header('X-Content-Type-Options', 'nosniff');
     c.header('Referrer-Policy', 'same-origin');
-    if (!c.res.headers.has('Content-Security-Policy')) c.header('Content-Security-Policy', CSP);
+    if (!c.res.headers.has('Content-Security-Policy')) c.header('Content-Security-Policy', csp);
     c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   });
   // Avant toute route, lectures et /healthz compris : contre le DNS rebinding (guard.ts).
@@ -714,6 +736,96 @@ export function createApp(deps: AppDeps) {
       deps.store.audit(c.get('actor'), 'acceptance-layout', device, deps.now());
       return c.json({ device, layout, updatedAt }, 200);
     },
+  );
+
+  // --- Jumeaux vivants (#23, ADR 0013): Neko joined for the PWA, the bench's mirror relayed ---------
+
+  const TwinRequest = z.object({
+    repo: z.string().regex(/^[\w-]+$/),
+    pr: z.coerce.number().int().positive(),
+  });
+  const TwinSideRequest = TwinRequest.extend({ side: TwinSide });
+  const benchDown = (c: Context) =>
+    c.json({ error: 'Le banc de jumeaux ne répond pas', code: 'bench_unreachable' as const }, 502);
+  const noPair = (c: Context) =>
+    c.json({ error: 'Pas de jumeaux pour cette PR', code: 'not_found' as const }, 404);
+  const invalid = (c: Context) =>
+    c.json({ error: 'Requête invalide', code: 'invalid_request' as const }, 400);
+
+  // A viewer's session: watching needs no write right, the gestures below do.
+  app.get('/api/twins/:repo/:pr/session/:side', async (c) => {
+    const query = TwinSideRequest.safeParse(c.req.param());
+    if (!query.success) return invalid(c);
+    const { repo, pr, side } = query.data;
+    try {
+      const viewer = requestOrigin(deps.origins, c.req.header('host'));
+      const session = await deps.twins?.session(repo, pr, side, viewer);
+      if (!session) return noPair(c);
+      c.header('Cache-Control', 'no-store');
+      return c.json(session, 200);
+    } catch {
+      return benchDown(c);
+    }
+  });
+
+  app.get('/api/twins/:repo/:pr/shot/:side', async (c) => {
+    const query = TwinSideRequest.safeParse(c.req.param());
+    if (!query.success) return invalid(c);
+    const { repo, pr, side } = query.data;
+    try {
+      const image = await deps.twins?.shot(repo, pr, side);
+      if (!image) return noPair(c);
+      return c.body(new Uint8Array(image), 200, {
+        'Content-Type': 'image/jpeg',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      });
+    } catch {
+      return benchDown(c);
+    }
+  });
+
+  app.get('/api/twins/:repo/:pr/state', async (c) => {
+    const query = TwinRequest.safeParse(c.req.param());
+    if (!query.success) return invalid(c);
+    try {
+      const state = await deps.twins?.state(query.data.repo, query.data.pr);
+      if (!state) return noPair(c);
+      c.header('Cache-Control', 'no-store');
+      return c.json(state, 200);
+    } catch {
+      return benchDown(c);
+    }
+  });
+
+  // The owner's gestures and the mirror: this PC, or an allowed Tailscale login, as the unblock; with
+  // a limit of their own, a pointer sending up to one gesture a frame, and never eating the others' writes.
+  app.on('POST', '/api/twins/*', twinsGuard);
+  const relay = (
+    path: string,
+    call: (repo: string, pr: number, body: unknown) => Promise<boolean>,
+  ) =>
+    app.post(path, async (c) => {
+      const query = TwinRequest.safeParse(c.req.param());
+      if (!query.success) return invalid(c);
+      const body: unknown = await c.req.json().catch(() => null);
+      try {
+        const done = await call(query.data.repo, query.data.pr, body);
+        return done ? c.body(null, 204) : noPair(c);
+      } catch (error) {
+        return error instanceof z.ZodError ? invalid(c) : benchDown(c);
+      }
+    });
+  relay('/api/twins/:repo/:pr/gesture', (repo, pr, body) =>
+    deps.twins ? deps.twins.gesture(repo, pr, TwinGesture.parse(body)) : Promise.resolve(false),
+  );
+  relay('/api/twins/:repo/:pr/mirror', (repo, pr, body) =>
+    deps.twins
+      ? deps.twins.mirror(repo, pr, z.object({ on: z.boolean() }).parse(body).on)
+      : Promise.resolve(false),
+  );
+  relay('/api/twins/:repo/:pr/resync', (repo, pr) =>
+    deps.twins ? deps.twins.resync(repo, pr) : Promise.resolve(false),
   );
 
   app.doc31('/api/openapi.json', {

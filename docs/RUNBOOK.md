@@ -124,6 +124,19 @@ La recette d'une PR (ADR 0011, ADR 0012) se lit sous le détail de son issue. Le
 
 Un critère reste « non prouvé » alors que sa PR cite un test : le nom entre « » doit être celui du test (sans les `describe`) et son fichier doit finir le chemin du rapport. Un autre dépôt n'a sa recette complète que si sa CI publie ses rapports JUnit en artefacts nommés `junit…`, à chaque exécution.
 
+### Jumeaux vivants
+
+Les jumeaux d'une PR (ADR 0013) tournent sur le banc de la factory (`scripts/factory-twins.py`), jamais dans factory-live. Le widget « Jumeaux interactifs » les montre dès que la factory a écrit l'état de la paire.
+
+| Besoin                        | Commande ou fichier                                                                                 |
+| ----------------------------- | --------------------------------------------------------------------------------------------------- |
+| État de la paire, lu ici      | `~/.hermes/kanban/boards/<tableau>/twins/<dépôt>-<pr>.json` (`AcceptanceTwins` et port du miroir)   |
+| Démarrer ou arrêter une paire | `python3 scripts/factory-twins.py up\|down <dépôt> <pr> [--tailnet]`, depuis le dépôt de la factory |
+| Miroir en direct              | `curl -s localhost:8446/api/twins/<dépôt>/<pr>/state`                                               |
+| Hôte des ports du banc        | `TWINS_HOST` : `host.docker.internal` dans le conteneur (`docker/compose.yaml`)                     |
+
+Un écran reste sur « Connexion au jumeau… » : la paire tourne-t-elle (`factory-twins.py status`) ? Depuis un autre appareil, la paire doit être démarrée avec `--tailnet`.
+
 ## Secrets
 
 - `~/.config/factory-live/hook-secret` : secret HMAC partagé avec Hermès (`FACTORY_LIVE_HOOK_SECRET` de `~/.hermes/.env`), créé une fois par `install.sh` de la factory (étape 5b), jamais affiché. Absent : l'ingestion répond 503.

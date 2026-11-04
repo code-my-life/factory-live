@@ -163,6 +163,62 @@ export const AcceptanceTwins = z.object({
 });
 export type AcceptanceTwins = z.infer<typeof AcceptanceTwins>;
 
+/** One of the pair: the app at the PR's base, or at its head. */
+export const TwinSide = z.enum(['base', 'head']);
+export type TwinSide = z.infer<typeof TwinSide>;
+
+/**
+ * What the PWA needs to watch a twin as a Neko client (#23, ADR 0013): the twin's WebSocket, at the
+ * host the PWA came by, and a viewer's token the server obtained (the session's password stays there).
+ */
+export const TwinSession = z.object({
+  ws: z.string(),
+  token: z.string(),
+  /** The address to put in the twin's ICE candidates (this PC: the tailnet does not answer it); `null`: as announced. */
+  candidateHost: z.string().nullable(),
+});
+export type TwinSession = z.infer<typeof TwinSession>;
+
+/** The bench's mirror, live: on or off, the divergence it waits on, the lag between both twins. */
+export const TwinsBenchState = z.object({
+  mirror: z.boolean(),
+  divergence: z.string().nullable(),
+  /** The median time between a gesture on one twin and on the other, in milliseconds; `null` before any. */
+  lagMs: z.number().nonnegative().nullable(),
+});
+export type TwinsBenchState = z.infer<typeof TwinsBenchState>;
+
+/** A gesture of the owner on one twin's screen, in the twin's own pixels (Neko's control events). */
+export const TwinGesture = z.discriminatedUnion('event', [
+  z.object({
+    side: TwinSide,
+    event: z.literal('control/move'),
+    payload: z.object({
+      x: z.number().int().min(0).max(8192),
+      y: z.number().int().min(0).max(8192),
+    }),
+  }),
+  z.object({
+    side: TwinSide,
+    event: z.enum(['control/buttondown', 'control/buttonup']),
+    payload: z.object({ code: z.number().int().min(1).max(5) }),
+  }),
+  z.object({
+    side: TwinSide,
+    event: z.literal('control/scroll'),
+    payload: z.object({
+      delta_x: z.number().int().min(-10_000).max(10_000),
+      delta_y: z.number().int().min(-10_000).max(10_000),
+    }),
+  }),
+  z.object({
+    side: TwinSide,
+    event: z.enum(['control/keydown', 'control/keyup']),
+    payload: z.object({ keysym: z.number().int().min(1).max(0x10ffffff) }),
+  }),
+]);
+export type TwinGesture = z.infer<typeof TwinGesture>;
+
 export const AcceptanceView = z.object({
   pr: z.number().int().positive(),
   /** The commit judged, and the base it is compared with. */

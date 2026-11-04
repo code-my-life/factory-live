@@ -17,7 +17,10 @@ import { trackUnblockReactions } from '../application/unblock.ts';
 import { sign } from '../ingest/signature.ts';
 import { NOW, NOW_S, ORIGINS, SECRET, harness } from '../test/harness.ts';
 import type { Harness } from '../test/harness.ts';
-import { insertEvent, insertRun, insertTask, schemaFor } from '../test/hermes-fixtures.ts';
+import { insertEvent, insertRun, insertTask, schemaFor, tempDir } from '../test/hermes-fixtures.ts';
+import type { TempDir } from '../test/hermes-fixtures.ts';
+import { TwinBench } from '../adapters/twins/bench.ts';
+import { contentSecurityPolicy } from './app.ts';
 
 let h: Harness;
 
@@ -1352,5 +1355,106 @@ describe('disposition de la recette', () => {
     ]);
     expect(await refusal(await put('tablet', LOCAL))).toEqual([400, 'invalid_request']);
     expect((await get('desktop')).layout).toEqual(layout);
+  });
+});
+
+describe('jumeaux vivants', () => {
+  const PAIR = {
+    surfaces: [
+      {
+        id: 'app',
+        label: 'App',
+        kind: 'web',
+        changed: true,
+        base: {
+          sha: 'a'.repeat(40),
+          stream: 'http://127.0.0.1:52125/?usr=p&pwd=secret',
+          poster: null,
+        },
+        head: {
+          sha: 'b'.repeat(40),
+          stream: 'http://127.0.0.1:52127/?usr=p&pwd=secret',
+          poster: null,
+        },
+        differences: null,
+      },
+    ],
+    state: 'ready',
+    divergence: null,
+    mirror: 52129,
+  };
+  let dir: TempDir;
+  let relayed: string[];
+
+  beforeEach(() => {
+    h.close();
+    dir = tempDir();
+    writeFileSync(join(dir.path, 'factory-live-25.json'), JSON.stringify(PAIR));
+    relayed = [];
+    const twins = new TwinBench({
+      file: (repo, pr) =>
+        repo === 'factory-live' && pr === 25 ? join(dir.path, 'factory-live-25.json') : null,
+      host: '127.0.0.1',
+      fetchImpl: ((url: string) => {
+        relayed.push(url);
+        return Promise.resolve(
+          url.endsWith('/api/login')
+            ? Response.json({ token: 'tok' })
+            : new Response(null, { status: 200 }),
+        );
+      }) as typeof fetch,
+    });
+    h = harness({ twins });
+  });
+
+  afterEach(() => dir.remove());
+
+  it('la session d’un jumeau suit l’hôte de la PWA, sans mot de passe', async () => {
+    const response = await h.app.request('/api/twins/factory-live/25/session/head', {
+      headers: { host: 'machine.tailnet.ts.net:8446' },
+    });
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(JSON.parse(body)).toEqual({
+      ws: 'wss://machine.tailnet.ts.net:52127/api/ws',
+      token: 'tok',
+      candidateHost: null,
+    });
+    expect(body).not.toContain('secret');
+    expect(
+      (await h.app.request('/api/twins/factory-live/26/session/head', { headers: THIS_PC })).status,
+    ).toBe(404);
+  });
+
+  it('les gestes et le miroir sont gardés comme le déblocage, puis relayés au banc', async () => {
+    const gesture = (headers: Record<string, string>, body: unknown) =>
+      h.app.request('/api/twins/factory-live/25/gesture', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+    const click = { side: 'head', event: 'control/buttondown', payload: { code: 1 } };
+    expect(await refusal(await gesture(TAILNET, click))).toEqual([403, 'write_local_only']);
+    expect(relayed).toEqual([]);
+    expect((await gesture(LOCAL, click)).status).toBe(204);
+    expect(relayed).toEqual(['http://127.0.0.1:52129/gesture']);
+    expect(
+      await refusal(await gesture(LOCAL, { side: 'head', event: 'chat/message', payload: {} })),
+    ).toEqual([400, 'invalid_request']);
+    const resync = await h.app.request('/api/twins/factory-live/25/resync', {
+      method: 'POST',
+      headers: LOCAL,
+      body: '{}',
+    });
+    expect(resync.status).toBe(204);
+    expect(relayed.at(-1)).toBe('http://127.0.0.1:52129/resync');
+  });
+
+  it('la page n’ouvre de WebSocket qu’à ses propres hôtes', () => {
+    const policy = contentSecurityPolicy([
+      'http://localhost:8446',
+      'https://machine.tailnet.ts.net:8446',
+    ]);
+    expect(policy).toContain("connect-src 'self' ws://localhost:* wss://machine.tailnet.ts.net:*;");
   });
 });
