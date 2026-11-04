@@ -7,7 +7,7 @@ import {
   StreamEvent,
   msg,
 } from '@factory-live/contracts';
-import { mkdirSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { HOOK_TIMEOUT_MESSAGE } from '@factory-live/domain';
@@ -1113,5 +1113,147 @@ describe('erreurs d’API classées par Hermès', () => {
     h.hub.flush();
     const nvidia = (await snapshot()).health.find((item) => item.id === 'provider:nvidia');
     expect(nvidia?.metrics).toEqual([{ label: msg('health.metric.rateLimited'), value: '1' }]);
+  });
+});
+
+/** GitHub's answers for the PR #52 of cv-site#49, read by the cache to build its recette (#22). */
+function prRoutes(): Record<string, () => Response> {
+  const fixture = (path: string) =>
+    readFileSync(new URL(`../../../../fixtures/${path}`, import.meta.url));
+  const reply = (body: unknown) =>
+    new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  const head = 'd'.repeat(40);
+  const run = 'https://github.com/code-my-life/cv-site/actions/runs/11';
+  return {
+    '/issues/49': () =>
+      reply({
+        title: 'Page Projets',
+        html_url: 'https://github.com/code-my-life/cv-site/issues/49',
+        labels: [],
+        state: 'open',
+        body: "### Critères d'acceptation\n\n- C1 : la page s'ouvre\n- C2 : le filtre garde le choix\n",
+      }),
+    '/pulls/52': () =>
+      reply({
+        html_url: 'https://github.com/code-my-life/cv-site/pull/52',
+        title: 'feat: page Projets',
+        state: 'open',
+        head: { sha: head },
+        base: { sha: 'e'.repeat(40) },
+        requested_reviewers: [],
+        body: "## Critères\n\n- C1 : `packages/domain/src/recette.test.ts` « un critère vert »\n- C2 : `recette.test.ts` « un critère rouge »\n\n## Ce qui n'est pas prouvé\n\n- Le rendu sur un vrai iPhone.\n",
+      }),
+    '/pulls/52/reviews?per_page=100': () => reply([]),
+    [`/actions/runs?head_sha=${head}&per_page=50`]: () =>
+      reply({
+        workflow_runs: [
+          {
+            id: 11,
+            name: 'CI',
+            check_suite_id: 7,
+            html_url: run,
+            status: 'completed',
+            conclusion: 'failure',
+          },
+        ],
+      }),
+    [`/commits/${head}/check-runs?per_page=100`]: () =>
+      reply({
+        check_runs: [
+          {
+            id: 1,
+            name: 'Vérifications',
+            status: 'completed',
+            conclusion: 'failure',
+            started_at: '2026-11-04T10:00:00Z',
+            completed_at: '2026-11-04T10:03:00Z',
+            html_url: `${run}/job/21`,
+            check_suite: { id: 7 },
+          },
+        ],
+      }),
+    [`/commits/${head}/statuses?per_page=100`]: () =>
+      reply([
+        {
+          context: 'factory/gate',
+          state: 'failure',
+          description: 'rouge',
+          target_url: null,
+          created_at: '2026-11-04T10:05:00Z',
+          updated_at: '2026-11-04T10:05:00Z',
+        },
+      ]),
+    '/issues/52/comments?per_page=100': () =>
+      reply([
+        {
+          body: fixture('github-gate/gate-rouge.md').toString('utf8'),
+          html_url: 'https://github.com/code-my-life/cv-site/pull/52#issuecomment-9',
+          created_at: '2026-11-04T10:05:00Z',
+          user: { type: 'Bot' },
+        },
+      ]),
+    '/pulls/52/files?per_page=100': () =>
+      reply([{ filename: 'e2e/captures.spec.ts-snapshots/projets.png', status: 'modified' }]),
+    '/graphql': () =>
+      reply(JSON.parse(fixture('github-acceptance/review-threads.json').toString('utf8'))),
+    '/actions/runs/11/artifacts?per_page=100': () =>
+      reply({ artifacts: [{ id: 5, name: 'junit-unit', expired: false }] }),
+    '/actions/artifacts/5/zip': () =>
+      new Response(new Uint8Array(fixture('github-junit/junit.zip')), { status: 200 }),
+    [`/contents/e2e/captures.spec.ts-snapshots/projets.png?ref=${'e'.repeat(40)}`]: () =>
+      new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x01]), { status: 200 }),
+    [`/contents/e2e/captures.spec.ts-snapshots/projets.png?ref=${head}`]: () =>
+      new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x02]), { status: 200 }),
+  };
+}
+
+describe('recette d’une PR', () => {
+  let pr: Harness;
+  beforeEach(async () => {
+    pr = harness({ githubRoutes: prRoutes() });
+    insertRun(pr.writer, {
+      taskId: 't_1a9f0049',
+      profile: 'coder',
+      status: 'done',
+      outcome: 'completed',
+      startedAt: NOW_S - 300,
+      endedAt: NOW_S - 200,
+      metadata: { pr_url: 'https://github.com/code-my-life/cv-site/pull/52' },
+    });
+    pr.syncKanban();
+    await pr.refreshGitHub();
+  });
+  afterEach(() => pr.close());
+
+  it('le détail d’une issue porte la recette de sa PR, lue sur GitHub', async () => {
+    const detail = IssueDetail.parse(
+      await (await pr.app.request('/api/issues/cv-site/49', { headers: THIS_PC })).json(),
+    );
+    const acceptance = detail.acceptance!;
+    expect(acceptance).toMatchObject({
+      pr: 52,
+      head: 'd'.repeat(40),
+      twins: null,
+      twinsAbsent: 'no_build',
+    });
+    expect(acceptance.criteria.map(({ id, status, reason }) => ({ id, status, reason }))).toEqual([
+      { id: 'C1', status: 'ok', reason: 'proven' },
+      { id: 'C2', status: 'nok', reason: 'failing' },
+    ]);
+    expect(
+      acceptance.checks.map(({ name, workflow, status }) => ({ name, workflow, status })),
+    ).toEqual([{ name: 'Vérifications', workflow: 'CI', status: 'failure' }]);
+    expect(acceptance.gate).toMatchObject({ status: 'nok', head: '140abfe' });
+    expect(acceptance.tests.map(({ kind, name, failed }) => ({ kind, name, failed }))).toEqual([
+      { kind: 'unit', name: 'Vitest', failed: 1 },
+      { kind: 'e2e', name: 'demo-bureau', failed: 1 },
+      { kind: 'e2e', name: 'demo-iphone', failed: 1 },
+    ]);
+    expect(acceptance.threads).toHaveLength(6);
+    expect(acceptance.reviewRounds).toBe(7);
+    expect(acceptance.proofs.map((proof) => proof.kind)).toEqual(['capture', 'unproven']);
   });
 });
