@@ -6,3 +6,4 @@ test-results/
 package-lock.json
 fixtures/hermes-schema/
 evidence/
+fixtures/github-gate/

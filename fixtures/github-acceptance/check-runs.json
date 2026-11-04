@@ -1,0 +1,200 @@
+{
+  "check_runs": [
+    {
+      "app": {
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 113450524367
+      },
+      "completed_at": "2026-11-04T16:25:40Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/code-my-life/factory-live/actions/runs/41867078328/job/126703912323",
+      "id": 126703912323,
+      "name": "Conventions / Branche, titre et texte de PR",
+      "started_at": "2026-11-04T16:25:33Z",
+      "status": "completed"
+    },
+    {
+      "app": {
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 113431732785
+      },
+      "completed_at": "2026-11-04T15:52:36Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/code-my-life/factory-live/actions/runs/41860606024/job/126686729038",
+      "id": 126686729038,
+      "name": "Conventions / Branche, titre et texte de PR",
+      "started_at": "2026-11-04T15:52:31Z",
+      "status": "completed"
+    },
+    {
+      "app": {
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 113427792566
+      },
+      "completed_at": "2026-11-04T15:38:08Z",
+      "conclusion": "skipped",
+      "html_url": "https://github.com/code-my-life/factory-live/actions/runs/41859193793/job/126678107637",
+      "id": 126678107637,
+      "name": "Publication sur GitHub Pages",
+      "started_at": "2026-11-04T15:38:08Z",
+      "status": "completed"
+    },
+    {
+      "app": {
+        "slug": "github-advanced-security"
+      },
+      "check_suite": {
+        "id": 113428023873
+      },
+      "completed_at": "2026-11-04T15:35:12Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/code-my-life/factory-live/runs/126676282232",
+      "id": 126676282232,
+      "name": "CodeQL",
+      "started_at": "2026-11-04T15:35:10Z",
+      "status": "completed"
+    },
+    {
+      "app": {
+        "slug": "greptile-apps"
+      },
+      "check_suite": {
+        "id": 113427747642
+      },
+      "completed_at": "2026-11-04T15:37:41Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/code-my-life/factory-live/runs/126676000667",
+      "id": 126676000667,
+      "name": "Greptile Review",
+      "started_at": "2026-11-04T15:34:43Z",
+      "status": "completed"
+    },
+    {
+      "app": {
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 113427797769
+      },
+      "completed_at": "2026-11-04T15:34:54Z",
+      "conclusion": "failure",
+      "html_url": "https://github.com/code-my-life/factory-live/actions/runs/41859195788/job/126675992349",
+      "id": 126675992349,
+      "name": "Conventions / Branche, titre et texte de PR",
+      "started_at": "2026-11-04T15:34:48Z",
+      "status": "completed"
+    },
+    {
+      "app": {
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 113427792547
+      },
+      "completed_at": "2026-11-04T15:37:29Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/code-my-life/factory-live/actions/runs/41859193780/job/126675986039",
+      "id": 126675986039,
+      "name": "Vérifications (Node 24.22.1)",
+      "started_at": "2026-11-04T15:34:45Z",
+      "status": "completed"
+    },
+    {
+      "app": {
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 113427792547
+      },
+      "completed_at": "2026-11-04T15:35:33Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/code-my-life/factory-live/actions/runs/41859193780/job/126675985801",
+      "id": 126675985801,
+      "name": "Image Docker",
+      "started_at": "2026-11-04T15:34:47Z",
+      "status": "completed"
+    },
+    {
+      "app": {
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 113427792547
+      },
+      "completed_at": "2026-11-04T15:44:40Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/code-my-life/factory-live/actions/runs/41859193780/job/126675985696",
+      "id": 126675985696,
+      "name": "Bout en bout (Chromium, WebKit) et captures",
+      "started_at": "2026-11-04T15:34:44Z",
+      "status": "completed"
+    },
+    {
+      "app": {
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 113427792566
+      },
+      "completed_at": "2026-11-04T15:38:08Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/code-my-life/factory-live/actions/runs/41859193793/job/126675985378",
+      "id": 126675985378,
+      "name": "Site, build et tests (Chromium, WebKit)",
+      "started_at": "2026-11-04T15:34:44Z",
+      "status": "completed"
+    },
+    {
+      "app": {
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 113427792547
+      },
+      "completed_at": "2026-11-04T15:37:26Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/code-my-life/factory-live/actions/runs/41859193780/job/126675985229",
+      "id": 126675985229,
+      "name": "Vérifications (Node 26)",
+      "started_at": "2026-11-04T15:34:44Z",
+      "status": "completed"
+    },
+    {
+      "app": {
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 113427764146
+      },
+      "completed_at": "2026-11-04T15:35:19Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/code-my-life/factory-live/actions/runs/41859182915/job/126675960042",
+      "id": 126675960042,
+      "name": "Analyze (actions)",
+      "started_at": "2026-11-04T15:34:42Z",
+      "status": "completed"
+    },
+    {
+      "app": {
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 113427764146
+      },
+      "completed_at": "2026-11-04T15:35:52Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/code-my-life/factory-live/actions/runs/41859182915/job/126675959716",
+      "id": 126675959716,
+      "name": "Analyze (javascript-typescript)",
+      "started_at": "2026-11-04T15:34:42Z",
+      "status": "completed"
+    }
+  ],
+  "total_count": 13
+}
