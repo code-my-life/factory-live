@@ -65,6 +65,10 @@
   color: var(--fgColor-default);
 }
 
+.bucket[data-status='ok'] {
+  color: var(--fgColor-success);
+}
+
 .bucket:focus-visible {
   outline: var(--focus-outline);
 }
@@ -134,6 +138,7 @@
 .toggle:focus-visible,
 .disclosure:focus-visible,
 .row:focus-visible,
+.rule:focus-visible,
 .github:focus-visible {
   outline: var(--focus-outline);
   outline-offset: calc(var(--borderWidth-thick) * -1);
@@ -438,12 +443,23 @@
   list-style: none;
 }
 
+/* A rule of the gate: the whole line leads to the gate's comment, like a row. */
 .rule {
   display: grid;
-  grid-template-columns: var(--base-size-16) minmax(0, max-content) minmax(0, 1fr);
+  grid-template-columns: var(--base-size-16) minmax(0, max-content) minmax(0, 1fr) var(
+      --base-size-12
+    );
   align-items: baseline;
   gap: var(--base-size-8);
+  padding: var(--base-size-4);
+  color: var(--fgColor-default);
   font-size: var(--text-body-size-small);
+  text-decoration: none;
+  border-radius: var(--borderRadius-medium);
+}
+
+.rule:hover {
+  text-decoration: none;
 }
 
 .ruleName {
@@ -568,6 +584,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--base-size-4);
+  padding-inline: var(--base-size-4);
   font-size: var(--text-body-size-small);
 }
 
@@ -720,6 +737,7 @@
   .groupToggle:hover,
   .handle:hover,
   .row:hover,
+  .rule:hover,
   .github:hover {
     background-color: var(--control-transparent-bgColor-hover);
   }
@@ -737,9 +755,16 @@
   .toggle,
   .groupToggle,
   .bucket,
+  .rule,
+  .captureSource,
+  .captureEnlarge,
   .divergenceActions > * {
     min-width: var(--control-minTarget-coarse);
     min-height: var(--control-minTarget-coarse);
+  }
+
+  .rule {
+    align-items: center;
   }
 
   .handle {
@@ -793,10 +818,11 @@
   }
 
   .rule {
-    grid-template-columns: var(--base-size-16) minmax(0, 1fr);
+    grid-template-columns: var(--base-size-16) minmax(0, 1fr) var(--base-size-12);
   }
 
   .ruleDetail {
+    grid-row: 2;
     grid-column: 2;
   }
 }

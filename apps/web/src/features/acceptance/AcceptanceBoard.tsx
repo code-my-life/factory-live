@@ -80,6 +80,8 @@ interface FrameProps {
   onPin: () => void;
   onHalf: () => void;
   onMove: (delta: -1 | 1) => void;
+  /** A drag let go: the owner hears where the widget landed, as after a move by the keys. */
+  onDropped: () => void;
   children: ReactNode;
 }
 
@@ -104,6 +106,7 @@ function WidgetFrame({
   onPin,
   onHalf,
   onMove,
+  onDropped,
   children,
 }: FrameProps) {
   const { t } = useI18n();
@@ -126,6 +129,7 @@ function WidgetFrame({
       value={id}
       dragListener={false}
       dragControls={controls}
+      onDragEnd={onDropped}
       tabIndex={-1}
       layout="position"
       className={styles.widget}
@@ -270,6 +274,9 @@ export function AcceptanceBoard({ issue, view }: { issue: IssueSummary; view: Ac
   const wide = useWide();
   const [layout, setLayout] = useState<BoardLayout>(loadLayout);
   const [announcement, setAnnouncement] = useState('');
+  // Motion can end a drag before React renders the drag's last reorder: the layout that reorder made is
+  // kept here, for the announcement, rather than read from a render that predates it.
+  const dragged = useRef<BoardLayout | null>(null);
   const repoUrl = issue.url.replace(/\/issues\/\d+$/, '');
   const prUrl = issue.pr?.url ?? `${repoUrl}/pull/${view.pr}`;
 
@@ -303,17 +310,32 @@ export function AcceptanceBoard({ issue, view }: { issue: IssueSummary; view: Ac
   const status = boardStatus(view);
   const counts = boardTally(view);
 
-  /** The first widget, in the owner's order, that holds an element of this kind: unfolded, in sight. */
-  const reveal = (kind: 'nok' | 'pending' | 'info') => {
+  /**
+   * The first element of this kind, in the owner's order: its widget unfolded, then each fold that hides
+   * it opened (a group of green lines, the captures), then in sight with the focus.
+   */
+  const reveal = (kind: keyof Tally) => {
     const id = layout.order.find((each) => widgetTally(view, each)[kind] > 0);
     if (!id) return;
     if (layout.collapsed.includes(id)) apply(toggleCollapsed(layout, id), null);
     requestAnimationFrame(() => {
-      const toggle = listRef.current?.querySelector<HTMLButtonElement>(
-        `[data-widget="${id}"] button[aria-expanded]`,
-      );
-      toggle?.scrollIntoView({ behavior: enabled ? 'smooth' : 'auto', block: 'start' });
-      toggle?.focus({ preventScroll: true });
+      const frame = listRef.current?.querySelector<HTMLElement>(`[data-widget="${id}"]`);
+      if (!frame) return;
+      const target =
+        frame.querySelector<HTMLElement>(`[data-item="${kind}"]`) ??
+        frame.querySelector<HTMLElement>('button[aria-expanded]');
+      if (!target) return;
+      // Each fold is opened once by its own toggle, the one whose `aria-controls` names it.
+      const toggles = [...frame.querySelectorAll<HTMLElement>('[aria-controls]')];
+      for (let node = target.parentElement; node && node !== frame; node = node.parentElement) {
+        const fold = node;
+        if (fold.hidden)
+          toggles.find((each) => each.getAttribute('aria-controls') === fold.id)?.click();
+      }
+      requestAnimationFrame(() => {
+        target.scrollIntoView({ behavior: enabled ? 'smooth' : 'auto', block: 'center' });
+        target.focus({ preventScroll: true });
+      });
     });
   };
   const buckets = (
@@ -321,6 +343,7 @@ export function AcceptanceBoard({ issue, view }: { issue: IssueSummary; view: Ac
       ['nok', `${counts.nok} NOK`],
       ['pending', t.acceptance.tally(0, 0, counts.pending)],
       ['info', t.acceptance.tally(0, 0, 0, counts.info)],
+      ['ok', t.acceptance.tally(counts.ok, 0, 0)],
     ] as const
   ).filter(([kind]) => counts[kind] > 0);
   // Approving is offered only when every element is OK: a red verdict never sits beside « Approve ».
@@ -347,7 +370,6 @@ export function AcceptanceBoard({ issue, view }: { issue: IssueSummary; view: Ac
                 {text}
               </button>
             ))}
-            {counts.ok > 0 ? <span>{t.acceptance.tally(counts.ok, 0, 0)}</span> : null}
           </span>
         </div>
         <div className={styles.headActions}>
@@ -387,7 +409,11 @@ export function AcceptanceBoard({ issue, view }: { issue: IssueSummary; view: Ac
         ref={listRef}
         as="ol"
         values={layout.order}
-        onReorder={(order) => apply(reorder(layout, order), null)}
+        onReorder={(order) => {
+          const next = reorder(layout, order);
+          dragged.current = next;
+          apply(next, null);
+        }}
         className={styles.list}
         aria-labelledby={titleId}
       >
@@ -422,6 +448,11 @@ export function AcceptanceBoard({ issue, view }: { issue: IssueSummary; view: Ac
               onMove={(delta) => {
                 const next = move(layout, id, delta);
                 apply(next, announceMove(next, id));
+              }}
+              onDropped={() => {
+                const landed = dragged.current ?? layout;
+                dragged.current = null;
+                setAnnouncement(announceMove(landed, id));
               }}
             >
               {content[id]}

@@ -1,5 +1,5 @@
 import type { IssueSummary } from '@factory-live/contracts';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -84,11 +84,18 @@ describe('recette d’une PR', () => {
   it('un élément rouge mène à son élément sur GitHub : le check, le test qui échoue, la gate', () => {
     const { container } = render(<AcceptanceBoard issue={issue(44)} view={footerAcceptance(AT)} />);
     const checks = within(widget(container, 'checks'));
-    expect(checks.getByRole('link', { name: /Bout en bout \(Chromium, WebKit\)/ })).toHaveAttribute(
+    expect(
+      checks.getByRole('link', { name: /^En échec\s*Bout en bout \(Chromium, WebKit\)/ }),
+    ).toHaveAttribute(
       'href',
       'https://github.com/code-my-life/cv-site/actions/runs/19401876502/job/55498811302',
     );
     expect(checks.getByRole('link', { name: /factory\/gate/ })).toHaveAttribute(
+      'href',
+      'https://github.com/code-my-life/cv-site/pull/50#issuecomment-3497102877',
+    );
+    // Each rule of the gate leads to the comment that writes it, the red one first.
+    expect(checks.getByRole('link', { name: /^NOK\s*CI.*en échec sur la tête/ })).toHaveAttribute(
       'href',
       'https://github.com/code-my-life/cv-site/pull/50#issuecomment-3497102877',
     );
@@ -176,6 +183,22 @@ describe('recette d’une PR', () => {
       within(widget(container, 'twins')).getByRole('img', { name: 'Sans objet' }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Cette PR ne change aucun écran/)).toBeInTheDocument();
+    // A review posted without a thread to handle still counts.
+    expect(
+      within(widget(container, 'threads')).getByText('1 revue postée sur la PR'),
+    ).toBeInTheDocument();
+  });
+
+  it('des captures repliées disent leur pire verdict : une capture en cours n’est pas verte', () => {
+    const { container } = render(
+      <AcceptanceBoard issue={issue(47)} view={contactAcceptance('judging', AT)} />,
+    );
+    const captures = within(widget(container, 'proofs')).getByRole('button', {
+      name: /1 capture avant \/ après/,
+    });
+    expect(captures).toHaveAttribute('aria-expanded', 'false');
+    expect(captures).toHaveTextContent('1 en cours');
+    expect(captures.querySelector('[data-status="pending"]')).not.toBeNull();
   });
 
   it('un critère non prouvé est rouge même quand la CI et la gate sont vertes', async () => {
@@ -188,7 +211,7 @@ describe('recette d’une PR', () => {
         name: /^NOK\s*Critères d’acceptation/,
       }),
     );
-    const unproven = screen.getByRole('link', { name: /C4/ });
+    const unproven = within(widget(container, 'criteria')).getByRole('link', { name: /C4/ });
     expect(unproven).toHaveTextContent('Non prouvé, la PR le dit');
     expect(within(unproven).getByRole('img', { name: 'NOK' })).toBeInTheDocument();
     expect(
@@ -208,13 +231,40 @@ describe('recette d’une PR', () => {
     expect(screen.getByRole('link', { name: /Ouvrir la PR sur GitHub/ })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Approuver sur GitHub/ })).toBeNull();
     await user.click(nok);
-    const criteria = within(widget(container, 'criteria')).getByRole('button', {
-      name: /^NOK\s*Critères d’acceptation/,
-    });
-    expect(criteria).toHaveAttribute('aria-expanded', 'true');
+    const criteria = within(widget(container, 'criteria'));
+    expect(criteria.getByRole('button', { name: /^NOK\s*Critères d’acceptation/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    // Not the widget only: the first red criterion itself, with the focus.
+    const firstRed = criteria
+      .getAllByRole('link')
+      .find((link) => within(link).queryByRole('img', { name: 'NOK' }));
+    await waitFor(() => expect(firstRed).toHaveFocus());
+    // The OK count leads too, to the first green element.
+    await user.click(screen.getByRole('button', { name: /^Aller à : \d+ OK$/ }));
+    const firstGreen = criteria
+      .getAllByRole('link')
+      .find((link) => within(link).queryByRole('img', { name: 'OK' }));
+    await waitFor(() => expect(firstGreen).toHaveFocus());
     // The PR #19 points it does not prove are counted apart, to see.
     render(<AcceptanceBoard issue={issue(18, 'factory-live')} view={graphAcceptance()} />);
     expect(screen.getByRole('button', { name: 'Aller à : 4 à voir' })).toBeInTheDocument();
+  });
+
+  it('un compte ouvre le repli qui cache son premier élément : le groupe des checks réussis', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<AcceptanceBoard issue={issue(44)} view={footerAcceptance(AT)} />);
+    const checks = within(widget(container, 'checks'));
+    await user.click(checks.getByRole('button', { name: 'Épingler en tête' }));
+    const group = checks.getByRole('button', { name: /checks réussis$/ });
+    expect(group).toHaveAttribute('aria-expanded', 'false');
+    await user.click(screen.getByRole('button', { name: /^Aller à : \d+ OK$/ }));
+    await waitFor(() => expect(group).toHaveAttribute('aria-expanded', 'true'));
+    const firstGreen = checks
+      .getAllByRole('link')
+      .find((link) => within(link).queryByRole('img', { name: 'Réussi' }));
+    await waitFor(() => expect(firstGreen).toHaveFocus());
   });
 
   it('les jumeaux : les surfaces de la PR, le miroir des gestes, et la divergence qui propose de piloter séparément', async () => {

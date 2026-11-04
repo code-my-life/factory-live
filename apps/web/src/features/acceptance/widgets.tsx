@@ -16,7 +16,7 @@ import { useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import styles from './acceptance.module.css';
-import { checkStatus } from './status.ts';
+import { checkStatus, tally, worst } from './status.ts';
 import type { WidgetStatus } from './status.ts';
 import { StatusIcon } from './StatusMark.tsx';
 
@@ -39,7 +39,14 @@ function Row({
   value?: ReactNode;
 }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" className={styles.row} data-status={status}>
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className={styles.row}
+      data-status={status}
+      data-item={status}
+    >
       <StatusIcon status={status} label={label} />
       <span className={styles.rowMain}>{children}</span>
       {value !== undefined ? <span className={styles.rowValue}>{value}</span> : <span />}
@@ -128,22 +135,32 @@ function CheckRow({ check }: { check: AcceptanceCheck }) {
   );
 }
 
-function GateRule({ rule }: { rule: AcceptanceGateRule }) {
+/** A rule of the gate, as its comment writes it: the whole line leads to that comment. */
+function GateRule({ rule, href }: { rule: AcceptanceGateRule; href: string }) {
   const { t } = useI18n();
   return (
-    <li className={styles.rule} data-status={rule.status}>
-      {rule.status === 'info' ? (
-        <InfoIcon
-          size={16}
-          aria-label={t.acceptance.checks.info}
-          className={styles.statusIcon}
-          data-status="none"
-        />
-      ) : (
-        <StatusIcon status={rule.status} />
-      )}
-      <span className={styles.ruleName}>{rule.rule}</span>
-      <span className={styles.ruleDetail}>{rule.detail}</span>
+    <li>
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className={styles.rule}
+        data-status={rule.status}
+      >
+        {rule.status === 'info' ? (
+          <InfoIcon
+            size={16}
+            aria-label={t.acceptance.checks.info}
+            className={styles.statusIcon}
+            data-status="none"
+          />
+        ) : (
+          <StatusIcon status={rule.status} />
+        )}
+        <span className={styles.ruleName}>{rule.rule}</span>
+        <span className={styles.ruleDetail}>{rule.detail}</span>
+        <LinkExternalIcon size={12} className={styles.rowOut} aria-hidden="true" />
+      </a>
     </li>
   );
 }
@@ -157,6 +174,7 @@ export function ChecksWidget({ view }: { view: AcceptanceView }) {
   const passed = view.checks.filter((check) => checkStatus(check) === 'ok');
   const other = view.checks.filter((check) => checkStatus(check) !== 'ok');
   const rules = view.gate?.rules ?? [];
+  const gateUrl = view.gate?.url ?? '';
   const green = rules.filter((rule) => rule.status === 'ok');
   const notGreen = rules.filter((rule) => rule.status !== 'ok');
   return (
@@ -201,7 +219,7 @@ export function ChecksWidget({ view }: { view: AcceptanceView }) {
             {notGreen.length > 0 ? (
               <ul className={styles.rules}>
                 {notGreen.map((rule, index) => (
-                  <GateRule key={`${rule.rule}-${index}`} rule={rule} />
+                  <GateRule key={`${rule.rule}-${index}`} rule={rule} href={gateUrl} />
                 ))}
               </ul>
             ) : null}
@@ -211,7 +229,7 @@ export function ChecksWidget({ view }: { view: AcceptanceView }) {
                   <li className={styles.rowItem}>
                     <ul className={styles.rules}>
                       {green.map((rule, index) => (
-                        <GateRule key={`${rule.rule}-${index}`} rule={rule} />
+                        <GateRule key={`${rule.rule}-${index}`} rule={rule} href={gateUrl} />
                       ))}
                     </ul>
                   </li>
@@ -336,7 +354,7 @@ function CapturePair({ proof }: { proof: AcceptanceProof }) {
     ['after', proof.after],
   ] as const;
   return (
-    <li className={styles.capturePair}>
+    <li className={styles.capturePair} data-item={proof.status} tabIndex={-1}>
       <p className={styles.captureHead}>
         <StatusIcon status={proof.status} />
         <span className={styles.captureTitle}>{proof.detail}</span>
@@ -359,6 +377,7 @@ function CapturePair({ proof }: { proof: AcceptanceProof }) {
           ref={enlarge}
           size="small"
           leadingVisual={ScreenFullIcon}
+          className={styles.captureEnlarge}
           onClick={() => setOpen(true)}
         >
           {t.acceptance.proofs.enlarge}
@@ -395,11 +414,16 @@ function CapturePair({ proof }: { proof: AcceptanceProof }) {
   );
 }
 
-/** The visual proofs, folded by default: on a big PR they would take the whole board. */
+/**
+ * The visual proofs, folded by default: on a big PR they would take the whole board. Folded, their line
+ * still says the worst of their verdicts, and how many are NOK or still running.
+ */
 function Captures({ proofs }: { proofs: AcceptanceProof[] }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const id = useId();
+  const statuses = proofs.flatMap((proof) => (proof.status === 'info' ? [] : [proof.status]));
+  const counts = tally(statuses);
   return (
     <section className={styles.part}>
       <button
@@ -409,11 +433,13 @@ function Captures({ proofs }: { proofs: AcceptanceProof[] }) {
         aria-controls={id}
         onClick={() => setOpen((value) => !value)}
       >
-        <StatusIcon
-          status={proofs.some((proof) => proof.status === 'nok') ? 'nok' : 'ok'}
-          label={null}
-        />
+        <StatusIcon status={worst(statuses)} label={null} />
         <span>{t.acceptance.proofs.visual(proofs.length)}</span>
+        {counts.nok + counts.pending > 0 ? (
+          <span className={styles.summary}>
+            {t.acceptance.tally(counts.ok, counts.nok, counts.pending)}
+          </span>
+        ) : null}
         <ChevronDownIcon
           size={16}
           className={styles.chevron}
@@ -485,7 +511,18 @@ export function ProofsWidget({ view }: { view: AcceptanceView }) {
  */
 export function ThreadsWidget({ view }: { view: AcceptanceView }) {
   const { t, fmt } = useI18n();
-  if (view.threads.length === 0) return <Empty>{t.acceptance.threads.none}</Empty>;
+  // The reviews posted on the PR count even when none left a thread to handle.
+  const rounds =
+    view.reviewRounds > 0 ? (
+      <p className={styles.empty}>{t.acceptance.threads.rounds(view.reviewRounds)}</p>
+    ) : null;
+  if (view.threads.length === 0)
+    return (
+      <div className={styles.parts}>
+        {rounds}
+        <Empty>{t.acceptance.threads.none}</Empty>
+      </div>
+    );
   const open = view.threads.filter((thread) => !thread.resolved);
   const resolved = view.threads.filter((thread) => thread.resolved);
   const row = (thread: (typeof view.threads)[number]) => (
@@ -506,9 +543,7 @@ export function ThreadsWidget({ view }: { view: AcceptanceView }) {
   );
   return (
     <div className={styles.parts}>
-      {view.reviewRounds > 0 ? (
-        <p className={styles.empty}>{t.acceptance.threads.rounds(view.reviewRounds)}</p>
-      ) : null}
+      {rounds}
       <ul className={styles.rows}>
         {open.map(row)}
         {resolved.length > 0 ? (

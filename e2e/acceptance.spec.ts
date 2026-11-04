@@ -23,16 +23,27 @@ for (const route of ROUTES) {
     await expect(folded).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
     if (testInfo.project.name.includes('iphone')) {
-      // The controls of the board's header and of each widget's head, on a touch screen.
+      // Every control of the board on a touch screen: its header, the head and the body of each widget.
+      // Primer widens its small controls (segmented control, switch) by an absolute `::before` of 44 px:
+      // that is their target.
       const small = await board.evaluate((root) =>
-        [
-          ...root.querySelectorAll(
-            ':scope > header button, :scope > header a, [data-widget] > div:first-child button, [data-widget] > div:first-child a',
-          ),
-        ]
-          .map((element) => element.getBoundingClientRect())
-          .filter((box) => box.width > 0 && (box.width < 44 || box.height < 44))
-          .map((box) => `${Math.round(box.width)}x${Math.round(box.height)}`),
+        [...root.querySelectorAll<HTMLElement>('button, a, input, select, [role="slider"]')]
+          .map((element) => {
+            const box = element.getBoundingClientRect();
+            const before = getComputedStyle(element, '::before');
+            const widened = before.content !== 'none' && before.position === 'absolute';
+            const reach = (size: string) => (widened ? Number.parseFloat(size) || 0 : 0);
+            return {
+              element,
+              width: Math.max(box.width, reach(before.minWidth)),
+              height: Math.max(box.height, reach(before.minHeight)),
+            };
+          })
+          .filter(({ width, height }) => width > 0 && (width < 44 || height < 44))
+          .map(({ element, width, height }) => {
+            const name = (element.getAttribute('aria-label') ?? element.textContent ?? '').trim();
+            return `${element.tagName.toLowerCase()} « ${name.slice(0, 40)} » ${Math.round(width)}x${Math.round(height)}`;
+          }),
       );
       expect(small, 'cibles de moins de 44 px').toEqual([]);
     }
@@ -60,3 +71,26 @@ for (const route of ROUTES) {
     ).toEqual([]);
   });
 }
+
+test('un widget glissé par sa poignée annonce sa nouvelle place', async ({ page }) => {
+  await page.goto('/issues/cv-site/44');
+  const board = page.locator(BOARD);
+  // The next widget folded: the drag is short, and stays in sight on a phone too.
+  const checks = board.locator('[data-widget="checks"]');
+  await checks.locator('h4 button').click();
+  await expect(checks.locator('[data-collapsed]')).toHaveCSS('height', '0px');
+  const handle = board.getByRole('button', { name: 'Déplacer « Critères d’acceptation »' });
+  // The handle mid-view: a sticky bar covers the top of the page.
+  await handle.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+  const from = await handle.boundingBox();
+  const next = await checks.boundingBox();
+  if (!from || !next) throw new Error('poignée ou widget hors de la page');
+  const x = from.x + from.width / 2;
+  await page.mouse.move(x, from.y + from.height / 2);
+  await page.mouse.down();
+  // In steps, as a hand moves; it lets go once it sees the widgets swap, as a hand would.
+  await page.mouse.move(x, next.y + next.height * 0.8, { steps: 30 });
+  await expect(board.locator('[data-widget]').first()).toHaveAttribute('data-widget', 'checks');
+  await page.mouse.up();
+  await expect(board.getByRole('status')).toHaveText('Critères d’acceptation : position 2 sur 6');
+});
