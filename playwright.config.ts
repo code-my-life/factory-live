@@ -24,7 +24,14 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // On CI, a JUnit report too: the recette of a PR reads it from the run's artifacts (#22).
+  reporter: process.env.CI
+    ? [
+        ['list'],
+        ['html', { open: 'never' }],
+        ['junit', { outputFile: 'reports/junit/playwright.xml' }],
+      ]
+    : 'list',
   timeout: 60_000,
   expect: { timeout: 10_000, toHaveScreenshot: { maxDiffPixelRatio: 0.01 } },
   use: { trace: 'retain-on-failure', locale: 'fr-FR', colorScheme: 'dark' },

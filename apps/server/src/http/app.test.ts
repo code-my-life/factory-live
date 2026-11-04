@@ -1343,7 +1343,7 @@ describe('disposition de la recette', () => {
     expect((await get('phone')).layout).toEqual({ ...layout, half: [] });
     // Nobody else writes it, and a layout that is not one is refused.
     expect(
-      await refusal(await put('desktop', { ...TAILNET, 'tailscale-user-login': 'eve@github' })),
+      await refusal(await put('desktop', { ...TAILNET, 'tailscale-user-login': 'intrus@github' })),
     ).toEqual([403, 'write_login_refused']);
     expect(await refusal(await put('desktop', TAILNET))).toEqual([403, 'write_local_only']);
     expect(await refusal(await put('desktop', LOCAL, { ...layout, order: ['secrets'] }))).toEqual([
