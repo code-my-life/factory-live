@@ -107,7 +107,7 @@ afterEach(() => {
 });
 
 describe('jumeaux vivants', () => {
-  it('les deux flux d’une surface s’affichent sans iframe de l’app', async () => {
+  it("les deux flux d'une surface s'affichent sans iframe de l'app", async () => {
     const { container } = render(<TwinsWidget view={liveView()} fetchImpl={fetchImpl} />);
     const screens = await liveScreens();
     expect(screens).toHaveLength(2);
@@ -130,7 +130,7 @@ describe('jumeaux vivants', () => {
     ).toBeTruthy();
   });
 
-  it('un geste part vers le banc et n’est rejoué que si le miroir est actif', async () => {
+  it("un geste part vers le banc et n'est rejoué que si le miroir est actif", async () => {
     render(<TwinsWidget view={liveView()} fetchImpl={fetchImpl} />);
     const [, after] = await liveScreens();
     fireEvent.pointerDown(after!, { clientX: 39, clientY: 150, button: 0, pointerId: 1 });
