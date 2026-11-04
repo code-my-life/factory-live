@@ -15,9 +15,12 @@ for (const route of ROUTES) {
     await page.goto(route);
     const board = page.locator(BOARD);
     await expect(board).toBeVisible();
-    for (const toggle of await board.locator('h4 button[aria-expanded="false"]').all())
-      await toggle.click();
-    await expect(board.locator('h4 button[aria-expanded="false"]')).toHaveCount(0);
+    // Every fold of the board (widgets, green groups, captures), not the menus. The list shrinks at
+    // each click, hence the first one each time.
+    const folded = board.locator('button[aria-expanded="false"]:not([aria-haspopup])');
+    for (let left = 20; left > 0 && (await folded.count()) > 0; left -= 1)
+      await folded.first().click();
+    await expect(folded).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
     if (testInfo.project.name.includes('iphone')) {
       // The controls of the board's header and of each widget's head, on a touch screen.
