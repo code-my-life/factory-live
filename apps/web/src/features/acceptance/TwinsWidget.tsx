@@ -16,6 +16,7 @@ import {
 } from '@primer/octicons-react';
 import { Banner, Button, SegmentedControl, ToggleSwitch } from '@primer/react';
 import {
+  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -24,7 +25,6 @@ import {
   useSyncExternalStore,
   type KeyboardEvent,
   type PointerEvent,
-  type WheelEvent,
 } from 'react';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import styles from './acceptance.module.css';
@@ -126,13 +126,29 @@ function LiveScreen({ api, side, name }: { api: TwinsApi; side: TwinSide; name: 
     };
   }, [api, side, attempt]);
 
+  // A failed retry stays « lost »: each attempt schedules the next one.
   useEffect(() => {
     if (status !== 'lost') return;
     const retry = setTimeout(() => setAttempt((count) => count + 1), RETRY_MS);
     return () => clearTimeout(retry);
-  }, [status]);
+  }, [status, attempt]);
 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
+
+  // What the owner holds down on the twin: released on every way out, so nothing stays pressed there.
+  const held = useRef({ buttons: new Set<number>(), keys: new Set<number>() });
+  const releaseAll = useCallback(() => {
+    for (const code of held.current.buttons)
+      api.gesture({ side, event: 'control/buttonup', payload: { code } });
+    for (const keysym of held.current.keys)
+      api.gesture({ side, event: 'control/keyup', payload: { keysym } });
+    held.current.buttons.clear();
+    held.current.keys.clear();
+  }, [api, side]);
+  useEffect(() => {
+    if (status !== 'live') releaseAll();
+  }, [status, releaseAll]);
+  useEffect(() => releaseAll, [releaseAll]);
 
   const at = (event: { clientX: number; clientY: number }) =>
     video.current ? pointOn(video.current, event.clientX, event.clientY) : null;
@@ -158,25 +174,22 @@ function LiveScreen({ api, side, name }: { api: TwinsApi; side: TwinSide; name: 
     event.currentTarget.focus();
     event.currentTarget.setPointerCapture?.(event.pointerId);
     move(point);
+    held.current.buttons.add(event.button + 1);
     api.gesture({ side, event: 'control/buttondown', payload: { code: event.button + 1 } });
   };
+  // A release always goes, live or not, as long as its press went.
   const onPointerUp = (event: PointerEvent) => {
-    if (status !== 'live') return;
-    api.gesture({ side, event: 'control/buttonup', payload: { code: event.button + 1 } });
-  };
-  const onWheel = (event: WheelEvent) => {
-    if (status !== 'live') return;
-    const step = (delta: number) =>
-      Math.max(-10, Math.min(10, Math.round(delta / 40))) || Math.sign(delta);
-    api.gesture({
-      side,
-      event: 'control/scroll',
-      payload: { delta_x: step(event.deltaX), delta_y: step(event.deltaY) },
-    });
+    const code = event.button + 1;
+    if (!held.current.buttons.delete(code)) return;
+    api.gesture({ side, event: 'control/buttonup', payload: { code } });
   };
   const onKey = (event: KeyboardEvent) => {
     const keysym = keysymOf(event.key);
-    if (!keysym || status !== 'live') return;
+    if (!keysym) return;
+    if (event.type === 'keydown') {
+      if (status !== 'live') return;
+      held.current.keys.add(keysym);
+    } else if (!held.current.keys.delete(keysym)) return;
     event.preventDefault();
     api.gesture({
       side,
@@ -185,9 +198,34 @@ function LiveScreen({ api, side, name }: { api: TwinsApi; side: TwinSide; name: 
     });
   };
 
+  // The wheel scrolls the twin, not the page: a listener that may cancel it (React's is passive).
+  const screenRef = useRef<HTMLDivElement>(null);
+  const live = useRef(false);
+  useEffect(() => {
+    live.current = status === 'live';
+  }, [status]);
+  useEffect(() => {
+    const element = screenRef.current;
+    if (!element) return;
+    const onWheel = (event: globalThis.WheelEvent) => {
+      if (!live.current) return;
+      event.preventDefault();
+      const step = (delta: number) =>
+        Math.max(-10, Math.min(10, Math.round(delta / 40))) || Math.sign(delta);
+      api.gesture({
+        side,
+        event: 'control/scroll',
+        payload: { delta_x: step(event.deltaX), delta_y: step(event.deltaY) },
+      });
+    };
+    element.addEventListener('wheel', onWheel, { passive: false });
+    return () => element.removeEventListener('wheel', onWheel);
+  }, [api, side]);
+
   const still = kept ?? api.shot(side);
   return (
     <div
+      ref={screenRef}
       className={styles.live}
       data-status={status}
       role="application"
@@ -197,7 +235,8 @@ function LiveScreen({ api, side, name }: { api: TwinsApi; side: TwinSide; name: 
       onPointerMove={onPointerMove}
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
-      onWheel={onWheel}
+      onPointerCancel={releaseAll}
+      onBlur={releaseAll}
       onKeyDown={onKey}
       onKeyUp={onKey}
       onContextMenu={(event) => event.preventDefault()}

@@ -104,14 +104,27 @@ export class TwinBench {
   view(repo: string, pr: number): AcceptanceTwins | null {
     const pair = this.pair(repo, pr);
     if (!pair) return null;
-    const stream = (side: TwinSide, value: string | null) =>
-      value && pair.sessions[side] ? `/api/twins/${repo}/${pr}/session/${side}` : null;
+    // The sessions are those of one surface (the app): no other surface may show or drive them.
+    const served = (pair.twins.surfaces.find((each) => each.id === 'app') ??
+      pair.twins.surfaces[0])!.id;
+    const stream = (id: string, side: TwinSide, value: string | null) =>
+      id === served && value && pair.sessions[side]
+        ? `/api/twins/${repo}/${pr}/session/${side}`
+        : null;
     return {
       ...pair.twins,
       surfaces: pair.twins.surfaces.map((surface) => ({
         ...surface,
-        base: { ...surface.base, stream: stream('base', surface.base.stream), poster: null },
-        head: { ...surface.head, stream: stream('head', surface.head.stream), poster: null },
+        base: {
+          ...surface.base,
+          stream: stream(surface.id, 'base', surface.base.stream),
+          poster: null,
+        },
+        head: {
+          ...surface.head,
+          stream: stream(surface.id, 'head', surface.head.stream),
+          poster: null,
+        },
       })),
     };
   }

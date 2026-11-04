@@ -139,4 +139,17 @@ describe('banc de jumeaux', () => {
       lagMs: 0.12,
     });
   });
+
+  it('une autre surface que l’app ne montre ni ne pilote les jumeaux de l’app', () => {
+    const site = { ...PAIR.surfaces[0]!, id: 'site', label: 'Site', kind: 'site' };
+    writeFileSync(
+      join(board, 'twins', 'factory-live-25.json'),
+      JSON.stringify({ ...PAIR, surfaces: [PAIR.surfaces[0], site] }),
+    );
+    const view = bench().view('factory-live', 25);
+    expect(view?.surfaces.map((each) => [each.id, each.head.stream])).toEqual([
+      ['app', '/api/twins/factory-live/25/session/head'],
+      ['site', null],
+    ]);
+  });
 });

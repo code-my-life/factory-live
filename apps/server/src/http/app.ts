@@ -149,6 +149,12 @@ export function createApp(deps: AppDeps) {
     tailscaleLogins: deps.tailscaleLogins,
     now: deps.now,
   });
+  const twinsGuard = writeGuard({
+    origins: deps.origins,
+    tailscaleLogins: deps.tailscaleLogins,
+    now: deps.now,
+    perMinute: 6000,
+  });
   const replay = new ReplayGuard();
   const decoder = new TextDecoder();
 
@@ -792,8 +798,9 @@ export function createApp(deps: AppDeps) {
     }
   });
 
-  // The owner's gestures and the mirror: this PC, or an allowed Tailscale login (the unblock's guard).
-  app.on('POST', '/api/twins/*', guard);
+  // The owner's gestures and the mirror: this PC, or an allowed Tailscale login, as the unblock; with
+  // a limit of their own, a pointer sending up to one gesture a frame, and never eating the others' writes.
+  app.on('POST', '/api/twins/*', twinsGuard);
   const relay = (
     path: string,
     call: (repo: string, pr: number, body: unknown) => Promise<boolean>,

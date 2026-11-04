@@ -54,6 +54,9 @@ class FakeSocket {
 }
 
 let bench: TwinsBenchState;
+/** The bench refuses sessions (it restarts), as long as this says so. */
+let sessionsDown = false;
+let sessionAsks = 0;
 let posts: { path: string; body: unknown }[];
 
 const fetchMock = vi.fn((url: string, init?: RequestInit) => {
@@ -62,7 +65,9 @@ const fetchMock = vi.fn((url: string, init?: RequestInit) => {
     posts.push({ path, body: JSON.parse(init.body as string) as unknown });
     return Promise.resolve(new Response(null, { status: 204 }));
   }
-  if (path.startsWith('/session/'))
+  if (path.startsWith('/session/')) {
+    sessionAsks += 1;
+    if (sessionsDown) return Promise.resolve(new Response(null, { status: 502 }));
     return Promise.resolve(
       Response.json({
         ws: 'ws://localhost:52127/api/ws',
@@ -70,6 +75,7 @@ const fetchMock = vi.fn((url: string, init?: RequestInit) => {
         candidateHost: '127.0.0.1',
       }),
     );
+  }
   return Promise.resolve(Response.json(bench));
 });
 const fetchImpl = fetchMock as unknown as typeof fetch;
@@ -93,6 +99,8 @@ async function liveScreens(): Promise<HTMLElement[]> {
 beforeEach(() => {
   FakeSocket.all = [];
   posts = [];
+  sessionsDown = false;
+  sessionAsks = 0;
   bench = { mirror: true, divergence: null, lagMs: 0.12 };
   vi.stubGlobal('WebSocket', FakeSocket);
   vi.stubGlobal('requestAnimationFrame', (run: FrameRequestCallback) => {
@@ -186,5 +194,39 @@ describe('jumeaux vivants', () => {
     expect(await screen.findByText(/Flux perdu : dernière image du jumeau/)).toBeTruthy();
     // jsdom draws no frame: the last image is the twin's screen as the bench keeps it.
     expect(before!.querySelector('img')?.getAttribute('src')).toBe(`${API}/shot/base`);
+  });
+
+  it('un bouton tenu est relâché quand l’écran perd le focus', async () => {
+    render(<TwinsWidget view={liveView()} fetchImpl={fetchImpl} />);
+    const [, after] = await liveScreens();
+    fireEvent.pointerDown(after!, { clientX: 39, clientY: 150, button: 0, pointerId: 1 });
+    fireEvent.blur(after!);
+    await waitFor(() => expect(posts).toHaveLength(3));
+    expect(posts.at(-1)).toEqual({
+      path: '/gesture',
+      body: { side: 'head', event: 'control/buttonup', payload: { code: 1 } },
+    });
+  });
+
+  it('un flux qui retombe pendant un nouvel essai est réessayé encore', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<TwinsWidget view={liveView()} fetchImpl={fetchImpl} />);
+      await waitFor(() => expect(FakeSocket.all).toHaveLength(2));
+      // The bench restarts: the stream drops, and its sessions fail for a while.
+      sessionsDown = true;
+      act(() => FakeSocket.all[0]?.onclose?.());
+      const asked = sessionAsks;
+      await act(() => vi.advanceTimersByTimeAsync(5000));
+      await waitFor(() => expect(sessionAsks).toBe(asked + 1));
+      await act(() => vi.advanceTimersByTimeAsync(5000));
+      await waitFor(() => expect(sessionAsks).toBe(asked + 2));
+      // Back up: the next attempt joins the twin again.
+      sessionsDown = false;
+      await act(() => vi.advanceTimersByTimeAsync(5000));
+      await waitFor(() => expect(FakeSocket.all).toHaveLength(3));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

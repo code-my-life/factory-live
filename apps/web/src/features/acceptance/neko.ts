@@ -200,7 +200,12 @@ export class TwinsApi {
     });
   }
 
-  private readonly pending: TwinGesture[] = [];
+  /** What waits to reach the bench, in order: gestures and the mirror's commands share one line. */
+  private readonly pending: {
+    path: '/gesture' | '/mirror' | '/resync';
+    body: unknown;
+    settle?: (response: Response | null) => void;
+  }[] = [];
   private sending = false;
 
   /**
@@ -209,33 +214,48 @@ export class TwinsApi {
    * move before it: only the pointer's latest place matters.
    */
   gesture(gesture: TwinGesture): void {
-    const last = this.pending.at(-1);
+    const last = this.pending.at(-1)?.body as TwinGesture | undefined;
     if (
       gesture.event === 'control/move' &&
+      this.pending.at(-1)?.path === '/gesture' &&
       last?.event === 'control/move' &&
       last.side === gesture.side
     )
-      this.pending[this.pending.length - 1] = gesture;
-    else this.pending.push(gesture);
+      this.pending[this.pending.length - 1] = { path: '/gesture', body: gesture };
+    else this.pending.push({ path: '/gesture', body: gesture });
     void this.flush();
+  }
+
+  /** A command of the mirror, after the gestures already sent: it never overtakes them. */
+  private command(path: '/mirror' | '/resync', body: unknown): Promise<Response | null> {
+    // Back home, the gestures still waiting would only take the twins away from it again.
+    if (path === '/resync')
+      for (let index = this.pending.length - 1; index >= 0; index -= 1)
+        if (this.pending[index]!.path === '/gesture') this.pending.splice(index, 1);
+    return new Promise((settle) => {
+      this.pending.push({ path, body, settle });
+      void this.flush();
+    });
   }
 
   private async flush(): Promise<void> {
     if (this.sending) return;
     this.sending = true;
     try {
-      for (let next = this.pending.shift(); next; next = this.pending.shift())
-        await this.post('/gesture', next).catch(() => undefined);
+      for (let next = this.pending.shift(); next; next = this.pending.shift()) {
+        const response = await this.post(next.path, next.body).catch(() => null);
+        next.settle?.(response);
+      }
     } finally {
       this.sending = false;
     }
   }
 
-  mirror(on: boolean): Promise<Response> {
-    return this.post('/mirror', { on });
+  mirror(on: boolean): Promise<Response | null> {
+    return this.command('/mirror', { on });
   }
 
-  resync(): Promise<Response> {
-    return this.post('/resync', {});
+  resync(): Promise<Response | null> {
+    return this.command('/resync', {});
   }
 }
