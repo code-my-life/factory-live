@@ -877,7 +877,7 @@ export const en: Messages = {
     },
     twins: {
       preview:
-        'Preview: the demo streams nothing. The live twins will come from the factory’s twin bench, through Neko.',
+        'Preview: the demo streams nothing. Live, the twins come from the factory’s twin bench, through Neko.',
       surfaces: 'Surfaces of the PR',
       kind: {
         web: 'Web app',
@@ -912,6 +912,11 @@ export const en: Messages = {
         stopped: 'Twins stopped',
       },
       noStill: 'No picture of this screen yet.',
+      liveScreen: 'twin screen, to drive',
+      connecting: 'Connecting to the twin…',
+      lost: 'Stream lost: last picture of the twin. Trying again in a few seconds.',
+      lag: (ms: number) =>
+        `Mirror lag between both twins: ${ms.toLocaleString('en-US', { maximumFractionDigits: 2 })} ms.`,
       screen: (side: string, sha: string) => `The screen ${side}, ${sha}`,
       absent: {
         no_screen:

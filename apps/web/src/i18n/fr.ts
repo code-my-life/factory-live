@@ -971,7 +971,7 @@ export const fr = {
     },
     twins: {
       preview:
-        'Aperçu : la démo ne diffuse aucun flux. Les jumeaux vivants viendront du banc de la factory, par Neko.',
+        'Aperçu : la démo ne diffuse aucun flux. En direct, les jumeaux viennent du banc de la factory, par Neko.',
       surfaces: 'Surfaces de la PR',
       kind: {
         web: 'App web',
@@ -1006,6 +1006,11 @@ export const fr = {
         stopped: 'Jumeaux arrêtés',
       } satisfies Record<'starting' | 'ready' | 'stopped', string>,
       noStill: 'Pas encore d’image de cet écran.',
+      liveScreen: 'écran du jumeau, à piloter',
+      connecting: 'Connexion au jumeau…',
+      lost: 'Flux perdu : dernière image du jumeau. Nouvel essai dans quelques secondes.',
+      lag: (ms: number) =>
+        `Décalage du miroir entre les deux jumeaux : ${ms.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} ms.`,
       screen: (side: string, sha: string) => `L’écran ${side}, ${sha}`,
       absent: {
         no_screen:
