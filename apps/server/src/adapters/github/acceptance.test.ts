@@ -142,3 +142,71 @@ describe('la recette lue sur GitHub', () => {
     ]);
   });
 });
+
+describe('la recette lue sur GitHub, hors des cas de factory-live', () => {
+  it('un statut de commit est un check : le plus récent de chaque nom, sans workflow', () => {
+    const at = (state: string, updated: string): StatusJson => ({
+      context: 'ci/externe',
+      state,
+      description: null,
+      target_url: 'https://ci.example/build/7',
+      created_at: updated,
+      updated_at: updated,
+    });
+    // GitHub gives the statuses newest first.
+    const checks = headChecksOf(
+      [],
+      [at('error', '2026-11-04T10:05:00Z'), at('pending', '2026-11-04T10:00:00Z')],
+      [],
+      COMMIT,
+    );
+    expect(checks).toEqual([
+      {
+        name: 'ci/externe',
+        workflow: null,
+        status: 'failure',
+        durationMs: null,
+        url: 'https://ci.example/build/7',
+      },
+    ]);
+  });
+
+  it('un fil écrit par une personne : sa première ligne pour titre, sans gravité', () => {
+    const { threads } = threadsOf({
+      data: {
+        repository: {
+          pullRequest: {
+            reviews: { totalCount: 1 },
+            reviewThreads: {
+              nodes: [
+                {
+                  isResolved: false,
+                  comments: {
+                    nodes: [
+                      {
+                        author: null,
+                        body: '\n> Le `pied de page` déborde à 390 px.\nSuite du commentaire.',
+                        createdAt: '2026-11-04T10:00:00Z',
+                        url: 'https://github.com/code-my-life/cv-site/pull/50#discussion_r1',
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+    expect(threads).toEqual([
+      {
+        author: 'ghost',
+        severity: null,
+        title: 'Le pied de page déborde à 390 px.',
+        resolved: false,
+        at: '2026-11-04T10:00:00Z',
+        url: 'https://github.com/code-my-life/cv-site/pull/50#discussion_r1',
+      },
+    ]);
+  });
+});
