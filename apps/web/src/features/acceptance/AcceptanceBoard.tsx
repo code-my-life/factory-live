@@ -1,4 +1,9 @@
-import type { AcceptanceLayout, AcceptanceView, IssueSummary } from '@factory-live/contracts';
+import type {
+  AcceptanceDevice,
+  AcceptanceLayout,
+  AcceptanceView,
+  IssueSummary,
+} from '@factory-live/contracts';
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -289,14 +294,28 @@ function WidgetFrame({
  * The header counts the elements, what needs the owner first; each count leads to its first element.
  */
 export function AcceptanceBoard({ issue, view }: { issue: IssueSummary; view: AcceptanceView }) {
+  // A type of screen has its own layout: crossing the phone's breakpoint mounts the board afresh,
+  // with that type's layout, read again from the server, and no edit of the other type carried over.
+  const device = useMedia(PHONE) ? 'phone' : 'desktop';
+  return <DeviceBoard key={device} issue={issue} view={view} device={device} />;
+}
+
+function DeviceBoard({
+  issue,
+  view,
+  device,
+}: {
+  issue: IssueSummary;
+  view: AcceptanceView;
+  device: AcceptanceDevice;
+}) {
   const { t } = useI18n();
   const { enabled } = useMotion();
   const titleId = useId();
   const listRef = useRef<HTMLOListElement>(null);
   const wide = useWide();
-  const device = useMedia(PHONE) ? 'phone' : 'desktop';
   const source = useOptionalFactorySource();
-  const [layout, setLayout] = useState<BoardLayout>(loadLayout);
+  const [layout, setLayout] = useState<BoardLayout>(() => loadLayout(device));
   // The owner's layout follows them from one device to another of the same type (#22): the server's,
   // once read, replaces this device's copy, unless the owner changed it meanwhile.
   const touched = useRef(false);
@@ -309,7 +328,7 @@ export function AcceptanceBoard({ issue, view }: { issue: IssueSummary; view: Ac
         if (!saved || cancelled || touched.current) return;
         const next = normalizeLayout(saved);
         setLayout(next);
-        saveLayout(next);
+        saveLayout(next, device);
       })
       .catch(() => undefined);
     return () => {
@@ -358,7 +377,7 @@ export function AcceptanceBoard({ issue, view }: { issue: IssueSummary; view: Ac
 
   const apply = (next: BoardLayout, message: string | null) => {
     setLayout(next);
-    saveLayout(next);
+    saveLayout(next, device);
     touched.current = true;
     if (source?.saveAcceptanceLayout) {
       if (pending.current) window.clearTimeout(pending.current.timer);

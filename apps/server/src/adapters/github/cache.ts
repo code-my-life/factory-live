@@ -301,7 +301,15 @@ export class GitHubCache implements GitHubReadPort {
   ): Promise<AcceptanceSource['tests']> {
     let found = false;
     const tests: NonNullable<AcceptanceSource['tests']> = { suites: [], results: [] };
+    // The current run of each workflow: a newer run of the same head (a rerun, a reopened PR)
+    // replaces the older one's reports; different workflows each keep theirs.
+    const current = new Map<string, WorkflowRunJson>();
     for (const run of workflows) {
+      const key = String(run.workflow_id ?? run.name ?? run.id);
+      const known = current.get(key);
+      if (!known || run.id > known.id) current.set(key, run);
+    }
+    for (const run of current.values()) {
       const artifacts = (await this.client.artifacts(repo, run.id)).filter((artifact) =>
         /^junit/i.test(artifact.name),
       );

@@ -136,6 +136,20 @@ describe('la recette d’une PR', () => {
     );
     expect(criterion(red, 'C2')).toMatchObject({ status: 'nok', reason: 'failing' });
 
+    // Green on the desktop but skipped on the phone: the phone proves nothing, the criterion is not proven.
+    const skipped = acceptanceOf(
+      source({
+        tests: {
+          suites: [],
+          results: GREEN.map((each) =>
+            each.project === 'demo-iphone' ? { ...each, outcome: 'skipped' as const } : each,
+          ),
+        },
+      }),
+      [],
+    );
+    expect(criterion(skipped, 'C2')).toMatchObject({ status: 'nok', reason: 'unproven' });
+
     // A named test missing from the reports proves nothing.
     const missing = acceptanceOf(
       source({

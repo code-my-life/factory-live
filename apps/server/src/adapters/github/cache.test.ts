@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { GitHubCache } from './cache.ts';
 import { GitHubError } from './client.ts';
@@ -308,5 +309,33 @@ describe('GitHubCache, recette d’une PR', () => {
       await cache.capture('factory-live', 24, 'e2e/captures.spec.ts-snapshots/neuve.png', 'head'),
     ).toBeNull();
     expect(fileAt).toHaveBeenCalledTimes(2);
+  });
+
+  it('la dernière exécution de chaque workflow donne les rapports : une plus ancienne ne compte plus', async () => {
+    const { client } = prClient(false);
+    const zip = new Uint8Array(
+      readFileSync(new URL('../../../../../fixtures/github-junit/junit.zip', import.meta.url)),
+    );
+    const run = (id: number) => ({
+      id,
+      workflow_id: 9,
+      name: 'CI',
+      check_suite_id: id,
+      html_url: `https://github.com/code-my-life/factory-live/actions/runs/${id}`,
+    });
+    Object.assign(client, {
+      workflowRuns: () => Promise.resolve([run(1), run(2)]),
+      artifacts: (_repo: string, runId: number) =>
+        Promise.resolve([{ id: runId * 10, name: 'junit-unit' }]),
+      artifactZip: () => Promise.resolve(zip),
+    });
+    const cache = new GitHubCache(client, 'code-my-life', log());
+    await cache.refresh(tracked, 0);
+    const suites = cache.acceptance('factory-live#21')!.tests!.suites;
+    // One run's suites (Vitest and two projects), the newer run's: never both.
+    expect(suites.map((suite) => suite.name)).toEqual(['Vitest', 'demo-bureau', 'demo-iphone']);
+    expect(new Set(suites.map((suite) => suite.url))).toEqual(
+      new Set(['https://github.com/code-my-life/factory-live/actions/runs/2']),
+    );
   });
 });

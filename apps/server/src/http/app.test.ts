@@ -1161,7 +1161,7 @@ function prRoutes(): Record<string, () => Response> {
           },
         ],
       }),
-    [`/commits/${head}/check-runs?per_page=100`]: () =>
+    [`/commits/${head}/check-runs?per_page=100&page=1`]: () =>
       reply({
         check_runs: [
           {
@@ -1187,7 +1187,7 @@ function prRoutes(): Record<string, () => Response> {
           updated_at: '2026-11-04T10:05:00Z',
         },
       ]),
-    '/issues/52/comments?per_page=100': () =>
+    '/issues/52/comments?per_page=100&page=1': () =>
       reply([
         {
           body: fixture('github-gate/gate-rouge.md').toString('utf8'),
@@ -1196,7 +1196,7 @@ function prRoutes(): Record<string, () => Response> {
           user: { type: 'Bot' },
         },
       ]),
-    '/pulls/52/files?per_page=100': () =>
+    '/pulls/52/files?per_page=100&page=1': () =>
       reply([{ filename: 'e2e/captures.spec.ts-snapshots/projets.png', status: 'modified' }]),
     '/graphql': () =>
       reply(JSON.parse(fixture('github-acceptance/review-threads.json').toString('utf8'))),

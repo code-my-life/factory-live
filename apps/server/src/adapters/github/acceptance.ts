@@ -39,6 +39,8 @@ export interface StatusJson {
 /** A workflow run of the head, as `/actions/runs?head_sha=` gives it: its name is the check's workflow. */
 export interface WorkflowRunJson {
   id: number;
+  /** The workflow it runs: a newer run of the same workflow replaces an older one's reports. */
+  workflow_id?: number;
   name: string | null;
   check_suite_id: number;
   html_url: string;
@@ -59,6 +61,7 @@ export interface ThreadsJson {
       pullRequest: {
         reviews: { totalCount: number };
         reviewThreads: {
+          pageInfo?: { hasNextPage: boolean; endCursor: string | null };
           nodes: {
             isResolved: boolean;
             comments: {
@@ -77,11 +80,12 @@ export interface ThreadsJson {
 }
 
 /** The review threads of a PR and how many reviews were posted on it, by GraphQL (REST has no threads). */
-export const THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
+export const THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       reviews { totalCount }
-      reviewThreads(first: 100) {
+      reviewThreads(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
         nodes { isResolved comments(first: 1) { nodes { author { login } body createdAt url } } }
       }
     }
@@ -216,16 +220,19 @@ export function gateOf(
   };
 }
 
-/** A thread's title: its first bold words (Greptile's title), else its first line without markup. */
+/**
+ * A thread's title: its first bold words (Greptile's title), else its first line without markup. Shown
+ * as text, never as HTML; tags go, and so does any angle bracket a broken tag would leave.
+ */
 function titleOf(body: string): string {
   const bold = /\*\*(.+?)\*\*/.exec(body)?.[1];
-  if (bold) return bold.trim();
+  if (bold) return bold.replace(/[<>]/g, '').trim();
   const line = body
     .split('\n')
     .map((each) =>
       each
-        .replace(/<[^>]+>/g, '')
-        .replace(/[*_`#>]/g, '')
+        .replace(/<[^>]*>/g, '')
+        .replace(/[<>*_`#]/g, '')
         .trim(),
     )
     .find(Boolean);

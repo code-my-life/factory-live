@@ -366,13 +366,30 @@ export class GitHubClient implements GitHubWritePort {
     return str(data['body']);
   }
 
+  /**
+   * Every page of a list GitHub gives by pages of 100 (`per_page=100` in `path`), up to `max` pages:
+   * past its first page, a PR's newest gate verdict, captures or threads would be missed.
+   */
+  private async pages<T>(path: string, pick: (body: unknown) => T[], max: number): Promise<T[]> {
+    const all: T[] = [];
+    for (let page = 1; page <= max; page += 1) {
+      const items = pick(await this.request('GET', `${path}&page=${page}`));
+      all.push(...items);
+      if (items.length < 100) break;
+    }
+    return all;
+  }
+
   /** The check runs of a commit (each job of each workflow, and the checks of Apps). */
   async checkRuns(repo: string, sha: string): Promise<CheckRunJson[]> {
-    const data = (await this.request(
-      'GET',
+    return this.pages(
       this.path(repo, `/commits/${sha}/check-runs?per_page=100`),
-    )) as Json;
-    return (Array.isArray(data['check_runs']) ? data['check_runs'] : []) as CheckRunJson[];
+      (body) => {
+        const runs = obj(body)['check_runs'];
+        return (Array.isArray(runs) ? runs : []) as CheckRunJson[];
+      },
+      5,
+    );
   }
 
   /** The commit statuses of a commit, newest first (`factory/gate` among them). */
@@ -395,20 +412,22 @@ export class GitHubClient implements GitHubWritePort {
 
   /** The comments of a PR's conversation, oldest first (the gate's verdicts among them). */
   async issueComments(repo: string, number: number): Promise<GateCommentJson[]> {
-    const data = await this.request(
-      'GET',
+    return this.pages(
       this.path(repo, `/issues/${number}/comments?per_page=100`),
+      (body) => (Array.isArray(body) ? body : []) as GateCommentJson[],
+      10,
     );
-    return (Array.isArray(data) ? data : []) as GateCommentJson[];
   }
 
   /** The files a PR changes, with how (added, modified, removed, renamed). */
   async pullFiles(repo: string, number: number): Promise<{ filename: string; status: string }[]> {
-    const data = await this.request('GET', this.path(repo, `/pulls/${number}/files?per_page=100`));
-    return (Array.isArray(data) ? (data as Json[]) : []).map((file) => ({
-      filename: str(file['filename']),
-      status: str(file['status']),
-    }));
+    // GitHub lists up to 3 000 files of a PR, 100 a page.
+    const files = await this.pages(
+      this.path(repo, `/pulls/${number}/files?per_page=100`),
+      (body) => (Array.isArray(body) ? (body as Json[]) : []),
+      30,
+    );
+    return files.map((file) => ({ filename: str(file['filename']), status: str(file['status']) }));
   }
 
   /** The artifacts of a workflow run that have not expired. */
@@ -444,24 +463,41 @@ export class GitHubClient implements GitHubWritePort {
   /** The review threads of a PR and its number of reviews, by GraphQL (REST has no threads). */
   async reviewThreads(repo: string, number: number): Promise<ThreadsJson> {
     if (!NAME.test(repo)) throw new GitHubError(400, `Dépôt invalide : ${repo}`);
-    const answer = (await this.request(
-      'POST',
-      '/graphql',
-      { query: THREADS_QUERY, variables: { owner: this.owner, name: repo, number } },
-      false,
-      'read',
-    )) as ThreadsJson & { errors?: { type?: string; message?: string }[] };
-    // GraphQL answers 200 even when it refuses: a refusal is GitHub's, like a 403 of REST.
-    if (answer.errors?.length) {
-      const refused = answer.errors.some(
-        (error) => error.type === 'FORBIDDEN' || error.type === 'NOT_FOUND',
-      );
-      throw new GitHubError(
-        refused ? 403 : 502,
-        `GitHub GraphQL : ${answer.errors[0]?.message ?? ''}`,
-      );
+    type Thread = NonNullable<
+      NonNullable<NonNullable<ThreadsJson['data']>['repository']>['pullRequest']
+    >['reviewThreads']['nodes'][number];
+    const nodes: Thread[] = [];
+    let first: ThreadsJson | null = null;
+    let after: string | null = null;
+    // A hundred threads a page, ten pages at most: a long review keeps its last threads.
+    for (let page = 0; page < 10; page += 1) {
+      const answer = (await this.request(
+        'POST',
+        '/graphql',
+        { query: THREADS_QUERY, variables: { owner: this.owner, name: repo, number, after } },
+        false,
+        'read',
+      )) as ThreadsJson & { errors?: { type?: string; message?: string }[] };
+      // GraphQL answers 200 even when it refuses: a refusal is GitHub's, like a 403 of REST.
+      if (answer.errors?.length) {
+        const refused = answer.errors.some(
+          (error) => error.type === 'FORBIDDEN' || error.type === 'NOT_FOUND',
+        );
+        throw new GitHubError(
+          refused ? 403 : 502,
+          `GitHub GraphQL : ${answer.errors[0]?.message ?? ''}`,
+        );
+      }
+      first ??= answer;
+      const threads = answer.data?.repository?.pullRequest?.reviewThreads;
+      nodes.push(...(threads?.nodes ?? []));
+      if (!threads?.pageInfo?.hasNextPage || !threads.pageInfo.endCursor) break;
+      after = threads.pageInfo.endCursor;
     }
-    return answer;
+    const pr = first?.data?.repository?.pullRequest;
+    return pr
+      ? { data: { repository: { pullRequest: { ...pr, reviewThreads: { nodes } } } } }
+      : (first ?? { data: null });
   }
 }
 

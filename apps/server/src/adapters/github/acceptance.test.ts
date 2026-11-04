@@ -171,6 +171,37 @@ describe('la recette lue sur GitHub, hors des cas de factory-live', () => {
     ]);
   });
 
+  it('un titre de fil s’affiche en texte : aucune balise, même cassée, n’en reste', () => {
+    const { threads } = threadsOf({
+      data: {
+        repository: {
+          pullRequest: {
+            reviews: { totalCount: 1 },
+            reviewThreads: {
+              nodes: [
+                {
+                  isResolved: false,
+                  comments: {
+                    nodes: [
+                      {
+                        author: { login: 'quelqu-un' },
+                        body: '<scr<script>ipt>alert(1)</scr</script>ipt> le pied de page',
+                        createdAt: '2026-11-04T10:00:00Z',
+                        url: 'https://github.com/code-my-life/cv-site/pull/50#discussion_r2',
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+    expect(threads[0]!.title).not.toMatch(/[<>]/);
+    expect(threads[0]!.title).toContain('le pied de page');
+  });
+
   it('un fil écrit par une personne : sa première ligne pour titre, sans gravité', () => {
     const { threads } = threadsOf({
       data: {

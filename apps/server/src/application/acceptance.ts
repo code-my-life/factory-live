@@ -106,9 +106,10 @@ function isNamed(
 }
 
 /**
- * A criterion's verdict, by written rules: NOK « non prouvé » when the PR says so, names no test, or
- * names a test missing from the reports once the CI is over; NOK « sa preuve échoue » when one of its
- * tests is red; running while a check runs and its tests are not reported; OK when all are green.
+ * A criterion's verdict, by written rules: NOK « non prouvé » when the PR says so, names no test,
+ * names a test missing from the reports once the CI is over, or a test a project skipped; NOK « sa
+ * preuve échoue » when one of its tests is red; running while a check runs and its tests are not
+ * reported; OK when all are green on every project that reports them.
  */
 function judge(
   id: string,
@@ -132,13 +133,14 @@ function judge(
   const runs = named.map((each) => results.filter((result) => isNamed(result, each)));
   const failed = runs.flat().find((result) => result.outcome === 'failed');
   if (failed) return { id, text, status: 'nok', reason: 'failing', proof, url: failed.url };
-  // A skipped run proves nothing: only a passed run counts.
-  const passed = runs.map((each) => each.filter((result) => result.outcome === 'passed'));
-  if (passed.some((each) => each.length === 0))
+  // A named test missing from the reports: the CI may still run it, else nothing proves it.
+  if (runs.some((each) => each.length === 0))
     return running
       ? { id, text, status: 'pending', reason: 'running', proof, url: source.prUrl }
       : unproven;
-  return { id, text, status: 'ok', reason: 'proven', proof, url: passed[0]![0]!.url };
+  // Green on every project that reports it (ADR 0012): a project that skipped it proves nothing there.
+  if (runs.flat().some((result) => result.outcome !== 'passed')) return unproven;
+  return { id, text, status: 'ok', reason: 'proven', proof, url: runs[0]![0]!.url };
 }
 
 function proofStatus(rule: AcceptanceGateRule | undefined): AcceptanceProof['status'] {

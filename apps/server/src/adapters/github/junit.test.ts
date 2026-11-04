@@ -65,6 +65,14 @@ describe('rapports JUnit de la CI', () => {
     );
   });
 
+  it('une archive a un budget : un nombre de rapports et d’octets en tout, au-delà rien', () => {
+    const zip = new Uint8Array(fixture('junit.zip'));
+    expect(junitFiles(zip, { reports: 1, bytes: 50 * 1024 * 1024 })).toHaveLength(1);
+    // The first report fits, the second would pass the budget: it is left.
+    const first = junitFiles(zip)[0]!;
+    expect(junitFiles(zip, { reports: 50, bytes: Buffer.byteLength(first) + 10 })).toEqual([first]);
+  });
+
   it('un fichier de l’artefact qui n’est pas un rapport JUnit est laissé de côté', () => {
     const files = junitFiles(new Uint8Array(fixture('junit.zip')));
     expect(files).toHaveLength(2);

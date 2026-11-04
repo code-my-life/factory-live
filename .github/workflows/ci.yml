@@ -44,6 +44,8 @@ jobs:
           path: reports/junit/
           if-no-files-found: ignore
           retention-days: 30
+          # A rerun of the job replaces its report instead of failing on the name.
+          overwrite: true
       - run: npm run build
 
   docker:
@@ -88,6 +90,8 @@ jobs:
           path: reports/junit/
           if-no-files-found: ignore
           retention-days: 30
+          # A rerun of the job replaces its report instead of failing on the name.
+          overwrite: true
       - name: Rapport et traces en cas d'échec
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

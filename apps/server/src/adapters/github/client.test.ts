@@ -256,3 +256,75 @@ describe('lectures de la recette', () => {
     await expect(client.artifactZip('factory-live', 7)).rejects.toMatchObject({ status: 413 });
   });
 });
+
+describe('lectures de la recette, au-delà de la première page', () => {
+  const tokens = {
+    token: () => Promise.resolve('lecture'),
+    rejected: () => undefined,
+  };
+
+  it('lit la page suivante tant que la précédente est pleine : le dernier verdict de la gate vient', async () => {
+    const comment = (index: number) => ({
+      body: `commentaire ${index}`,
+      html_url: `https://github.com/code-my-life/cv-site/pull/52#issuecomment-${index}`,
+      created_at: '2026-11-04T10:00:00Z',
+      user: { type: 'User' },
+    });
+    const { impl, calls } = fakeFetch({
+      '/issues/52/comments?per_page=100&page=1': () =>
+        json(Array.from({ length: 100 }, (_, index) => comment(index))),
+      '/issues/52/comments?per_page=100&page=2': () => json([comment(100)]),
+    });
+    const client = new GitHubClient(tokens, 'code-my-life', 'https://api.github.com', impl);
+    const comments = await client.issueComments('cv-site', 52);
+    expect(comments).toHaveLength(101);
+    expect(comments.at(-1)!.body).toBe('commentaire 100');
+    expect(calls).toHaveLength(2);
+  });
+
+  it('suit le curseur de GraphQL jusqu’au dernier fil de revue', async () => {
+    const node = (title: string) => ({
+      isResolved: false,
+      comments: {
+        nodes: [
+          {
+            author: { login: 'greptile-apps' },
+            body: `**${title}**`,
+            createdAt: '2026-11-04T10:00:00Z',
+            url: 'https://github.com/code-my-life/cv-site/pull/52#discussion_r1',
+          },
+        ],
+      },
+    });
+    let page = 0;
+    const answers = [
+      { hasNextPage: true, endCursor: 'curseur', nodes: [node('Premier')] },
+      { hasNextPage: false, endCursor: null, nodes: [node('Dernier')] },
+    ];
+    const { impl, calls } = fakeFetch({
+      '/graphql': () => {
+        const { hasNextPage, endCursor, nodes } = answers[page++]!;
+        return json({
+          data: {
+            repository: {
+              pullRequest: {
+                reviews: { totalCount: 3 },
+                reviewThreads: { pageInfo: { hasNextPage, endCursor }, nodes },
+              },
+            },
+          },
+        });
+      },
+    });
+    const client = new GitHubClient(tokens, 'code-my-life', 'https://api.github.com', impl);
+    const answer = await client.reviewThreads('cv-site', 52);
+    const threads = answer.data!.repository!.pullRequest!.reviewThreads.nodes;
+    expect(threads.map((thread) => thread.comments.nodes[0]!.body)).toEqual([
+      '**Premier**',
+      '**Dernier**',
+    ]);
+    expect(JSON.parse(calls[1]!.init.body as string)).toMatchObject({
+      variables: { after: 'curseur' },
+    });
+  });
+});

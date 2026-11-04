@@ -9,12 +9,14 @@ import type { AcceptanceTestResult } from '../../application/ports.ts';
 
 /** A report's file in the artifact: past this size, it is not read (a zip can claim anything). */
 const MAX_REPORT_BYTES = 20 * 1024 * 1024;
+/** All the reports of one artifact: past this many, or this many bytes in all, the rest is left. */
+export const REPORT_LIMITS = { reports: 50, bytes: 50 * 1024 * 1024 };
 const EOCD = 0x06054b50;
 const CENTRAL = 0x02014b50;
 const LOCAL = 0x04034b50;
 
 /** The JUnit reports of an artifact's zip, as text, in the zip's order; any other file is left out. */
-export function junitFiles(zip: Uint8Array): string[] {
+export function junitFiles(zip: Uint8Array, limits = REPORT_LIMITS): string[] {
   const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
   let end = -1;
   for (let at = zip.byteLength - 22; at >= Math.max(0, zip.byteLength - 65_557); at -= 1) {
@@ -27,6 +29,8 @@ export function junitFiles(zip: Uint8Array): string[] {
   const count = view.getUint16(end + 10, true);
   let at = view.getUint32(end + 16, true);
   const reports: string[] = [];
+  // A small zip may expand to a lot: the whole artifact has a budget, not only each file.
+  let budget = limits.bytes;
   for (let index = 0; index < count && at + 46 <= zip.byteLength; index += 1) {
     if (view.getUint32(at, true) !== CENTRAL) break;
     const method = view.getUint16(at + 10, true);
@@ -41,15 +45,15 @@ export function junitFiles(zip: Uint8Array): string[] {
     if (view.getUint32(local, true) !== LOCAL) continue;
     const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
     const data = zip.subarray(start, start + size);
+    if (reports.length >= limits.reports || budget <= 0) break;
+    const max = Math.min(MAX_REPORT_BYTES, budget);
     try {
       const bytes =
-        method === 0
-          ? data
-          : method === 8
-            ? inflateRawSync(data, { maxOutputLength: MAX_REPORT_BYTES })
-            : null;
-      if (bytes && bytes.byteLength <= MAX_REPORT_BYTES)
+        method === 0 ? data : method === 8 ? inflateRawSync(data, { maxOutputLength: max }) : null;
+      if (bytes && bytes.byteLength <= max) {
+        budget -= bytes.byteLength;
         reports.push(new TextDecoder().decode(bytes));
+      }
     } catch {
       // A damaged or oversized entry: the other reports still count.
     }
