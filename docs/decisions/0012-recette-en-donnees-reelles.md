@@ -12,7 +12,7 @@ La recette (ADR 0011, #21) ne vivait que sur la démo. En direct, le serveur ne 
   - les textes de l'issue et de la PR ;
   - les check runs et les statuts de la tête, avec le dernier run de chaque nom ;
   - le dernier commentaire de la gate ;
-  - les rapports JUnit des artefacts `junit…` des runs de la tête, lus une fois par artefact (un artefact ne change jamais) ;
+  - les rapports JUnit des artefacts `junit…` de la dernière exécution de chaque workflow de la tête (une relance remplace l'ancienne), lus une fois par artefact (un artefact ne change jamais) ;
   - les PNG que la PR modifie ;
   - les fils de revue, par GraphQL et avec le jeton de lecture de l'App.
 
@@ -36,8 +36,8 @@ La recette (ADR 0011, #21) ne vivait que sur la démo. En direct, le serveur ne 
 - **La disposition** se garde dans la base de factory-live, une par type d'écran : téléphone sous 768 px, sinon bureau.
   - Elle est lue et écrite par `GET` et `PUT /api/preferences/acceptance-layout?device=phone|desktop`.
   - Seuls ce PC et un login Tailscale autorisé l'écrivent : c'est la garde du déblocage.
-  - La PWA la lit au chargement et l'envoie une fois le changement posé (un glisser réordonne à chaque pas). L'appareil en garde une copie pour le hors-ligne.
-- **Aucune dépendance nouvelle** : le zip d'un artefact se lit par son répertoire central et `zlib`, un rapport JUnit par un petit lecteur fait pour Vitest et Playwright.
+  - La PWA la lit au chargement et l'envoie une fois le changement posé (un glisser réordonne à chaque pas). L'appareil en garde une copie par type d'écran pour le hors-ligne ; franchir le seuil du téléphone recharge la disposition de l'autre type, sans y reporter un changement en cours.
+- **Aucune dépendance nouvelle** : le zip d'un artefact se lit par son répertoire central et `zlib`, avec un budget (50 rapports et 50 Mo par archive), un rapport JUnit par un petit lecteur fait pour Vitest et Playwright. Les listes de GitHub (commentaires, fichiers, check runs, fils de revue) se lisent page après page.
 - **Les jumeaux** restent absents (`twinsAbsent: 'no_build'`) tant que le banc de la factory n'existe pas (hermes-software-factory#26).
 
 Écartés :
