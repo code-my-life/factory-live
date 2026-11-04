@@ -11,7 +11,13 @@ import {
 import { join } from 'node:path';
 import { redactSecrets } from '@factory-live/domain';
 import type { EvidenceFile } from '@factory-live/domain';
-import type { CardFilesPort, LaneTranscript, TranscriptLine } from '../../application/ports.ts';
+import type {
+  CardFilesPort,
+  GateProof,
+  LaneTranscript,
+  TranscriptLine,
+} from '../../application/ports.ts';
+import { gateProofs } from './evidence.ts';
 import type { HermesPaths } from './paths.ts';
 
 const CARD = /^t_[0-9a-f]{8}$/;
@@ -307,6 +313,10 @@ export class CardFiles implements CardFilesPort {
   evidence(cardId: string): EvidenceFile[] | null {
     const dir = this.paths.evidenceDir(cardId);
     return dir ? evidenceFiles(this.paths, dir) : null;
+  }
+
+  gateProofs(cardId: string, sha7: string): GateProof[] {
+    return gateProofs(this.paths, cardId, sha7);
   }
 
   evidenceStamp(cardId: string): string {

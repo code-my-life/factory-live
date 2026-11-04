@@ -166,6 +166,13 @@ export interface LaneTranscript {
   costUsd: number | null;
 }
 
+/** A proof of the gate for a head (#22): its rule, its place in the gate's order, its text (cut). */
+export interface GateProof {
+  order: number;
+  rule: string;
+  text: string;
+}
+
 export interface CardFilesPort {
   // Raw card log, ANSI sequences kept; `null` if absent.
   cardLog(cardId: string): string[] | null;
@@ -175,6 +182,8 @@ export interface CardFilesPort {
   evidence(cardId: string): EvidenceFile[] | null;
   // Evidence folder fingerprint: changes when a file is added or removed there.
   evidenceStamp(cardId: string): string;
+  // The gate's proofs of a head (`evidence/gate/<sha7>/NN-<rule>.txt`), texts cut at 64 KB.
+  gateProofs(cardId: string, sha7: string): GateProof[];
 }
 
 // --- Journal d'Hermès ----------------------------------------------------------------------------
