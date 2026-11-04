@@ -229,12 +229,15 @@ function titleOf(body: string): string {
   if (bold) return bold.replace(/[<>]/g, '').trim();
   const line = body
     .split('\n')
-    .map((each) =>
-      each
-        .replace(/<[^>]*>/g, '')
-        .replace(/[<>*_`#]/g, '')
-        .trim(),
-    )
+    .map((each) => {
+      // Tags removed until none is left (a broken tag can hide another), then any stray bracket.
+      let text = each;
+      for (let previous = ''; previous !== text;) {
+        previous = text;
+        text = text.replace(/<[^<>]*>/g, '');
+      }
+      return text.replace(/[<>*_`#]/g, '').trim();
+    })
     .find(Boolean);
   return (line ?? '').slice(0, 200);
 }

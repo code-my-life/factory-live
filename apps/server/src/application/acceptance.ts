@@ -85,21 +85,26 @@ function criteriaLines(lines: string[]): Map<string, string> {
 }
 
 /**
- * A proof line as its author writes it: the names of its tests, set aside so that what they say counts
- * for nothing else (a test may be named « … non prouvé … »), and the rest of the line without its
- * notes in parentheses (a note quoting a word names no test).
+ * A proof line as its author writes it: the names of its tests set aside, so that what they say counts
+ * for nothing else (a test may be named « … non prouvé … »). `marked` is the line with each name as a
+ * mark; `rest` is the same without its notes in parentheses, where no test is named (a note may quote
+ * a word).
  */
-function proofParts(proof: string): { names: string[]; rest: string } {
+function proofParts(proof: string): { names: string[]; marked: string; rest: string } {
   const names: string[] = [];
-  let rest = proof.replace(QUOTED, (_whole, angled?: string, curly?: string, straight?: string) => {
-    names.push((angled ?? curly ?? straight ?? '').trim());
-    return `\uE000${names.length - 1}\uE001`;
-  });
+  const marked = proof.replace(
+    QUOTED,
+    (_whole, angled?: string, curly?: string, straight?: string) => {
+      names.push((angled ?? curly ?? straight ?? '').trim());
+      return `\uE000${names.length - 1}\uE001`;
+    },
+  );
+  let rest = marked;
   for (let previous = ''; previous !== rest;) {
     previous = rest;
     rest = rest.replace(/\([^()]*\)/g, ' ');
   }
-  return { names, rest };
+  return { names, marked, rest };
 }
 
 /** The tests a proof names, each with the file written before it, when there is one. */
@@ -114,9 +119,12 @@ function namedTests(proof: string): { file: string | null; name: string }[] {
   return tests;
 }
 
-/** The PR says it does not prove the criterion: « non prouvé » outside the names of its tests. */
+/**
+ * The PR says it does not prove the criterion: « non prouvé » anywhere outside the names of its tests,
+ * a note in parentheses included (« (non prouvé sur téléphone) » is a reservation the owner reads).
+ */
 function saysUnproven(proof: string): boolean {
-  return UNPROVEN.test(proofParts(proof).rest.replace(/\uE000\d+\uE001/g, ' '));
+  return UNPROVEN.test(proofParts(proof).marked.replace(/\uE000\d+\uE001/g, ' '));
 }
 
 /** Two paths name the same file when one ends the other at a folder's edge. */

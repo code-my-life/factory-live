@@ -220,6 +220,8 @@ describe('la recette d’une PR', () => {
           // A note in parentheses names no test, even between quotes; the next test keeps the file before it.
           '- C2 : `apps/server/src/adapters/github/acceptance.test.ts` « liste chaque check de la tête » (« Conventions », lancé trois fois, n’y est qu’une fois) ; « un statut de commit est un check »',
           '- C3 : non prouvé (la démo le montre)',
+          // A qualification in parentheses still says what is not proven.
+          '- C4 : `apps/server/src/application/acceptance.test.ts` « une ligne non prouvé de la PR rend son critère NOK » (non prouvé sur téléphone)',
         ].join('\n'),
       }),
       [],
@@ -227,6 +229,7 @@ describe('la recette d’une PR', () => {
     expect(criterion(view, 'C1')).toMatchObject({ status: 'ok', reason: 'proven' });
     expect(criterion(view, 'C2')).toMatchObject({ status: 'ok', reason: 'proven' });
     expect(criterion(view, 'C3')).toMatchObject({ status: 'nok', reason: 'unproven' });
+    expect(criterion(view, 'C4')).toMatchObject({ status: 'nok', reason: 'unproven' });
   });
 
   it("tant qu'un check tourne sans rapport, les critères sont en cours", () => {
