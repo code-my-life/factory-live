@@ -2,6 +2,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { extname, join, normalize, sep } from 'node:path';
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import {
+  AcceptanceDevice,
+  AcceptanceLayout,
+  AcceptanceLayoutPreference,
   ApiError,
   ClientLog,
   GitHubAccess,
@@ -635,6 +638,83 @@ export function createApp(deps: AppDeps) {
     deps.store.audit(c.get('actor'), 'github-logout', null, deps.now());
     return c.body(null, 204);
   });
+
+  // --- Recette des PR (#22): pictures of the PR, layout per type of screen -------------------------
+
+  // A picture the PR modifies, read on GitHub by the server: no token in the address, and any other
+  // file of the repository is never served.
+  const CaptureRequest = z.object({
+    repo: z.string().regex(/^[\w.-]+$/),
+    pr: z.coerce.number().int().positive(),
+    path: z
+      .string()
+      .min(1)
+      .max(400)
+      .regex(/\.png$/i),
+    side: z.enum(['base', 'head']),
+  });
+  app.get('/api/acceptance/:repo/:pr/capture', async (c) => {
+    const query = CaptureRequest.safeParse({ ...c.req.param(), ...c.req.query() });
+    if (!query.success)
+      return c.json({ error: 'Requête invalide', code: 'invalid_request' as const }, 400);
+    const { repo, pr, path, side } = query.data;
+    try {
+      const image = (await deps.views.github?.capture(repo, pr, path, side)) ?? null;
+      if (!image)
+        return c.json({ error: 'Capture inconnue de cette PR', code: 'not_found' as const }, 404);
+      return c.body(new Uint8Array(image), 200, {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'private, max-age=60',
+        'X-Content-Type-Options': 'nosniff',
+      });
+    } catch {
+      return c.json({ error: 'GitHub a refusé la capture', code: 'github_refused' as const }, 502);
+    }
+  });
+
+  app.openapi(
+    createRoute({
+      method: 'get',
+      path: '/api/preferences/acceptance-layout',
+      request: { query: z.object({ device: AcceptanceDevice }) },
+      responses: {
+        200: json(AcceptanceLayoutPreference, 'Disposition de la recette pour ce type d’écran'),
+        ...errors,
+      },
+    }),
+    (c) => {
+      const { device } = c.req.valid('query');
+      const saved = deps.store.acceptanceLayout(device);
+      return c.json(
+        { device, layout: saved?.layout ?? null, updatedAt: saved?.updatedAt ?? null },
+        200,
+      );
+    },
+  );
+
+  // Kept for the owner only: this PC, or an allowed Tailscale login (the unblock's guard).
+  app.on('PUT', '/api/preferences/acceptance-layout', guard);
+  app.openapi(
+    createRoute({
+      method: 'put',
+      path: '/api/preferences/acceptance-layout',
+      request: {
+        query: z.object({ device: AcceptanceDevice }),
+        body: { content: { 'application/json': { schema: AcceptanceLayout } } },
+      },
+      responses: {
+        200: json(AcceptanceLayoutPreference, 'Disposition enregistrée pour ce type d’écran'),
+        ...errors,
+      },
+    }),
+    (c) => {
+      const { device } = c.req.valid('query');
+      const layout = c.req.valid('json');
+      const updatedAt = deps.store.saveAcceptanceLayout(device, layout, deps.now());
+      deps.store.audit(c.get('actor'), 'acceptance-layout', device, deps.now());
+      return c.json({ device, layout, updatedAt }, 200);
+    },
+  );
 
   app.doc31('/api/openapi.json', {
     openapi: '3.1.0',

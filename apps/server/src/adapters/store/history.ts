@@ -1,7 +1,8 @@
 import { chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import type { ActivityEvent } from '@factory-live/contracts';
+import { AcceptanceLayout } from '@factory-live/contracts';
+import type { AcceptanceDevice, ActivityEvent } from '@factory-live/contracts';
 import type { Board, Comment, Run, Task, TaskEvent } from '@factory-live/domain';
 import type { AppCredentials, GitHubAuthStore, UserTokens } from '../github/app.ts';
 import type {
@@ -86,6 +87,30 @@ export class HistoryStore implements HistoryPort, GitHubAuthStore {
   meta(key: string): string | null {
     const row = this.db.prepare('SELECT value FROM meta WHERE key = ?').get(key);
     return row ? String(row['value']) : null;
+  }
+
+  /** The recette's layout kept for a type of screen (#22); `null` until the owner saves one. */
+  acceptanceLayout(
+    device: AcceptanceDevice,
+  ): { layout: AcceptanceLayout; updatedAt: string } | null {
+    const value = this.meta(`layout:acceptance:${device}`);
+    if (!value) return null;
+    try {
+      const saved = JSON.parse(value) as { layout?: unknown; updatedAt?: unknown };
+      const layout = AcceptanceLayout.safeParse(saved.layout);
+      return layout.success && typeof saved.updatedAt === 'string'
+        ? { layout: layout.data, updatedAt: saved.updatedAt }
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Keeps the recette's layout of a type of screen; gives back when (ISO). */
+  saveAcceptanceLayout(device: AcceptanceDevice, layout: AcceptanceLayout, at: number): string {
+    const updatedAt = new Date(at).toISOString();
+    this.setMeta(`layout:acceptance:${device}`, JSON.stringify({ layout, updatedAt }));
+    return updatedAt;
   }
 
   setMeta(key: string, value: string): void {

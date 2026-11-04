@@ -1,4 +1,5 @@
 import {
+  AcceptanceLayoutPreference,
   ApiError,
   GitHubAccess,
   IssueDetail,
@@ -1255,5 +1256,101 @@ describe('recette d’une PR', () => {
     expect(acceptance.threads).toHaveLength(6);
     expect(acceptance.reviewRounds).toBe(7);
     expect(acceptance.proofs.map((proof) => proof.kind)).toEqual(['capture', 'unproven']);
+  });
+
+  it('sert une capture seulement si la PR modifie ce fichier', async () => {
+    const detail = IssueDetail.parse(
+      await (await pr.app.request('/api/issues/cv-site/49', { headers: THIS_PC })).json(),
+    );
+    const capture = detail.acceptance!.proofs.find((proof) => proof.kind === 'capture')!;
+    // The addresses carry no token: the server reads GitHub with the App's.
+    expect(capture.before).toBe(
+      '/api/acceptance/cv-site/52/capture?path=e2e%2Fcaptures.spec.ts-snapshots%2Fprojets.png&side=base',
+    );
+    const before = await pr.app.request(capture.before!, { headers: THIS_PC });
+    expect(before.status).toBe(200);
+    expect(before.headers.get('content-type')).toBe('image/png');
+    expect(new Uint8Array(await before.arrayBuffer())).toEqual(
+      new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x01]),
+    );
+    const after = await pr.app.request(capture.after!, { headers: THIS_PC });
+    expect(new Uint8Array(await after.arrayBuffer())).toEqual(
+      new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x02]),
+    );
+    // Any other file of the repository: never read, never served.
+    const other = (path: string, side = 'head') =>
+      pr.app.request(
+        `/api/acceptance/cv-site/52/capture?path=${encodeURIComponent(path)}&side=${side}`,
+        { headers: THIS_PC },
+      );
+    expect(await refusal(await other('apps/server/.env.png'))).toEqual([404, 'not_found']);
+    expect(
+      await refusal(await other('e2e/captures.spec.ts-snapshots/projets.png', 'main')),
+    ).toEqual([400, 'invalid_request']);
+    expect(
+      await refusal(
+        await pr.app.request('/api/acceptance/..%2Fetc/52/capture?path=a.png&side=head', {
+          headers: THIS_PC,
+        }),
+      ),
+    ).toEqual([400, 'invalid_request']);
+    expect(pr.github.calls.filter((call) => call.url.includes('/contents/'))).toHaveLength(2);
+  });
+});
+
+describe('disposition de la recette', () => {
+  const layout = {
+    order: ['twins', 'criteria', 'checks', 'tests', 'proofs', 'threads'],
+    pinned: ['twins'],
+    collapsed: ['criteria'],
+    half: ['tests', 'proofs'],
+  };
+  const put = (device: string, headers: Record<string, string>, body: unknown = layout) =>
+    h.app.request(`/api/preferences/acceptance-layout?device=${device}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(body),
+    });
+  const get = async (device: string, headers: Record<string, string> = THIS_PC) =>
+    AcceptanceLayoutPreference.parse(
+      await (
+        await h.app.request(`/api/preferences/acceptance-layout?device=${device}`, { headers })
+      ).json(),
+    );
+
+  it('enregistre la disposition de la recette par type d’écran, pour les seuls logins autorisés', async () => {
+    expect((await get('desktop')).layout).toBeNull();
+    expect((await put('desktop', LOCAL)).status).toBe(200);
+    // Another device of the same type finds it; a phone keeps its own.
+    expect(
+      (
+        await get('desktop', {
+          host: 'machine.tailnet.ts.net:8446',
+          'tailscale-user-login': 'alice@github',
+        })
+      ).layout,
+    ).toEqual(layout);
+    expect((await get('phone')).layout).toBeNull();
+    expect(
+      (
+        await put(
+          'phone',
+          { ...TAILNET, 'tailscale-user-login': 'alice@github' },
+          { ...layout, half: [] },
+        )
+      ).status,
+    ).toBe(200);
+    expect((await get('phone')).layout).toEqual({ ...layout, half: [] });
+    // Nobody else writes it, and a layout that is not one is refused.
+    expect(
+      await refusal(await put('desktop', { ...TAILNET, 'tailscale-user-login': 'eve@github' })),
+    ).toEqual([403, 'write_login_refused']);
+    expect(await refusal(await put('desktop', TAILNET))).toEqual([403, 'write_local_only']);
+    expect(await refusal(await put('desktop', LOCAL, { ...layout, order: ['secrets'] }))).toEqual([
+      400,
+      'invalid_request',
+    ]);
+    expect(await refusal(await put('tablet', LOCAL))).toEqual([400, 'invalid_request']);
+    expect((await get('desktop')).layout).toEqual(layout);
   });
 });

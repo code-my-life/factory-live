@@ -181,3 +181,35 @@ export const AcceptanceView = z.object({
   twinsAbsent: z.enum(['no_screen', 'no_build']).nullable(),
 });
 export type AcceptanceView = z.infer<typeof AcceptanceView>;
+
+/** The widgets of the recette, in the order the owner listed them (#21). */
+export const AcceptanceWidget = z.enum([
+  'criteria',
+  'checks',
+  'tests',
+  'proofs',
+  'threads',
+  'twins',
+]);
+export type AcceptanceWidget = z.infer<typeof AcceptanceWidget>;
+
+/** The owner's layout of the recette (#22): the order, and the pinned, folded and half-width widgets. */
+export const AcceptanceLayout = z.object({
+  order: z.array(AcceptanceWidget).max(6),
+  pinned: z.array(AcceptanceWidget).max(6),
+  collapsed: z.array(AcceptanceWidget).max(6),
+  half: z.array(AcceptanceWidget).max(6),
+});
+export type AcceptanceLayout = z.infer<typeof AcceptanceLayout>;
+
+/** A type of screen: one layout is kept for each, the same for every PR. */
+export const AcceptanceDevice = z.enum(['phone', 'desktop']);
+export type AcceptanceDevice = z.infer<typeof AcceptanceDevice>;
+
+/** The layout kept for a type of screen; `null` until the owner changes the default one. */
+export const AcceptanceLayoutPreference = z.object({
+  device: AcceptanceDevice,
+  layout: AcceptanceLayout.nullable(),
+  updatedAt: Timestamp.nullable(),
+});
+export type AcceptanceLayoutPreference = z.infer<typeof AcceptanceLayoutPreference>;
