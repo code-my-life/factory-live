@@ -1318,7 +1318,7 @@ describe('disposition de la recette', () => {
       ).json(),
     );
 
-  it('enregistre la disposition de la recette par type d’écran, pour les seuls logins autorisés', async () => {
+  it("enregistre la disposition de la recette par type d'écran, pour les seuls logins autorisés", async () => {
     expect((await get('desktop')).layout).toBeNull();
     expect((await put('desktop', LOCAL)).status).toBe(200);
     // Another device of the same type finds it; a phone keeps its own.

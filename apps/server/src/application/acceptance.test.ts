@@ -177,7 +177,7 @@ describe('la recette d’une PR', () => {
     });
   });
 
-  it('tant qu’un check tourne sans rapport, les critères sont en cours', () => {
+  it("tant qu'un check tourne sans rapport, les critères sont en cours", () => {
     const running = source({
       tests: null,
       checks: [
@@ -203,7 +203,7 @@ describe('la recette d’une PR', () => {
     expect(criterion(over, 'C1')).toMatchObject({ status: 'nok', reason: 'unproven' });
   });
 
-  it('une lecture GitHub refusée laisse l’élément sans données sans faire tomber la recette', () => {
+  it("une lecture GitHub refusée laisse l'élément sans données sans faire tomber la recette", () => {
     const view = acceptanceOf(
       source({
         checks: null,

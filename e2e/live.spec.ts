@@ -44,7 +44,7 @@ test('Réglages : la section GitHub lit le serveur et mène à ses pages', async
   await expect(page.getByText(/Démo/)).toHaveCount(0);
 });
 
-test('la recette d’une PR réelle s’affiche avec ses checks, ses critères et ses retours', async ({
+test("la recette d'une PR réelle s'affiche avec ses checks, ses critères et ses retours", async ({
   page,
 }) => {
   await page.goto('/issues/cv-site/52');
