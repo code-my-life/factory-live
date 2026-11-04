@@ -25,15 +25,16 @@ import {
   interventionTone,
   issueWorkState,
 } from '../../ui/work/workState.tsx';
+import { AcceptanceBoard } from '../acceptance/AcceptanceBoard.tsx';
 import { shortCardTitle } from './cardText.ts';
 import { prNumberOfUrl, repoOfKey } from '../../ui/paths.ts';
-import { PullRequestPanel, PullRequestState } from './PullRequestPanel.tsx';
+import { PullRequestState } from './PullRequestState.tsx';
 import { TranscriptPanel } from './TranscriptPanel.tsx';
 import styles from './issues.module.css';
 
 type Tab = keyof Messages['issue']['tabs'];
 
-const TABS: readonly Tab[] = ['activity', 'transcript', 'pr', 'costs', 'evidence'];
+const TABS: readonly Tab[] = ['activity', 'transcript', 'costs', 'evidence'];
 
 function defaultCard(detail: IssueDetail): CardView | null {
   return (
@@ -377,6 +378,8 @@ export function IssuePage({
         );
       })}
 
+      {detail.acceptance ? <AcceptanceBoard issue={issue} view={detail.acceptance} /> : null}
+
       <section className={styles.section} aria-label={t.issue.cardsTitle}>
         {selectedCard ? (
           <div className={styles.cardPanel}>
@@ -464,7 +467,6 @@ export function IssuePage({
               <p className={styles.muted}>{t.issue.noRun}</p>
             )
           ) : null}
-          {tab === 'pr' ? <PullRequestPanel issue={issue} /> : null}
           {tab === 'costs' ? (
             <div className={styles.tableBox}>
               <Table

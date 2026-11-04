@@ -1,0 +1,828 @@
+/* A pull request's acceptance board: a grid of widgets the owner orders, pins, folds and sizes. */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap-condensed);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8) var(--base-size-12);
+  min-width: 0;
+}
+
+.headTitle {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8);
+  min-width: 0;
+}
+
+.title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.headSummary {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-4) var(--base-size-12);
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+  white-space: nowrap;
+}
+
+/* A count of the header that leads to its first element: underlined, in the color of its kind. */
+.bucket {
+  min-height: var(--base-size-24);
+  padding: 0 var(--base-size-4);
+  font: inherit;
+  font-weight: var(--base-text-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: var(--base-size-2);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: var(--borderRadius-small);
+}
+
+.bucket[data-status='nok'] {
+  color: var(--fgColor-danger);
+}
+
+.bucket[data-status='pending'] {
+  color: var(--fgColor-attention);
+}
+
+.bucket[data-status='info'] {
+  color: var(--fgColor-default);
+}
+
+.bucket[data-status='ok'] {
+  color: var(--fgColor-success);
+}
+
+.bucket:focus-visible {
+  outline: var(--focus-outline);
+}
+
+.headActions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--base-size-8);
+}
+
+.intro {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+}
+
+/* One column on phones and tablets; two beyond, each widget at full or half width. */
+.list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--base-size-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.widget {
+  position: relative;
+  min-width: 0;
+  background-color: var(--bgColor-default);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+}
+
+.widgetHead {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-4);
+  min-height: var(--control-xlarge-size);
+  padding: var(--base-size-4) var(--base-size-8) var(--base-size-4) var(--base-size-4);
+}
+
+.handle {
+  display: inline-grid;
+  flex: none;
+  width: var(--control-medium-size);
+  height: var(--control-medium-size);
+  padding: 0;
+  color: var(--fgColor-muted);
+  cursor: grab;
+  background: none;
+  border: 0;
+  border-radius: var(--borderRadius-medium);
+  /* Only the handle captures the finger: anywhere else, a finger scrolls the page. */
+  touch-action: none;
+  place-items: center;
+}
+
+.handle:active {
+  cursor: grabbing;
+}
+
+.handle:focus-visible,
+.toggle:focus-visible,
+.disclosure:focus-visible,
+.row:focus-visible,
+.rule:focus-visible,
+.github:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: calc(var(--borderWidth-thick) * -1);
+}
+
+.toggle,
+.disclosure {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-4) var(--base-size-8);
+  min-width: 0;
+  padding: var(--base-size-4) var(--base-size-8);
+  color: var(--fgColor-default);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: var(--borderRadius-medium);
+}
+
+.widgetHeading {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font: inherit;
+}
+
+.toggle {
+  flex: 1 1 auto;
+  min-height: var(--control-large-size);
+}
+
+.pinnedMark {
+  flex: none;
+  color: var(--fgColor-accent);
+}
+
+.disclosure {
+  align-self: flex-start;
+  min-height: var(--control-minTarget-coarse);
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.widgetTitle {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--base-text-weight-semibold);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.summary {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.chevron {
+  flex: none;
+  color: var(--fgColor-muted);
+  transition: transform var(--motion-duration-short) var(--motion-easing-move);
+}
+
+.chevron[data-open] {
+  transform: rotate(180deg);
+}
+
+.github {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--base-size-4);
+  min-height: var(--control-medium-size);
+  padding: 0 var(--base-size-8);
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+  text-decoration: none;
+  white-space: nowrap;
+  border-radius: var(--borderRadius-medium);
+}
+
+.pin[aria-pressed='true'] {
+  color: var(--fgColor-accent);
+}
+
+/* The shares of OK, NOK and pending: a thin bar under the title, folded or not. */
+.tallyBar {
+  display: flex;
+  gap: var(--base-size-2);
+  height: var(--base-size-4);
+  margin: 0 var(--base-size-12) var(--base-size-8);
+}
+
+.tallyPart {
+  flex-basis: 0;
+  min-width: var(--base-size-4);
+  border-radius: var(--borderRadius-full);
+}
+
+.tallyPart[data-status='ok'] {
+  background-color: var(--bgColor-success-emphasis);
+}
+
+.tallyPart[data-status='nok'] {
+  background-color: var(--bgColor-danger-emphasis);
+}
+
+.tallyPart[data-status='pending'] {
+  background-color: var(--bgColor-attention-emphasis);
+}
+
+.tallyPart[data-status='info'] {
+  background-color: var(--bgColor-neutral-emphasis);
+}
+
+.fold {
+  overflow: hidden;
+}
+
+.widgetBody {
+  padding: var(--base-size-12) var(--base-size-16) var(--base-size-16);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+
+.statusIcon {
+  flex: none;
+}
+
+.statusIcon[data-status='ok'] {
+  color: var(--fgColor-success);
+}
+
+.statusIcon[data-status='nok'] {
+  color: var(--fgColor-danger);
+}
+
+.statusIcon[data-status='pending'] {
+  color: var(--fgColor-attention);
+}
+
+.statusIcon[data-status='info'],
+.statusIcon[data-status='none'] {
+  color: var(--fgColor-muted);
+}
+
+/* The lines of a widget: each one leads to its element on GitHub. */
+
+.parts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-16);
+}
+
+.part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4);
+  min-width: 0;
+}
+
+.subhead {
+  margin: 0;
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rows[hidden] {
+  display: none;
+}
+
+.rowItem + .rowItem {
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+
+/* The green lines folded into one: how many, and the chevron to see them all, in place. */
+.groupToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  width: 100%;
+  min-height: var(--control-large-size);
+  padding: var(--base-size-8);
+  color: var(--fgColor-muted);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: var(--borderRadius-medium);
+}
+
+.groupLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.groupToggle:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: calc(var(--borderWidth-thick) * -1);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: var(--base-size-16) minmax(0, 1fr) auto var(--base-size-12);
+  align-items: start;
+  gap: var(--base-size-2) var(--base-size-8);
+  min-height: var(--control-minTarget-coarse);
+  padding: var(--base-size-8);
+  color: var(--fgColor-default);
+  text-decoration: none;
+  border-radius: var(--borderRadius-medium);
+}
+
+/* The whole line is the link: its arrow and its hover say so, not an underline under every word. */
+.row:hover {
+  text-decoration: none;
+}
+
+.row > .statusIcon {
+  margin-top: var(--base-size-2);
+}
+
+.rowMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-2);
+  min-width: 0;
+}
+
+.rowTitle {
+  overflow-wrap: anywhere;
+}
+
+.rowNote {
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+  overflow-wrap: anywhere;
+}
+
+.rowValue {
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: end;
+}
+
+.rowOut {
+  margin-top: var(--base-size-4);
+  color: var(--fgColor-muted);
+}
+
+.criterionId {
+  margin-inline-end: var(--base-size-8);
+  color: var(--fgColor-muted);
+  font-weight: var(--base-text-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.reason[data-status='nok'] {
+  color: var(--fgColor-danger);
+}
+
+.reason[data-status='pending'] {
+  color: var(--fgColor-attention);
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-4) var(--base-size-12);
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.failures {
+  margin: 0 0 var(--base-size-8) var(--base-size-24);
+  padding: 0;
+  list-style: none;
+}
+
+.rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4);
+  margin: 0;
+  padding: 0 var(--base-size-8) var(--base-size-4);
+  list-style: none;
+}
+
+/* A rule of the gate: the whole line leads to the gate's comment, like a row. */
+.rule {
+  display: grid;
+  grid-template-columns: var(--base-size-16) minmax(0, max-content) minmax(0, 1fr) var(
+      --base-size-12
+    );
+  align-items: baseline;
+  gap: var(--base-size-8);
+  padding: var(--base-size-4);
+  color: var(--fgColor-default);
+  font-size: var(--text-body-size-small);
+  text-decoration: none;
+  border-radius: var(--borderRadius-medium);
+}
+
+.rule:hover {
+  text-decoration: none;
+}
+
+.ruleName {
+  font-weight: var(--base-text-weight-semibold);
+  white-space: nowrap;
+}
+
+.ruleDetail {
+  color: var(--fgColor-muted);
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  margin: 0;
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+}
+
+/* A textual proof: its text as is, its first lines in view. */
+.proofText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--base-size-4);
+  margin: 0 0 var(--base-size-8) var(--base-size-32);
+  min-width: 0;
+}
+
+.proofPre {
+  align-self: stretch;
+  margin: 0;
+  padding: var(--base-size-8) var(--base-size-12);
+  overflow-x: auto;
+  color: var(--fgColor-default);
+  font: var(--text-codeBlock-shorthand);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background-color: var(--bgColor-inset);
+  border: var(--borderWidth-thin) solid var(--borderColor-muted);
+  border-radius: var(--borderRadius-medium);
+}
+
+/* Captures: folded by default, as thumbnails, enlarged on demand. */
+.captureList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 264px), 1fr));
+  gap: var(--base-size-12);
+  margin: var(--base-size-8) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Folded, the list leaves the page: its own display would override the attribute. */
+.captureList[hidden] {
+  display: none;
+}
+
+.capturePair {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+  padding: var(--base-size-12);
+  border: var(--borderWidth-thin) solid var(--borderColor-muted);
+  border-radius: var(--borderRadius-medium);
+}
+
+.captureHead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--base-size-8);
+  margin: 0;
+  font-size: var(--text-body-size-small);
+}
+
+.captureTitle {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.captureThumbs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--base-size-8);
+}
+
+.capture {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4);
+  min-width: 0;
+  margin: 0;
+}
+
+.captureThumbs .captureImage {
+  height: var(--base-size-128);
+  object-fit: cover;
+  object-position: top;
+}
+
+.captureImage {
+  display: block;
+  width: 100%;
+  background-color: var(--bgColor-inset);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-small);
+}
+
+.captureCaption {
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+}
+
+.captureActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8) var(--base-size-12);
+}
+
+.captureSource {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-4);
+  padding-inline: var(--base-size-4);
+  font-size: var(--text-body-size-small);
+}
+
+.captureLarge {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--base-size-16);
+}
+
+/* Twins: the base and the head, live in the factory's bench, side by side or overlaid. */
+
+.twins {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-12);
+  min-width: 0;
+}
+
+.twinsTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8) var(--base-size-16);
+}
+
+.twinsNote {
+  margin: 0;
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+}
+
+.mirror {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-8);
+}
+
+.mirrorLabel {
+  font-size: var(--text-body-size-small);
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.divergence {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+}
+
+.divergenceActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8);
+}
+
+.stage {
+  position: relative;
+  display: grid;
+  gap: var(--base-size-12);
+  min-width: 0;
+}
+
+.stage[data-view='side'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stage[data-view='overlay'] .pane {
+  grid-area: 1 / 1;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-6);
+  min-width: 0;
+  margin: 0;
+  background-color: var(--bgColor-default);
+}
+
+.pane[data-hidden] {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.paneHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--base-size-4) var(--base-size-8);
+  margin: 0;
+  font-size: var(--text-body-size-small);
+}
+
+.paneHead[data-end] {
+  justify-content: flex-end;
+}
+
+.paneName {
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.paneSha {
+  color: var(--fgColor-muted);
+}
+
+/* A twin's screen: the Neko stream of its container; in the demo, an image of that screen. */
+.screen {
+  overflow: hidden;
+  background-color: var(--bgColor-inset);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+}
+
+.screenImage {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.screenEmpty {
+  display: grid;
+  min-height: var(--base-size-128);
+  margin: 0;
+  padding: var(--base-size-16);
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+  place-items: center;
+}
+
+.splitLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--borderWidth-thick);
+  pointer-events: none;
+  background-color: var(--bgColor-accent-emphasis);
+}
+
+.split {
+  width: 100%;
+  min-height: var(--control-minTarget-coarse);
+  accent-color: var(--fgColor-accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .toggle:hover,
+  .disclosure:hover,
+  .groupToggle:hover,
+  .handle:hover,
+  .row:hover,
+  .rule:hover,
+  .github:hover {
+    background-color: var(--control-transparent-bgColor-hover);
+  }
+
+  .github:hover {
+    color: var(--fgColor-default);
+  }
+}
+
+@media (pointer: coarse) {
+  .handle,
+  .github,
+  .iconButton,
+  .cta,
+  .toggle,
+  .groupToggle,
+  .bucket,
+  .rule,
+  .captureSource,
+  .captureEnlarge,
+  .divergenceActions > * {
+    min-width: var(--control-minTarget-coarse);
+    min-height: var(--control-minTarget-coarse);
+  }
+
+  .rule {
+    align-items: center;
+  }
+
+  .handle {
+    width: var(--control-minTarget-coarse);
+    height: var(--control-minTarget-coarse);
+  }
+}
+
+@media (min-width: 1012px) {
+  .list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .widget[data-size='full'] {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Phone: the summary moves under the title, the pin joins the menu, the GitHub link keeps its icon. */
+@media (max-width: 543px) {
+  .toggle {
+    flex-wrap: wrap;
+  }
+
+  .toggle .summary {
+    flex-basis: 100%;
+    order: 3;
+    margin-inline-start: var(--base-size-24);
+  }
+
+  .widgetTitle {
+    flex: 1 1 0;
+    white-space: normal;
+  }
+
+  .chevron {
+    order: 2;
+  }
+
+  .githubText,
+  .pin {
+    display: none;
+  }
+
+  .proofText {
+    margin-inline-start: 0;
+  }
+
+  .captureLarge {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rule {
+    grid-template-columns: var(--base-size-16) minmax(0, 1fr) var(--base-size-12);
+  }
+
+  .ruleDetail {
+    grid-row: 2;
+    grid-column: 2;
+  }
+}

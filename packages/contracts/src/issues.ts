@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AcceptanceView } from './acceptance.ts';
 import { ModelRef } from './agents.ts';
 import { BlockKind, IssueKey, KanbanStatus, StationId, Timestamp } from './common.ts';
 import { EvidenceFile, RunVerdict } from './diagnosis.ts';
@@ -188,5 +189,7 @@ export const IssueDetail = z.object({
   timeline: z.array(TimelineEntry),
   tokens: z.number().int().nonnegative(),
   costUsd: z.number().nonnegative(),
+  /** The acceptance of the issue's PR (« la recette »); absent until the PR is open. */
+  acceptance: AcceptanceView.nullable().optional(),
 });
 export type IssueDetail = z.infer<typeof IssueDetail>;

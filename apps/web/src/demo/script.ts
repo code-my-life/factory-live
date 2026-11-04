@@ -1,6 +1,7 @@
 import { msg } from '@factory-live/contracts';
 import type { ActivityEvent } from '@factory-live/contracts';
 import { NEMOTRON_SUPER, QWEN_LOCAL, limitsOf, model } from './catalog.ts';
+import { contactAcceptance } from './acceptance.ts';
 import { answered, hookTimeoutDiagnosis } from './diagnoses.ts';
 import { CARDS, KEYS, LANE_COMMAND, RUNS, prUrl } from './initial.ts';
 import {
@@ -340,6 +341,9 @@ export function buildScript(): ScenarioStep[] {
           blockKind: 'needs_input',
         });
         const pr = state.details[KEYS.contact]?.issue.pr;
+        // The gate has judged the head: the end-to-end tests are in, the acceptance turns final.
+        const contact = state.details[KEYS.contact];
+        if (contact) contact.acceptance = contactAcceptance('judged', iso(now));
         patchIssue(state, KEYS.contact, {
           station: 'review',
           status: 'waiting_human',
