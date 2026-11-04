@@ -73,6 +73,70 @@ function snapshot() {
   };
 }
 
+/**
+ * The recette of a real PR, as the server computes it from GitHub (#22): the head of factory-live#24,
+ * its checks, two criteria (one proven, one whose proof fails) and two review threads of Greptile.
+ */
+function acceptance() {
+  const head = '9a72096265a97aab5223e2e1d77bf48411a8c962';
+  const run = 'https://github.com/code-my-life/factory-live/actions/runs/41859193780';
+  const check = (name, workflow, status, durationMs, job) => ({
+    name,
+    workflow,
+    status,
+    durationMs,
+    url: `${run}/job/${job}`,
+  });
+  const thread = (title, resolved, id) => ({
+    author: 'greptile-apps',
+    severity: 'P2',
+    title,
+    resolved,
+    at: '2026-11-04T14:55:43Z',
+    url: `https://github.com/code-my-life/factory-live/pull/24#discussion_r${id}`,
+  });
+  return {
+    pr: 24,
+    head,
+    base: 'c9fa041a51e2d8aa5c1b0d8e3b1f1e0b2a7d6c5e',
+    criteria: [
+      {
+        id: 'C1',
+        text: 'la recette apparaît sous les faits de toute issue qui a une PR.',
+        status: 'ok',
+        reason: 'proven',
+        proof:
+          '`AcceptanceBoard.test.tsx` « montre les six widgets, chacun avec son picto de verdict »',
+        url: `https://github.com/code-my-life/factory-live/blob/${head}/apps/web/src/features/acceptance/AcceptanceBoard.test.tsx`,
+      },
+      {
+        id: 'C2',
+        text: 'axe ne trouve aucune violation WCAG 2.2 AA dans la recette.',
+        status: 'nok',
+        reason: 'failing',
+        proof:
+          '`e2e/acceptance.spec.ts` « recette : aucune violation WCAG 2.2 AA (axe) : /issues/factory-live/18 »',
+        url: `https://github.com/code-my-life/factory-live/blob/${head}/e2e/acceptance.spec.ts#L41`,
+      },
+    ],
+    checks: [
+      check('Vérifications (Node 24.22.1)', 'CI', 'success', 164_000, 126675986039),
+      check('Bout en bout (Chromium, WebKit) et captures', 'CI', 'failure', 596_000, 126675985696),
+      check('Image Docker', 'CI', 'success', 46_000, 126675985801),
+    ],
+    gate: null,
+    tests: [],
+    proofs: [],
+    threads: [
+      thread('Posted reviews disappear', false, 4469110873),
+      thread('Gate rules have no links', true, 4469110935),
+    ],
+    reviewRounds: 7,
+    twins: null,
+    twinsAbsent: 'no_build',
+  };
+}
+
 function json(response, body, status = 200) {
   response.writeHead(status, { 'Content-Type': 'application/json' });
   response.end(JSON.stringify(body));
@@ -106,6 +170,27 @@ createServer((request, response) => {
       open.delete(response);
     });
     return undefined;
+  }
+  if (pathname === '/api/issues/cv-site/52')
+    return json(response, {
+      issue: snapshot().issues[0],
+      cards: [],
+      timeline: [],
+      tokens: 0,
+      costUsd: 0,
+      acceptance: acceptance(),
+    });
+  if (pathname === '/api/preferences/acceptance-layout') {
+    const device = new URL(request.url ?? '/', 'http://localhost').searchParams.get('device');
+    if (request.method === 'PUT') {
+      let body = '';
+      request.on('data', (chunk) => (body += chunk));
+      request.on('end', () =>
+        json(response, { device, layout: JSON.parse(body), updatedAt: new Date().toISOString() }),
+      );
+      return undefined;
+    }
+    return json(response, { device, layout: null, updatedAt: null });
   }
   if (pathname === '/api/github/status')
     return json(response, {
