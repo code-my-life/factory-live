@@ -136,11 +136,12 @@ function LiveScreen({ api, side, name }: { api: TwinsApi; side: TwinSide; name: 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
   // What the owner holds down on the twin: released on every way out, so nothing stays pressed there.
-  const held = useRef({ buttons: new Set<number>(), keys: new Set<number>() });
+  // Keys by their physical key (`event.code`): with Shift released first, « A » is let go as « a ».
+  const held = useRef({ buttons: new Set<number>(), keys: new Map<string, number>() });
   const releaseAll = useCallback(() => {
     for (const code of held.current.buttons)
       api.gesture({ side, event: 'control/buttonup', payload: { code } });
-    for (const keysym of held.current.keys)
+    for (const keysym of held.current.keys.values())
       api.gesture({ side, event: 'control/keyup', payload: { keysym } });
     held.current.buttons.clear();
     held.current.keys.clear();
@@ -184,18 +185,20 @@ function LiveScreen({ api, side, name }: { api: TwinsApi; side: TwinSide; name: 
     api.gesture({ side, event: 'control/buttonup', payload: { code } });
   };
   const onKey = (event: KeyboardEvent) => {
-    const keysym = keysymOf(event.key);
-    if (!keysym) return;
     if (event.type === 'keydown') {
-      if (status !== 'live') return;
-      held.current.keys.add(keysym);
-    } else if (!held.current.keys.delete(keysym)) return;
+      const keysym = keysymOf(event.key);
+      if (!keysym || status !== 'live') return;
+      event.preventDefault();
+      held.current.keys.set(event.code || event.key, keysym);
+      api.gesture({ side, event: 'control/keydown', payload: { keysym } });
+      return;
+    }
+    // The release of the key pressed, as it was pressed, whatever it reads as now.
+    const keysym = held.current.keys.get(event.code || event.key);
+    if (!keysym) return;
+    held.current.keys.delete(event.code || event.key);
     event.preventDefault();
-    api.gesture({
-      side,
-      event: event.type === 'keydown' ? 'control/keydown' : 'control/keyup',
-      payload: { keysym },
-    });
+    api.gesture({ side, event: 'control/keyup', payload: { keysym } });
   };
 
   // The wheel scrolls the twin, not the page: a listener that may cancel it (React's is passive).

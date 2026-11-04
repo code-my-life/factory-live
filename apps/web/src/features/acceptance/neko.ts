@@ -228,10 +228,16 @@ export class TwinsApi {
 
   /** A command of the mirror, after the gestures already sent: it never overtakes them. */
   private command(path: '/mirror' | '/resync', body: unknown): Promise<Response | null> {
-    // Back home, the gestures still waiting would only take the twins away from it again.
+    // Back home, the gestures still waiting would only take the twins away from it again; but a
+    // release still goes, its press may already be there.
     if (path === '/resync')
-      for (let index = this.pending.length - 1; index >= 0; index -= 1)
-        if (this.pending[index]!.path === '/gesture') this.pending.splice(index, 1);
+      for (let index = this.pending.length - 1; index >= 0; index -= 1) {
+        const waiting = this.pending[index]!;
+        const release =
+          (waiting.body as TwinGesture | undefined)?.event === 'control/buttonup' ||
+          (waiting.body as TwinGesture | undefined)?.event === 'control/keyup';
+        if (waiting.path === '/gesture' && !release) this.pending.splice(index, 1);
+      }
     return new Promise((settle) => {
       this.pending.push({ path, body, settle });
       void this.flush();

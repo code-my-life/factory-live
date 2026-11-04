@@ -229,4 +229,20 @@ describe('jumeaux vivants', () => {
       vi.useRealTimers();
     }
   });
+
+  it('une touche lâchée après Maj est relâchée telle qu’elle a été appuyée', async () => {
+    render(<TwinsWidget view={liveView()} fetchImpl={fetchImpl} />);
+    const [, after] = await liveScreens();
+    fireEvent.keyDown(after!, { key: 'Shift', code: 'ShiftLeft' });
+    fireEvent.keyDown(after!, { key: 'A', code: 'KeyA' });
+    fireEvent.keyUp(after!, { key: 'Shift', code: 'ShiftLeft' });
+    fireEvent.keyUp(after!, { key: 'a', code: 'KeyA' });
+    await waitFor(() => expect(posts).toHaveLength(4));
+    expect(posts.map((each) => each.body)).toEqual([
+      { side: 'head', event: 'control/keydown', payload: { keysym: 0xffe1 } },
+      { side: 'head', event: 'control/keydown', payload: { keysym: 0x41 } },
+      { side: 'head', event: 'control/keyup', payload: { keysym: 0xffe1 } },
+      { side: 'head', event: 'control/keyup', payload: { keysym: 0x41 } },
+    ]);
+  });
 });
