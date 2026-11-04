@@ -211,3 +211,120 @@ describe('GitHubClient', () => {
     await expect(client.issue('cv-site', 1)).rejects.toMatchObject({ status: 404 });
   });
 });
+
+describe('lectures de la recette', () => {
+  /** Two tokens, as with the App: the installation's reads, the owner's writes. */
+  const tokens = {
+    token: (kind: 'read' | 'write') => Promise.resolve(kind === 'read' ? 'lecture' : 'ecriture'),
+    rejected: () => undefined,
+  };
+
+  it('lit les fils de revue par GraphQL avec le jeton de lecture, et un refus de GraphQL est un 403', async () => {
+    const { impl, calls } = fakeFetch({
+      '/graphql': () => json({ data: { repository: { pullRequest: null } } }),
+    });
+    const client = new GitHubClient(tokens, 'code-my-life', 'https://api.github.com', impl);
+    await client.reviewThreads('factory-live', 24);
+    const headers = calls[0]!.init.headers as Record<string, string>;
+    expect(calls[0]!.init.method).toBe('POST');
+    expect(headers['Authorization']).toBe('Bearer lecture');
+    expect(JSON.parse(calls[0]!.init.body as string)).toMatchObject({
+      variables: { owner: 'code-my-life', name: 'factory-live', number: 24 },
+    });
+
+    const refused = fakeFetch({
+      '/graphql': () => json({ data: null, errors: [{ type: 'FORBIDDEN', message: 'non' }] }),
+    });
+    const denied = new GitHubClient(tokens, 'code-my-life', 'https://api.github.com', refused.impl);
+    await expect(denied.reviewThreads('factory-live', 24)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('lit un fichier à un commit, brut, et refuse un fichier trop gros', async () => {
+    const { impl, calls } = fakeFetch({
+      '/contents/e2e/captures%20x.png?ref=abc1234': () =>
+        new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47]), { status: 200 }),
+      '/actions/artifacts/7/zip': () =>
+        new Response('x', { status: 200, headers: { 'content-length': String(60 * 1024 * 1024) } }),
+    });
+    const client = new GitHubClient(tokens, 'code-my-life', 'https://api.github.com', impl);
+    expect(await client.fileAt('factory-live', 'e2e/captures x.png', 'abc1234')).toEqual(
+      new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+    );
+    expect((calls[0]!.init.headers as Record<string, string>)['Accept']).toBe(
+      'application/vnd.github.raw',
+    );
+    await expect(client.artifactZip('factory-live', 7)).rejects.toMatchObject({ status: 413 });
+  });
+});
+
+describe('lectures de la recette, au-delà de la première page', () => {
+  const tokens = {
+    token: () => Promise.resolve('lecture'),
+    rejected: () => undefined,
+  };
+
+  it('lit la page suivante tant que la précédente est pleine : le dernier verdict de la gate vient', async () => {
+    const comment = (index: number) => ({
+      body: `commentaire ${index}`,
+      html_url: `https://github.com/code-my-life/cv-site/pull/52#issuecomment-${index}`,
+      created_at: '2026-11-04T10:00:00Z',
+      user: { type: 'User' },
+    });
+    const { impl, calls } = fakeFetch({
+      '/issues/52/comments?per_page=100&page=1': () =>
+        json(Array.from({ length: 100 }, (_, index) => comment(index))),
+      '/issues/52/comments?per_page=100&page=2': () => json([comment(100)]),
+    });
+    const client = new GitHubClient(tokens, 'code-my-life', 'https://api.github.com', impl);
+    const comments = await client.issueComments('cv-site', 52);
+    expect(comments).toHaveLength(101);
+    expect(comments.at(-1)!.body).toBe('commentaire 100');
+    expect(calls).toHaveLength(2);
+  });
+
+  it('suit le curseur de GraphQL jusqu’au dernier fil de revue', async () => {
+    const node = (title: string) => ({
+      isResolved: false,
+      comments: {
+        nodes: [
+          {
+            author: { login: 'greptile-apps' },
+            body: `**${title}**`,
+            createdAt: '2026-11-04T10:00:00Z',
+            url: 'https://github.com/code-my-life/cv-site/pull/52#discussion_r1',
+          },
+        ],
+      },
+    });
+    let page = 0;
+    const answers = [
+      { hasNextPage: true, endCursor: 'curseur', nodes: [node('Premier')] },
+      { hasNextPage: false, endCursor: null, nodes: [node('Dernier')] },
+    ];
+    const { impl, calls } = fakeFetch({
+      '/graphql': () => {
+        const { hasNextPage, endCursor, nodes } = answers[page++]!;
+        return json({
+          data: {
+            repository: {
+              pullRequest: {
+                reviews: { totalCount: 3 },
+                reviewThreads: { pageInfo: { hasNextPage, endCursor }, nodes },
+              },
+            },
+          },
+        });
+      },
+    });
+    const client = new GitHubClient(tokens, 'code-my-life', 'https://api.github.com', impl);
+    const answer = await client.reviewThreads('cv-site', 52);
+    const threads = answer.data!.repository!.pullRequest!.reviewThreads.nodes;
+    expect(threads.map((thread) => thread.comments.nodes[0]!.body)).toEqual([
+      '**Premier**',
+      '**Dernier**',
+    ]);
+    expect(JSON.parse(calls[1]!.init.body as string)).toMatchObject({
+      variables: { after: 'curseur' },
+    });
+  });
+});

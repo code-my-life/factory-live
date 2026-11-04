@@ -1,0 +1,105 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviews": {
+          "totalCount": 7
+        },
+        "reviewThreads": {
+          "nodes": [
+            {
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "greptile-apps"
+                    },
+                    "body": "<a href=\"#\"><img alt=\"P2\" src=\"https://greptile-static-assets.s3.amazonaws.com/badges/p2.svg?v=9\" align=\"top\"></a> **Posted reviews disappear**\n\n`ThreadsWidget` hides the review count whenever there are no discussion threads. This already affects the maintenance demo, which has `reviewRounds: 1` and `threads: []`, and the contact demo once its checks finish. Render the review count independently of the empty-thread message.\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\nThis is a comment left during a code review.\nPath: apps/web/src/features/acceptance/widgets.tsx\nLine: 488\n\nComment:\n**Posted reviews disappear**\n\n`ThreadsWidget` hides the review count whenever there are no discussion threads. This already affects the maintenance demo, which has `reviewRounds: 1` and `threads: []`, and the contact demo once its checks finish. Render the review count independently of the empty-thread message.\n\n---\n\nFor each issue above, determine whether it is valid and should be fixed. If so, fix it directly.\n`````\n</details>\n\n<a href=\"https://app.greptile.com/ide/claude-code?prompt=This%20is%20a%20comment%20left%20during%20a%20code%20review.%0APath%3A%20apps%2Fweb%2Fsrc%2Ffeatures%2Facceptance%2Fwidgets.tsx%0ALine%3A%20488%0A%0AComment%3A%0A**Posted%20reviews%20disappear**%0A%0A%60ThreadsWidget%60%20hides%20the%20review%20count%20whenever%20there%20are%20no%20discussion%20threads.%20This%20already%20affects%20the%20maintenance%20demo%2C%20which%20has%20%60reviewRounds%3A%201%60%20and%20%60threads%3A%20%5B%5D%60%2C%20and%20the%20contact%20demo%20once%20its%20checks%20finish.%20Render%20the%20review%20count%20independently%20of%20the%20empty-thread%20message.%0A%0A---%0A%0AFor%20each%20issue%20above%2C%20determine%20whether%20it%20is%20valid%20and%20should%20be%20fixed.%20If%20so%2C%20fix%20it%20directly.&repo=code-my-life%2Ffactory-live&pr=24&platform=github\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaudeDark.svg?v=7\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaude.svg?v=7\"><img alt=\"Fix in Claude Code\" src=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaude.svg?v=7\"></picture></a>",
+                    "createdAt": "2026-11-04T14:55:43Z",
+                    "url": "https://github.com/code-my-life/factory-live/pull/24#discussion_r4469110873"
+                  }
+                ]
+              }
+            },
+            {
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "greptile-apps"
+                    },
+                    "body": "<a href=\"#\"><img alt=\"P2\" src=\"https://greptile-static-assets.s3.amazonaws.com/badges/p2.svg?v=9\" align=\"top\"></a> **Unfinished captures look green**\n\n`Captures` shows a green check whenever no capture is red, even while a capture is still running. The contact demo reaches this state before its checks finish. Failed and unfinished captures also start folded.\n\n`AGENTS.md` requires anything needing a decision to stay visible. Before merging, keep these captures visible and derive the group icon from all their statuses.\n\n**Context Used:** AGENTS.md ([source](https://github.com/code-my-life/factory-live/blob/main/AGENTS.md))\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\nThis is a comment left during a code review.\nPath: apps/web/src/features/acceptance/widgets.tsx\nLine: 412-414\n\nComment:\n**Unfinished captures look green**\n\n`Captures` shows a green check whenever no capture is red, even while a capture is still running. The contact demo reaches this state before its checks finish. Failed and unfinished captures also start folded.\n\n`AGENTS.md` requires anything needing a decision to stay visible. Before merging, keep these captures visible and derive the group icon from all their statuses.\n\n**Context Used:** AGENTS.md ([source](https://github.com/code-my-life/factory-live/blob/main/AGENTS.md))\n\n---\n\nFor each issue above, determine whether it is valid and should be fixed. If so, fix it directly.\n`````\n</details>\n\n<a href=\"https://app.greptile.com/ide/claude-code?prompt=This%20is%20a%20comment%20left%20during%20a%20code%20review.%0APath%3A%20apps%2Fweb%2Fsrc%2Ffeatures%2Facceptance%2Fwidgets.tsx%0ALine%3A%20412-414%0A%0AComment%3A%0A**Unfinished%20captures%20look%20green**%0A%0A%60Captures%60%20shows%20a%20green%20check%20whenever%20no%20capture%20is%20red%2C%20even%20while%20a%20capture%20is%20still%20running.%20The%20contact%20demo%20reaches%20this%20state%20before%20its%20checks%20finish.%20Failed%20and%20unfinished%20captures%20also%20start%20folded.%0A%0A%60AGENTS.md%60%20requires%20anything%20needing%20a%20decision%20to%20stay%20visible.%20Before%20merging%2C%20keep%20these%20captures%20visible%20and%20derive%20the%20group%20icon%20from%20all%20their%20statuses.%0A%0A**Context%20Used%3A**%20AGENTS.md%20%28%5Bsource%5D%28https%3A%2F%2Fgithub.com%2Fcode-my-life%2Ffactory-live%2Fblob%2Fmain%2FAGENTS.md%29%29%0A%0A---%0A%0AFor%20each%20issue%20above%2C%20determine%20whether%20it%20is%20valid%20and%20should%20be%20fixed.%20If%20so%2C%20fix%20it%20directly.&repo=code-my-life%2Ffactory-live&pr=24&platform=github\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaudeDark.svg?v=7\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaude.svg?v=7\"><img alt=\"Fix in Claude Code\" src=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaude.svg?v=7\"></picture></a>",
+                    "createdAt": "2026-11-04T14:55:43Z",
+                    "url": "https://github.com/code-my-life/factory-live/pull/24#discussion_r4469110893"
+                  }
+                ]
+              }
+            },
+            {
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "greptile-apps"
+                    },
+                    "body": "<a href=\"#\"><img alt=\"P2\" src=\"https://greptile-static-assets.s3.amazonaws.com/badges/p2.svg?v=9\" align=\"top\"></a> **Counts do not reach items**\n\n`reveal` focuses the widget title rather than the first matching row. The OK count is also a plain span with no action. On a long criteria list, selecting NOK still leaves the reviewer searching through the list. Make all nonzero counts open any needed folds and focus the first matching item.\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\nThis is a comment left during a code review.\nPath: apps/web/src/features/acceptance/AcceptanceBoard.tsx\nLine: 312-316\n\nComment:\n**Counts do not reach items**\n\n`reveal` focuses the widget title rather than the first matching row. The OK count is also a plain span with no action. On a long criteria list, selecting NOK still leaves the reviewer searching through the list. Make all nonzero counts open any needed folds and focus the first matching item.\n\n---\n\nFor each issue above, determine whether it is valid and should be fixed. If so, fix it directly.\n`````\n</details>\n\n<a href=\"https://app.greptile.com/ide/claude-code?prompt=This%20is%20a%20comment%20left%20during%20a%20code%20review.%0APath%3A%20apps%2Fweb%2Fsrc%2Ffeatures%2Facceptance%2FAcceptanceBoard.tsx%0ALine%3A%20312-316%0A%0AComment%3A%0A**Counts%20do%20not%20reach%20items**%0A%0A%60reveal%60%20focuses%20the%20widget%20title%20rather%20than%20the%20first%20matching%20row.%20The%20OK%20count%20is%20also%20a%20plain%20span%20with%20no%20action.%20On%20a%20long%20criteria%20list%2C%20selecting%20NOK%20still%20leaves%20the%20reviewer%20searching%20through%20the%20list.%20Make%20all%20nonzero%20counts%20open%20any%20needed%20folds%20and%20focus%20the%20first%20matching%20item.%0A%0A---%0A%0AFor%20each%20issue%20above%2C%20determine%20whether%20it%20is%20valid%20and%20should%20be%20fixed.%20If%20so%2C%20fix%20it%20directly.&repo=code-my-life%2Ffactory-live&pr=24&platform=github\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaudeDark.svg?v=7\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaude.svg?v=7\"><img alt=\"Fix in Claude Code\" src=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaude.svg?v=7\"></picture></a>",
+                    "createdAt": "2026-11-04T14:55:43Z",
+                    "url": "https://github.com/code-my-life/factory-live/pull/24#discussion_r4469110913"
+                  }
+                ]
+              }
+            },
+            {
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "greptile-apps"
+                    },
+                    "body": "<a href=\"#\"><img alt=\"P2\" src=\"https://greptile-static-assets.s3.amazonaws.com/badges/p2.svg?v=9\" align=\"top\"></a> **Gate rules have no links**\n\n`GateRule` renders each rule as plain text, so clicking a red rule cannot open its source on GitHub. The gate's separate link does not make the rule itself a link.\n\n`AGENTS.md` requires every acceptance element to lead to its own GitHub source. Before merging, pass the gate URL into `GateRule` and make each rule link to that comment.\n\n**Context Used:** AGENTS.md ([source](https://github.com/code-my-life/factory-live/blob/main/AGENTS.md))\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\nThis is a comment left during a code review.\nPath: apps/web/src/features/acceptance/widgets.tsx\nLine: 134-146\n\nComment:\n**Gate rules have no links**\n\n`GateRule` renders each rule as plain text, so clicking a red rule cannot open its source on GitHub. The gate's separate link does not make the rule itself a link.\n\n`AGENTS.md` requires every acceptance element to lead to its own GitHub source. Before merging, pass the gate URL into `GateRule` and make each rule link to that comment.\n\n**Context Used:** AGENTS.md ([source](https://github.com/code-my-life/factory-live/blob/main/AGENTS.md))\n\n---\n\nFor each issue above, determine whether it is valid and should be fixed. If so, fix it directly.\n`````\n</details>\n\n<a href=\"https://app.greptile.com/ide/claude-code?prompt=This%20is%20a%20comment%20left%20during%20a%20code%20review.%0APath%3A%20apps%2Fweb%2Fsrc%2Ffeatures%2Facceptance%2Fwidgets.tsx%0ALine%3A%20134-146%0A%0AComment%3A%0A**Gate%20rules%20have%20no%20links**%0A%0A%60GateRule%60%20renders%20each%20rule%20as%20plain%20text%2C%20so%20clicking%20a%20red%20rule%20cannot%20open%20its%20source%20on%20GitHub.%20The%20gate's%20separate%20link%20does%20not%20make%20the%20rule%20itself%20a%20link.%0A%0A%60AGENTS.md%60%20requires%20every%20acceptance%20element%20to%20lead%20to%20its%20own%20GitHub%20source.%20Before%20merging%2C%20pass%20the%20gate%20URL%20into%20%60GateRule%60%20and%20make%20each%20rule%20link%20to%20that%20comment.%0A%0A**Context%20Used%3A**%20AGENTS.md%20%28%5Bsource%5D%28https%3A%2F%2Fgithub.com%2Fcode-my-life%2Ffactory-live%2Fblob%2Fmain%2FAGENTS.md%29%29%0A%0A---%0A%0AFor%20each%20issue%20above%2C%20determine%20whether%20it%20is%20valid%20and%20should%20be%20fixed.%20If%20so%2C%20fix%20it%20directly.&repo=code-my-life%2Ffactory-live&pr=24&platform=github\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaudeDark.svg?v=7\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaude.svg?v=7\"><img alt=\"Fix in Claude Code\" src=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaude.svg?v=7\"></picture></a>",
+                    "createdAt": "2026-11-04T14:55:43Z",
+                    "url": "https://github.com/code-my-life/factory-live/pull/24#discussion_r4469110935"
+                  }
+                ]
+              }
+            },
+            {
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "greptile-apps"
+                    },
+                    "body": "<a href=\"#\"><img alt=\"P2\" src=\"https://greptile-static-assets.s3.amazonaws.com/badges/p2.svg?v=9\" align=\"top\"></a> **Capture links are too small**\n\n`captureSource` leaves the capture's GitHub link at small-text height, with no padding or minimum height. It is absent from the touch-size overrides, and the new test checks only headers.\n\n`AGENTS.md` requires touch targets of at least 44 px. Before merging, give this link a 44 px target and include widget-body controls in the size check.\n\n**Context Used:** AGENTS.md ([source](https://github.com/code-my-life/factory-live/blob/main/AGENTS.md))\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\nThis is a comment left during a code review.\nPath: apps/web/src/features/acceptance/acceptance.module.css\nLine: 567-572\n\nComment:\n**Capture links are too small**\n\n`captureSource` leaves the capture's GitHub link at small-text height, with no padding or minimum height. It is absent from the touch-size overrides, and the new test checks only headers.\n\n`AGENTS.md` requires touch targets of at least 44 px. Before merging, give this link a 44 px target and include widget-body controls in the size check.\n\n**Context Used:** AGENTS.md ([source](https://github.com/code-my-life/factory-live/blob/main/AGENTS.md))\n\n---\n\nFor each issue above, determine whether it is valid and should be fixed. If so, fix it directly.\n`````\n</details>\n\n<a href=\"https://app.greptile.com/ide/claude-code?prompt=This%20is%20a%20comment%20left%20during%20a%20code%20review.%0APath%3A%20apps%2Fweb%2Fsrc%2Ffeatures%2Facceptance%2Facceptance.module.css%0ALine%3A%20567-572%0A%0AComment%3A%0A**Capture%20links%20are%20too%20small**%0A%0A%60captureSource%60%20leaves%20the%20capture's%20GitHub%20link%20at%20small-text%20height%2C%20with%20no%20padding%20or%20minimum%20height.%20It%20is%20absent%20from%20the%20touch-size%20overrides%2C%20and%20the%20new%20test%20checks%20only%20headers.%0A%0A%60AGENTS.md%60%20requires%20touch%20targets%20of%20at%20least%2044%20px.%20Before%20merging%2C%20give%20this%20link%20a%2044%20px%20target%20and%20include%20widget-body%20controls%20in%20the%20size%20check.%0A%0A**Context%20Used%3A**%20AGENTS.md%20%28%5Bsource%5D%28https%3A%2F%2Fgithub.com%2Fcode-my-life%2Ffactory-live%2Fblob%2Fmain%2FAGENTS.md%29%29%0A%0A---%0A%0AFor%20each%20issue%20above%2C%20determine%20whether%20it%20is%20valid%20and%20should%20be%20fixed.%20If%20so%2C%20fix%20it%20directly.&repo=code-my-life%2Ffactory-live&pr=24&platform=github\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaudeDark.svg?v=7\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaude.svg?v=7\"><img alt=\"Fix in Claude Code\" src=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaude.svg?v=7\"></picture></a>",
+                    "createdAt": "2026-11-04T14:55:43Z",
+                    "url": "https://github.com/code-my-life/factory-live/pull/24#discussion_r4469110952"
+                  }
+                ]
+              }
+            },
+            {
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "greptile-apps"
+                    },
+                    "body": "<a href=\"#\"><img alt=\"P2\" src=\"https://greptile-static-assets.s3.amazonaws.com/badges/p2.svg?v=9\" align=\"top\"></a> **Dragging gives no spoken feedback**\n\nDragging a widget never announces its new position. `onReorder` passes `null` to `apply`, so the spoken status stays empty or keeps an earlier message. Keyboard and menu moves do announce their positions. Announce the final position when a drag finishes too.\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\nThis is a comment left during a code review.\nPath: apps/web/src/features/acceptance/AcceptanceBoard.tsx\nLine: 390\n\nComment:\n**Dragging gives no spoken feedback**\n\nDragging a widget never announces its new position. `onReorder` passes `null` to `apply`, so the spoken status stays empty or keeps an earlier message. Keyboard and menu moves do announce their positions. Announce the final position when a drag finishes too.\n\n---\n\nFor each issue above, determine whether it is valid and should be fixed. If so, fix it directly.\n`````\n</details>\n\n<a href=\"https://app.greptile.com/ide/claude-code?prompt=This%20is%20a%20comment%20left%20during%20a%20code%20review.%0APath%3A%20apps%2Fweb%2Fsrc%2Ffeatures%2Facceptance%2FAcceptanceBoard.tsx%0ALine%3A%20390%0A%0AComment%3A%0A**Dragging%20gives%20no%20spoken%20feedback**%0A%0ADragging%20a%20widget%20never%20announces%20its%20new%20position.%20%60onReorder%60%20passes%20%60null%60%20to%20%60apply%60%2C%20so%20the%20spoken%20status%20stays%20empty%20or%20keeps%20an%20earlier%20message.%20Keyboard%20and%20menu%20moves%20do%20announce%20their%20positions.%20Announce%20the%20final%20position%20when%20a%20drag%20finishes%20too.%0A%0A---%0A%0AFor%20each%20issue%20above%2C%20determine%20whether%20it%20is%20valid%20and%20should%20be%20fixed.%20If%20so%2C%20fix%20it%20directly.&repo=code-my-life%2Ffactory-live&pr=24&platform=github\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaudeDark.svg?v=7\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaude.svg?v=7\"><img alt=\"Fix in Claude Code\" src=\"https://greptile-static-assets.s3.amazonaws.com/badges/FixInClaude.svg?v=7\"></picture></a>",
+                    "createdAt": "2026-11-04T14:55:43Z",
+                    "url": "https://github.com/code-my-life/factory-live/pull/24#discussion_r4469110970"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

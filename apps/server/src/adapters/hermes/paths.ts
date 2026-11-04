@@ -1,8 +1,12 @@
-import { lstatSync, realpathSync } from 'node:fs';
+import { lstatSync, readdirSync, realpathSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 
 const NAME = /^[\w-]+$/;
 const CARD = /^t_[0-9a-f]{8}$/;
+/** A head, as the gate names its proofs' folder (`evidence/gate/<sha7>`). */
+const SHA7 = /^[0-9a-f]{7}$/;
+/** A proof of a rule of the gate: `NN-<rule>.txt`, written by `factory-gate.py`. */
+const GATE_PROOF = /^(\d{2})-([a-z_]+)\.txt$/;
 
 /** Plafonds de lecture : un fichier plus gros n'est pas un fichier que le diagnostic attend. */
 export const MAX_CONFIG_BYTES = 256 * 1024;
@@ -86,6 +90,29 @@ export class HermesPaths {
       real(this.boardDir, ['workspaces', cardId, 'evidence'], 'dir') ??
       real(this.boardDir, ['evidence', cardId], 'dir')
     );
+  }
+
+  /**
+   * The gate's proofs of a head (#22): only the files `evidence/gate/<sha7>/NN-<rule>.txt` of the card,
+   * in the gate's order; its verdict, notes and any link are never among them.
+   */
+  gateProofs(cardId: string, sha7: string): { order: number; rule: string; path: string }[] {
+    const dir = this.evidenceDir(cardId);
+    const gate = dir && SHA7.test(sha7) ? this.evidenceEntry(dir, ['gate', sha7], 'dir') : null;
+    if (!dir || !gate) return [];
+    let names: string[];
+    try {
+      names = readdirSync(gate);
+    } catch {
+      return [];
+    }
+    return names
+      .flatMap((name) => {
+        const proof = GATE_PROOF.exec(name);
+        const path = proof ? this.evidenceEntry(dir, ['gate', sha7, name], 'file') : null;
+        return proof && path ? [{ order: Number(proof[1]), rule: proof[2]!, path }] : [];
+      })
+      .sort((left, right) => left.order - right.order);
   }
 
   /** Un fichier sous un dossier rendu par `evidenceDir`, sans lien ni sortie du dossier. */

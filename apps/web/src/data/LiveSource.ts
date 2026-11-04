@@ -1,4 +1,6 @@
 import type {
+  AcceptanceDevice,
+  AcceptanceLayout,
   ActivityEvent,
   GitHubAccess,
   HistoryStats,
@@ -12,7 +14,11 @@ import type {
   TranscriptView,
   UsageReport,
 } from '@factory-live/contracts';
-import { STREAM_PING, STREAM_PING_EVERY_MS } from '@factory-live/contracts';
+import {
+  AcceptanceLayoutPreference,
+  STREAM_PING,
+  STREAM_PING_EVERY_MS,
+} from '@factory-live/contracts';
 import { refusal } from './errors.ts';
 import type { Connection, FactoryDataSource, UnblockOptions, UsagePeriod } from './source.ts';
 
@@ -380,6 +386,29 @@ export class LiveSource implements FactoryDataSource {
     if (!response.ok) throw await refusal(response, 'logout');
     if (this.github) this.github.stale = true;
     this.getGitHubAccess();
+  }
+
+  async getAcceptanceLayout(device: AcceptanceDevice): Promise<AcceptanceLayout | null> {
+    const response = await this.fetchImpl(
+      `${this.base}/api/preferences/acceptance-layout?device=${device}`,
+      { headers: { Accept: 'application/json' } },
+    );
+    if (!response.ok) return null;
+    const preference = AcceptanceLayoutPreference.safeParse(await response.json());
+    return preference.success ? preference.data.layout : null;
+  }
+
+  async saveAcceptanceLayout(device: AcceptanceDevice, layout: AcceptanceLayout): Promise<void> {
+    const response = await this.fetchImpl(
+      `${this.base}/api/preferences/acceptance-layout?device=${device}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Factory-Live': '1' },
+        body: JSON.stringify(layout),
+      },
+    );
+    // Refused off the owner's devices: the layout stays on this device only.
+    if (!response.ok) throw new Error(`acceptance layout: HTTP ${response.status}`);
   }
 
   /** Lecture en arrière-plan, une seule à la fois par clé ; prévient les abonnés à l'arrivée. */

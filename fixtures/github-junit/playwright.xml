@@ -1,0 +1,118 @@
+<testsuites id="" name="" tests="6" failures="2" skipped="2" errors="0" time="5.237444">
+<testsuite name="recette.spec.ts" timestamp="2026-11-04T16:54:13.126Z" hostname="demo-bureau" tests="3" failures="1" skipped="1" time="1.308" errors="0">
+<testcase name="recette › la ligne s’ouvre" classname="recette.spec.ts" time="0.39">
+</testcase>
+<testcase name="recette › une preuve rouge" classname="recette.spec.ts" time="0.918">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../../../../../home/user/perso/factory-live/test-results/recette-recette-une-preuve-rouge-demo-bureau/error-context.md]]
+
+[[ATTACHMENT|../../../../../home/user/perso/factory-live/test-results/recette-recette-une-preuve-rouge-demo-bureau/trace.zip]]
+]]>
+</system-out>
+<failure message="expect(locator).toHaveText(expected) failed" type="expect.toHaveText">
+<![CDATA[  [demo-bureau] › recette.spec.ts:8:3 › recette › une preuve rouge ──────────────────────
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator:  getByRole('heading', { level: 1 })
+    Expected: "Autre titre"
+    Received: "Ligne d’usine"
+    Timeout:  500ms
+
+    Call log:
+      - Expect "toHaveText" getByRole('heading', { level: 1 }) with timeout 500ms
+      - waiting for getByRole('heading', { level: 1 })
+        6 × locator resolved to <h1 data-variant="medium" data-component="Heading" class="prc-Heading-Heading-MtWFE">Ligne d’usine</h1>
+          - unexpected value "Ligne d’usine"
+
+
+       8 |   test('une preuve rouge', async ({ page }) => {
+       9 |     await page.goto('/');
+    > 10 |     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Autre titre', { timeout: 500 });
+         |                                                           ^
+      11 |   });
+      12 |   test.fixme('une preuve ignorée', async () => {});
+      13 | });
+        at /home/user/perso/factory-live/e2e/recette.spec.ts:10:59
+
+    Error Context: ../test-results/recette-recette-une-preuve-rouge-demo-bureau/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../test-results/recette-recette-une-preuve-rouge-demo-bureau/trace.zip
+    Usage:
+
+        npx playwright show-trace ../test-results/recette-recette-une-preuve-rouge-demo-bureau/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+</testcase>
+<testcase name="recette › une preuve ignorée" classname="recette.spec.ts">
+<properties>
+<property name="fixme" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="recette.spec.ts" timestamp="2026-11-04T16:54:13.126Z" hostname="demo-iphone" tests="3" failures="1" skipped="1" time="1.321" errors="0">
+<testcase name="recette › la ligne s’ouvre" classname="recette.spec.ts" time="0.394">
+</testcase>
+<testcase name="recette › une preuve rouge" classname="recette.spec.ts" time="0.927">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../../../../../home/user/perso/factory-live/test-results/recette-recette-une-preuve-rouge-demo-iphone/error-context.md]]
+
+[[ATTACHMENT|../../../../../home/user/perso/factory-live/test-results/recette-recette-une-preuve-rouge-demo-iphone/trace.zip]]
+]]>
+</system-out>
+<failure message="expect(locator).toHaveText(expected) failed" type="expect.toHaveText">
+<![CDATA[  [demo-iphone] › recette.spec.ts:8:3 › recette › une preuve rouge ──────────────────────
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator:  getByRole('heading', { level: 1 })
+    Expected: "Autre titre"
+    Received: "Ligne d’usine"
+    Timeout:  500ms
+
+    Call log:
+      - Expect "toHaveText" getByRole('heading', { level: 1 }) with timeout 500ms
+      - waiting for getByRole('heading', { level: 1 })
+        6 × locator resolved to <h1 data-variant="medium" data-component="Heading" class="prc-Heading-Heading-MtWFE">Ligne d’usine</h1>
+          - unexpected value "Ligne d’usine"
+
+
+       8 |   test('une preuve rouge', async ({ page }) => {
+       9 |     await page.goto('/');
+    > 10 |     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Autre titre', { timeout: 500 });
+         |                                                           ^
+      11 |   });
+      12 |   test.fixme('une preuve ignorée', async () => {});
+      13 | });
+        at /home/user/perso/factory-live/e2e/recette.spec.ts:10:59
+
+    Error Context: ../test-results/recette-recette-une-preuve-rouge-demo-iphone/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../test-results/recette-recette-une-preuve-rouge-demo-iphone/trace.zip
+    Usage:
+
+        npx playwright show-trace ../test-results/recette-recette-une-preuve-rouge-demo-iphone/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+</testcase>
+<testcase name="recette › une preuve ignorée" classname="recette.spec.ts">
+<properties>
+<property name="fixme" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+</testsuites>

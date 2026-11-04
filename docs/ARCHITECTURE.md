@@ -37,17 +37,18 @@ Les règles sont vérifiées en CI par dependency-cruiser (`.dependency-cruiser.
 
 ## Sources et corrélation
 
-| Besoin                    | Source                                            | Méthode                                                                       |
-| ------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Action et modèle en cours | webhooks `pre/post_tool_call`, `post_api_request` | carte tirée du `cwd` du worker, session par `session_id`                      |
-| Cartes, runs, transitions | `kanban.db`                                       | `PRAGMA data_version` toutes les 300 ms, `task_events` au-delà du curseur     |
-| Transcription Hermès      | `state.db` du profil                              | à la demande et pour le rattrapage                                            |
-| Terminal brut             | `logs/<task_id>.log` du board                     | à la demande, rendu ANSI                                                      |
-| Lane Claude Code          | `~/.claude/projects`                              | dossier tiré du workspace de la carte, fenêtre du run, coût `cost-state`      |
-| Lane OpenCode             | session Hermès et log de la carte                 | sortie de `opencode run` ; `opencode.db` n'est pas lu (jetons OAuth)          |
-| Santé                     | sonde du gateway + signaux passifs                | « sonde muette » après 90 s sans rapport                                      |
-| PR, CI, réactions         | API REST GitHub                                   | ETag, API Actions pour la CI                                                  |
-| Diagnostic d'un blocage   | `state.db`, `logs/agent.log`, configs, plugins    | liste blanche (`adapters/hermes/paths.ts`), recalcul sur empreinte (ADR 0009) |
+| Besoin                    | Source                                                                        | Méthode                                                                                  |
+| ------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Action et modèle en cours | webhooks `pre/post_tool_call`, `post_api_request`                             | carte tirée du `cwd` du worker, session par `session_id`                                 |
+| Cartes, runs, transitions | `kanban.db`                                                                   | `PRAGMA data_version` toutes les 300 ms, `task_events` au-delà du curseur                |
+| Transcription Hermès      | `state.db` du profil                                                          | à la demande et pour le rattrapage                                                       |
+| Terminal brut             | `logs/<task_id>.log` du board                                                 | à la demande, rendu ANSI                                                                 |
+| Lane Claude Code          | `~/.claude/projects`                                                          | dossier tiré du workspace de la carte, fenêtre du run, coût `cost-state`                 |
+| Lane OpenCode             | session Hermès et log de la carte                                             | sortie de `opencode run` ; `opencode.db` n'est pas lu (jetons OAuth)                     |
+| Santé                     | sonde du gateway + signaux passifs                                            | « sonde muette » après 90 s sans rapport                                                 |
+| PR, CI, réactions         | API REST GitHub                                                               | ETag, API Actions pour la CI                                                             |
+| Recette d'une PR          | API REST et GraphQL GitHub, artefacts JUnit de la CI, `evidence/gate/<sha7>/` | partie par partie, chaque lecture isolée ; rapports lus une fois par artefact (ADR 0012) |
+| Diagnostic d'un blocage   | `state.db`, `logs/agent.log`, configs, plugins                                | liste blanche (`adapters/hermes/paths.ts`), recalcul sur empreinte (ADR 0009)            |
 
 ## Front
 

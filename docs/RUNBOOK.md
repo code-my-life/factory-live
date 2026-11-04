@@ -111,6 +111,19 @@ La tuile Santé « Délais des gardes » lit les mêmes faits avant tout blocage
 
 Le fuseau du journal suit `HERMES_TZ` (`docker/.env`) : après un changement d'heure ou de fuseau de ce PC, le diagnostic date le journal d'après lui ; une heure qui existe deux fois en octobre suit l'ordre du journal.
 
+## Recette des PR
+
+La recette d'une PR (ADR 0011, ADR 0012) se lit sous le détail de son issue. Le serveur la recalcule à chaque lecture de GitHub (30 s pour une issue active).
+
+| Besoin                               | Commande ou fichier                                                                                     |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Lire la recette d'une issue          | `curl -s localhost:8446/api/issues/<dépôt>/<numéro> \| jq '.acceptance \| {criteria, gate}'`            |
+| Rapports de tests lus par la recette | artefacts `junit-unit` et `junit-e2e` des runs de la tête (`.github/workflows/ci.yml`), gardés 30 jours |
+| Format de la gate                    | `apps/server/src/adapters/github/acceptance.ts`, au format de `scripts/factory-gate.py` de la factory   |
+| Disposition gardée                   | table `meta` de `factory-live.db`, clés `layout:acceptance:phone` et `layout:acceptance:desktop`        |
+
+Un critère reste « non prouvé » alors que sa PR cite un test : le nom entre « » doit être celui du test (sans les `describe`) et son fichier doit finir le chemin du rapport. Un autre dépôt n'a sa recette complète que si sa CI publie ses rapports JUnit en artefacts nommés `junit…`, à chaque exécution.
+
 ## Secrets
 
 - `~/.config/factory-live/hook-secret` : secret HMAC partagé avec Hermès (`FACTORY_LIVE_HOOK_SECRET` de `~/.hermes/.env`), créé une fois par `install.sh` de la factory (étape 5b), jamais affiché. Absent : l'ingestion répond 503.

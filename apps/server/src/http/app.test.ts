@@ -1,4 +1,5 @@
 import {
+  AcceptanceLayoutPreference,
   ApiError,
   GitHubAccess,
   IssueDetail,
@@ -7,7 +8,7 @@ import {
   StreamEvent,
   msg,
 } from '@factory-live/contracts';
-import { mkdirSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { HOOK_TIMEOUT_MESSAGE } from '@factory-live/domain';
@@ -1113,5 +1114,243 @@ describe('erreurs d’API classées par Hermès', () => {
     h.hub.flush();
     const nvidia = (await snapshot()).health.find((item) => item.id === 'provider:nvidia');
     expect(nvidia?.metrics).toEqual([{ label: msg('health.metric.rateLimited'), value: '1' }]);
+  });
+});
+
+/** GitHub's answers for the PR #52 of cv-site#49, read by the cache to build its recette (#22). */
+function prRoutes(): Record<string, () => Response> {
+  const fixture = (path: string) =>
+    readFileSync(new URL(`../../../../fixtures/${path}`, import.meta.url));
+  const reply = (body: unknown) =>
+    new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  const head = 'd'.repeat(40);
+  const run = 'https://github.com/code-my-life/cv-site/actions/runs/11';
+  return {
+    '/issues/49': () =>
+      reply({
+        title: 'Page Projets',
+        html_url: 'https://github.com/code-my-life/cv-site/issues/49',
+        labels: [],
+        state: 'open',
+        body: "### Critères d'acceptation\n\n- C1 : la page s'ouvre\n- C2 : le filtre garde le choix\n",
+      }),
+    '/pulls/52': () =>
+      reply({
+        html_url: 'https://github.com/code-my-life/cv-site/pull/52',
+        title: 'feat: page Projets',
+        state: 'open',
+        head: { sha: head },
+        base: { sha: 'e'.repeat(40) },
+        requested_reviewers: [],
+        body: "## Critères\n\n- C1 : `packages/domain/src/recette.test.ts` « un critère vert »\n- C2 : `recette.test.ts` « un critère rouge »\n\n## Ce qui n'est pas prouvé\n\n- Le rendu sur un vrai iPhone.\n",
+      }),
+    '/pulls/52/reviews?per_page=100': () => reply([]),
+    [`/actions/runs?head_sha=${head}&per_page=50`]: () =>
+      reply({
+        workflow_runs: [
+          {
+            id: 11,
+            name: 'CI',
+            check_suite_id: 7,
+            html_url: run,
+            status: 'completed',
+            conclusion: 'failure',
+          },
+        ],
+      }),
+    [`/commits/${head}/check-runs?per_page=100&page=1`]: () =>
+      reply({
+        check_runs: [
+          {
+            id: 1,
+            name: 'Vérifications',
+            status: 'completed',
+            conclusion: 'failure',
+            started_at: '2026-11-04T10:00:00Z',
+            completed_at: '2026-11-04T10:03:00Z',
+            html_url: `${run}/job/21`,
+            check_suite: { id: 7 },
+          },
+        ],
+      }),
+    [`/commits/${head}/statuses?per_page=100`]: () =>
+      reply([
+        {
+          context: 'factory/gate',
+          state: 'failure',
+          description: 'rouge',
+          target_url: null,
+          created_at: '2026-11-04T10:05:00Z',
+          updated_at: '2026-11-04T10:05:00Z',
+        },
+      ]),
+    '/issues/52/comments?per_page=100&page=1': () =>
+      reply([
+        {
+          body: fixture('github-gate/gate-rouge.md').toString('utf8'),
+          html_url: 'https://github.com/code-my-life/cv-site/pull/52#issuecomment-9',
+          created_at: '2026-11-04T10:05:00Z',
+          user: { type: 'Bot' },
+        },
+      ]),
+    '/pulls/52/files?per_page=100&page=1': () =>
+      reply([{ filename: 'e2e/captures.spec.ts-snapshots/projets.png', status: 'modified' }]),
+    '/graphql': () =>
+      reply(JSON.parse(fixture('github-acceptance/review-threads.json').toString('utf8'))),
+    '/actions/runs/11/artifacts?per_page=100': () =>
+      reply({ artifacts: [{ id: 5, name: 'junit-unit', expired: false }] }),
+    '/actions/artifacts/5/zip': () =>
+      new Response(new Uint8Array(fixture('github-junit/junit.zip')), { status: 200 }),
+    [`/contents/e2e/captures.spec.ts-snapshots/projets.png?ref=${'e'.repeat(40)}`]: () =>
+      new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x01]), { status: 200 }),
+    [`/contents/e2e/captures.spec.ts-snapshots/projets.png?ref=${head}`]: () =>
+      new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x02]), { status: 200 }),
+  };
+}
+
+describe('recette d’une PR', () => {
+  let pr: Harness;
+  beforeEach(async () => {
+    pr = harness({ githubRoutes: prRoutes() });
+    insertRun(pr.writer, {
+      taskId: 't_1a9f0049',
+      profile: 'coder',
+      status: 'done',
+      outcome: 'completed',
+      startedAt: NOW_S - 300,
+      endedAt: NOW_S - 200,
+      metadata: { pr_url: 'https://github.com/code-my-life/cv-site/pull/52' },
+    });
+    pr.syncKanban();
+    await pr.refreshGitHub();
+  });
+  afterEach(() => pr.close());
+
+  it('le détail d’une issue porte la recette de sa PR, lue sur GitHub', async () => {
+    const detail = IssueDetail.parse(
+      await (await pr.app.request('/api/issues/cv-site/49', { headers: THIS_PC })).json(),
+    );
+    const acceptance = detail.acceptance!;
+    expect(acceptance).toMatchObject({
+      pr: 52,
+      head: 'd'.repeat(40),
+      twins: null,
+      twinsAbsent: 'no_build',
+    });
+    expect(acceptance.criteria.map(({ id, status, reason }) => ({ id, status, reason }))).toEqual([
+      { id: 'C1', status: 'ok', reason: 'proven' },
+      { id: 'C2', status: 'nok', reason: 'failing' },
+    ]);
+    expect(
+      acceptance.checks.map(({ name, workflow, status }) => ({ name, workflow, status })),
+    ).toEqual([{ name: 'Vérifications', workflow: 'CI', status: 'failure' }]);
+    expect(acceptance.gate).toMatchObject({ status: 'nok', head: '140abfe' });
+    expect(acceptance.tests.map(({ kind, name, failed }) => ({ kind, name, failed }))).toEqual([
+      { kind: 'unit', name: 'Vitest', failed: 1 },
+      { kind: 'e2e', name: 'demo-bureau', failed: 1 },
+      { kind: 'e2e', name: 'demo-iphone', failed: 1 },
+    ]);
+    expect(acceptance.threads).toHaveLength(6);
+    expect(acceptance.reviewRounds).toBe(7);
+    expect(acceptance.proofs.map((proof) => proof.kind)).toEqual(['capture', 'unproven']);
+  });
+
+  it('sert une capture seulement si la PR modifie ce fichier', async () => {
+    const detail = IssueDetail.parse(
+      await (await pr.app.request('/api/issues/cv-site/49', { headers: THIS_PC })).json(),
+    );
+    const capture = detail.acceptance!.proofs.find((proof) => proof.kind === 'capture')!;
+    // The addresses carry no token: the server reads GitHub with the App's.
+    expect(capture.before).toBe(
+      '/api/acceptance/cv-site/52/capture?path=e2e%2Fcaptures.spec.ts-snapshots%2Fprojets.png&side=base',
+    );
+    const before = await pr.app.request(capture.before!, { headers: THIS_PC });
+    expect(before.status).toBe(200);
+    expect(before.headers.get('content-type')).toBe('image/png');
+    expect(new Uint8Array(await before.arrayBuffer())).toEqual(
+      new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x01]),
+    );
+    const after = await pr.app.request(capture.after!, { headers: THIS_PC });
+    expect(new Uint8Array(await after.arrayBuffer())).toEqual(
+      new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x02]),
+    );
+    // Any other file of the repository: never read, never served.
+    const other = (path: string, side = 'head') =>
+      pr.app.request(
+        `/api/acceptance/cv-site/52/capture?path=${encodeURIComponent(path)}&side=${side}`,
+        { headers: THIS_PC },
+      );
+    expect(await refusal(await other('apps/server/.env.png'))).toEqual([404, 'not_found']);
+    expect(
+      await refusal(await other('e2e/captures.spec.ts-snapshots/projets.png', 'main')),
+    ).toEqual([400, 'invalid_request']);
+    expect(
+      await refusal(
+        await pr.app.request('/api/acceptance/..%2Fetc/52/capture?path=a.png&side=head', {
+          headers: THIS_PC,
+        }),
+      ),
+    ).toEqual([400, 'invalid_request']);
+    expect(pr.github.calls.filter((call) => call.url.includes('/contents/'))).toHaveLength(2);
+  });
+});
+
+describe('disposition de la recette', () => {
+  const layout = {
+    order: ['twins', 'criteria', 'checks', 'tests', 'proofs', 'threads'],
+    pinned: ['twins'],
+    collapsed: ['criteria'],
+    half: ['tests', 'proofs'],
+  };
+  const put = (device: string, headers: Record<string, string>, body: unknown = layout) =>
+    h.app.request(`/api/preferences/acceptance-layout?device=${device}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(body),
+    });
+  const get = async (device: string, headers: Record<string, string> = THIS_PC) =>
+    AcceptanceLayoutPreference.parse(
+      await (
+        await h.app.request(`/api/preferences/acceptance-layout?device=${device}`, { headers })
+      ).json(),
+    );
+
+  it("enregistre la disposition de la recette par type d'écran, pour les seuls logins autorisés", async () => {
+    expect((await get('desktop')).layout).toBeNull();
+    expect((await put('desktop', LOCAL)).status).toBe(200);
+    // Another device of the same type finds it; a phone keeps its own.
+    expect(
+      (
+        await get('desktop', {
+          host: 'machine.tailnet.ts.net:8446',
+          'tailscale-user-login': 'alice@github',
+        })
+      ).layout,
+    ).toEqual(layout);
+    expect((await get('phone')).layout).toBeNull();
+    expect(
+      (
+        await put(
+          'phone',
+          { ...TAILNET, 'tailscale-user-login': 'alice@github' },
+          { ...layout, half: [] },
+        )
+      ).status,
+    ).toBe(200);
+    expect((await get('phone')).layout).toEqual({ ...layout, half: [] });
+    // Nobody else writes it, and a layout that is not one is refused.
+    expect(
+      await refusal(await put('desktop', { ...TAILNET, 'tailscale-user-login': 'intrus@github' })),
+    ).toEqual([403, 'write_login_refused']);
+    expect(await refusal(await put('desktop', TAILNET))).toEqual([403, 'write_local_only']);
+    expect(await refusal(await put('desktop', LOCAL, { ...layout, order: ['secrets'] }))).toEqual([
+      400,
+      'invalid_request',
+    ]);
+    expect(await refusal(await put('tablet', LOCAL))).toEqual([400, 'invalid_request']);
+    expect((await get('desktop')).layout).toEqual(layout);
   });
 });

@@ -46,6 +46,8 @@ export interface Harness {
   pushes: { subscription: StoredSubscription; payload: string }[];
   clock: { now: number };
   syncKanban(): void;
+  /** One pass of the GitHub cache over the tracked issues, as `main.ts` runs every 30 s. */
+  refreshGitHub(): Promise<boolean>;
   close(): void;
 }
 
@@ -55,7 +57,12 @@ export interface Harness {
  * créée, l'accès GitHub passe par le jeton de repli (`jeton`, ou aucun avec `githubToken: null`).
  */
 export function harness(
-  options: { githubToken?: string | null; streamPingMs?: number } = {},
+  options: {
+    githubToken?: string | null;
+    streamPingMs?: number;
+    /** More answers of GitHub, by the end of the address, read before the built-in ones. */
+    githubRoutes?: Record<string, () => Response>;
+  } = {},
 ): Harness {
   const dir = tempDir();
   const hermes = join(dir.path, 'hermes');
@@ -156,6 +163,8 @@ export function harness(
           headers: { 'content-type': 'application/json' },
         }),
       );
+    const extra = Object.keys(options.githubRoutes ?? {}).find((route) => url.endsWith(route));
+    if (extra) return Promise.resolve(options.githubRoutes![extra]!());
     if (method === 'POST' && url.endsWith('/issues/49/comments'))
       return respond({
         id: 4242,
@@ -306,6 +315,7 @@ export function harness(
     pushes,
     clock,
     syncKanban,
+    refreshGitHub: () => cache.refresh(hub.trackedIssues(), clock.now),
     close: () => {
       kanban.close();
       writer.close();

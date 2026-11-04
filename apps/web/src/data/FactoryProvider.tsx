@@ -30,6 +30,11 @@ export function useFactorySource(): FactoryDataSource {
   return source;
 }
 
+/** The source when a provider gives one: a screen that also lives without it (tests, demo) asks this. */
+export function useOptionalFactorySource(): FactoryDataSource | null {
+  return useContext(FactorySourceContext);
+}
+
 function useSourceValue<T>(read: (source: FactoryDataSource) => T): T {
   const source = useFactorySource();
   const subscribe = useCallback((listener: () => void) => source.subscribe(listener), [source]);

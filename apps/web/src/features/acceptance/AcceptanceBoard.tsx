@@ -1,4 +1,9 @@
-import type { AcceptanceView, IssueSummary } from '@factory-live/contracts';
+import type {
+  AcceptanceDevice,
+  AcceptanceLayout,
+  AcceptanceView,
+  IssueSummary,
+} from '@factory-live/contracts';
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -15,8 +20,9 @@ import {
 } from '@primer/octicons-react';
 import { ActionList, ActionMenu, Button, Heading, IconButton } from '@primer/react';
 import { Reorder, motion, useDragControls } from 'motion/react';
-import { useId, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
+import { useOptionalFactorySource } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { useMotion } from '../../ui/motion.tsx';
 import styles from './acceptance.module.css';
@@ -24,6 +30,7 @@ import {
   DEFAULT_LAYOUT,
   loadLayout,
   move,
+  normalizeLayout,
   placeOf,
   reorder,
   saveLayout,
@@ -49,19 +56,39 @@ const FOLD = { duration: 0.2, ease: [0.42, 0, 0.58, 1] } as const;
 
 /** Wide enough for two widgets side by side (Primer's large breakpoint). */
 const WIDE = '(min-width: 1012px)';
+/** A phone: its layout is kept apart from a desktop's (#22), at the app's phone breakpoint. */
+const PHONE = '(max-width: 767px)';
+/** A change of layout reaches the server once it settles: a drag reorders at every step. */
+const SAVE_AFTER_MS = 800;
 
-function subscribeWide(listener: () => void): () => void {
-  const query = window.matchMedia(WIDE);
-  query.addEventListener('change', listener);
-  return () => query.removeEventListener('change', listener);
+function useMedia(media: string): boolean {
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      const query = window.matchMedia(media);
+      query.addEventListener('change', listener);
+      return () => query.removeEventListener('change', listener);
+    },
+    [media],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(media).matches,
+    () => false,
+  );
 }
 
 function useWide(): boolean {
-  return useSyncExternalStore(
-    subscribeWide,
-    () => window.matchMedia(WIDE).matches,
-    () => false,
-  );
+  return useMedia(WIDE);
+}
+
+/** The board's layout as the contract writes it. */
+function contractLayout(layout: BoardLayout): AcceptanceLayout {
+  return {
+    order: [...layout.order],
+    pinned: [...layout.pinned],
+    collapsed: [...layout.collapsed],
+    half: [...layout.half],
+  };
 }
 
 interface FrameProps {
@@ -267,12 +294,62 @@ function WidgetFrame({
  * The header counts the elements, what needs the owner first; each count leads to its first element.
  */
 export function AcceptanceBoard({ issue, view }: { issue: IssueSummary; view: AcceptanceView }) {
+  // A type of screen has its own layout: crossing the phone's breakpoint mounts the board afresh,
+  // with that type's layout, read again from the server, and no edit of the other type carried over.
+  const device = useMedia(PHONE) ? 'phone' : 'desktop';
+  return <DeviceBoard key={device} issue={issue} view={view} device={device} />;
+}
+
+function DeviceBoard({
+  issue,
+  view,
+  device,
+}: {
+  issue: IssueSummary;
+  view: AcceptanceView;
+  device: AcceptanceDevice;
+}) {
   const { t } = useI18n();
   const { enabled } = useMotion();
   const titleId = useId();
   const listRef = useRef<HTMLOListElement>(null);
   const wide = useWide();
-  const [layout, setLayout] = useState<BoardLayout>(loadLayout);
+  const source = useOptionalFactorySource();
+  const [layout, setLayout] = useState<BoardLayout>(() => loadLayout(device));
+  // The owner's layout follows them from one device to another of the same type (#22): the server's,
+  // once read, replaces this device's copy, unless the owner changed it meanwhile.
+  const touched = useRef(false);
+  const pending = useRef<{ timer: number; layout: BoardLayout } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void source
+      ?.getAcceptanceLayout?.(device)
+      .then((saved) => {
+        if (!saved || cancelled || touched.current) return;
+        const next = normalizeLayout(saved);
+        setLayout(next);
+        saveLayout(next, device);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [source, device]);
+  const send = useCallback(
+    (next: BoardLayout) =>
+      void source?.saveAcceptanceLayout?.(device, contractLayout(next))?.catch(() => undefined),
+    [source, device],
+  );
+  // Leaving the screen sends what was not sent yet.
+  useEffect(
+    () => () => {
+      if (!pending.current) return;
+      window.clearTimeout(pending.current.timer);
+      send(pending.current.layout);
+      pending.current = null;
+    },
+    [send],
+  );
   const [announcement, setAnnouncement] = useState('');
   // Motion can end a drag before React renders the drag's last reorder: the layout that reorder made is
   // kept here, for the announcement, rather than read from a render that predates it.
@@ -300,7 +377,18 @@ export function AcceptanceBoard({ issue, view }: { issue: IssueSummary; view: Ac
 
   const apply = (next: BoardLayout, message: string | null) => {
     setLayout(next);
-    saveLayout(next);
+    saveLayout(next, device);
+    touched.current = true;
+    if (source?.saveAcceptanceLayout) {
+      if (pending.current) window.clearTimeout(pending.current.timer);
+      pending.current = {
+        layout: next,
+        timer: window.setTimeout(() => {
+          pending.current = null;
+          send(next);
+        }, SAVE_AFTER_MS),
+      };
+    }
     if (message) setAnnouncement(message);
   };
   const announceMove = (next: BoardLayout, id: WidgetId) => {

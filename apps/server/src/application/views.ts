@@ -29,6 +29,7 @@ import {
   timelineOf,
 } from '@factory-live/domain';
 import type { ProfileFacts, Run, Task } from '@factory-live/domain';
+import { acceptanceOf } from './acceptance.ts';
 import { configDrift } from './drift.ts';
 import type { Hub } from './hub.ts';
 import type {
@@ -228,12 +229,21 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
       detail: event.detail,
       tone: event.status === 'blocked' || event.status === 'error' ? 'danger' : 'neutral',
     }));
+  // The recette of the issue's PR (#22): GitHub's side, read by the cache, with the gate's proofs of
+  // the head in the evidence of the issue's cards.
+  const source = deps.github?.acceptance(key) ?? null;
   return {
     issue,
     cards,
     timeline: [...kanban, ...hooks].sort((left, right) => left.at.localeCompare(right.at)),
     tokens,
     costUsd: Math.round(cost * 10_000) / 10_000,
+    acceptance: source
+      ? acceptanceOf(
+          source,
+          ids.flatMap((id) => deps.files.gateProofs(id, source.head.slice(0, 7))),
+        )
+      : null,
   };
 }
 

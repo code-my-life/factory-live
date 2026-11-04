@@ -34,7 +34,18 @@ jobs:
       - run: npm run typecheck
       - run: npm run check:text
       - run: npm run check:arch
-      - run: npm run test:coverage
+      # The JUnit report feeds the recette of the PR (#22): published at every run, green included.
+      - run: npm run test:coverage -- --reporter=default --reporter=junit --outputFile.junit=reports/junit/vitest.xml
+      - name: Rapport JUnit des tests unitaires (recette des PR)
+        if: always() && matrix.node == '24.22.1'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: junit-unit
+          path: reports/junit/
+          if-no-files-found: ignore
+          retention-days: 30
+          # A rerun of the job replaces its report instead of failing on the name.
+          overwrite: true
       - run: npm run build
 
   docker:
@@ -70,6 +81,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: npm ci
       - run: npx playwright test
+      # The JUnit report (reporter of playwright.config.ts on CI) feeds the recette of the PR (#22).
+      - name: Rapport JUnit des tests de bout en bout (recette des PR)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: junit-e2e
+          path: reports/junit/
+          if-no-files-found: ignore
+          retention-days: 30
+          # A rerun of the job replaces its report instead of failing on the name.
+          overwrite: true
       - name: Rapport et traces en cas d'échec
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

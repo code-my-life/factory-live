@@ -1,4 +1,6 @@
 import type {
+  AcceptanceDevice,
+  AcceptanceLayout,
   GitHubAccess,
   HistoryStats,
   IssueDetail,
@@ -43,6 +45,10 @@ export interface FactoryDataSource {
   restart?(): void;
   /** Version de factory-live annoncée par le serveur (`GET /healthz`), ou la version du paquet en démo. */
   getServerVersion(): Promise<string | null>;
+  /** The recette's layout kept by the server for a type of screen (#22); `null` if none. Live only. */
+  getAcceptanceLayout?(device: AcceptanceDevice): Promise<AcceptanceLayout | null>;
+  /** Keeps the recette's layout of a type of screen; refused off the owner's devices. Live only. */
+  saveAcceptanceLayout?(device: AcceptanceDevice, layout: AcceptanceLayout): Promise<void>;
 }
 
 export type UsagePeriod = 1 | 7 | 30;

@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 playwright-report/
+reports/
 test-results/
 *.tsbuildinfo
 .vite/

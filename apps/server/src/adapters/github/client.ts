@@ -6,6 +6,14 @@ import type {
   PullRequestView,
 } from '@factory-live/contracts';
 import type { GitHubWritePort, IssueInfo } from '../../application/ports.ts';
+import { THREADS_QUERY } from './acceptance.ts';
+import type {
+  CheckRunJson,
+  GateCommentJson,
+  StatusJson,
+  ThreadsJson,
+  WorkflowRunJson,
+} from './acceptance.ts';
 import { StaticTokenSource } from './app.ts';
 import type { TokenSource } from './app.ts';
 
@@ -103,8 +111,9 @@ export class GitHubClient implements GitHubWritePort {
     path: string,
     body?: unknown,
     retried = false,
+    // A POST that only reads (GraphQL) still uses the reading token, the App's.
+    kind: 'read' | 'write' = method === 'GET' ? 'read' : 'write',
   ): Promise<unknown> {
-    const kind = method === 'GET' ? 'read' : 'write';
     const token = await this.tokens.token(kind);
     if (!token) {
       throw new GitHubError(
@@ -142,7 +151,7 @@ export class GitHubClient implements GitHubWritePort {
     if (response.status === 401 && !retried) {
       // Jeton expiré ou révoqué : la source en fournit un neuf (installation renouvelée, rafraîchissement).
       this.tokens.rejected(kind);
-      return this.request(method, path, body, true);
+      return this.request(method, path, body, true, kind);
     }
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
@@ -295,6 +304,200 @@ export class GitHubClient implements GitHubWritePort {
       }
     }
     return deliveries.sort((left, right) => right.at - left.at);
+  }
+
+  /**
+   * Bytes GitHub serves (an artifact's zip, a file at a commit), with the reading token; redirects are
+   * followed (an artifact lives elsewhere, and fetch drops the token there). Past `max` bytes, nothing.
+   */
+  private async bytes(
+    path: string,
+    accept: string,
+    max: number,
+    retried = false,
+  ): Promise<Uint8Array> {
+    const token = await this.tokens.token('read');
+    if (!token)
+      throw new GitHubError(
+        401,
+        'Aucun accès GitHub : crée et installe l’App factory-live',
+        'none',
+      );
+    const response = await this.fetchImpl(`${this.api}${path}`, {
+      headers: {
+        Accept: accept,
+        Authorization: `Bearer ${token}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'factory-live',
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (response.status === 401 && !retried) {
+      this.tokens.rejected('read');
+      return this.bytes(path, accept, max, true);
+    }
+    if (!response.ok)
+      throw new GitHubError(response.status, `GitHub GET ${path} : HTTP ${response.status}`);
+    const length = Number(response.headers.get('content-length') ?? 0);
+    if (length > max) throw new GitHubError(413, `GitHub GET ${path} : ${length} octets`);
+    const data = new Uint8Array(await response.arrayBuffer());
+    if (data.byteLength > max)
+      throw new GitHubError(413, `GitHub GET ${path} : ${data.byteLength} octets`);
+    return data;
+  }
+
+  /** The text of an issue or a PR as its author wrote it (the criteria, the proofs), and its PR's shas. */
+  async pullRequestText(
+    repo: string,
+    number: number,
+  ): Promise<{ body: string; head: string; base: string; url: string }> {
+    const data = (await this.request('GET', this.path(repo, `/pulls/${number}`))) as Json;
+    return {
+      body: str(data['body']),
+      head: str(obj(data['head'])['sha']),
+      base: str(obj(data['base'])['sha']),
+      url: str(data['html_url']),
+    };
+  }
+
+  async issueBody(repo: string, number: number): Promise<string> {
+    const data = (await this.request('GET', this.path(repo, `/issues/${number}`))) as Json;
+    return str(data['body']);
+  }
+
+  /**
+   * Every page of a list GitHub gives by pages of 100 (`per_page=100` in `path`), up to `max` pages:
+   * past its first page, a PR's newest gate verdict, captures or threads would be missed.
+   */
+  private async pages<T>(path: string, pick: (body: unknown) => T[], max: number): Promise<T[]> {
+    const all: T[] = [];
+    for (let page = 1; page <= max; page += 1) {
+      const items = pick(await this.request('GET', `${path}&page=${page}`));
+      all.push(...items);
+      if (items.length < 100) break;
+    }
+    return all;
+  }
+
+  /** The check runs of a commit (each job of each workflow, and the checks of Apps). */
+  async checkRuns(repo: string, sha: string): Promise<CheckRunJson[]> {
+    return this.pages(
+      this.path(repo, `/commits/${sha}/check-runs?per_page=100`),
+      (body) => {
+        const runs = obj(body)['check_runs'];
+        return (Array.isArray(runs) ? runs : []) as CheckRunJson[];
+      },
+      5,
+    );
+  }
+
+  /** The commit statuses of a commit, newest first (`factory/gate` among them). */
+  async statuses(repo: string, sha: string): Promise<StatusJson[]> {
+    const data = await this.request(
+      'GET',
+      this.path(repo, `/commits/${sha}/statuses?per_page=100`),
+    );
+    return (Array.isArray(data) ? data : []) as StatusJson[];
+  }
+
+  /** The workflow runs of a commit: they name the checks' workflows and hold the test reports. */
+  async workflowRuns(repo: string, sha: string): Promise<WorkflowRunJson[]> {
+    const data = (await this.request(
+      'GET',
+      this.path(repo, `/actions/runs?head_sha=${sha}&per_page=50`),
+    )) as Json;
+    return (Array.isArray(data['workflow_runs']) ? data['workflow_runs'] : []) as WorkflowRunJson[];
+  }
+
+  /** The comments of a PR's conversation, oldest first (the gate's verdicts among them). */
+  async issueComments(repo: string, number: number): Promise<GateCommentJson[]> {
+    return this.pages(
+      this.path(repo, `/issues/${number}/comments?per_page=100`),
+      (body) => (Array.isArray(body) ? body : []) as GateCommentJson[],
+      10,
+    );
+  }
+
+  /** The files a PR changes, with how (added, modified, removed, renamed). */
+  async pullFiles(repo: string, number: number): Promise<{ filename: string; status: string }[]> {
+    // GitHub lists up to 3 000 files of a PR, 100 a page.
+    const files = await this.pages(
+      this.path(repo, `/pulls/${number}/files?per_page=100`),
+      (body) => (Array.isArray(body) ? (body as Json[]) : []),
+      30,
+    );
+    return files.map((file) => ({ filename: str(file['filename']), status: str(file['status']) }));
+  }
+
+  /** The artifacts of a workflow run that have not expired. */
+  async artifacts(repo: string, runId: number): Promise<{ id: number; name: string }[]> {
+    const data = (await this.request(
+      'GET',
+      this.path(repo, `/actions/runs/${runId}/artifacts?per_page=100`),
+    )) as Json;
+    return (Array.isArray(data['artifacts']) ? (data['artifacts'] as Json[]) : [])
+      .filter((artifact) => artifact['expired'] !== true)
+      .map((artifact) => ({ id: Number(artifact['id']), name: str(artifact['name']) }));
+  }
+
+  /** An artifact's zip (the CI's test reports are a few hundred kilobytes; past 50 MB, nothing). */
+  async artifactZip(repo: string, id: number): Promise<Uint8Array> {
+    return this.bytes(
+      this.path(repo, `/actions/artifacts/${id}/zip`),
+      'application/vnd.github+json',
+      50 * 1024 * 1024,
+    );
+  }
+
+  /** A file of the repository at a commit, raw (a capture; past 10 MB, nothing). */
+  async fileAt(repo: string, path: string, ref: string): Promise<Uint8Array> {
+    const at = path.split('/').map(encodeURIComponent).join('/');
+    return this.bytes(
+      this.path(repo, `/contents/${at}?ref=${encodeURIComponent(ref)}`),
+      'application/vnd.github.raw',
+      10 * 1024 * 1024,
+    );
+  }
+
+  /** The review threads of a PR and its number of reviews, by GraphQL (REST has no threads). */
+  async reviewThreads(repo: string, number: number): Promise<ThreadsJson> {
+    if (!NAME.test(repo)) throw new GitHubError(400, `Dépôt invalide : ${repo}`);
+    type Thread = NonNullable<
+      NonNullable<NonNullable<ThreadsJson['data']>['repository']>['pullRequest']
+    >['reviewThreads']['nodes'][number];
+    const nodes: Thread[] = [];
+    let first: ThreadsJson | null = null;
+    let after: string | null = null;
+    // A hundred threads a page, ten pages at most: a long review keeps its last threads.
+    for (let page = 0; page < 10; page += 1) {
+      const answer = (await this.request(
+        'POST',
+        '/graphql',
+        { query: THREADS_QUERY, variables: { owner: this.owner, name: repo, number, after } },
+        false,
+        'read',
+      )) as ThreadsJson & { errors?: { type?: string; message?: string }[] };
+      // GraphQL answers 200 even when it refuses: a refusal is GitHub's, like a 403 of REST.
+      if (answer.errors?.length) {
+        const refused = answer.errors.some(
+          (error) => error.type === 'FORBIDDEN' || error.type === 'NOT_FOUND',
+        );
+        throw new GitHubError(
+          refused ? 403 : 502,
+          `GitHub GraphQL : ${answer.errors[0]?.message ?? ''}`,
+        );
+      }
+      first ??= answer;
+      const threads = answer.data?.repository?.pullRequest?.reviewThreads;
+      nodes.push(...(threads?.nodes ?? []));
+      if (!threads?.pageInfo?.hasNextPage || !threads.pageInfo.endCursor) break;
+      after = threads.pageInfo.endCursor;
+    }
+    const pr = first?.data?.repository?.pullRequest;
+    return pr
+      ? { data: { repository: { pullRequest: { ...pr, reviewThreads: { nodes } } } } }
+      : (first ?? { data: null });
   }
 }
 

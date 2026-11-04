@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="7" failures="1" errors="0" time="0.009348163">
+    <testsuite name="packages/domain/src/journey.test.ts" timestamp="2026-11-04T16:48:03.825Z" hostname="machine" tests="4" failures="0" errors="0" skipped="0" time="0.004051286">
+        <testcase classname="packages/domain/src/journey.test.ts" name="journeyOf &gt; le trajet compte deux gates rouges, une demande de changements et un revert dans l&apos;ordre" time="0.002154239">
+        </testcase>
+        <testcase classname="packages/domain/src/journey.test.ts" name="journeyOf &gt; une issue livrée finit par la CI de main, le déploiement puis Terminé" time="0.000324336">
+        </testcase>
+        <testcase classname="packages/domain/src/journey.test.ts" name="journeyOf &gt; le trajet finit toujours sur la station courante" time="0.000324588">
+        </testcase>
+        <testcase classname="packages/domain/src/journey.test.ts" name="journeyOf &gt; un diagnostic passe du brief à sa branche, puis à Terminé, sans gate ni PR" time="0.00036016">
+        </testcase>
+    </testsuite>
+    <testsuite name="packages/domain/src/recette.test.ts" timestamp="2026-11-04T16:48:03.826Z" hostname="machine" tests="3" failures="1" errors="0" skipped="1" time="0.005296877">
+        <testcase classname="packages/domain/src/recette.test.ts" name="recette &gt; un critère vert" time="0.000940329">
+        </testcase>
+        <testcase classname="packages/domain/src/recette.test.ts" name="recette &gt; un critère rouge" time="0.003602105">
+            <failure message="expected &apos;rouge&apos; to be &apos;vert&apos; // Object.is equality" type="AssertionError">
+AssertionError: expected &apos;rouge&apos; to be &apos;vert&apos; // Object.is equality
+
+Expected: &quot;vert&quot;
+Received: &quot;rouge&quot;
+
+ ❯ packages/domain/src/recette.test.ts:8:21
+            </failure>
+        </testcase>
+        <testcase classname="packages/domain/src/recette.test.ts" name="recette &gt; un critère ignoré" time="0">
+            <skipped/>
+        </testcase>
+    </testsuite>
+</testsuites>

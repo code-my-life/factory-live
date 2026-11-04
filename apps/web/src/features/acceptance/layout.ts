@@ -1,3 +1,4 @@
+import type { AcceptanceDevice } from '@factory-live/contracts';
 import { WIDGETS } from './status.ts';
 import type { WidgetId } from './status.ts';
 
@@ -124,19 +125,26 @@ export function toggleCollapsed(layout: BoardLayout, id: WidgetId): BoardLayout 
 
 const STORAGE_KEY = 'factory-live:acceptance-layout';
 
+/** Each type of screen keeps its own copy (#22); the key without a type is the copy kept before. */
+function storageKey(device?: AcceptanceDevice): string {
+  return device ? `${STORAGE_KEY}:${device}` : STORAGE_KEY;
+}
+
 /** The saved layout of this device; the default when nothing is saved or storage is closed. */
-export function loadLayout(): BoardLayout {
+export function loadLayout(device?: AcceptanceDevice): BoardLayout {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw =
+      (device ? window.localStorage.getItem(storageKey(device)) : null) ??
+      window.localStorage.getItem(STORAGE_KEY);
     return raw ? normalizeLayout(JSON.parse(raw)) : DEFAULT_LAYOUT;
   } catch {
     return DEFAULT_LAYOUT;
   }
 }
 
-export function saveLayout(layout: BoardLayout): void {
+export function saveLayout(layout: BoardLayout, device?: AcceptanceDevice): void {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(layout));
+    window.localStorage.setItem(storageKey(device), JSON.stringify(layout));
   } catch {
     // Storage closed (private browsing): the layout holds for this visit.
   }

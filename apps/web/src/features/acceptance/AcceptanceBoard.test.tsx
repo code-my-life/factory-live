@@ -1,5 +1,5 @@
 import type { IssueSummary } from '@factory-live/contracts';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -8,6 +8,8 @@ import {
   graphAcceptance,
   tagsAcceptance,
 } from '../../demo/acceptance.ts';
+import { FactoryProvider } from '../../data/FactoryProvider.tsx';
+import type { FactoryDataSource } from '../../data/source.ts';
 import { AcceptanceBoard } from './AcceptanceBoard.tsx';
 
 const AT = '2026-11-04T10:00:00.000Z';
@@ -265,6 +267,116 @@ describe('recette d’une PR', () => {
       .getAllByRole('link')
       .find((link) => within(link).queryByRole('img', { name: 'Réussi' }));
     await waitFor(() => expect(firstGreen).toHaveFocus());
+  });
+
+  it('la disposition suit le serveur : lue au chargement, enregistrée après un changement, par type d’écran', async () => {
+    const user = userEvent.setup();
+    const saved = {
+      order: ['twins', 'criteria', 'checks', 'tests', 'proofs', 'threads'],
+      pinned: ['twins'],
+      collapsed: ['criteria'],
+      half: [],
+    } as const;
+    const getAcceptanceLayout = vi.fn(() =>
+      Promise.resolve({
+        ...saved,
+        order: [...saved.order],
+        pinned: [...saved.pinned],
+        collapsed: [...saved.collapsed],
+        half: [],
+      }),
+    );
+    const saveAcceptanceLayout = vi.fn(() => Promise.resolve());
+    const source = {
+      subscribe: () => () => undefined,
+      getAcceptanceLayout,
+      saveAcceptanceLayout,
+    } as unknown as FactoryDataSource;
+    const { container } = render(
+      <FactoryProvider source={source}>
+        <AcceptanceBoard issue={issue(44)} view={footerAcceptance(AT)} />
+      </FactoryProvider>,
+    );
+    // The server's layout for this type of screen (a desktop here) replaces the device's copy.
+    expect(getAcceptanceLayout).toHaveBeenCalledWith('desktop');
+    await waitFor(() => expect(widgetOrder()[0]).toBe('Déplacer « Jumeaux interactifs »'));
+    // A change goes to the server once it settles, for this type of screen.
+    await user.click(
+      within(widget(container, 'checks')).getByRole('button', { name: 'Épingler en tête' }),
+    );
+    await waitFor(() => expect(saveAcceptanceLayout).toHaveBeenCalledOnce(), { timeout: 3000 });
+    expect(saveAcceptanceLayout).toHaveBeenCalledWith('desktop', {
+      order: ['twins', 'checks', 'criteria', 'tests', 'proofs', 'threads'],
+      pinned: ['twins', 'checks'],
+      collapsed: ['criteria'],
+      half: [],
+    });
+  });
+
+  it('téléphone et bureau gardent chacun leur disposition : passer de l’un à l’autre n’écrase rien', async () => {
+    const user = userEvent.setup();
+    // A window that crosses the phone's breakpoint: matchMedia says so, and tells its listeners.
+    let phone = true;
+    const listeners = new Set<() => void>();
+    const media = vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes('max-width: 767px') ? phone : false,
+          media: query,
+          addEventListener: (_type: string, listener: () => void) => {
+            listeners.add(listener);
+          },
+          removeEventListener: (_type: string, listener: () => void) => {
+            listeners.delete(listener);
+          },
+        }) as unknown as MediaQueryList,
+    );
+    const layouts = {
+      phone: {
+        order: ['threads', 'criteria', 'checks', 'tests', 'proofs', 'twins'],
+        pinned: [],
+        collapsed: [],
+        half: [],
+      },
+      desktop: {
+        order: ['tests', 'criteria', 'checks', 'proofs', 'threads', 'twins'],
+        pinned: [],
+        collapsed: [],
+        half: [],
+      },
+    };
+    const saveAcceptanceLayout = vi.fn(() => Promise.resolve());
+    const source = {
+      subscribe: () => () => undefined,
+      getAcceptanceLayout: (device: 'phone' | 'desktop') =>
+        Promise.resolve(structuredClone(layouts[device])),
+      saveAcceptanceLayout,
+    } as unknown as FactoryDataSource;
+    try {
+      const { container } = render(
+        <FactoryProvider source={source}>
+          <AcceptanceBoard issue={issue(44)} view={footerAcceptance(AT)} />
+        </FactoryProvider>,
+      );
+      await waitFor(() => expect(widgetOrder()[0]).toBe('Déplacer « Retours de revue »'));
+      // An edit on the phone, then the window widens before it is sent.
+      await user.click(
+        within(widget(container, 'checks')).getByRole('button', { name: 'Épingler en tête' }),
+      );
+      phone = false;
+      act(() => listeners.forEach((listener) => listener()));
+      // The desktop shows its own layout; the phone's edit went to the phone, never to the desktop.
+      await waitFor(() =>
+        expect(widgetOrder()[0]).toBe('Déplacer « Tests unitaires et de bout en bout »'),
+      );
+      expect(saveAcceptanceLayout).toHaveBeenCalledOnce();
+      expect(saveAcceptanceLayout).toHaveBeenCalledWith(
+        'phone',
+        expect.objectContaining({ pinned: ['checks'] }),
+      );
+    } finally {
+      media.mockRestore();
+    }
   });
 
   it('les jumeaux : les surfaces de la PR, le miroir des gestes, et la divergence qui propose de piloter séparément', async () => {
