@@ -10,6 +10,8 @@ import { pauseMotion } from './helpers.ts';
 const VIEWS = [
   ['ligne', '/'],
   ['issue', '/issues/claude-cockpit/71'],
+  // The acceptance of a big real PR (factory-live#18, PR #19), under the graph.
+  ['recette', '/issues/factory-live/18'],
   ['reglages', '/settings'],
 ] as const;
 
