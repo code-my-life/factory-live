@@ -16,8 +16,18 @@ const ROOT = resolve(import.meta.dirname, '..');
 const IMG = join(ROOT, 'site/src/img');
 /** La langue de l'app (Réglages), celle du navigateur, et la capture du README de cette langue. */
 const LANGUAGES = [
-  { lang: 'en', locale: 'en-US', readme: join(ROOT, 'docs/factory-live.png') },
-  { lang: 'fr', locale: 'fr-FR', readme: join(ROOT, 'docs/factory-live.fr.png') },
+  {
+    lang: 'en',
+    locale: 'en-US',
+    readme: join(ROOT, 'docs/factory-live.png'),
+    twins: join(ROOT, 'docs/twins.png'),
+  },
+  {
+    lang: 'fr',
+    locale: 'fr-FR',
+    readme: join(ROOT, 'docs/factory-live.fr.png'),
+    twins: join(ROOT, 'docs/twins.fr.png'),
+  },
 ];
 const NOW = new Date('2026-10-28T18:00:00Z');
 const require = createRequire(import.meta.url);
@@ -69,6 +79,19 @@ const SHOTS = [
     device: DESKTOP,
     route: '/issues/claude-cockpit/71',
     clip: (page) => box(page, ['main article > header', 'main article table']),
+  },
+  // The live twins of a big real pull request, side by side: the app before and after, and the mirror
+  // waiting on a gesture the base has no counterpart for.
+  {
+    name: 'twins',
+    device: DESKTOP,
+    route: '/issues/factory-live/18',
+    prepare: async (page) => {
+      await page.locator('[data-widget="twins"] button[aria-expanded="false"]').first().click();
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(400);
+    },
+    clip: (page) => box(page, ['[data-widget="twins"]'], 0),
   },
   // The acceptance of a big real pull request: its header and its first widgets, criteria and checks.
   {
@@ -212,7 +235,7 @@ try {
   const encoder = await browser.newPage();
   const fontCss = monaSansCss();
   try {
-    for (const { lang, locale, readme } of LANGUAGES) {
+    for (const { lang, locale, readme, twins } of LANGUAGES) {
       mkdirSync(join(IMG, lang), { recursive: true });
       for (const shot of SHOTS) {
         const context = await browser.newContext({
@@ -259,6 +282,7 @@ try {
         if (shot.png) writeFileSync(join(IMG, lang, `${shot.name}.png`), png);
         else writeFileSync(join(IMG, lang, `${shot.name}.webp`), await toWebp(encoder, png));
         if (shot.name === 'line-desktop') writeFileSync(readme, png);
+        if (shot.name === 'twins') writeFileSync(twins, png);
         console.log(
           `${lang}/${shot.name} : ${clip ? `${Math.round(clip.width)} x ${Math.round(clip.height)}` : 'écran'}`,
         );
