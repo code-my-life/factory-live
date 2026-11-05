@@ -39,7 +39,7 @@ import {
   togglePin,
 } from './layout.ts';
 import type { BoardLayout } from './layout.ts';
-import { boardStatus, boardTally, widgetStatus, widgetTally } from './status.ts';
+import { WIDGETS, boardStatus, boardTally, widgetStatus, widgetTally } from './status.ts';
 import type { Tally, WidgetId, WidgetStatus } from './status.ts';
 import { StatusIcon, TallyBar } from './StatusMark.tsx';
 import { TwinsWidget } from './TwinsWidget.tsx';
@@ -293,21 +293,32 @@ function WidgetFrame({
  * folds and sizes; the layout is theirs, kept on the device for every PR. Each element leads to GitHub.
  * The header counts the elements, what needs the owner first; each count leads to its first element.
  */
-export function AcceptanceBoard({ issue, view }: { issue: IssueSummary; view: AcceptanceView }) {
+export function AcceptanceBoard({
+  issue,
+  view,
+  focus = null,
+}: {
+  issue: IssueSummary;
+  view: AcceptanceView;
+  /** A widget to open on, unfolded and in sight, without changing the owner's layout (a link's). */
+  focus?: string | null;
+}) {
   // A type of screen has its own layout: crossing the phone's breakpoint mounts the board afresh,
   // with that type's layout, read again from the server, and no edit of the other type carried over.
   const device = useMedia(PHONE) ? 'phone' : 'desktop';
-  return <DeviceBoard key={device} issue={issue} view={view} device={device} />;
+  return <DeviceBoard key={device} issue={issue} view={view} device={device} focus={focus} />;
 }
 
 function DeviceBoard({
   issue,
   view,
   device,
+  focus,
 }: {
   issue: IssueSummary;
   view: AcceptanceView;
   device: AcceptanceDevice;
+  focus: string | null;
 }) {
   const { t } = useI18n();
   const { enabled } = useMotion();
@@ -350,6 +361,20 @@ function DeviceBoard({
     },
     [send],
   );
+  // The widget a link asked for: shown unfolded until the owner folds it, the layout left as it is.
+  const [shown, setShown] = useState<WidgetId | null>(() =>
+    (WIDGETS as readonly string[]).includes(focus ?? '') ? (focus as WidgetId) : null,
+  );
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!shown || opened.current) return;
+    opened.current = true;
+    requestAnimationFrame(() =>
+      listRef.current
+        ?.querySelector<HTMLElement>(`[data-widget="${shown}"]`)
+        ?.scrollIntoView({ behavior: enabled ? 'smooth' : 'auto', block: 'start' }),
+    );
+  }, [shown, enabled]);
   const [announcement, setAnnouncement] = useState('');
   // Motion can end a drag before React renders the drag's last reorder: the layout that reorder made is
   // kept here, for the announcement, rather than read from a render that predates it.
@@ -515,14 +540,18 @@ function DeviceBoard({
               title={names[id]}
               status={widgetStatus(view, id)}
               counts={widgetTally(view, id)}
-              collapsed={layout.collapsed.includes(id)}
+              collapsed={layout.collapsed.includes(id) && id !== shown}
               pinned={pinned}
               half={layout.half.includes(id)}
               wide={wide}
               canUp={place.canUp}
               canDown={place.canDown}
               github={github[id]}
-              onToggle={() => apply(toggleCollapsed(layout, id), null)}
+              onToggle={() => {
+                // Folding a widget a link opened folds it back to the owner's layout.
+                if (id === shown && layout.collapsed.includes(id)) setShown(null);
+                else apply(toggleCollapsed(layout, id), null);
+              }}
               onPin={() => {
                 const next = togglePin(layout, id);
                 apply(

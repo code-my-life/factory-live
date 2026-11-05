@@ -134,7 +134,7 @@ ${t.twins.points.map(([name, text]) => `<li class="twins-point"><h3 class="twins
 </ul>
 <div class="twins-foot" data-reveal>
 <p class="twins-note">${t.twins.note}</p>
-<a class="cell cell-ink" href="${page.root}demo/#recette">${t.twins.open}</a>
+<a class="cell cell-ink" href="${page.root}demo/#jumeaux">${t.twins.open}</a>
 </div>
 </div>
 </section>`;

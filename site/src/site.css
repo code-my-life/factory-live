@@ -1509,9 +1509,11 @@
 }
 
 /* En largeur : les arrêts sur une voie horizontale, comme la ligne de l'app sur un grand écran. */
-@media (min-width: 64rem) {
+/* As many columns as stops: from 80rem, where ten of them still have room for their text. */
+@media (min-width: 80rem) {
   .milestones {
-    grid-template-columns: repeat(8, minmax(0, 1fr));
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
     column-gap: var(--base-size-24);
   }
 
@@ -1549,7 +1551,7 @@
   }
 }
 
-@media (min-width: 64rem) and (prefers-reduced-motion: no-preference) {
+@media (min-width: 80rem) and (prefers-reduced-motion: no-preference) {
   [data-ui] .milestone[data-track='flow']::before {
     animation-name: flow-right;
   }

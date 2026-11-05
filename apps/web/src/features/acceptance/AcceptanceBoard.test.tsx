@@ -145,6 +145,26 @@ describe('recette d’une PR', () => {
     ).toBeInTheDocument();
   });
 
+  it('un lien ouvre la recette sur ses jumeaux dépliés, sans changer la disposition', async () => {
+    const user = userEvent.setup();
+    const scrolled = vi.spyOn(Element.prototype, 'scrollIntoView');
+    const { container } = render(
+      <AcceptanceBoard issue={issue(18, 'factory-live')} view={graphAcceptance()} focus="twins" />,
+    );
+    const toggle = (id: string) =>
+      widget(container, id).querySelector('button[aria-expanded]') as HTMLElement;
+    // Folded by default, the twins are open; the criteria, folded too, stay so.
+    expect(toggle('twins')).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle('criteria')).toHaveAttribute('aria-expanded', 'false');
+    await waitFor(() => expect(scrolled).toHaveBeenCalled());
+    expect(
+      Object.keys(window.localStorage).filter((key) => key.includes('acceptance-layout')),
+    ).toEqual([]);
+    // Folded by the owner, they go back to the layout: folded.
+    await user.click(toggle('twins'));
+    expect(toggle('twins')).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('les retours de revue : à traiter en tête, les résolus repliés en une ligne, chacun vers sa discussion', async () => {
     const user = userEvent.setup();
     const { container, unmount } = render(
