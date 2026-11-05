@@ -539,6 +539,7 @@ export const en: Messages = {
     line: 'Factory line',
     lineShort: 'Line',
     interventions: 'Interventions',
+    studio: 'Studio',
     agents: 'Agents',
     health: 'Health',
     costs: 'Costs and quotas',
@@ -582,6 +583,74 @@ export const en: Messages = {
     invalid: 'This workflow’s sheet is refused: the graph cannot be drawn',
   },
 
+  studio: {
+    title: 'Studio',
+    waiting: (count: number) =>
+      count === 0
+        ? 'No video waits for you'
+        : `${count} ${f.plural(count, 'video waits', 'videos wait')} for you`,
+    live: 'The live studio comes with the next piece: for now, the graph alone.',
+    selectHint: 'Touch a video in the graph to open its detail here.',
+    loading: 'Reading the studio…',
+    unknown: 'This video is not in the studio.',
+    marks: {
+      label: 'Landmarks',
+      station: 'Station',
+      since: (stay: string) => `for ${stay}`,
+      card: 'Card',
+      master: 'Master',
+      noMaster: 'no master yet',
+      words: 'Aligned words',
+      wordCount: (count: number) => `${count} ${f.plural(count, 'word', 'words')}`,
+      noWords: 'no aligned words yet',
+      derived: 'Demo: words derived from the script at a fixed pace, not those of a master.',
+      qc: 'Quality check',
+      studioPage: 'Studio page',
+      publication: 'See the publication',
+    },
+    gesture: {
+      label: 'Gesture',
+      approve: 'Approve',
+      redo: 'Redo…',
+      reason: 'Reason',
+      reasonHint: 'What must change: the request follows the card.',
+      send: 'Send',
+      cancel: 'Cancel',
+      relaunch: 'Relaunch',
+      takes: 'Open the takes page',
+      refused: 'The studio refused this gesture. Try again.',
+      none: 'Nothing waits for your gesture at this station.',
+      failed: 'Lane failed',
+    },
+    journey: 'Journey',
+    steps: {
+      label: 'Steps of vf run',
+      none: 'No step of vf run yet.',
+      step: 'Step',
+      result: 'Result',
+      duration: 'Duration',
+      outputs: 'Fingerprints',
+    },
+    script: {
+      label: 'Script',
+      none: 'No script yet.',
+    },
+    player: (title: string) => `Master: ${title}`,
+  },
+
+  media: {
+    player: 'video player',
+    words: 'Aligned words',
+    time: (seconds: number) => `${seconds.toFixed(2)} s`,
+    frame: (frame: number, total: number) => `frame ${frame} / ${total}`,
+    noMaster: 'No master yet',
+    previous: 'Previous frame',
+    next: 'Next frame',
+    play: 'Play',
+    pause: 'Pause',
+    keys: '← and →: one frame; with Shift: one second; Space: play',
+  },
+
   components: {
     title: 'Components',
     intro:
@@ -620,6 +689,12 @@ export const en: Messages = {
     },
     legend: { title: 'Legend', closed: 'Closed, under a graph', open: 'Open' },
     zoom: { title: 'Zoom' },
+    media: {
+      title: 'Player and aligned words',
+      noMaster: 'Without a master: the 9:16 frame',
+      word: 'Lit word, at the frame shown',
+      sample: 'Sample',
+    },
     sheet: {
       title: 'A sheet of three stations',
       invalid: 'A refused sheet: the page stays up',
@@ -1099,6 +1174,9 @@ export const en: Messages = {
     resolvedLabel: 'Unblocked',
     resolvedAt: (time) => `unblocked at ${time}`,
     runAfter: 'Next run',
+    studio: 'Studio',
+    studioWaits: (station: string) => `Video at the ${station} station`,
+    openStudio: 'Open in the Studio',
   },
 
   diagnosis: {

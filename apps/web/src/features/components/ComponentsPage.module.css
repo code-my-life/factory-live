@@ -45,6 +45,15 @@
   border-radius: var(--borderRadius-medium);
 }
 
+/* The player and its words, as narrow as a phone's column. */
+.media {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-12);
+  width: 320px;
+  max-width: 100%;
+}
+
 .legend {
   max-width: 100%;
   border: var(--borderWidth-thin) solid var(--borderColor-default);

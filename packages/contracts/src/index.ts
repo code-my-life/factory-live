@@ -13,3 +13,4 @@ export * from './stream.ts';
 export * from './ingest.ts';
 export * from './api.ts';
 export * from './workflow.ts';
+export * from './studio.ts';

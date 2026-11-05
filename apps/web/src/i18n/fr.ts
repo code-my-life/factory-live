@@ -587,6 +587,7 @@ export const fr = {
     line: 'Ligne d’usine',
     lineShort: 'Ligne',
     interventions: 'Interventions',
+    studio: 'Studio',
     agents: 'Agents',
     health: 'Santé',
     costs: 'Coûts et quotas',
@@ -634,6 +635,76 @@ export const fr = {
     invalid: 'La fiche de ce workflow est refusée : le graphe ne peut pas se dessiner',
   },
 
+  /** The video studio's page (`/studio`), its detail and the owner's gesture. */
+  studio: {
+    title: 'Studio',
+    waiting: (count: number) =>
+      count === 0
+        ? 'Aucune vidéo ne t’attend'
+        : `${count} ${f.plural(count, 'vidéo t’attend', 'vidéos t’attendent')}`,
+    live: 'Le direct du studio arrive avec la pièce suivante : pour l’instant, le graphe seul.',
+    selectHint: 'Touche une vidéo dans le graphe pour ouvrir son détail ici.',
+    loading: 'Lecture du studio…',
+    unknown: 'Cette vidéo n’est pas dans le studio.',
+    marks: {
+      label: 'Repères',
+      station: 'Station',
+      since: (stay: string) => `depuis ${stay}`,
+      card: 'Carte',
+      master: 'Master',
+      noMaster: 'pas encore de master',
+      words: 'Mots calés',
+      wordCount: (count: number) => `${count} ${f.plural(count, 'mot', 'mots')}`,
+      noWords: 'pas encore de mots calés',
+      derived: 'Démo : mots dérivés du script à cadence fixe, pas ceux d’un master.',
+      qc: 'Contrôle qualité',
+      studioPage: 'Page du studio',
+      publication: 'Voir la publication',
+    },
+    gesture: {
+      label: 'Geste',
+      approve: 'Valider',
+      redo: 'Refaire…',
+      reason: 'Raison',
+      reasonHint: 'Ce qui doit changer : la demande suit la carte.',
+      send: 'Envoyer',
+      cancel: 'Annuler',
+      relaunch: 'Relancer',
+      takes: 'Ouvrir la page des prises',
+      refused: 'Le studio a refusé ce geste. Réessaie.',
+      none: 'Rien n’attend ton geste à cette station.',
+      failed: 'Voie en échec',
+    },
+    journey: 'Trajet',
+    steps: {
+      label: 'Étapes de vf run',
+      none: 'Aucune étape de vf run pour l’instant.',
+      step: 'Étape',
+      result: 'Résultat',
+      duration: 'Durée',
+      outputs: 'Empreintes',
+    },
+    script: {
+      label: 'Script',
+      none: 'Pas encore de script.',
+    },
+    player: (title: string) => `Master : ${title}`,
+  },
+
+  /** The video's standard blocks (`ui/media`): the player and the aligned words. */
+  media: {
+    player: 'lecteur vidéo',
+    words: 'Mots calés',
+    time: (seconds: number) => `${seconds.toFixed(2).replace('.', ',')} s`,
+    frame: (frame: number, total: number) => `image ${frame} / ${total}`,
+    noMaster: 'Pas encore de master',
+    previous: 'Image précédente',
+    next: 'Image suivante',
+    play: 'Lecture',
+    pause: 'Pause',
+    keys: '← et → : une image ; avec Maj : une seconde ; Espace : lecture',
+  },
+
   /** The catalogue of the standard blocks of a workflow's graph (`/composants`). */
   components: {
     title: 'Composants',
@@ -674,6 +745,12 @@ export const fr = {
     },
     legend: { title: 'Légende', closed: 'Fermée, sous un graphe', open: 'Ouverte' },
     zoom: { title: 'Zoom' },
+    media: {
+      title: 'Lecteur et mots calés',
+      noMaster: 'Sans master : le cadre 9:16',
+      word: 'Mot surligné, à l’image affichée',
+      sample: 'Exemple',
+    },
     sheet: {
       title: 'Une fiche de trois postes',
       invalid: 'Une fiche refusée : la page reste debout',
@@ -1198,6 +1275,10 @@ export const fr = {
     resolvedLabel: 'Débloquée',
     resolvedAt: (time: string) => `débloquée à ${time}`,
     runAfter: 'Run suivant',
+    /** A video of the studio that waits for the owner, among the interventions. */
+    studio: 'Studio',
+    studioWaits: (station: string) => `Vidéo à la station ${station}`,
+    openStudio: 'Ouvrir dans le Studio',
   },
 
   diagnosis: {

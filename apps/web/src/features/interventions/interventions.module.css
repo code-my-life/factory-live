@@ -164,6 +164,20 @@
   border-radius: var(--borderRadius-medium);
 }
 
+/* A video of the studio: the link to its page, and its gesture across the card. */
+.studioLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--fgColor-accent);
+  font: var(--text-body-shorthand-small);
+}
+
+.studioGesture {
+  align-self: stretch;
+  min-width: 0;
+}
+
 .cardHead {
   display: flex;
   flex-direction: column;
