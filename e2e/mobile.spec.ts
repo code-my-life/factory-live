@@ -122,8 +122,8 @@ for (const { locale, name } of LANGUAGES) {
         const labels = page
           .getByRole('navigation', { name: 'Navigation', exact: true })
           .locator('[class*="tabLabel"]');
-        // The line, the interventions, the agents, then « Plus »: the issues live on the line.
-        await expect(labels).toHaveCount(4);
+        // The line, the studio, the interventions, the agents, then « Plus »: the issues live on the line.
+        await expect(labels).toHaveCount(5);
         for (const label of await labels.all()) {
           const cut = await label.evaluate((element) => element.scrollWidth - element.clientWidth);
           expect(cut, `${width} px : « ${await label.innerText()} » tronqué`).toBeLessThanOrEqual(
