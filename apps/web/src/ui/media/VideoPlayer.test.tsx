@@ -15,6 +15,10 @@ beforeEach(() => {
     writable: true,
     configurable: true,
   });
+  // Nor the popover methods Primer's tooltip calls when it opens, 50 ms after a hover: a slow run
+  // reaches them before the test ends.
+  HTMLElement.prototype.showPopover = vi.fn();
+  HTMLElement.prototype.hidePopover = vi.fn();
 });
 afterEach(() => {
   localStorage.clear();
