@@ -306,6 +306,8 @@ export function TwinsWidget({
   const streamOf = live ? (live.head.stream ?? live.base.stream) : null;
   const api = useMemo(() => TwinsApi.of(streamOf, fetchImpl), [streamOf, fetchImpl]);
   const bench = useBenchState(api);
+  const [refused, setRefused] = useState<string | null>(null);
+  useEffect(() => api?.onRefused(setRefused), [api]);
 
   if (!twins) {
     return (
@@ -405,6 +407,14 @@ export function TwinsWidget({
           ? ` ${t.acceptance.twins.differences(surface.differences)}.`
           : ''}
       </p>
+
+      {refused ? (
+        <Banner
+          variant="critical"
+          title={t.acceptance.twins.refusedTitle}
+          description={t.acceptance.twins.refused(refused)}
+        />
+      ) : null}
 
       {waiting ? (
         <div className={styles.divergence}>

@@ -71,7 +71,11 @@ export function writeGuard(
       );
     }
     const origin = c.req.header('origin');
-    if (origin && !options.origins.includes(origin))
+    // This PC opens the app at localhost, 127.0.0.1 or [::1]: a local request whose page is its own host
+    // is this app, whichever loopback name it came by (#35).
+    const ownPage =
+      actor === 'local' && origin === `http://${(c.req.header('host') ?? '').toLowerCase()}`;
+    if (origin && !ownPage && !options.origins.includes(origin))
       return c.json({ error: 'Origine refusée', code: 'origin_refused' }, 403);
     if (c.req.header(CSRF_HEADER) !== '1')
       return c.json({ error: 'En-tête x-factory-live manquant', code: 'csrf_missing' }, 403);
