@@ -133,14 +133,23 @@ function sameFile(left: string, right: string): boolean {
   return left === right || left.endsWith(`/${right}`) || right.endsWith(`/${left}`);
 }
 
+/**
+ * A test's name as written, whatever its apostrophes and runs of spaces: a French keyboard types
+ * « d’usine » where a PR may write « d'usine », and the gate takes them for the same test (#33).
+ */
+function testName(text: string): string {
+  return text.normalize('NFC').replace(/[’ʼ]/g, "'").replace(/\s+/g, ' ').trim();
+}
+
 /** A report's test is the named one: same name, or the same name under its describe blocks. */
 function isNamed(
   result: AcceptanceTestResult,
   named: { file: string | null; name: string },
 ): boolean {
-  const name = result.name;
+  const name = testName(result.name);
+  const wanted = testName(named.name);
   const sameName =
-    name === named.name || name.endsWith(` > ${named.name}`) || name.endsWith(` › ${named.name}`);
+    name === wanted || name.endsWith(` > ${wanted}`) || name.endsWith(` › ${wanted}`);
   return sameName && (named.file === null || sameFile(result.file, named.file));
 }
 
