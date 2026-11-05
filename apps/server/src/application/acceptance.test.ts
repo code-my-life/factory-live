@@ -163,6 +163,58 @@ describe('la recette d’une PR', () => {
     expect(criterion(missing, 'C1')).toMatchObject({ status: 'nok', reason: 'unproven', url: PR });
   });
 
+  it('un test nommé avec une autre apostrophe que son rapport prouve son critère', () => {
+    // The PR writes the straight apostrophe, the test was written with a French keyboard's one: the same test.
+    const named = (prBody: string, reported: string) =>
+      criterion(
+        acceptanceOf(
+          source({
+            prBody,
+            tests: {
+              suites: [],
+              results: [
+                result('apps/web/src/graph/sheet.test.ts', `la fiche > ${reported}`, 'passed'),
+              ],
+            },
+          }),
+          [],
+        ),
+        'C1',
+      );
+    expect(
+      named(
+        "## Critères\n\n- C1 : `sheet.test.ts` « la ligne d'usine  se dessine »",
+        'la ligne d’usine se dessine',
+      ),
+    ).toMatchObject({ status: 'ok', reason: 'proven' });
+    expect(
+      named(
+        '## Critères\n\n- C1 : `sheet.test.ts` « la ligne d’usine se dessine »',
+        "la ligne d'usine se dessine",
+      ),
+    ).toMatchObject({ status: 'ok', reason: 'proven' });
+  });
+
+  it("un nom de test différent d'un mot ne prouve pas son critère", () => {
+    const view = acceptanceOf(
+      source({
+        prBody: "## Critères\n\n- C1 : `sheet.test.ts` « la ligne d'usine se dessine »",
+        tests: {
+          suites: [],
+          results: [
+            result(
+              'apps/web/src/graph/sheet.test.ts',
+              'la fiche > la ligne d’usine se dessine vite',
+              'passed',
+            ),
+          ],
+        },
+      }),
+      [],
+    );
+    expect(criterion(view, 'C1')).toMatchObject({ status: 'nok', reason: 'unproven' });
+  });
+
   it('une ligne non prouvé de la PR rend son critère NOK', () => {
     const view = acceptanceOf(source(), []);
     expect(criterion(view, 'C3')).toEqual({
