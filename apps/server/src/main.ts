@@ -21,8 +21,8 @@ import { StreamBuffer } from './http/stream.ts';
 import { DiagnosisService } from './application/diagnosis.ts';
 import { Hub } from './application/hub.ts';
 import { createLogger } from './logger.ts';
-import { notifyOpened } from './application/notify.ts';
-import { notifyArrivals } from './application/notifications.ts';
+import { factoryBadge, notifyOpened } from './application/notify.ts';
+import { notifyArrivals, waitingForOwner } from './application/notifications.ts';
 import { KEEP_FINISHED_MS } from './application/projection.ts';
 import { trackUnblockReactions } from './application/unblock.ts';
 
@@ -101,6 +101,9 @@ const workflows = config.WORKFLOWS.map(
   (workflow) => new WorkflowApi({ name: workflow.name, url: workflow.url }),
 );
 let codeSheet = publishedSheet(paths.factorySheet());
+/** The workflows' items that wait for the owner: the app's badge counts them with the factory's. */
+const workflowsWaiting = () =>
+  workflows.reduce((count, workflow) => count + waitingForOwner(workflow.view()).length, 0);
 
 const hub = new Hub(
   {
@@ -127,8 +130,9 @@ hub.subscribe((event) => buffer.push(event));
 
 const notifier = new PushNotifier(store, vapidKeys(store), config.VAPID_SUBJECT);
 hub.interventionListeners.add((opened, all) => {
-  notifyOpened({ store, notifier, log, now }, opened, all).catch((error: unknown) =>
-    log.error({ component: 'push', error: String(error) }, 'notification en échec'),
+  notifyOpened({ store, notifier, log, now }, opened, all, workflowsWaiting()).catch(
+    (error: unknown) =>
+      log.error({ component: 'push', error: String(error) }, 'notification en échec'),
   );
 });
 
@@ -192,7 +196,11 @@ const refreshWorkflows = async () => {
   try {
     for (const workflow of workflows) {
       if (await workflow.refresh()) hub.workflowsChanged();
-      await notifyArrivals({ store, notifier, log, now }, workflow.view());
+      const others =
+        factoryBadge(hub.openInterventions) +
+        workflowsWaiting() -
+        waitingForOwner(workflow.view()).length;
+      await notifyArrivals({ store, notifier, log, now }, workflow.view(), others);
     }
   } catch (error) {
     log.warn({ component: 'workflows', error: String(error) }, 'lecture des workflows en échec');

@@ -63,6 +63,8 @@ export interface WorkflowApiOptions {
 export class WorkflowApi {
   private readonly options: WorkflowApiOptions;
   private state: WorkflowView;
+  /** The first read that saw an item without its own time at a station: `id:station`. */
+  private readonly firstSeen = new Map<string, string>();
 
   constructor(options: WorkflowApiOptions) {
     this.options = options;
@@ -91,6 +93,33 @@ export class WorkflowApi {
       ...init,
       signal: AbortSignal.timeout(this.options.timeoutMs ?? 5000),
     });
+  }
+
+  /**
+   * A file: the deadline holds until its headers only, never while its body streams to the player,
+   * which may take minutes for a whole master.
+   */
+  private async stream(path: string, headers: Record<string, string>): Promise<Response> {
+    const fetchImpl = this.options.fetchImpl ?? fetch;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.options.timeoutMs ?? 5000);
+    try {
+      return await fetchImpl(`${this.options.url}${path}`, { headers, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * When an item got to its station: the workflow's own time, else the first read that saw it there.
+   * It stays the same from one read to the next: an arrival is notified once.
+   */
+  private arrivedAt(item: z.infer<typeof ApiItem>, now: number): string {
+    if (item.since) return item.since;
+    const key = `${item.id}:${item.station ?? ''}`;
+    const seen = this.firstSeen.get(key) ?? new Date(now).toISOString();
+    this.firstSeen.set(key, seen);
+    return seen;
   }
 
   private async json(path: string): Promise<Record<string, unknown>> {
@@ -126,7 +155,10 @@ export class WorkflowApi {
       const items = z
         .array(ApiItem)
         .parse(itemsBody.items)
-        .flatMap((item) => (item.station ? [toItem(item, now)] : []));
+        .flatMap((item) => (item.station ? [toItem(item, this.arrivedAt(item, now))] : []));
+      // An item that left its station forgets when it came: back there later, it arrives again.
+      const here = new Set(items.map((item) => `${item.id}:${item.station}`));
+      for (const key of this.firstSeen.keys()) if (!here.has(key)) this.firstSeen.delete(key);
       this.state = {
         ...this.state,
         sheet: parsed.ok ? parsed.sheet : this.state.sheet,
@@ -161,7 +193,7 @@ export class WorkflowApi {
     const base = `/api/workflows/${this.name}`;
     const page = studioPage(this.options.url, viewer, id);
     return {
-      ...toItem(item, this.now()),
+      ...toItem(item, this.arrivedAt(item, this.now())),
       script: item.script ?? '',
       steps: item.steps.map((step) => ({
         name: step.name,
@@ -196,9 +228,7 @@ export class WorkflowApi {
   /** A file of an item, as the workflow serves it: the byte range asked for, passed through. */
   async media(id: string, name: string, range: string | undefined): Promise<Response | null> {
     if (!ITEM_ID.test(id) || !FILE_NAME.test(name)) return null;
-    const response = await this.call(`/v/${id}/media/${name}`, {
-      headers: range ? { Range: range } : {},
-    });
+    const response = await this.stream(`/v/${id}/media/${name}`, range ? { Range: range } : {});
     return response.status === 404 ? null : response;
   }
 
@@ -227,14 +257,14 @@ export class WorkflowApi {
   }
 }
 
-function toItem(item: z.infer<typeof ApiItem>, now: number): StudioItem {
+function toItem(item: z.infer<typeof ApiItem>, since: string): StudioItem {
   return StudioItem.parse({
     id: item.id,
     card: item.card,
     title: item.title,
     station: item.station,
     state: item.state,
-    since: item.since ?? new Date(now).toISOString(),
+    since,
     waits: item.waits,
     failure: item.failure,
   });

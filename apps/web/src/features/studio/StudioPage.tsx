@@ -21,6 +21,7 @@ export function StudioPage() {
     agents,
     waiting,
     sheet: parsed,
+    sheetRead,
     configured,
     ready,
     unreachableSince,
@@ -62,15 +63,19 @@ export function StudioPage() {
             />
           ) : null}
 
-          <SheetGraph
-            parsed={parsed}
-            items={rows}
-            providers={providers}
-            selectedKey={selected}
-            onSelect={(key) => void navigate(key === selected ? '/studio' : `/studio/${key}`)}
-            now={now}
-            maxInProgress={1}
-          />
+          {sheetRead ? (
+            <SheetGraph
+              parsed={parsed}
+              items={rows}
+              providers={providers}
+              selectedKey={selected}
+              onSelect={(key) => void navigate(key === selected ? '/studio' : `/studio/${key}`)}
+              now={now}
+              maxInProgress={1}
+            />
+          ) : (
+            <p className={styles.quiet}>{t.studio.loading}</p>
+          )}
 
           {selected && sheet ? (
             <VideoDetail key={selected} id={selected} sheet={sheet} now={now} />

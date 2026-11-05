@@ -13,6 +13,8 @@ export interface StudioState {
   ready: boolean;
   /** False when this server follows no studio: its page and tab are hidden. */
   configured: boolean;
+  /** False until the studio has given a sheet. */
+  sheetRead: boolean;
   /** The studio's sheet, as its source gives it: the graph is drawn from it alone. */
   sheet: WorkflowSheetResult;
   /** Since when the studio does not answer (ms), and why: the last state read stays shown. */
@@ -51,6 +53,7 @@ const StudioContext = createContext<StudioState>({
   source: EMPTY_SOURCE,
   ready: true,
   configured: false,
+  sheetRead: true,
   sheet: STUDIO_SHEET,
   unreachableSince: null,
   error: null,
@@ -113,6 +116,7 @@ export function StudioProvider({
   const value = useMemo<StudioState>(() => {
     const status: StudioStatus = read?.status ?? {
       configured: source.kind === 'demo',
+      sheetRead: source.kind === 'demo',
       sheet: STUDIO_SHEET,
       unreachableSince: null,
       error: null,
@@ -121,6 +125,7 @@ export function StudioProvider({
       source,
       ready: read !== null,
       configured: status.configured,
+      sheetRead: status.sheetRead,
       sheet: status.sheet,
       unreachableSince: status.unreachableSince,
       error: status.error,

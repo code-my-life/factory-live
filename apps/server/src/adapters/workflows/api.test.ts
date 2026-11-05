@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FakeWorkflow, STUDIO_SHEET, waitingVideo } from '../../test/workflow-fixtures.ts';
 import { WorkflowApi } from './api.ts';
@@ -148,5 +149,96 @@ describe('WorkflowApi', () => {
     // Back: the outage ends.
     expect(await api.refresh()).toBe(true);
     expect(api.view()).toMatchObject({ unreachableSince: null, error: null, readAt: now });
+  });
+
+  it("lit les vraies réponses de l'API du studio, version 1", async () => {
+    const real = (name: string) =>
+      JSON.parse(
+        readFileSync(
+          new URL(`../../../../../fixtures/workflow-studio-v1/${name}.json`, import.meta.url),
+          'utf8',
+        ),
+      ) as unknown;
+    const routes: Record<string, unknown> = {
+      'GET /api/workflow': real('workflow'),
+      'GET /api/items': real('items'),
+      'GET /api/items/essai': real('item-essai'),
+      'GET /api/items/essai/words': real('words-essai'),
+    };
+    let gesture = real('gesture-ok') as { status: number; body: unknown };
+    const api = new WorkflowApi({
+      name: 'studio',
+      url: 'http://host.docker.internal:8448',
+      now: () => NOW,
+      fetchImpl: (input, init) => {
+        const path = new URL(input instanceof Request ? input.url : input.toString()).pathname;
+        if (init?.method === 'POST')
+          return Promise.resolve(Response.json(gesture.body, { status: gesture.status }));
+        const body = routes[`GET ${path}`];
+        return Promise.resolve(
+          body === undefined ? new Response(null, { status: 404 }) : Response.json(body),
+        );
+      },
+    });
+
+    await api.refresh();
+    const view = api.view();
+    expect(view.sheetError).toBeNull();
+    expect(view.sheet?.item).toEqual({ type: 'video', label: 'Vidéo' });
+    expect(
+      view.sheet?.stations.filter(({ kind }) => kind === 'owner').map(({ key }) => key),
+    ).toEqual(['approbation', 'tournage', 'revue']);
+    expect(view.items.map(({ id, station, state }) => [id, station, state])).toEqual([
+      ['essai', 'revue', 'waiting'],
+      ['rendu', 'montage', 'failed'],
+    ]);
+
+    const detail = await api.detail('essai', 'http://localhost:8446');
+    expect(detail?.steps.map(({ name, durationMs }) => [name, durationMs])).toEqual([
+      ['cut', 1000],
+      ['compose', 60000],
+      ['master', 30000],
+    ]);
+    expect(detail?.files.map(({ kind, url }) => [kind, url])).toEqual([
+      ['video', '/api/workflows/studio/items/essai/media/master'],
+      ['video', '/api/workflows/studio/items/essai/media/tiktok'],
+      ['words', '/api/workflows/studio/items/essai/words'],
+    ]);
+    expect(detail?.links).toEqual({ studio: 'http://localhost:8448/v/essai' });
+    expect(await api.words('essai')).toEqual([
+      { mot: 'Bonjour', debut: 0, fin: 0.5, garde: true },
+      { mot: 'euh', debut: 1, fin: 1.2, garde: false },
+    ]);
+
+    expect(await api.gesture('essai', { decision: 'refaire', note: 'le son' })).toEqual({
+      ok: true,
+    });
+    // The studio's own refusal comes back with its words.
+    gesture = real('gesture-refused') as typeof gesture;
+    expect(await api.gesture('essai', { decision: 'ok' })).toEqual({
+      ok: false,
+      status: 400,
+      error: 'décision inconnue « peut-etre » : ok ou refaire',
+    });
+  });
+
+  it('une vidéo sans heure d’arrivée garde celle de sa première lecture', async () => {
+    const fake = new FakeWorkflow();
+    fake.items = [waitingVideo({ since: null })];
+    let now = NOW;
+    const api = studio(fake, () => now);
+    await api.refresh();
+    const first = api.view().items[0]?.since;
+    expect(first).toBe(new Date(NOW).toISOString());
+    now += 30_000;
+    await api.refresh();
+    expect(api.view().items[0]?.since).toBe(first);
+    // Gone from the station, then back: a new arrival.
+    fake.items = [waitingVideo({ since: null, station: 'script', state: 'running' })];
+    await api.refresh();
+    fake.items = [waitingVideo({ since: null })];
+    now += 30_000;
+    await api.refresh();
+    expect(api.view().items[0]?.since).toBe(new Date(now).toISOString());
   });
 });

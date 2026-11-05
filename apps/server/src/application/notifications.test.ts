@@ -69,7 +69,8 @@ describe('notifyArrivals', () => {
       { ...video, id: 'script', station: 'script' },
       { ...video, id: 'ancienne', since: '2026-11-03T14:00:00.000Z' },
     ];
-    expect(await notifyArrivals(value, studio([video, ...others]))).toBe(1);
+    // Three interventions of the factory wait too: the badge counts them with the videos.
+    expect(await notifyArrivals(value, studio([video, ...others]), 3)).toBe(1);
     expect(sent).toEqual([
       {
         where: 'studio:essai',
@@ -77,7 +78,7 @@ describe('notifyArrivals', () => {
         body: 'Une vidéo d’essai',
         url: '/studio/essai',
         tag: 'studio:essai:revue:2026-11-04T14:00:00.000Z',
-        badge: 2,
+        badge: 5,
       },
     ]);
 

@@ -34,10 +34,19 @@ function headline(intervention: Intervention): { title: Text; body: Text } {
  * texte partent tels quels (texte de l'agent ou code de factory-live) : le service worker de chaque
  * appareil les écrit dans la langue qui y est choisie.
  */
+/** The factory's interventions that wait for the owner, as the app's badge counts them. */
+export function factoryBadge(all: readonly Intervention[]): number {
+  return all.filter(
+    (item) => item.kind !== 'pr_approval' && item.kind !== 'main_red' && !item.resolvedAt,
+  ).length;
+}
+
 export async function notifyOpened(
   deps: NotifyDeps,
   opened: readonly Intervention[],
   all: readonly Intervention[],
+  /** What else waits for the owner (the workflows' items): the app's badge counts it too. */
+  alsoWaiting = 0,
 ): Promise<void> {
   const now = deps.now();
   for (const intervention of opened) {
@@ -51,9 +60,7 @@ export async function notifyOpened(
       body: clip(body, 180),
       url: `/interventions/${encodeURIComponent(intervention.id)}`,
       tag: intervention.id,
-      badge: all.filter(
-        (item) => item.kind !== 'pr_approval' && item.kind !== 'main_red' && !item.resolvedAt,
-      ).length,
+      badge: factoryBadge(all) + alsoWaiting,
     });
     deps.log.info(
       { component: 'push', interventionId: intervention.id, ...result },

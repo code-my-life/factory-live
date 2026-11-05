@@ -1,0 +1,17 @@
+{
+  "api": 1,
+  "words": [
+    {
+      "mot": "Bonjour",
+      "debut": 0.0,
+      "fin": 0.5,
+      "garde": true
+    },
+    {
+      "mot": "euh",
+      "debut": 1.0,
+      "fin": 1.2,
+      "garde": false
+    }
+  ]
+}

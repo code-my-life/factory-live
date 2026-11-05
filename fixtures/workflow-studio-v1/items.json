@@ -1,0 +1,25 @@
+{
+  "api": 1,
+  "items": [
+    {
+      "id": "essai",
+      "card": "t_0001",
+      "title": "Titre à écrire",
+      "station": "revue",
+      "state": "waiting",
+      "since": "1970-01-01T00:16:41Z",
+      "waits": "Regarder le master",
+      "failure": null
+    },
+    {
+      "id": "rendu",
+      "card": "t_0002",
+      "title": "Titre à écrire",
+      "station": "montage",
+      "state": "failed",
+      "since": "1970-01-01T00:16:44Z",
+      "waits": null,
+      "failure": "Montage en échec : compose refuse le projet"
+    }
+  ]
+}

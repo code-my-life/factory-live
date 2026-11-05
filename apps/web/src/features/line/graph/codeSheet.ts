@@ -37,20 +37,26 @@ export function useCodeSheet(): WorkflowSheetResult {
   useEffect(() => {
     if (!live) return;
     let current = true;
-    if (Date.now() - readAt > EVERY_MS) {
-      readAt = Date.now();
-      reading ??= readCodeSheet().finally(() => {
-        reading = null;
+    const refresh = () => {
+      if (Date.now() - readAt > EVERY_MS) {
+        readAt = Date.now();
+        reading ??= readCodeSheet().finally(() => {
+          reading = null;
+        });
+      }
+      void (reading ?? Promise.resolve(published ?? CODE_LINE_SHEET)).then((next) => {
+        published = next;
+        // The same sheet keeps its object: the graph does not lay itself out again for nothing.
+        if (current)
+          setSheet((last) => (JSON.stringify(last) === JSON.stringify(next) ? last : next));
       });
-    }
-    void (reading ?? Promise.resolve(published ?? CODE_LINE_SHEET)).then((next) => {
-      published = next;
-      // The same sheet keeps its object: the graph does not lay itself out again for nothing.
-      if (current)
-        setSheet((last) => (JSON.stringify(last) === JSON.stringify(next) ? last : next));
-    });
+    };
+    refresh();
+    // An open line sees a sheet the factory publishes later, or comes back from a failed read.
+    const timer = setInterval(refresh, EVERY_MS);
     return () => {
       current = false;
+      clearInterval(timer);
     };
   }, [live]);
   return live ? sheet : CODE_LINE_SHEET;
