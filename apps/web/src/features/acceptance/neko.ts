@@ -222,15 +222,16 @@ export class TwinsApi {
 
   private async heard(response: Response | null): Promise<void> {
     if (!response || !this.listener) return;
-    if (response.ok) {
-      this.listener(null);
-      return;
+    let refused: string | null = null;
+    if (!response.ok) {
+      const body = (await response
+        .clone()
+        .json()
+        .catch(() => null)) as { code?: unknown } | null;
+      refused = typeof body?.code === 'string' ? body.code : `http_${response.status}`;
     }
-    const body = (await response
-      .clone()
-      .json()
-      .catch(() => null)) as { code?: unknown } | null;
-    this.listener(typeof body?.code === 'string' ? body.code : `http_${response.status}`);
+    // The widget may have left while the body was read: the listener is read again, never kept.
+    this.listener?.(refused);
   }
 
   /**
@@ -275,7 +276,8 @@ export class TwinsApi {
     try {
       for (let next = this.pending.shift(); next; next = this.pending.shift()) {
         const response = await this.post(next.path, next.body).catch(() => null);
-        await this.heard(response);
+        // Telling the widget never stops the line: a release behind must still go.
+        await this.heard(response).catch(() => undefined);
         next.settle?.(response);
       }
     } finally {
