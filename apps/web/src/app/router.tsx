@@ -1,6 +1,7 @@
 import { Navigate, createBrowserRouter, createMemoryRouter } from 'react-router';
 import type { RouteObject } from 'react-router';
 import { AgentsPage } from '../features/agents/AgentsPage.tsx';
+import { ComponentsPage } from '../features/components/ComponentsPage.tsx';
 import { CostsPage } from '../features/costs/CostsPage.tsx';
 import { HealthPage } from '../features/health/HealthPage.tsx';
 import { HistoryPage } from '../features/history/HistoryPage.tsx';
@@ -26,6 +27,8 @@ const routes: RouteObject[] = [
       { path: 'costs', element: <CostsPage /> },
       { path: 'history', element: <HistoryPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      // The catalogue of the graph's blocks: opened by its address, never by the navigation.
+      { path: 'composants', element: <ComponentsPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
@@ -45,6 +48,7 @@ const VIEW_TOKENS: Record<string, string> = {
   couts: '/costs',
   historique: '/history',
   reglages: '/settings',
+  composants: '/composants',
 };
 
 export function createAppRouter() {
