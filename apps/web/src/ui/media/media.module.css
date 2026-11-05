@@ -1,0 +1,104 @@
+/*
+ * The player and the aligned words: a 9:16 screen that never stretches, its bar of controls with the
+ * time and the frame's number, then the script, one button per word.
+ */
+.player {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+  max-width: 100%;
+  border-radius: var(--borderRadius-medium);
+}
+
+.player:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--borderWidth-thick);
+}
+
+/* 9:16 at most 320 px wide, and never taller than the window allows. */
+.screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 320px, calc(70vh * 9 / 16));
+  aspect-ratio: 9 / 16;
+  object-fit: contain;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  background-color: var(--bgColor-inset);
+}
+
+.screenNote {
+  padding: var(--base-size-16);
+  color: var(--fgColor-muted);
+  font: var(--text-body-shorthand-small);
+  text-align: center;
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-4);
+  min-width: 0;
+}
+
+.clock {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-4) var(--base-size-12);
+  margin: 0 0 0 var(--base-size-8);
+  font: var(--text-body-shorthand-small);
+  font-family: var(--fontStack-monospace);
+  font-variant-numeric: tabular-nums;
+}
+
+.keys {
+  margin: 0;
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+}
+
+.words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-2);
+  min-width: 0;
+  line-height: var(--text-body-lineHeight-large);
+}
+
+.word {
+  padding: 0 var(--base-size-2);
+  border: 0;
+  border-radius: var(--borderRadius-small);
+  background: none;
+  color: var(--fgColor-default);
+  font: var(--text-body-shorthand-medium);
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.word[aria-current='true'] {
+  background-color: var(--bgColor-accent-emphasis);
+  color: var(--fgColor-onEmphasis);
+}
+
+.word:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .word:hover:not([aria-current='true']) {
+    background-color: var(--bgColor-muted);
+  }
+}
+
+@media (pointer: coarse) {
+  .control,
+  .word {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

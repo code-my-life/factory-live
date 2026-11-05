@@ -8,6 +8,7 @@ import { HistoryPage } from '../features/history/HistoryPage.tsx';
 import { InterventionsPage } from '../features/interventions/InterventionsPage.tsx';
 import { FactoryLinePage } from '../features/line/FactoryLinePage.tsx';
 import { SettingsPage } from '../features/settings/SettingsPage.tsx';
+import { StudioPage } from '../features/studio/StudioPage.tsx';
 import { AppShell } from './AppShell.tsx';
 import { NotFoundPage } from './NotFoundPage.tsx';
 
@@ -22,6 +23,8 @@ const routes: RouteObject[] = [
       { path: 'issues/:repo/:number', element: <FactoryLinePage /> },
       { path: 'interventions', element: <InterventionsPage /> },
       { path: 'interventions/:id', element: <InterventionsPage /> },
+      { path: 'studio', element: <StudioPage /> },
+      { path: 'studio/:video', element: <StudioPage /> },
       { path: 'agents', element: <AgentsPage /> },
       { path: 'health', element: <HealthPage /> },
       { path: 'costs', element: <CostsPage /> },
@@ -43,6 +46,7 @@ const VIEW_TOKENS: Record<string, string> = {
   // The same, open on its live twins (the site's « Teste la PR, pas son diff »).
   jumeaux: '/issues/factory-live/18?widget=twins',
   interventions: '/interventions',
+  studio: '/studio',
   agents: '/agents',
   sante: '/health',
   couts: '/costs',

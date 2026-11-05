@@ -10,7 +10,9 @@ import { ChevronDownIcon, ChevronUpIcon } from '@primer/octicons-react';
 import { Banner, Button, Heading } from '@primer/react';
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
+import { DEMO_WORDS } from '../../demo/studio.ts';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
+import { VideoPlayer, WordTrack, frameOf } from '../../ui/media/index.ts';
 import page from '../../ui/page.module.css';
 import {
   BranchLink,
@@ -156,6 +158,28 @@ function Section({ id, title, children }: { id: string; title: string; children:
       </h2>
       <div className={styles.cells}>{children}</div>
     </section>
+  );
+}
+
+/** The first words of the demo's aligned words (derived from a script, not a master's). */
+const SAMPLE_WORDS = (DEMO_WORDS['presenter-factory-live'] ?? []).slice(0, 14);
+const SAMPLE_TOTAL = frameOf(SAMPLE_WORDS[SAMPLE_WORDS.length - 1]?.fin ?? 0) + 1;
+
+/** The player and its words, at `start`: touching a word or a key moves both. */
+function MediaSample({ start, words }: { start: number; words: boolean }) {
+  const { t } = useI18n();
+  const [frame, setFrame] = useState(start);
+  return (
+    <div className={styles.media}>
+      <VideoPlayer
+        src={null}
+        total={SAMPLE_TOTAL}
+        frame={frame}
+        onFrame={setFrame}
+        label={t.components.media.sample}
+      />
+      {words ? <WordTrack words={SAMPLE_WORDS} frame={frame} onSeek={setFrame} /> : null}
+    </div>
   );
 }
 
@@ -460,6 +484,15 @@ export function ComponentsPage() {
       <Section id="zoom" title={c.zoom.title}>
         <Cell label={t.line.graph.zoom}>
           <ZoomControls zoomBy={noop} fit={noop} />
+        </Cell>
+      </Section>
+
+      <Section id="media" title={c.media.title}>
+        <Cell label={c.media.noMaster}>
+          <MediaSample start={0} words={false} />
+        </Cell>
+        <Cell label={c.media.word}>
+          <MediaSample start={frameOf(SAMPLE_WORDS[3]?.debut ?? 0)} words />
         </Cell>
       </Section>
 

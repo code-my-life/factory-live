@@ -8,6 +8,7 @@ import {
   ProjectIcon,
   PulseIcon,
   UndoIcon,
+  VideoIcon,
   WorkflowIcon,
 } from '@primer/octicons-react';
 import type { Icon } from '@primer/octicons-react';
@@ -37,6 +38,7 @@ import {
   useLastUpdate,
   useSnapshot,
 } from '../data/FactoryProvider.tsx';
+import { useStudio } from '../features/studio/StudioProvider.tsx';
 import { useI18n } from '../i18n/I18nProvider.tsx';
 import type { Messages } from '../i18n/fr.ts';
 import { setAppBadge } from '../pwa/badge.ts';
@@ -56,6 +58,7 @@ interface Destination {
 const PRIMARY: Destination[] = [
   { to: '/', label: 'line', icon: WorkflowIcon },
   { to: '/interventions', label: 'interventions', icon: BellIcon },
+  { to: '/studio', label: 'studio', icon: VideoIcon },
   { to: '/agents', label: 'agents', icon: AgentIcon },
 ];
 
@@ -120,7 +123,9 @@ export function AppShell() {
 
   // Une intervention débloquée reste visible le temps du suivi, mais n'attend plus rien.
   const open = snapshot.interventions.filter((intervention) => !intervention.resolvedAt);
-  const openInterventions = open.length;
+  // The videos of the studio that wait for the owner join the interventions: the bell counts both.
+  const studioWaiting = useStudio().waiting.length;
+  const openInterventions = open.length + studioWaiting;
   // Pastille de l'icône de l'app installée : les blocages qui t'attendent, comme le serveur la pose
   // à chaque push (notify.ts) ; la démo n'y touche pas.
   const waiting = open.filter(
@@ -232,7 +237,15 @@ export function AppShell() {
                   ) : null
                 }
               />
-              <SideNavItem destination={PRIMARY[2] as Destination} />
+              <SideNavItem
+                destination={PRIMARY[2] as Destination}
+                trailing={
+                  studioWaiting > 0 ? (
+                    <CounterLabel variant="primary">{studioWaiting}</CounterLabel>
+                  ) : null
+                }
+              />
+              <SideNavItem destination={PRIMARY[3] as Destination} />
               <NavList.Divider />
               <SideNavItem
                 destination={SECONDARY[0] as Destination}
@@ -268,8 +281,13 @@ export function AppShell() {
       <nav className={styles.tabbar} aria-label={t.nav.tabs}>
         {PRIMARY.map((destination) => {
           const IconComponent = destination.icon;
-          const badge =
-            destination.to === '/interventions' && openInterventions > 0 ? openInterventions : null;
+          const count =
+            destination.to === '/interventions'
+              ? openInterventions
+              : destination.to === '/studio'
+                ? studioWaiting
+                : 0;
+          const badge = count > 0 ? count : null;
           return (
             <NavLink
               key={destination.to}

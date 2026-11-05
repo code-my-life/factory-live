@@ -1,0 +1,238 @@
+/* The studio: its head, the graph, then the open video's detail. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap-spacious);
+  min-width: 0;
+}
+
+.pageHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--stack-gap-condensed) var(--stack-gap-normal);
+}
+
+.pageTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.subtitle,
+.quiet {
+  margin: var(--base-size-4) 0 0;
+  color: var(--fgColor-muted);
+  font: var(--text-body-shorthand-medium);
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap-normal);
+  min-width: 0;
+}
+
+.detailHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8) var(--base-size-24);
+  margin: 0;
+  font: var(--text-body-shorthand-small);
+}
+
+.mark {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-2);
+  min-width: 0;
+}
+
+.markLabel {
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+}
+
+.markValue {
+  margin: 0;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-4) var(--base-size-16);
+  margin: 0;
+  font: var(--text-body-shorthand-small);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-4);
+  min-height: 44px;
+  color: var(--fgColor-accent);
+}
+
+/* The gesture: what the video waits for, then the owner's buttons. */
+.gesture {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+  padding: var(--stack-padding-normal);
+  border: var(--borderWidth-thin) solid var(--borderColor-attention-muted);
+  border-radius: var(--borderRadius-medium);
+  background-color: var(--bgColor-default);
+}
+
+.gesture[data-state='failed'] {
+  border-color: var(--borderColor-danger-muted);
+}
+
+.gesture[data-state='running'],
+.gesture[data-state='done'] {
+  border-color: var(--borderColor-default);
+}
+
+.waits,
+.failure,
+.refused {
+  margin: 0;
+  font: var(--text-body-shorthand-medium);
+  overflow-wrap: anywhere;
+}
+
+.failure,
+.refused {
+  color: var(--fgColor-danger);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8);
+}
+
+@media (pointer: coarse) {
+  .actions > * {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+.reason {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+}
+
+.blockTitle {
+  margin: 0;
+  font: var(--text-title-shorthand-small);
+}
+
+.journey {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-4) var(--base-size-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: var(--text-body-shorthand-small);
+}
+
+.stop:not(:last-child)::after {
+  content: '→';
+  margin-left: var(--base-size-8);
+  color: var(--fgColor-muted);
+}
+
+.stop[aria-current='step'] {
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--base-size-4) var(--base-size-12);
+  min-width: 0;
+  font: var(--text-body-shorthand-small);
+}
+
+.stepName {
+  font-family: var(--fontStack-monospace);
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.stepResult {
+  overflow-wrap: anywhere;
+}
+
+.step:not([data-result='ok']) .stepResult {
+  color: var(--fgColor-danger);
+}
+
+.stepDuration,
+.hash {
+  color: var(--fgColor-muted);
+}
+
+.hash {
+  font: var(--text-caption-shorthand);
+  font-family: var(--fontStack-monospace);
+  overflow-wrap: anywhere;
+}
+
+/* The player beside the script on a wide screen, under it on a phone. */
+.media {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--stack-gap-normal);
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .media {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.script {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+}
+
+.scriptText {
+  margin: 0;
+  font: var(--text-body-shorthand-medium);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
