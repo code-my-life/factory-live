@@ -976,6 +976,17 @@ export const en: Messages = {
       },
       noStill: 'No picture of this screen yet.',
       liveScreen: 'twin screen, to drive',
+      refusedTitle: 'The bench does not receive your gestures',
+      refused: (code: string) =>
+        `Your gestures are refused: ${
+          {
+            origin_refused:
+              'this address is not the app’s. Open factory-live at its declared address (localhost or your tailnet name).',
+            write_local_only: 'writing is kept for this PC and your Tailscale login.',
+            write_login_refused: 'this Tailscale login is not allowed to write.',
+            rate_limited: 'too many gestures in a minute, try again in a moment.',
+          }[code] ?? `the server refuses them (${code}).`
+        }`,
       connecting: 'Connecting to the twin…',
       lost: 'Stream lost: last picture of the twin. Trying again in a few seconds.',
       lag: (ms: number) =>

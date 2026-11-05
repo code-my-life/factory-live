@@ -207,6 +207,32 @@ export class TwinsApi {
     settle?: (response: Response | null) => void;
   }[] = [];
   private sending = false;
+  private listener: ((refused: string | null) => void) | null = null;
+
+  /**
+   * Hears whether the owner's writes are refused (#35): the server's refusal code, or `null` once one
+   * goes through again. A refused gesture must never fail in silence.
+   */
+  onRefused(listener: (refused: string | null) => void): () => void {
+    this.listener = listener;
+    return () => {
+      if (this.listener === listener) this.listener = null;
+    };
+  }
+
+  private async heard(response: Response | null): Promise<void> {
+    if (!response || !this.listener) return;
+    let refused: string | null = null;
+    if (!response.ok) {
+      const body = (await response
+        .clone()
+        .json()
+        .catch(() => null)) as { code?: unknown } | null;
+      refused = typeof body?.code === 'string' ? body.code : `http_${response.status}`;
+    }
+    // The widget may have left while the body was read: the listener is read again, never kept.
+    this.listener?.(refused);
+  }
 
   /**
    * A gesture, in order: a press must never reach the bench before the move that leads to it, nor a
@@ -250,6 +276,8 @@ export class TwinsApi {
     try {
       for (let next = this.pending.shift(); next; next = this.pending.shift()) {
         const response = await this.post(next.path, next.body).catch(() => null);
+        // Telling the widget never stops the line: a release behind must still go.
+        await this.heard(response).catch(() => undefined);
         next.settle?.(response);
       }
     } finally {

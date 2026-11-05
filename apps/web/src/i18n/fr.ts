@@ -1075,6 +1075,17 @@ export const fr = {
       } satisfies Record<'starting' | 'ready' | 'stopped', string>,
       noStill: 'Pas encore d’image de cet écran.',
       liveScreen: 'écran du jumeau, à piloter',
+      refusedTitle: 'Le banc ne reçoit pas tes gestes',
+      refused: (code: string) =>
+        `Tes gestes sont refusés : ${
+          {
+            origin_refused:
+              'cette adresse n’est pas celle de l’app. Ouvre factory-live par son adresse déclarée (localhost ou ton nom tailnet).',
+            write_local_only: 'l’écriture est réservée à ce PC et à ton login Tailscale.',
+            write_login_refused: 'ce login Tailscale n’est pas autorisé à écrire.',
+            rate_limited: 'trop de gestes en une minute, réessaie dans un instant.',
+          }[code] ?? `le serveur les refuse (${code}).`
+        }`,
       connecting: 'Connexion au jumeau…',
       lost: 'Flux perdu : dernière image du jumeau. Nouvel essai dans quelques secondes.',
       lag: (ms: number) =>
