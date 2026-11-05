@@ -37,8 +37,8 @@ const PHONE = {
 };
 
 /**
- * Une capture : la vue (`route`), puis la zone à garder (`clip`, sinon l'écran entier). `clip`
- * reçoit la page et rend un rectangle en pixels CSS.
+ * A shot: the view (`route`), what is opened there first (`prepare`), then the area kept (`clip`,
+ * else the whole screen). `clip` takes the page and returns a rectangle in CSS pixels.
  */
 const SHOTS = [
   { name: 'line-desktop', device: DESKTOP, route: '/' },
@@ -69,6 +69,26 @@ const SHOTS = [
     device: DESKTOP,
     route: '/issues/claude-cockpit/71',
     clip: (page) => box(page, ['main article > header', 'main article table']),
+  },
+  // The acceptance of a big real pull request: its header and its first widgets, criteria and checks.
+  {
+    name: 'acceptance',
+    device: DESKTOP,
+    route: '/issues/factory-live/18',
+    // Green, the criteria open folded: unfolded here, the tile shows what each one is proven by.
+    prepare: async (page) => {
+      await page.locator('[data-widget="criteria"] button[aria-expanded="false"]').first().click();
+      // The click scrolls the page: the clip is measured from its top, as for every other shot.
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(400);
+    },
+    clip: async (page) => {
+      const rect = await box(page, [
+        'section:has(> header + ol [data-widget]) > header',
+        '[data-widget="criteria"]',
+      ]);
+      return { ...rect, height: Math.min(rect.height, 760) };
+    },
   },
   {
     name: 'intervention',
@@ -229,6 +249,7 @@ try {
         });
         if (!loaded) throw new Error(`Capture ${lang}/${shot.name} : Mona Sans non chargée`);
         await page.waitForTimeout(600);
+        if (shot.prepare) await shot.prepare(page);
         const clip = shot.clip ? await shot.clip(page) : undefined;
         const png = await page.screenshot({
           clip,

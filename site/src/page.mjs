@@ -165,6 +165,7 @@ ${t.screens.installs.map(([name, how]) => `<li class="install"><span class="inst
 
 const TILE_IMAGES = {
   issue: 'issue-cards.webp',
+  acceptance: 'acceptance.webp',
   intervention: 'intervention.webp',
   agent: 'agent.webp',
   live: 'live.webp',

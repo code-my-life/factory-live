@@ -77,6 +77,13 @@ export default {
         alt: 'Les détails de l’issue claude-cockpit#71 sous le graphe : son harnais, son modèle et sa PR, et les runs de sa carte au travail.',
       },
       {
+        id: 'acceptance',
+        title: 'Recette des PR',
+        text: 'Plus de diff à lire : chaque critère de l’issue avec la preuve qui le tient, les checks, la gate, les tests, les captures avant et après, et l’app avant et après en jumeaux vivants.',
+        view: 'recette',
+        alt: 'La recette d’une grosse PR de factory-live : son verdict en tête, puis ses critères d’acceptation chacun avec son test, ses checks et sa gate en widgets.',
+      },
+      {
         id: 'intervention',
         title: 'Interventions',
         text: 'La question entière de l’agent. Tu réponds dans l’app, factory-live poste <code>/factory unblock</code> sur l’issue pour toi.',
@@ -402,6 +409,18 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
         icon: 'BeakerIcon',
         title: 'Tests',
         text: 'De bout en bout sous Chromium et WebKit, captures de référence, accessibilité.',
+      },
+      {
+        state: 'done',
+        icon: 'GitPullRequestIcon',
+        title: 'Recette des PR',
+        text: 'Les preuves d’une PR au lieu de son diff : critères, checks, gate, tests, captures et fils de revue.',
+      },
+      {
+        state: 'done',
+        icon: 'MirrorIcon',
+        title: 'Jumeaux vivants',
+        text: 'L’app avant et après la PR, pilotées ensemble depuis la recette, démarrées par la factory à la gate verte.',
       },
       {
         state: 'now',

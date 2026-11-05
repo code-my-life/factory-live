@@ -77,6 +77,13 @@ export default {
         alt: 'The details of the issue claude-cockpit#71 under the graph: its harness, model and pull request, and the runs of its card at work.',
       },
       {
+        id: 'acceptance',
+        title: 'Pull request acceptance',
+        text: 'No diff to read: each criterion of the issue with the proof that holds it, the checks, the gate, the tests, the screenshots before and after, and the app before and after as live twins.',
+        view: 'recette',
+        alt: 'The acceptance of a big factory-live pull request: its verdict on top, then its acceptance criteria each with its test, its checks and its gate as widgets.',
+      },
+      {
         id: 'intervention',
         title: 'Interventions',
         text: 'The agent’s whole question. Answer in the app: factory-live posts <code>/factory unblock</code> on the issue for you.',
@@ -405,6 +412,18 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
         icon: 'BeakerIcon',
         title: 'Tests',
         text: 'Chromium and WebKit end to end, reference captures, accessibility.',
+      },
+      {
+        state: 'done',
+        icon: 'GitPullRequestIcon',
+        title: 'Pull request acceptance',
+        text: 'The proofs of a pull request instead of its diff: criteria, checks, gate, tests, screenshots and review threads.',
+      },
+      {
+        state: 'done',
+        icon: 'MirrorIcon',
+        title: 'Live twins',
+        text: 'The app before and after the pull request, driven together from the acceptance, started by the factory on a green gate.',
       },
       {
         state: 'now',
