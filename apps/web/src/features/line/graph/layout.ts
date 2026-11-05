@@ -205,8 +205,8 @@ export interface SheetPlan {
   legend: readonly LegendEntry[];
   /** The series coloured from the display palette, in order: group members, then branches. */
   series: readonly Branch[];
-  /** The line, from its entry to its end, a group standing for its members. */
-  chain: readonly string[];
+  /** The line and fan links, in the order of the sheet: the ways a journey may skip along. */
+  along: readonly Link[];
 }
 
 /** A group member's key without its group: `<group>:<name>` gives `<name>`. */
@@ -225,14 +225,14 @@ export function kindOf(plan: SheetPlan, key: string): StationKind | null {
 /** The connector from the models node up to a station whose agent calls a model. */
 export const feedOf = (station: string): string => `${MODELS_KEY}:${station}`;
 
-function linkId(edge: WorkflowEdge, station: ReadonlyMap<string, WorkflowStation>): string {
-  if (edge.id) return edge.id;
+/** The short id of a link without an id of the sheet, if it has one: `line:<from>`, `in:`, `out:`. */
+function linkId(edge: WorkflowEdge, station: ReadonlyMap<string, WorkflowStation>): string | null {
   if (edge.kind === 'line') return `line:${edge.from}`;
   const to = station.get(edge.to);
   const from = station.get(edge.from);
   if (edge.kind === 'fan' && to?.group) return `in:${suffixOf(to)}`;
   if (edge.kind === 'fan' && from?.group) return `out:${suffixOf(from)}`;
-  return `${edge.kind}:${edge.from}:${edge.to}`;
+  return null;
 }
 
 /**
@@ -304,23 +304,40 @@ export function planOf(sheet: WorkflowSheet): SheetPlan {
 
   const kind = (key: string) => station.get(key)?.kind ?? members.get(key)?.[0]?.kind;
   let returns = 0;
-  // Every link has an id of its own: the preferred one if free, else `<kind>:<from>:<to>`, numbered
-  // if that one is taken too. The ids the sheet gives are reserved first: a worked-out id never takes
-  // the one the sheet gives another link.
-  const reserved = new Set(sheet.edges.flatMap((edge) => (edge.id ? [edge.id] : [])));
+  // Every link has an id of its own: the sheet's, else its short id when no other link without an
+  // id would take the same and the sheet gives it to none, else `<kind>:<from>:<to>`, numbered from 2
+  // if that one is taken too. The ids of the sheet and the unambiguous short ids are reserved first,
+  // so that the rule does not depend on the order of the links.
+  const shortCount = new Map<string, number>();
+  for (const edge of sheet.edges) {
+    const short = edge.id ? null : linkId(edge, station);
+    if (short !== null) shortCount.set(short, (shortCount.get(short) ?? 0) + 1);
+  }
+  const given = new Set(sheet.edges.flatMap((edge) => (edge.id ? [edge.id] : [])));
+  const shortOf = (edge: WorkflowEdge) => {
+    const short = linkId(edge, station);
+    return short !== null && shortCount.get(short) === 1 && !given.has(short) ? short : null;
+  };
+  const reserved = new Set(given);
+  for (const edge of sheet.edges) {
+    const short = edge.id ? null : shortOf(edge);
+    if (short !== null) reserved.add(short);
+  }
   const used = new Set<string>();
-  const taken = (id: string, edge: WorkflowEdge) =>
-    used.has(id) || (id !== edge.id && reserved.has(id));
   const freeId = (edge: WorkflowEdge) => {
     const plain = `${edge.kind}:${edge.from}:${edge.to}`;
-    let id = linkId(edge, station);
-    if (taken(id, edge)) id = plain;
-    for (let n = 2; taken(id, edge); n += 1) id = `${plain}:${n}`;
+    let id = edge.id ?? shortOf(edge);
+    if (id === null) {
+      id = plain;
+      for (let n = 2; used.has(id) || reserved.has(id); n += 1) id = `${plain}:${n}`;
+    }
     used.add(id);
     return id;
   };
+  const ids = new Map<WorkflowEdge, string>();
   const links: Link[] = drawOrder(sheet.edges, station, members).map((edge) => {
     const id = freeId(edge);
+    ids.set(edge, id);
     const label = edge.label === undefined ? {} : { label: edge.label };
     switch (edge.kind) {
       case 'line':
@@ -412,27 +429,12 @@ export function planOf(sheet: WorkflowSheet): SheetPlan {
     links,
     legend,
     series,
-    chain: chainOf(sheet, station),
+    along: sheet.edges
+      .filter((edge) => edge.kind === 'line' || edge.kind === 'fan')
+      .map((edge) => links.find((link) => link.id === ids.get(edge)) as Link),
   };
   plans.set(sheet, plan);
   return plan;
-}
-
-/** The line from its entry: each station's line link, a group standing for the members of its fan. */
-function chainOf(sheet: WorkflowSheet, station: ReadonlyMap<string, WorkflowStation>): string[] {
-  const along = sheet.edges.filter((edge) => edge.kind === 'line' || edge.kind === 'fan');
-  const node = (key: string) => station.get(key)?.group ?? key;
-  const next = (key: string): string | undefined => {
-    const out = along.find((edge) => node(edge.from) === key && node(edge.to) !== key);
-    return out ? node(out.to) : undefined;
-  };
-  const entry = along.find((edge) => !along.some((other) => node(other.to) === node(edge.from)));
-  const chain: string[] = [];
-  for (let key = entry ? node(entry.from) : undefined; key !== undefined; key = next(key)) {
-    if (chain.includes(key)) break;
-    chain.push(key);
-  }
-  return chain;
 }
 
 /** The members of the code line's group, the gate's proofs: `failfirst`, `sabotage`... */
@@ -564,9 +566,12 @@ export function layout(fills: Record<BoxId, Fill>, sheet: WorkflowSheet = CODE_L
   }
 
   // A branch station hangs under the lowest box of its own column and of the columns its source
-  // touches: the source's own and those its line runs to.
-  for (const station of sheet.stations) {
-    if (!plan.branchStations.has(station.key)) continue;
+  // touches: the source's own and those its line runs to. They are placed by column, then by row, so
+  // that each one hangs under those placed before it.
+  const hanging = sheet.stations
+    .filter((station) => plan.branchStations.has(station.key))
+    .sort((a, b) => a.col - b.col || a.row - b.row);
+  for (const station of hanging) {
     const sources = sheet.edges
       .filter((edge) => edge.kind === 'branch' && edge.to === station.key)
       .map(({ from }) => from);
@@ -755,18 +760,27 @@ export function layout(fills: Record<BoxId, Fill>, sheet: WorkflowSheet = CODE_L
         );
     }
     for (const link of routed) {
-      // Up the gap right of its column, then under the station, into it near its right side.
+      // Up the gap right of its column, then under the station, into it near its right side. A gap
+      // beyond the models node is reached from its right side, level with its port.
       const station = boxes[link.to] as Box;
       const gapX = station.x + COLUMN_W + (COLUMN_STEP - COLUMN_W) / 2;
       const entryX = station.x + station.w - FEED_UNDER;
       const turnY = bottomOf(station) + FEED_UNDER;
       const points: Point[] = [
-        [gapX, top],
+        ...(gapX > models.x + models.w
+          ? [right(models), [gapX, models.portY] as Point]
+          : [[gapX, top] as Point]),
         [gapX, turnY],
         [entryX, turnY],
         bottomAt(station, entryX),
       ];
-      edge(link.id, link.branch, route(points), points[0] as Point, points[3] as Point);
+      edge(
+        link.id,
+        link.branch,
+        route(points),
+        points[0] as Point,
+        points[points.length - 1] as Point,
+      );
     }
   }
 
@@ -820,16 +834,33 @@ export function journeyEdges(journey: readonly Step[], sheet: WorkflowSheet = CO
     else if (fanned(to, 'in')) out.push(fanId(to, 'in', (journey[index + 1] as Step).lane));
     else if (fanned(from, 'out')) out.push(fanId(from, 'out', (journey[index] as Step).lane));
     else if (direct) out.push(direct.id);
-    else {
-      // Along the line, every connector between the two.
-      const start = plan.chain.indexOf(from);
-      const stop = plan.chain.indexOf(to);
-      for (let step = start; step >= 0 && step < stop; step += 1) {
-        const key = plan.chain[step] as string;
-        const line = plan.links.find((link) => link.kind === 'line' && link.from === key);
-        out.push(line?.id ?? `line:${key}`);
-      }
-    }
+    else out.push(...skipped(plan, from, to));
   }
   return out;
+}
+
+/**
+ * The line links of the shortest way from one station to another over the sheet's line and fan
+ * links, a group standing for its members; at a tie, the order of the sheet. A fan step gives
+ * nothing: its curve depends on a lane the skipped step does not say. No way, nothing.
+ */
+function skipped(plan: SheetPlan, from: string, to: string): string[] {
+  const node = (key: string) => plan.station.get(key)?.group ?? key;
+  const [start, goal] = [node(from), node(to)];
+  const reachedBy = new Map<string, Link | null>([[start, null]]);
+  const queue = [start];
+  for (let index = 0; index < queue.length && !reachedBy.has(goal); index += 1) {
+    const key = queue[index] as string;
+    for (const link of plan.along) {
+      const next = node(link.to);
+      if (node(link.from) !== key || reachedBy.has(next)) continue;
+      reachedBy.set(next, link);
+      queue.push(next);
+    }
+  }
+  if (start === goal || !reachedBy.has(goal)) return [];
+  const path: Link[] = [];
+  for (let link = reachedBy.get(goal); link; link = reachedBy.get(node(link.from)))
+    path.unshift(link);
+  return path.filter((link) => link.kind === 'line').map(({ id }) => id);
 }
