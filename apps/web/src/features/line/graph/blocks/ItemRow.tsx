@@ -100,7 +100,13 @@ export function ItemRow({
         {row === 'compact' || issue.type ? (
           <span className="fl-visually-hidden">{state.label}</span>
         ) : null}
-        <IssueBadge issueKey={issue.key} icon={false} />
+        {/* An issue key (repository#number) splits into its repository and number; another item's
+            id (a studio video) has no « # » and stays whole, with no repository label. */}
+        {issue.key.includes('#') ? (
+          <IssueBadge issueKey={issue.key} icon={false} />
+        ) : (
+          <Badge value={issue.key} code description={issue.key} />
+        )}
       </span>
       <button
         type="button"

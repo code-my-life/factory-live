@@ -146,4 +146,19 @@ describe('StudioPage', () => {
     );
     expect((await source.item('presenter-factory-live'))?.station).toBe('publication');
   });
+
+  it("l'id d'une vidéo s'affiche entier dans sa ligne", async () => {
+    const { container } = renderStudio('/studio');
+    await waitFor(() => expect(row(container, 'revue', 'presenter-factory-live')).not.toBeNull());
+
+    // A video's id has no « # »: it is not cut into a repository label and a number.
+    const line = row(container, 'revue', 'presenter-factory-live') as HTMLElement;
+    const badge = line.querySelector('[data-badge]');
+    expect(badge).toHaveAttribute('title', 'presenter-factory-live');
+    expect(badge?.querySelector('[data-segment="label"]')).toBeNull();
+    const value = badge?.querySelector('[data-segment="value"]');
+    expect(value).toHaveTextContent('presenter-factory-live');
+    for (const label of line.querySelectorAll('[data-segment="label"]'))
+      expect(label.textContent).not.toBe('presenter-factory-liv');
+  });
 });
