@@ -1450,6 +1450,41 @@ describe('jumeaux vivants', () => {
     expect(relayed.at(-1)).toBe('http://127.0.0.1:52129/resync');
   });
 
+  it('depuis 127.0.0.1, ce PC écrit comme depuis localhost', async () => {
+    const mirror = (host: string) =>
+      h.app.request('/api/twins/factory-live/25/mirror', {
+        method: 'POST',
+        headers: {
+          host,
+          origin: `http://${host}`,
+          'x-factory-live': '1',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ on: false }),
+      });
+    expect((await mirror('127.0.0.1:8446')).status).toBe(204);
+    expect((await mirror('[::1]:8446')).status).toBe(204);
+    expect((await mirror('localhost:8446')).status).toBe(204);
+  });
+
+  it('une origine étrangère reste refusée, même sur un hôte de bouclage', async () => {
+    const mirror = (host: string, origin: string) =>
+      h.app.request('/api/twins/factory-live/25/mirror', {
+        method: 'POST',
+        headers: { host, origin, 'x-factory-live': '1', 'content-type': 'application/json' },
+        body: JSON.stringify({ on: false }),
+      });
+    expect(await refusal(await mirror('127.0.0.1:8446', 'http://evil.example'))).toEqual([
+      403,
+      'origin_refused',
+    ]);
+    // Another port of this PC is another app: not this one.
+    expect(await refusal(await mirror('127.0.0.1:8446', 'http://127.0.0.1:5173'))).toEqual([
+      403,
+      'origin_refused',
+    ]);
+  });
+
   it('la page n’ouvre de WebSocket qu’à ses propres hôtes', () => {
     const policy = contentSecurityPolicy([
       'http://localhost:8446',

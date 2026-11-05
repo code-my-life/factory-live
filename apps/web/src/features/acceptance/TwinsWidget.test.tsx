@@ -56,6 +56,8 @@ class FakeSocket {
 let bench: TwinsBenchState;
 /** The bench refuses sessions (it restarts), as long as this says so. */
 let sessionsDown = false;
+/** The server refuses the owner's writes with this code, as long as it is set. */
+let refuse: string | null = null;
 let sessionAsks = 0;
 let posts: { path: string; body: unknown }[];
 
@@ -63,6 +65,8 @@ const fetchMock = vi.fn((url: string, init?: RequestInit) => {
   const path = url.slice(API.length);
   if (init?.method === 'POST') {
     posts.push({ path, body: JSON.parse(init.body as string) as unknown });
+    if (refuse)
+      return Promise.resolve(Response.json({ error: 'refusé', code: refuse }, { status: 403 }));
     return Promise.resolve(new Response(null, { status: 204 }));
   }
   if (path.startsWith('/session/')) {
@@ -101,6 +105,7 @@ beforeEach(() => {
   posts = [];
   sessionsDown = false;
   sessionAsks = 0;
+  refuse = null;
   bench = { mirror: true, divergence: null, lagMs: 0.12 };
   vi.stubGlobal('WebSocket', FakeSocket);
   vi.stubGlobal('requestAnimationFrame', (run: FrameRequestCallback) => {
@@ -244,5 +249,15 @@ describe('jumeaux vivants', () => {
       { side: 'head', event: 'control/keyup', payload: { keysym: 0xffe1 } },
       { side: 'head', event: 'control/keyup', payload: { keysym: 0x41 } },
     ]);
+  });
+
+  it('un geste refusé par le serveur le dit', async () => {
+    refuse = 'origin_refused';
+    render(<TwinsWidget view={liveView()} fetchImpl={fetchImpl} />);
+    const [, after] = await liveScreens();
+    fireEvent.pointerDown(after!, { clientX: 39, clientY: 150, button: 0, pointerId: 1 });
+    expect(
+      await screen.findByText(/Tes gestes sont refusés : cette adresse n’est pas celle de l’app/),
+    ).toBeTruthy();
   });
 });

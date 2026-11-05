@@ -51,4 +51,32 @@ describe('file des gestes vers le banc', () => {
       { side: 'base', event: 'control/move', payload: { x: 4, y: 4 } },
     ]);
   });
+
+  it('quitter le widget pendant un refus ne bloque pas les gestes qui suivent', async () => {
+    const sent: string[] = [];
+    let readBody: () => void = () => {};
+    const api = new TwinsApi('/api/twins/factory-live/25', ((url: string, init?: RequestInit) => {
+      sent.push((JSON.parse(init?.body as string) as { event: string }).event);
+      if (sent.length > 1) return Promise.resolve(new Response(null, { status: 204 }));
+      // The first answer is a refusal whose body arrives late.
+      return Promise.resolve({
+        ok: false,
+        status: 403,
+        clone: () => ({
+          json: () =>
+            new Promise((resolve) => {
+              readBody = () => resolve({ code: 'origin_refused' });
+            }),
+        }),
+      } as unknown as Response);
+    }) as typeof fetch);
+    const leave = api.onRefused(() => {});
+    api.gesture({ side: 'head', event: 'control/buttondown', payload: { code: 1 } });
+    api.gesture({ side: 'head', event: 'control/buttonup', payload: { code: 1 } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    leave();
+    readBody();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sent).toEqual(['control/buttondown', 'control/buttonup']);
+  });
 });
