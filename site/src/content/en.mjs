@@ -11,6 +11,7 @@ export default {
   skip: 'Skip to content',
   nav: {
     label: 'Main',
+    twins: 'Twins',
     see: 'What you see',
     how: 'How it works',
     start: 'Install',
@@ -27,6 +28,32 @@ export default {
     source: 'Source on GitHub',
     note: 'It installs from the browser on a computer, a tablet or a smartphone, with no store. The demo replays an afternoon of the factory in your browser; the interface is in French.',
     alt: 'The factory line in factory-live: a graph of nine stations from intake to done, the four proofs of the gate, a row for each issue with its state and its agent, and what waits for your decision.',
+  },
+  twins: {
+    eyebrow: 'Pull request acceptance',
+    title: 'Try the pull request, not its diff',
+    lede: 'Live twins: the app as it was before the pull request, and as it is after, running side by side in its acceptance. Click, type or scroll on one, and the same gesture is replayed on the other. You see what the pull request changes by using it, without checking out the branch or running anything yourself.',
+    points: [
+      [
+        'Two live apps',
+        'The base and the head of the pull request, each in its own browser on the factory’s bench, streamed live into the acceptance: side by side, overlaid with a slider, or one after the other on a smartphone.',
+      ],
+      [
+        'A mirror of your gestures',
+        'Pointer, clicks, wheel, keyboard, touch: what you do on one twin, the other does too.',
+      ],
+      [
+        'The difference, under your finger',
+        'When the two screens differ where you click, the mirror stops and tells you: that is where the pull request changes something. Then drive each twin on its own, or take both back home.',
+      ],
+      [
+        'Nothing to install',
+        'The factory starts the twins once the pull request’s gate is green, and stops them at merge. No Internet, no secret: each one only sees its own app. On your computer as on your iPhone, over your tailnet.',
+      ],
+    ],
+    note: 'Around them, the acceptance gives the rest of the proofs: each criterion of the issue with the test that proves it, the checks, the gate, the screenshots before and after, the review threads. In the demo the twins are screenshots; live, they are the real apps.',
+    open: 'See the twins in the demo',
+    alt: 'The live twins of a big factory-live pull request, side by side: on the left the old factory line, on the right the new graph; above them the mirror waits, as the click on “Legend” has no counterpart before.',
   },
   screens: {
     title: 'One app, every screen',
@@ -75,6 +102,13 @@ export default {
         text: 'Touch an issue: its journey runs along the connectors, and under the graph open its runs with the model really used, the full transcript, the pull request and its CI.',
         view: 'issues',
         alt: 'The details of the issue claude-cockpit#71 under the graph: its harness, model and pull request, and the runs of its card at work.',
+      },
+      {
+        id: 'acceptance',
+        title: 'Pull request acceptance',
+        text: 'No diff to read: each criterion of the issue with the proof that holds it, the checks, the gate, the tests, the screenshots before and after, and the app before and after as live twins.',
+        view: 'recette',
+        alt: 'The acceptance of a big factory-live pull request: its verdict on top, then its acceptance criteria each with its test, its checks and its gate as widgets.',
       },
       {
         id: 'intervention',
@@ -405,6 +439,18 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
         icon: 'BeakerIcon',
         title: 'Tests',
         text: 'Chromium and WebKit end to end, reference captures, accessibility.',
+      },
+      {
+        state: 'done',
+        icon: 'GitPullRequestIcon',
+        title: 'Pull request acceptance',
+        text: 'The proofs of a pull request instead of its diff: criteria, checks, gate, tests, screenshots and review threads.',
+      },
+      {
+        state: 'done',
+        icon: 'MirrorIcon',
+        title: 'Live twins',
+        text: 'The app before and after the pull request, driven together from the acceptance, started by the factory on a green gate.',
       },
       {
         state: 'now',

@@ -1509,9 +1509,11 @@
 }
 
 /* En largeur : les arrêts sur une voie horizontale, comme la ligne de l'app sur un grand écran. */
-@media (min-width: 64rem) {
+/* As many columns as stops: from 80rem, where ten of them still have room for their text. */
+@media (min-width: 80rem) {
   .milestones {
-    grid-template-columns: repeat(8, minmax(0, 1fr));
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
     column-gap: var(--base-size-24);
   }
 
@@ -1549,7 +1551,7 @@
   }
 }
 
-@media (min-width: 64rem) and (prefers-reduced-motion: no-preference) {
+@media (min-width: 80rem) and (prefers-reduced-motion: no-preference) {
   [data-ui] .milestone[data-track='flow']::before {
     animation-name: flow-right;
   }
@@ -1745,5 +1747,92 @@
   .reveal-ready [data-reveal] {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* Live twins (factory-live#23): the reason of the acceptance, right after the hero, large. */
+.twins-inner {
+  display: grid;
+  gap: var(--base-size-32);
+  padding-block: var(--base-size-64);
+}
+
+.twins-copy {
+  display: grid;
+  gap: var(--base-size-16);
+  max-width: 48rem;
+}
+
+.twins-eyebrow {
+  color: var(--fgColor-accent);
+  font: var(--text-subtitle-shorthand);
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.twins-lede {
+  font: var(--text-body-shorthand-large);
+  text-wrap: pretty;
+}
+
+.twins-plate {
+  margin: 0;
+  padding: clamp(var(--base-size-8), 2vw, var(--base-size-24));
+  border-radius: var(--borderRadius-medium);
+  background-color: var(--bgColor-inset);
+}
+
+.twins-image {
+  width: 100%;
+  height: auto;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+}
+
+.twins-points {
+  display: grid;
+  gap: var(--base-size-24);
+}
+
+.twins-point {
+  display: grid;
+  gap: var(--base-size-8);
+  padding-block-start: var(--base-size-16);
+  border-block-start: var(--borderWidth-thick) solid var(--borderColor-accent-emphasis);
+}
+
+.twins-point-name {
+  font: var(--text-title-shorthand-small);
+}
+
+.twins-point-text {
+  color: var(--fgColor-muted);
+  text-wrap: pretty;
+}
+
+.twins-foot {
+  display: grid;
+  gap: var(--base-size-24);
+  align-items: center;
+}
+
+.twins-note {
+  max-width: 48rem;
+  color: var(--fgColor-muted);
+  text-wrap: pretty;
+}
+
+@media (min-width: 48rem) {
+  .twins-points {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 64rem) {
+  .twins-points {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .twins-foot {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 }

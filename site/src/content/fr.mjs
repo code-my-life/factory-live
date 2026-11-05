@@ -11,6 +11,7 @@ export default {
   skip: 'Aller au contenu',
   nav: {
     label: 'Principale',
+    twins: 'Jumeaux',
     see: 'Ce qu’on y voit',
     how: 'Comment ça marche',
     start: 'Installer',
@@ -27,6 +28,32 @@ export default {
     source: 'Le code sur GitHub',
     note: 'Elle s’installe depuis le navigateur sur ordinateur, tablette ou smartphone, sans store. La démo rejoue un après-midi de la factory dans ton navigateur, sans serveur.',
     alt: 'La ligne d’usine de factory-live : un graphe de neuf stations de l’intake à terminé, les quatre preuves de la gate, une ligne par issue avec son état et son agent, et ce qui attend ta décision.',
+  },
+  twins: {
+    eyebrow: 'Recette des PR',
+    title: 'Teste la PR, pas son diff',
+    lede: 'Les jumeaux vivants&nbsp;: l’app telle qu’elle était avant la pull request, et telle qu’elle est après, qui tournent côte à côte dans sa recette. Tu cliques, tu tapes, tu fais défiler sur l’une, et le même geste est rejoué sur l’autre. Tu vois ce que la PR change en t’en servant, sans récupérer la branche ni rien lancer chez toi.',
+    points: [
+      [
+        'Deux apps vivantes',
+        'La base et la tête de la PR, chacune dans son navigateur sur le banc de la factory, diffusées en direct dans la recette&nbsp;: côte à côte, superposées avec un curseur, ou l’une après l’autre sur smartphone.',
+      ],
+      [
+        'Un miroir de tes gestes',
+        'Pointeur, clics, molette, clavier, toucher&nbsp;: ce que tu fais sur un jumeau, l’autre le fait aussi.',
+      ],
+      [
+        'La différence, sous ton doigt',
+        'Quand les deux écrans diffèrent là où tu cliques, le miroir s’arrête et te le dit&nbsp;: c’est là que la PR change quelque chose. Tu pilotes alors chaque jumeau séparément, ou tu les ramènes tous deux à l’accueil.',
+      ],
+      [
+        'Rien à installer',
+        'La factory démarre les jumeaux quand la gate de la PR est verte, et les arrête à la fusion. Sans Internet ni secret, chacun ne voit que son app. Sur ton PC comme sur ton iPhone, par ton tailnet.',
+      ],
+    ],
+    note: 'Autour d’eux, la recette donne le reste des preuves&nbsp;: chaque critère de l’issue avec le test qui le prouve, les checks, la gate, les captures avant et après, les fils de revue. Dans la démo, les jumeaux sont des captures&nbsp;; en direct, ce sont les vraies apps.',
+    open: 'Voir les jumeaux dans la démo',
+    alt: 'Les jumeaux vivants d’une grosse PR de factory-live, côte à côte&nbsp;: à gauche l’ancienne ligne d’usine, à droite le nouveau graphe&nbsp;; au-dessus, le miroir attend, car le clic sur « Légende » n’a pas d’équivalent dans l’avant.',
   },
   screens: {
     title: 'Une app, tous tes écrans',
@@ -75,6 +102,13 @@ export default {
         text: 'Touche une issue : son trajet court sur les liens, et sous le graphe s’ouvrent ses runs avec le modèle réellement servi, la transcription intégrale, la PR et sa CI.',
         view: 'issues',
         alt: 'Les détails de l’issue claude-cockpit#71 sous le graphe : son harnais, son modèle et sa PR, et les runs de sa carte au travail.',
+      },
+      {
+        id: 'acceptance',
+        title: 'Recette des PR',
+        text: 'Plus de diff à lire : chaque critère de l’issue avec la preuve qui le tient, les checks, la gate, les tests, les captures avant et après, et l’app avant et après en jumeaux vivants.',
+        view: 'recette',
+        alt: 'La recette d’une grosse PR de factory-live : son verdict en tête, puis ses critères d’acceptation chacun avec son test, ses checks et sa gate en widgets.',
       },
       {
         id: 'intervention',
@@ -402,6 +436,18 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
         icon: 'BeakerIcon',
         title: 'Tests',
         text: 'De bout en bout sous Chromium et WebKit, captures de référence, accessibilité.',
+      },
+      {
+        state: 'done',
+        icon: 'GitPullRequestIcon',
+        title: 'Recette des PR',
+        text: 'Les preuves d’une PR au lieu de son diff : critères, checks, gate, tests, captures et fils de revue.',
+      },
+      {
+        state: 'done',
+        icon: 'MirrorIcon',
+        title: 'Jumeaux vivants',
+        text: 'L’app avant et après la PR, pilotées ensemble depuis la recette, démarrées par la factory à la gate verte.',
       },
       {
         state: 'now',

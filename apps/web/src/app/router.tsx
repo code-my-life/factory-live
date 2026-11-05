@@ -35,6 +35,10 @@ const routes: RouteObject[] = [
 const VIEW_TOKENS: Record<string, string> = {
   ligne: '/',
   issues: '/issues',
+  // The acceptance of a big real pull request (factory-live#18, PR #19), as the site shows it.
+  recette: '/issues/factory-live/18',
+  // The same, open on its live twins (the site's « Teste la PR, pas son diff »).
+  jumeaux: '/issues/factory-live/18?widget=twins',
   interventions: '/interventions',
   agents: '/agents',
   sante: '/health',

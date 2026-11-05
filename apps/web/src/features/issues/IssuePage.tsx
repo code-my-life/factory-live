@@ -3,7 +3,7 @@ import { IssueOpenedIcon, LinkExternalIcon } from '@primer/octicons-react';
 import { Banner, Button, Heading, Link as PrimerLink, UnderlineNav } from '@primer/react';
 import { Blankslate, Table } from '@primer/react/experimental';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useIssueDetail, useSnapshot } from '../../data/FactoryProvider.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { Messages } from '../../i18n/fr.ts';
@@ -231,6 +231,8 @@ export function IssuePage({
   const i18n = useI18n();
   const { t, fmt, text } = i18n;
   const navigate = useNavigate();
+  // `?widget=twins`: the recette opens on that widget, unfolded (the site's link to the twins).
+  const [params] = useSearchParams();
   const detail = useIssueDetail(key);
   const snapshot = useSnapshot();
   const [tab, setTab] = useState<Tab>('activity');
@@ -378,7 +380,9 @@ export function IssuePage({
         );
       })}
 
-      {detail.acceptance ? <AcceptanceBoard issue={issue} view={detail.acceptance} /> : null}
+      {detail.acceptance ? (
+        <AcceptanceBoard issue={issue} view={detail.acceptance} focus={params.get('widget')} />
+      ) : null}
 
       <section className={styles.section} aria-label={t.issue.cardsTitle}>
         {selectedCard ? (

@@ -75,10 +75,25 @@ factory-live is made for a developer who runs a factory of AI agents and does no
 
 It was built for the factory of Code My Life, which develops its own tools, factory-live included. If you run Hermes Agent with a kanban board fed by GitHub issues, it should fit your factory with a few settings (see [Configuration](#configuration)).
 
+## Live twins: try the pull request, not its diff
+
+With agents writing the code, reading a diff no longer tells you whether a pull request does what you asked. So under each issue, factory-live shows its pull request's acceptance, and at its heart, **live twins**: the app as it was before the pull request and as it is after, both running, side by side. Click, type or scroll on one, and the same gesture is replayed on the other. You see what the pull request changes by using it, without checking out the branch or running anything yourself.
+
+<p align="center"><img src="docs/twins.png" alt="The live twins of a big factory-live pull request, side by side: on the left the old factory line, on the right the new graph; above them the mirror waits, as the click on “Legend” has no counterpart before."></p>
+
+- **Two live apps.** The base and the head of the pull request, each in its own browser on the factory's twin bench, streamed live into the acceptance: side by side, overlaid with a slider, or one after the other on a smartphone.
+- **A mirror of your gestures.** Pointer, clicks, wheel, keyboard, touch: what you do on one twin, the other does too.
+- **The difference, under your finger.** When the two screens differ where you click, the mirror stops and tells you: that is where the pull request changes something. Then drive each twin on its own, or take both back home.
+- **Nothing to install.** The factory starts the twins once the pull request's gate is green and stops them at merge. No Internet, no secret: each one only sees its own app. On your computer as on your iPhone, over your tailnet.
+
+Around them, the acceptance gives the rest of the proofs, below.
+
 ## What you see
 
 - **The factory line.** One graph of the whole factory: Intake, Brief, Implementation, the gate and its four proofs by issue type (fail-first, sabotages, invariance, documents), your review, Merge, main's CI, Deployment and Done, with the Diagnosis branch, the returns (gate red, changes requested, revert) and the model providers that feed the stations where an agent calls a model. A row per issue with its state (running, waiting for you, blocked, queued), the agent that holds it and the model it calls. An issue that moves on travels along the connectors to its new station; the connectors without traffic step back. A quick search and filters by type, state, repository and model; the whole factory fits the screen at first, and zooms with two fingers or Ctrl and the wheel.
 - **An issue and its journey.** Touch an issue: the stations it went through light up as data running along the connectors, and under the graph open the runs of its card at work with the model actually served, the full transcript (Hermes session, Claude Code or OpenCode lane, raw terminal log), the pull request and its CI, tokens and cost.
+- **The acceptance of a pull request.** No diff to read: under its issue, the proofs that the pull request does what was asked. Each acceptance criterion of the issue with its verdict, judged by the tests the pull request names in the head's JUnit reports, with a written rule and no model; the checks of the head, the gate rule by rule, the test suites with what failed, the textual proofs and the screenshots before and after, the review threads. Six widgets you reorder, pin, fold or set side by side, the layout kept for each type of screen.
+- **Live twins.** The app before and after the pull request, both running in its acceptance, your gestures mirrored from one to the other (see [Live twins](#live-twins-try-the-pull-request-not-its-diff)).
 - **Interventions and unblocking.** The whole question of the agent, and a reply box. Your answer is posted on the issue as `/factory unblock <answer>` under your GitHub account; the bot of the factory reacts, the card restarts, and the app follows each step. A card held for another reason comes with the exact commands to copy. Blockers that wait for you also reach your smartphone as a push notification, with a badge on the app icon.
 - **Agents and models.** Each agent with its role, its model chain in fallback order, its effort, skills and plugins, the refusals of its guards over 7 days, its gate pass rate and median run time, and any drift between the configuration in service and the one in the repository.
 - **Health.** Gateway, dispatcher, pause switch, dashboard, model providers (freellmapi, NVIDIA, llama.cpp and its VRAM, Claude Code), MCP servers, GitHub API and webhooks, cron jobs, and the sources of factory-live itself.
@@ -119,6 +134,7 @@ flowchart LR
 - **One stream for every screen.** The server keeps the live state and sends each change over Server-Sent Events. A `ping` after 15 seconds of silence keeps the link honest; a stream silent for 45 seconds is restarted, and the app says when it is offline.
 - **A Progressive Web App.** Installed from the browser, with no store, on a computer, Android, iPhone or iPad; a service worker keeps the shell available offline, and the app opens on the last state received, kept on the device. The API never goes through the cache.
 - **Push.** Web Push with VAPID keys generated on first start, only for the blockers that wait for you. The contact sent to push services is the repository address, never an e-mail.
+- **The twin bench.** The factory runs each pair of twins in Docker, on internal networks without Internet, each app in a Neko Chromium streamed over WebRTC, behind a mirror that replays gestures from one twin to the other. factory-live never starts a container: it reads the pair's state on the board, joins Neko on behalf of the app (the session's password stays on the server), and relays the owner's gestures to the mirror, behind the same guard as unblocking.
 - **Unblocking.** A dedicated GitHub App, created in one click from factory-live, reads issues, pull requests and CI with its installation token; the comment is posted with your user token, so the bot of the factory takes it as yours.
 
 The code follows a clean architecture checked in CI: pure rules in `packages/domain`, zod contracts in `packages/contracts`, use cases behind ports in `apps/server/src/application`, adapters and HTTP around them, and the PWA in `apps/web`. Details, in French: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/decisions/](docs/decisions/).

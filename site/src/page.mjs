@@ -76,7 +76,7 @@ function head(t, page) {
 }
 
 function masthead(t, page) {
-  const links = ['see', 'how', 'start', 'security', 'roadmap']
+  const links = ['twins', 'see', 'how', 'start', 'security', 'roadmap']
     .map((id) => `<li><a class="nav-link" href="#${id}">${t.nav[id]}</a></li>`)
     .join('');
   return `<header class="masthead">
@@ -113,6 +113,28 @@ function hero(t, page) {
 <source media="(max-width: 47.99rem)" srcset="${page.root}assets/img/${page.lang}/line-phone.webp 3x" width="${Math.round(page.images['line-phone.webp'].width / 3)}" height="${Math.round(page.images['line-phone.webp'].height / 3)}">
 ${img(page, 'line-hero.webp', 2, t.hero.alt, ' class="hero-image" fetchpriority="high"')}
 </picture>
+</div>
+</div>
+</section>`;
+}
+
+function twins(t, page) {
+  return `<section class="twins" id="twins" aria-labelledby="twins-title">
+<div class="wrap twins-inner">
+<div class="twins-copy" data-reveal>
+<p class="twins-eyebrow">${t.twins.eyebrow}</p>
+<h2 class="section-title" id="twins-title">${t.twins.title}</h2>
+<p class="twins-lede">${t.twins.lede}</p>
+</div>
+<figure class="twins-plate" data-ui data-reveal>
+${img(page, 'twins.webp', 2, t.twins.alt, ' class="twins-image" loading="lazy" decoding="async"')}
+</figure>
+<ul class="twins-points" role="list" data-reveal>
+${t.twins.points.map(([name, text]) => `<li class="twins-point"><h3 class="twins-point-name">${name}</h3><p class="twins-point-text">${text}</p></li>`).join('\n')}
+</ul>
+<div class="twins-foot" data-reveal>
+<p class="twins-note">${t.twins.note}</p>
+<a class="cell cell-ink" href="${page.root}demo/#jumeaux">${t.twins.open}</a>
 </div>
 </div>
 </section>`;
@@ -165,6 +187,7 @@ ${t.screens.installs.map(([name, how]) => `<li class="install"><span class="inst
 
 const TILE_IMAGES = {
   issue: 'issue-cards.webp',
+  acceptance: 'acceptance.webp',
   intervention: 'intervention.webp',
   agent: 'agent.webp',
   live: 'live.webp',
@@ -435,6 +458,7 @@ ${head(t, page)}
 ${masthead(t, page)}
 <main id="content">
 ${hero(t, page)}
+${twins(t, page)}
 ${screens(t, page)}
 ${see(t, page)}
 ${how(t)}
