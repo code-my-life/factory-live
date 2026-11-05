@@ -35,6 +35,9 @@ import { GitHubAuthError } from '../adapters/github/app.ts';
 import type { GitHubAppAuth } from '../adapters/github/app.ts';
 import type { PushNotifier } from '../adapters/push/webpush.ts';
 import type { TwinBench } from '../adapters/twins/bench.ts';
+import { ITEM_ID } from '../adapters/workflows/api.ts';
+import type { WorkflowApi } from '../adapters/workflows/api.ts';
+import type { PublishedSheet } from '../adapters/workflows/sheets.ts';
 import type { HistoryStore } from '../adapters/store/history.ts';
 import { toHookEvent } from '../ingest/hermes.ts';
 import { ReplayGuard, verifySignature } from '../ingest/signature.ts';
@@ -65,6 +68,12 @@ export interface AppDeps {
   githubAuth: GitHubAppAuth | null;
   /** The factory's twin bench (#23, ADR 0013); `null` in the demo and the tests that do not use it. */
   twins?: TwinBench | null;
+  /** The workflows followed by their generic API (#31): the studio's videos, today. */
+  workflows?: readonly WorkflowApi[];
+  /** The code line's sheet as the factory publishes it, or why the embedded copy is drawn (#31). */
+  codeSheet?: () => PublishedSheet;
+  /** Someone looks at a workflow: it is read more often for a while. */
+  workflowWatched?: () => void;
   hookSecret: string | null;
   origins: readonly string[];
   /** Valeurs de l'en-tête `Host` acceptées (configuration) ; tout autre hôte reçoit 421. */
@@ -827,6 +836,113 @@ export function createApp(deps: AppDeps) {
   relay('/api/twins/:repo/:pr/resync', (repo, pr) =>
     deps.twins ? deps.twins.resync(repo, pr) : Promise.resolve(false),
   );
+
+  // --- Workflows (#31, ADR 0014): their sheet, items and files read, the owner's gesture relayed ------
+
+  const workflowOf = (name: string) => {
+    deps.workflowWatched?.();
+    return deps.workflows?.find((workflow) => workflow.name === name);
+  };
+  const unknownWorkflow = (c: Context) =>
+    c.json({ error: 'Workflow inconnu', code: 'not_found' as const }, 404);
+  const unknownItem = (c: Context) =>
+    c.json({ error: 'Élément inconnu de ce workflow', code: 'not_found' as const }, 404);
+  const workflowDown = (c: Context) =>
+    c.json({ error: 'Le workflow ne répond pas', code: 'workflow_unreachable' as const }, 502);
+
+  app.get('/api/workflows', (c) => {
+    c.header('Cache-Control', 'no-store');
+    return c.json(
+      {
+        workflows: (deps.workflows ?? []).map((workflow) => workflow.view()),
+        code: deps.codeSheet?.() ?? null,
+      },
+      200,
+    );
+  });
+
+  app.get('/api/workflows/:wf', (c) => {
+    const workflow = workflowOf(c.req.param('wf'));
+    if (!workflow) return unknownWorkflow(c);
+    c.header('Cache-Control', 'no-store');
+    return c.json(workflow.view(), 200);
+  });
+
+  app.get('/api/workflows/:wf/items/:id', async (c) => {
+    const workflow = workflowOf(c.req.param('wf'));
+    if (!workflow) return unknownWorkflow(c);
+    try {
+      const viewer = requestOrigin(deps.origins, c.req.header('host'));
+      const detail = await workflow.detail(c.req.param('id'), viewer);
+      if (!detail) return unknownItem(c);
+      c.header('Cache-Control', 'no-store');
+      return c.json(detail, 200);
+    } catch {
+      return workflowDown(c);
+    }
+  });
+
+  app.get('/api/workflows/:wf/items/:id/words', async (c) => {
+    const workflow = workflowOf(c.req.param('wf'));
+    if (!workflow) return unknownWorkflow(c);
+    try {
+      const words = await workflow.words(c.req.param('id'));
+      if (!words) return unknownItem(c);
+      return c.json({ words }, 200);
+    } catch {
+      return workflowDown(c);
+    }
+  });
+
+  // A file in byte ranges: the player seeks without loading the whole video.
+  app.get('/api/workflows/:wf/items/:id/media/:name', async (c) => {
+    const workflow = workflowOf(c.req.param('wf'));
+    if (!workflow) return unknownWorkflow(c);
+    try {
+      const upstream = await workflow.media(
+        c.req.param('id'),
+        c.req.param('name'),
+        c.req.header('range'),
+      );
+      if (!upstream) return unknownItem(c);
+      const headers = new Headers({ 'Cache-Control': 'private, max-age=300' });
+      for (const name of [
+        'content-type',
+        'content-length',
+        'content-range',
+        'accept-ranges',
+        'etag',
+      ])
+        if (upstream.headers.has(name)) headers.set(name, upstream.headers.get(name) ?? '');
+      return new Response(upstream.body, { status: upstream.status, headers });
+    } catch {
+      return workflowDown(c);
+    }
+  });
+
+  // The owner's gesture: this PC, or an allowed Tailscale login, as the unblock.
+  app.on('POST', '/api/workflows/:wf/items/:id/gesture', guard);
+  app.post('/api/workflows/:wf/items/:id/gesture', bodyLimit({ maxSize: 16 * 1024 }), async (c) => {
+    const workflow = workflowOf(c.req.param('wf'));
+    if (!workflow) return unknownWorkflow(c);
+    const id = c.req.param('id');
+    if (!ITEM_ID.test(id)) return unknownItem(c);
+    const body: unknown = await c.req.json().catch(() => null);
+    try {
+      const result = await workflow.gesture(id, body);
+      if (!result.ok)
+        return c.json(
+          { error: result.error, code: 'workflow_refused' as const },
+          result.status === 400 || result.status === 404 || result.status === 409
+            ? result.status
+            : 502,
+        );
+      deps.store.audit(c.get('actor'), `${workflow.name}-gesture`, id, deps.now());
+      return c.body(null, 204);
+    } catch {
+      return workflowDown(c);
+    }
+  });
 
   app.doc31('/api/openapi.json', {
     openapi: '3.1.0',

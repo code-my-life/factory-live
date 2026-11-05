@@ -323,6 +323,15 @@ export const Message = z.discriminatedUnion('code', [
   message('usage.claudeNote', none),
   message('push.test.title', none),
   message('push.test.body', none),
+  message('push.studio.title', { station: z.string() }),
+  message('health.workflow', { name: z.string() }),
+  message('health.workflow.ok', { count }),
+  message('health.workflow.unreachable', { ...seconds, error: z.string().nullable() }),
+  message('health.workflow.never', { error: z.string().nullable() }),
+  message('health.workflow.sheetInvalid', { error: z.string() }),
+  message('health.codeSheet', none),
+  message('health.codeSheet.published', none),
+  message('health.codeSheet.embedded', { reason: z.string() }),
 ]);
 export type Message = z.infer<typeof Message>;
 export type MessageCode = Message['code'];

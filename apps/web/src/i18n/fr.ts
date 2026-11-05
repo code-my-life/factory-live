@@ -494,6 +494,16 @@ const server: ServerMessages = {
     'Le solde de l’abonnement Claude n’a pas de source fiable : factory-live n’affiche une limite que si une transcription Claude Code la signale.',
   'push.test.title': () => 'factory-live : test',
   'push.test.body': () => 'Les notifications de cet appareil fonctionnent.',
+  'push.studio.title': ({ station }) => `Studio : ${station} t’attend`,
+  'health.workflow': ({ name }) => `Workflow « ${name} »`,
+  'health.workflow.ok': ({ count }) => `Répond, ${count} ${f.plural(count, 'élément', 'éléments')}`,
+  'health.workflow.unreachable': ({ seconds, error }) =>
+    `Injoignable ${f.ago(seconds)}, dernier état gardé${error ? ` (${error})` : ''}`,
+  'health.workflow.never': ({ error }) => `Jamais joint${error ? ` (${error})` : ''}`,
+  'health.workflow.sheetInvalid': ({ error }) => `Fiche invalide, la précédente reste : ${error}`,
+  'health.codeSheet': () => 'Fiche de la ligne du code',
+  'health.codeSheet.published': () => 'Publiée par la factory (config/workflow.json)',
+  'health.codeSheet.embedded': ({ reason }) => `Copie embarquée : ${reason}`,
 };
 
 export const fr = {
@@ -642,7 +652,10 @@ export const fr = {
       count === 0
         ? 'Aucune vidéo ne t’attend'
         : `${count} ${f.plural(count, 'vidéo t’attend', 'vidéos t’attendent')}`,
-    live: 'Le direct du studio arrive avec la pièce suivante : pour l’instant, le graphe seul.',
+    none: 'Ce serveur ne suit aucun studio : WORKFLOWS dans la configuration (RUNBOOK).',
+    unreachableTitle: 'Le studio ne répond pas',
+    unreachable: (stay: string, error: string) =>
+      `Injoignable depuis ${stay}${error ? ` (${error})` : ''} : le dernier état reçu reste affiché.`,
     selectHint: 'Touche une vidéo dans le graphe pour ouvrir son détail ici.',
     loading: 'Lecture du studio…',
     unknown: 'Cette vidéo n’est pas dans le studio.',
@@ -1631,6 +1644,8 @@ export const fr = {
       csrf_missing: 'En-tête x-factory-live manquant',
       rate_limited: 'Trop de demandes, réessaie dans une minute',
       host_refused: 'Adresse inconnue de factory-live : ouvre l’app par son adresse habituelle',
+      workflow_refused: 'Le workflow a refusé ce geste',
+      workflow_unreachable: 'Le workflow ne répond pas',
     } satisfies Record<ApiErrorCode, string>,
   },
 

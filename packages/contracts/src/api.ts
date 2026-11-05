@@ -60,6 +60,8 @@ export const ApiErrorCode = z.enum([
   'csrf_missing',
   'rate_limited',
   'host_refused',
+  'workflow_refused',
+  'workflow_unreachable',
 ]);
 export type ApiErrorCode = z.infer<typeof ApiErrorCode>;
 

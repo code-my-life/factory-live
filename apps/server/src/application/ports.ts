@@ -7,7 +7,9 @@ import type {
   IssueLabel,
   PullRequestView,
   PushPayload,
+  StudioItem,
   Text,
+  WorkflowSheet,
 } from '@factory-live/contracts';
 import type {
   Board,
@@ -352,3 +354,21 @@ export type PushMessage = PushPayload;
 export interface PushPort {
   notify(message: PushMessage): Promise<{ sent: number; removed: number; failed: number }>;
 }
+
+/** A workflow followed by its generic API (#31), as last read (`adapters/workflows/api.ts`). */
+export interface WorkflowView {
+  name: string;
+  /** The sheet the workflow serves; `null` until read, or while it is invalid (`sheetError`). */
+  sheet: WorkflowSheet | null;
+  sheetError: string | null;
+  items: StudioItem[];
+  /** When the workflow last answered; `null` before it ever did. */
+  readAt: number | null;
+  /** Since when it does not answer, the last state staying as it was; `null` while it answers. */
+  unreachableSince: number | null;
+  error: string | null;
+}
+
+/** Where the code line's sheet comes from (#31): the factory's published one, or the web's copy. */
+export type PublishedSheet =
+  { source: 'published'; sheet: WorkflowSheet } | { source: 'embedded'; reason: string };

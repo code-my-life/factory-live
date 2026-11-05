@@ -15,6 +15,7 @@ import type { StoredSubscription } from '../adapters/store/history.ts';
 import { HistoryStore } from '../adapters/store/history.ts';
 import { createApp } from '../http/app.ts';
 import type { TwinBench } from '../adapters/twins/bench.ts';
+import type { WorkflowApi } from '../adapters/workflows/api.ts';
 import { StreamBuffer } from '../http/stream.ts';
 import { DiagnosisService } from '../application/diagnosis.ts';
 import { Hub } from '../application/hub.ts';
@@ -65,6 +66,8 @@ export function harness(
     githubRoutes?: Record<string, () => Response>;
     /** The factory's twin bench (#23). */
     twins?: TwinBench;
+    /** The workflows followed by their generic API (#31). */
+    workflows?: WorkflowApi[];
   } = {},
 ): Harness {
   const dir = tempDir();
@@ -295,6 +298,7 @@ export function harness(
     notifier,
     githubAuth,
     ...(options.twins ? { twins: options.twins } : {}),
+    ...(options.workflows ? { workflows: options.workflows } : {}),
     hookSecret: SECRET,
     origins: ORIGINS,
     allowedHosts: allowedHosts(8446, ORIGINS),

@@ -62,6 +62,11 @@ export class HermesPaths {
       : null;
   }
 
+  /** The sheet of the code line the factory publishes (`config/workflow.json`, hermes-software-factory#31). */
+  factorySheet(): string | null {
+    return real(this.factoryRepo, ['config', 'workflow.json'], 'file');
+  }
+
   /** Le code d'un plugin installé pour l'agent, sinon celui du dépôt de la factory. */
   pluginSource(profile: string, plugin: string): string | null {
     if (!NAME.test(profile) || !NAME.test(plugin)) return null;

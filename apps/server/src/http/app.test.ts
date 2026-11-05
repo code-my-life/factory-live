@@ -20,6 +20,8 @@ import type { Harness } from '../test/harness.ts';
 import { insertEvent, insertRun, insertTask, schemaFor, tempDir } from '../test/hermes-fixtures.ts';
 import type { TempDir } from '../test/hermes-fixtures.ts';
 import { TwinBench } from '../adapters/twins/bench.ts';
+import { WorkflowApi } from '../adapters/workflows/api.ts';
+import { FakeWorkflow, MASTER, waitingVideo } from '../test/workflow-fixtures.ts';
 import { contentSecurityPolicy } from './app.ts';
 
 let h: Harness;
@@ -1491,5 +1493,105 @@ describe('jumeaux vivants', () => {
       'https://machine.tailnet.ts.net:8446',
     ]);
     expect(policy).toContain("connect-src 'self' ws://localhost:* wss://machine.tailnet.ts.net:*;");
+  });
+});
+
+describe('workflows suivis par leur API (#31)', () => {
+  async function withStudio() {
+    const fake = new FakeWorkflow();
+    fake.items = [waitingVideo()];
+    const studio = new WorkflowApi({
+      name: 'studio',
+      url: 'http://host.docker.internal:8448',
+      fetchImpl: fake.fetch,
+      now: () => NOW,
+    });
+    await studio.refresh();
+    h.close();
+    h = harness({ workflows: [studio] });
+    fake.calls.length = 0;
+    return fake;
+  }
+
+  it("le geste sur un élément d'un workflow est gardé comme le déblocage, puis relayé", async () => {
+    const fake = await withStudio();
+    const post = (
+      headers: Record<string, string>,
+      body: unknown = { decision: 'refaire', note: 'le son' },
+    ) =>
+      h.app.request('/api/workflows/studio/items/essai/gesture', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+    expect(await refusal(await post({ ...LOCAL, 'x-factory-live': '' }))).toEqual([
+      403,
+      'csrf_missing',
+    ]);
+    expect(await refusal(await post({ ...LOCAL, origin: 'https://evil.example' }))).toEqual([
+      403,
+      'origin_refused',
+    ]);
+    expect(await refusal(await post({ ...TAILNET }))).toEqual([403, 'write_local_only']);
+    expect(
+      await refusal(await post({ ...TAILNET, 'tailscale-user-login': 'intrus@github' })),
+    ).toEqual([403, 'write_login_refused']);
+    expect(fake.calls).toHaveLength(0);
+
+    // « Refaire » without a note is refused here, before the workflow.
+    expect(await refusal(await post(LOCAL, { decision: 'refaire' }))).toEqual([
+      400,
+      'workflow_refused',
+    ]);
+    expect(fake.calls).toHaveLength(0);
+
+    expect((await post({ ...TAILNET, 'tailscale-user-login': 'alice@github' })).status).toBe(204);
+    expect(fake.calls).toEqual([
+      expect.objectContaining({
+        method: 'POST',
+        path: '/api/items/essai/gesture',
+        body: { decision: 'refaire', note: 'le son' },
+      }),
+    ]);
+    expect((await post(LOCAL, { decision: 'ok' })).status).toBe(204);
+    expect(fake.calls.at(-1)?.body).toEqual({ decision: 'ok' });
+
+    // The workflow's own refusal comes back; an unknown workflow or item never reaches it.
+    fake.gestureStatus = 409;
+    expect(await refusal(await post(LOCAL, { decision: 'ok' }))).toEqual([409, 'workflow_refused']);
+    const unknown = await h.app.request('/api/workflows/autre/items/essai/gesture', {
+      method: 'POST',
+      headers: LOCAL,
+      body: JSON.stringify({ decision: 'ok' }),
+    });
+    expect(unknown.status).toBe(404);
+  });
+
+  it("un fichier d'un workflow est relayé en plages d'octets", async () => {
+    const fake = await withStudio();
+    const range = await h.app.request('/api/workflows/studio/items/essai/media/master', {
+      headers: { ...THIS_PC, range: 'bytes=10-19' },
+    });
+    expect(range.status).toBe(206);
+    expect(range.headers.get('content-range')).toBe('bytes 10-19/256');
+    expect(range.headers.get('accept-ranges')).toBe('bytes');
+    expect(range.headers.get('content-type')).toBe('video/mp4');
+    expect([...new Uint8Array(await range.arrayBuffer())]).toEqual([...MASTER.slice(10, 20)]);
+    expect(fake.calls.at(-1)).toMatchObject({ path: '/v/essai/media/master' });
+    expect(fake.calls.at(-1)?.headers.get('range')).toBe('bytes=10-19');
+
+    const whole = await h.app.request('/api/workflows/studio/items/essai/media/master', {
+      headers: THIS_PC,
+    });
+    expect(whole.status).toBe(200);
+    expect((await whole.arrayBuffer()).byteLength).toBe(256);
+
+    // A name or an id the workflow does not write never reaches it.
+    const calls = fake.calls.length;
+    for (const path of ['essai/media/..%2Fsecret', '..%2Fetc/media/master'])
+      expect(
+        (await h.app.request(`/api/workflows/studio/items/${path}`, { headers: THIS_PC })).status,
+      ).toBe(404);
+    expect(fake.calls).toHaveLength(calls);
   });
 });

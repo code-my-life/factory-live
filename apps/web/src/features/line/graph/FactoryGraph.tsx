@@ -1,7 +1,7 @@
 import type { WorkflowSheetResult } from '@factory-live/contracts';
 import { Banner } from '@primer/react';
 import { useI18n } from '../../../i18n/I18nProvider.tsx';
-import { CODE_LINE_SHEET } from './layout.ts';
+import { useCodeSheet } from './codeSheet.ts';
 import { WorkflowGraph } from './WorkflowGraph.tsx';
 import type { WorkflowGraphProps } from './WorkflowGraph.tsx';
 
@@ -20,9 +20,9 @@ export function SheetGraph({
 }
 
 /**
- * The factory line as a run graph: the workflows' graph drawn from the code line's sheet
- * (`workflows/code-line.json`).
+ * The factory line as a run graph: the workflows' graph drawn from the code line's sheet, as the
+ * factory publishes it, with the embedded copy (`workflows/code-line.json`) as its fallback (#31).
  */
 export function FactoryGraph(props: WorkflowGraphProps) {
-  return <SheetGraph {...props} parsed={CODE_LINE_SHEET} />;
+  return <SheetGraph {...props} parsed={useCodeSheet()} />;
 }

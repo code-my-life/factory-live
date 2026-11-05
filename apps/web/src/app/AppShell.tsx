@@ -124,7 +124,12 @@ export function AppShell() {
   // Une intervention débloquée reste visible le temps du suivi, mais n'attend plus rien.
   const open = snapshot.interventions.filter((intervention) => !intervention.resolvedAt);
   // The videos of the studio that wait for the owner join the interventions: the bell counts both.
-  const studioWaiting = useStudio().waiting.length;
+  const studio = useStudio();
+  const studioWaiting = studio.waiting.length;
+  // A server that follows no studio shows no tab for it.
+  const tabs = studio.configured
+    ? PRIMARY
+    : PRIMARY.filter((destination) => destination.to !== '/studio');
   const openInterventions = open.length + studioWaiting;
   // Pastille de l'icône de l'app installée : les blocages qui t'attendent, comme le serveur la pose
   // à chaque push (notify.ts) ; la démo n'y touche pas.
@@ -237,14 +242,16 @@ export function AppShell() {
                   ) : null
                 }
               />
-              <SideNavItem
-                destination={PRIMARY[2] as Destination}
-                trailing={
-                  studioWaiting > 0 ? (
-                    <CounterLabel variant="primary">{studioWaiting}</CounterLabel>
-                  ) : null
-                }
-              />
+              {studio.configured ? (
+                <SideNavItem
+                  destination={PRIMARY[2] as Destination}
+                  trailing={
+                    studioWaiting > 0 ? (
+                      <CounterLabel variant="primary">{studioWaiting}</CounterLabel>
+                    ) : null
+                  }
+                />
+              ) : null}
               <SideNavItem destination={PRIMARY[3] as Destination} />
               <NavList.Divider />
               <SideNavItem
@@ -279,7 +286,7 @@ export function AppShell() {
       </div>
 
       <nav className={styles.tabbar} aria-label={t.nav.tabs}>
-        {PRIMARY.map((destination) => {
+        {tabs.map((destination) => {
           const IconComponent = destination.icon;
           const count =
             destination.to === '/interventions'

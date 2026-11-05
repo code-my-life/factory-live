@@ -137,6 +137,20 @@ Les jumeaux d'une PR (ADR 0013) tournent sur le banc de la factory (`scripts/fac
 
 Un écran reste sur « Connexion au jumeau… » : la paire tourne-t-elle (`factory-twins.py status`) ? Depuis un autre appareil, la paire doit être démarrée avec `--tailnet`.
 
+### Studio et workflows
+
+Le studio de video-factory est suivi par son API (ADR 0014), servie sur ce PC par `vf studio serve` (service `video-factory-studio`, port 8448). factory-live ne lit ni son tableau ni ses fichiers.
+
+| Besoin                        | Commande ou fichier                                                                                 |
+| ----------------------------- | --------------------------------------------------------------------------------------------------- |
+| Workflows suivis              | `WORKFLOWS` : `studio=http://host.docker.internal:8448` (`docker/compose.yaml`), virgules entre eux |
+| Ce que factory-live en lit    | `curl -s localhost:8446/api/workflows/studio \| jq '{unreachableSince, error, items}'`              |
+| L'API du studio elle-même     | `curl -s localhost:8448/api/items`                                                                  |
+| Fiche de la ligne du code     | `/factory/config/workflow.json` (dépôt de la factory monté en lecture seule)                        |
+| Fiche lue, ou copie embarquée | `curl -s localhost:8446/api/workflows \| jq .code`                                                  |
+
+Le studio est « injoignable » dans la Santé : le service tourne-t-il (`systemctl --user status video-factory-studio`) ? La page Studio garde le dernier état reçu en attendant.
+
 ## Secrets
 
 - `~/.config/factory-live/hook-secret` : secret HMAC partagé avec Hermès (`FACTORY_LIVE_HOOK_SECRET` de `~/.hermes/.env`), créé une fois par `install.sh` de la factory (étape 5b), jamais affiché. Absent : l'ingestion répond 503.
