@@ -72,6 +72,13 @@
   border-radius: var(--borderRadius-full);
 }
 
+/* A link on its own (the catalogue of blocks): its curves may reach out of its box. */
+.linkSample {
+  display: block;
+  overflow: visible;
+  max-width: 100%;
+}
+
 .legendLine {
   fill: none;
   stroke-linecap: round;

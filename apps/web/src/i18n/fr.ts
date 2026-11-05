@@ -629,6 +629,73 @@ export const fr = {
     back: 'Revenir à la ligne d’usine',
   },
 
+  workflow: {
+    /** Over the reason a workflow's sheet is refused, given as is. */
+    invalid: 'La fiche de ce workflow est refusée : le graphe ne peut pas se dessiner',
+  },
+
+  /** The catalogue of the standard blocks of a workflow's graph (`/composants`). */
+  components: {
+    title: 'Composants',
+    intro:
+      'Les blocs standards du graphe des workflows, chacun dans ses états. Un nouveau graphe ou écran de workflow les réutilise au lieu d’en dessiner d’autres.',
+    station: {
+      title: 'Poste',
+      empty: 'Vide',
+      rows: 'Avec des lignes',
+      more: 'Avec « et N autres »',
+      selected: 'Avec la ligne ouverte',
+    },
+    kind: {
+      title: 'Nature du poste',
+      end: 'Fin : aucune puce',
+    },
+    row: {
+      title: 'Ligne d’élément',
+      agent: 'Avec un agent qui appelle son modèle',
+      waiting: 'En attente d’une place',
+    },
+    providers: {
+      title: 'Fournisseurs',
+      empty: 'Vide',
+      idle: 'Au repos',
+      busy: 'Un modèle répond',
+    },
+    group: { title: 'Cadre d’un groupe' },
+    links: {
+      title: 'Liens',
+      kind: { line: 'Ligne', return: 'Retour', branch: 'Branche', fan: 'Éventail' },
+      rest: 'Au repos',
+      active: 'En activité',
+      problem: 'Pris après un échec',
+      request: 'Pris sur une demande',
+      /** A link's sample, for screen readers: « Retour : En activité ». */
+      sample: (kind: string, state: string) => `${kind} : ${state}`,
+    },
+    legend: { title: 'Légende', closed: 'Fermée, sous un graphe', open: 'Ouverte' },
+    zoom: { title: 'Zoom' },
+    sheet: {
+      title: 'Une fiche de trois postes',
+      invalid: 'Une fiche refusée : la page reste debout',
+    },
+    /** The sample workflow and its items: a video studio. */
+    sample: {
+      item: 'Vidéo',
+      write: 'Scénario',
+      render: 'Rendu',
+      approve: 'Validation',
+      again: 'Retour : à reprendre',
+      member: 'Relecture',
+      group: 'Contrôles',
+      titles: {
+        intro: 'Présenter la ligne d’usine en une minute',
+        demo: 'Démo du graphe des workflows',
+        teaser: 'Bande-annonce du studio',
+        tutorial: 'Tutoriel : écrire une fiche de workflow',
+      },
+    },
+  },
+
   line: {
     title: 'Ligne d’usine',
     openIssues: (count: number) => `${count} ${f.plural(count, 'issue', 'issues')} en cours`,
@@ -656,7 +723,8 @@ export const fr = {
         github: 'GitHub le fait, sans modèle',
         owner: 'Ton jugement : la seule décision humaine de la ligne',
       },
-      gateHint: 'factory-gate.py : une preuve par type d’issue',
+      /** The hint of a group of stations and of its members, by the group's key. */
+      groupHint: { gate: 'factory-gate.py : une preuve par type d’issue' },
       lane: {
         failfirst: 'Fail-first',
         sabotage: 'Sabotages',
@@ -703,9 +771,9 @@ export const fr = {
         invariance: 'Preuve d’invariance',
         documents: 'Preuve documents',
         diagnostic: 'Diagnostic, sans PR',
-        gateRed: 'Retour : gate rouge',
-        changes: 'Retour : changements demandés',
-        revert: 'Revert : main rouge',
+        'loop:gate': 'Retour : gate rouge',
+        'loop:review': 'Retour : changements demandés',
+        'loop:revert': 'Revert : main rouge',
         models: 'Accès aux modèles',
       },
       motion: {
