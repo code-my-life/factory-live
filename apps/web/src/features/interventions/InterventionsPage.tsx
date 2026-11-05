@@ -1,6 +1,7 @@
-import type { Intervention, StudioItem } from '@factory-live/contracts';
+import type { Intervention, StudioItem, StudioItemDetail } from '@factory-live/contracts';
 import { ArrowLeftIcon, BellIcon, CheckCircleIcon, VideoIcon } from '@primer/octicons-react';
 import { Heading } from '@primer/react';
+import { useEffect, useState } from 'react';
 import { Blankslate } from '@primer/react/experimental';
 import { Link, useParams } from 'react-router';
 import { useSnapshot } from '../../data/FactoryProvider.tsx';
@@ -135,6 +136,21 @@ function StudioItemRow({ video, current }: { video: StudioItem; current: boolean
 /** A video of the studio, opened among the interventions: the same gesture as on the studio's page. */
 function StudioInterventionDetail({ video }: { video: StudioItem }) {
   const { t } = useI18n();
+  const { source, version } = useStudio();
+  // The video's detail, for its links (the takes page while it is shot), kept with the video it is of.
+  const [read, setRead] = useState<{ id: string; detail: StudioItemDetail | null } | null>(null);
+
+  useEffect(() => {
+    let current = true;
+    void source.item(video.id).then((detail) => {
+      if (current) setRead({ id: video.id, detail });
+    });
+    return () => {
+      current = false;
+    };
+  }, [source, video.id, version]);
+
+  const detail = read?.id === video.id ? read.detail : null;
   return (
     <article className={styles.card} aria-labelledby={`titre-${studioId(video)}`}>
       <header className={styles.cardHead}>
@@ -156,7 +172,12 @@ function StudioInterventionDetail({ video }: { video: StudioItem }) {
       </header>
       {STUDIO_SHEET.ok ? (
         <div className={styles.studioGesture}>
-          <GestureBar item={video} sheet={STUDIO_SHEET.sheet} />
+          <GestureBar
+            key={`${video.id}:${video.station}:${video.state}`}
+            item={video}
+            sheet={STUDIO_SHEET.sheet}
+            links={detail?.links}
+          />
         </div>
       ) : null}
     </article>

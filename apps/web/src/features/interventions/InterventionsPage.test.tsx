@@ -125,6 +125,47 @@ describe('InterventionsPage', () => {
     expect(container.querySelector('[data-studio][aria-current="page"]')).toBeNull();
   });
 
+  it('le formulaire de « Refaire » ne suit pas d’une vidéo à l’autre', async () => {
+    const user = userEvent.setup();
+    const studio = createDemoStudioSource();
+    const gestures = vi.spyOn(studio, 'gesture');
+    renderApp('/interventions/studio:presenter-factory-live', new DemoSource(), studio);
+    const list = screen.getByRole('navigation', { name: 'Interventions en attente' });
+    let gesture = await screen.findByRole('region', { name: 'Geste' });
+    expect(within(gesture).getByText('Le master attend ta revue')).toBeInTheDocument();
+    await user.click(within(gesture).getByRole('button', { name: 'Refaire…' }));
+    await user.type(within(gesture).getByRole('textbox', { name: 'Raison' }), 'Trop long');
+
+    // Another video opens with its own gesture: the form is closed and its reason empty.
+    await user.click(within(list).getByRole('link', { name: /La recette d’une PR/ }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', {
+          level: 2,
+          name: 'La recette d’une PR, sans lire une ligne de code',
+        }),
+      ).toBeInTheDocument(),
+    );
+    gesture = screen.getByRole('region', { name: 'Geste' });
+    expect(within(gesture).queryByRole('textbox', { name: 'Raison' })).toBeNull();
+    expect(within(gesture).queryByRole('button', { name: 'Envoyer' })).toBeNull();
+    expect(within(gesture).getByRole('button', { name: 'Refaire…' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    await user.click(within(gesture).getByRole('button', { name: 'Refaire…' }));
+    expect(within(gesture).getByRole('textbox', { name: 'Raison' })).toHaveValue('');
+    expect(gestures).not.toHaveBeenCalled();
+  });
+
+  it('en Tournage, la vidéo ouverte dans les interventions a le lien des prises', async () => {
+    renderApp('/interventions/studio:un-agent-bloque', new DemoSource(), createDemoStudioSource());
+    const gesture = await screen.findByRole('region', { name: 'Geste' });
+    expect(
+      await within(gesture).findByRole('link', { name: 'Ouvrir la page des prises' }),
+    ).toHaveAttribute('href', 'http://localhost:8447/videos/un-agent-bloque/prises');
+  });
+
   it('une vidéo seule, sans intervention de la factory, s’ouvre la première', async () => {
     const factory = new DemoSource();
     vi.spyOn(factory, 'getSnapshot').mockReturnValue({
