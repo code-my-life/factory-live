@@ -1,20 +1,36 @@
-import type { GateLane, JourneyStep, StationId } from '@factory-live/contracts';
+import { GateLane, MODELS_KEY, parseWorkflowSheet } from '@factory-live/contracts';
+import type {
+  EdgeKind,
+  JourneyStep,
+  StationKind,
+  WorkflowEdge,
+  WorkflowSheet,
+  WorkflowStation,
+} from '@factory-live/contracts';
+import codeLine from './workflows/code-line.json';
 
 /**
- * The factory line drawn as a run graph: one box per station holding its issues as rows, joined by
- * curved arrows, never a right angle. The line enters at Intake, above Brief, runs right along the
- * main row to Ta revue, then down the last column to Terminé. The gate opens and closes as a fan of
- * curves over its four proof boxes. The returns arch over the line. The models node is the base
- * under the stations whose agents call a model, and feeds each of them from below. Values in px.
+ * A workflow drawn as a run graph, from its sheet alone: one box per station holding its items as
+ * rows, joined by curved arrows, never a right angle. The stations sit on the sheet's grid: a column
+ * per `col`, row 0 above the main row, the next rows stacked down their column. A group's members
+ * share a frame and open and close as a fan of curves. The returns arch over the line. The models
+ * node is the base under the stations whose agents call a model, and feeds each of them from below.
+ * Values in px.
  */
-export const CANVAS_W = 1174;
+
+/** The sheet of the code line, read and checked once; its error, if any, shows instead of the graph. */
+export const CODE_LINE_SHEET = parseWorkflowSheet(codeLine);
+export const CODE_LINE: WorkflowSheet = CODE_LINE_SHEET.ok
+  ? CODE_LINE_SHEET.sheet
+  : { item: { type: '', label: '' }, stations: [], edges: [], models: [] };
+
 /** A station box's head: its icon, name, and the kind of work done there. */
 export const HEAD_H = 36;
-/** A proof box's head has a second line: the issue types it judges. */
+/** A head with a second line: the item types a station judges, or the providers' hint. */
 export const PROOF_HEAD_H = 52;
 /**
- * How an issue shows in its box: whole at a station; without the note in Terminé, where nothing holds
- * it any more; on two lines in Intake, where one issue shows at most.
+ * How an item shows in its box: whole at a station; without the note at the end, where nothing holds
+ * it any more; on two lines at the entry, where one item shows at most.
  */
 export type RowKind = 'full' | 'finished' | 'compact';
 /**
@@ -22,45 +38,76 @@ export type RowKind = 'full' | 'finished' | 'compact';
  * zoom (`MIN_SCALE`), the touch target WCAG 2.5.8 asks for: that is why a finished row is not compact.
  */
 export const ROW_H: Record<RowKind, number> = { full: 100, finished: 84, compact: 56 };
-/** The graph's zoom bounds: a phone opens on the whole factory, never smaller than this. */
+/** The graph's zoom bounds: a phone opens on the whole workflow, never smaller than this. */
 export const MIN_SCALE = 0.3;
 export const MAX_SCALE = 1.6;
 export const EMPTY_H = 34;
-/** The row that counts the issues not shown. */
+/** The row that counts the items not shown. */
 export const MORE_H = 30;
+/** How many items the end station lists, the last to finish first. */
 export const DONE_SHOWN = 2;
+/** How many items a station above the main row (the entry) lists. */
 export const INTAKE_SHOWN = 1;
-/** The main row, under Intake and the arches of the returns. */
+/** The main row (row 1), under the entry and the arches of the returns. */
 export const TOP = 176;
-const COLUMN_W = 220;
-const X = { first: 40, impl: 336, gate: 632, last: 928 } as const;
+export const COLUMN_W = 220;
+/** The left margin, then the step from one column to the next. */
+const MARGIN = 40;
+const COLUMN_STEP = 296;
+/** Room right of the last column, for the returns that bulge out of it. */
+const RIGHT_ROOM = 26;
+/** Row 0, above the main row. */
+const ABOVE_Y = 24;
 const V_GAP = 44;
+/** Between two members of a group. */
 const PROOF_GAP = 18;
-const INTAKE_Y = 24;
+/** A group's frame: its padding, and the room of its title above its first member. */
+const FRAME_PAD = 10;
+const FRAME_TITLE = 40;
 /** The ports of a fan, down the side of a box: the first one, then the step between them. */
 const FAN_FIRST = 10;
 const FAN_STEP = 15;
-/** Where the arches of the returns peak. */
-const ARCH_REVIEW = 40;
-const ARCH_GATE = 92;
-/** Radius of the turns of the long routes (Diagnostic, the feed to Brief). */
+/** Where the arches of the returns peak: the shortest one first, nearest the line, then outwards. */
+const ARCH_PEAK = 92;
+const ARCH_STEP = 52;
+/** Where an arch leaves a station, from its left side, or a group's frame, from its right side. */
+const ARCH_FROM = 56;
+const ARCH_FROM_FRAME = 40;
+/** Where the arches land on a station, from its left side: the shortest one rightmost. */
+const ARCH_LAND = 112;
+const ARCH_LAND_STEP = 40;
+/** The highest an arch may peak, from the top of the canvas. */
+const ARCH_MARGIN = 8;
+/** How far a return within one column bulges out to the right. */
+const BULGE = 30;
+/** A branch drops below the lowest box of the columns its source touches. */
+const BRANCH_GAP = 64;
+/** Where a branch that rejoins another column leaves its station, from its left side. */
+const BRANCH_EXIT = 22;
+/** The models node: under the stations it feeds, inset from their left. */
+const FEED_GAP = 56;
+const FEED_INSET = 56;
+/** A feed moves off the axis of a link entering the same box from above. */
+const FEED_SHIFT = 40;
+/** A blocked feed turns this far under its station, and enters it this far from its right side. */
+const FEED_UNDER = 30;
+/** The room under the lowest box, where the long routes run, then the foot of the canvas. */
+const UNDER = 40;
+const FOOT = 36;
+/** Radius of the turns of the long routes (a branch rejoining, a blocked feed). */
 const TURN = 40;
+/** The dashes of the returns, in the order of the sheet, then of the feeds. */
+const RETURN_DASHES = ['7 5', '1 5', '12 4 2 4'] as const;
+const FEED_DASH = '2 4';
 
-/** The stations drawn as a box of their own: the line, the Diagnostic branch, and Terminé. */
-export type StationBox =
-  | 'intake'
-  | 'brief'
-  | 'implementation'
-  | 'review'
-  | 'merge'
-  | 'ci'
-  | 'deploy'
-  | 'done'
-  | 'diagnostic';
+/** A box of the graph: a station's key, or `models` for the providers. */
+export type BoxId = string;
 
-export type BoxId = StationBox | `gate:${GateLane}` | 'models';
+/** The series an edge belongs to: `line`, a group member or a branch, `back` (returns), `models`. */
+export type Branch = string;
 
-export type Branch = 'line' | GateLane | 'diagnostic' | 'back' | 'models';
+/** Why an item takes a return: a failure, in red (kept for problems), or a request, in yellow. */
+export type FlowEvent = 'problem' | 'request';
 
 export interface Box {
   id: BoxId;
@@ -82,31 +129,322 @@ export interface Edge {
   to: { x: number; y: number };
 }
 
+export interface Frame {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface Layout {
   width: number;
   height: number;
   boxes: Record<BoxId, Box>;
   edges: Edge[];
-  /** The frame grouping the gate's proofs, its title above the first proof. */
-  gate: { x: number; y: number; w: number; h: number };
+  /** The frame of the first group, its title above its first member. */
+  gate: Frame;
+  /** The frame of every group, by its key. */
+  groups: Record<string, Frame>;
 }
-
-export const LANES: readonly GateLane[] = ['failfirst', 'sabotage', 'invariance', 'documents'];
 
 /** How many rows a box shows, and how tall they are. */
 export interface Fill {
   rows: number;
   row: RowKind;
-  /** Issues beyond those shown, counted on one more row. */
+  /** Items beyond those shown, counted on one more row. */
   more: number;
   /** A list's own row height (the models node's providers). */
   rowH?: number;
 }
 
+const EMPTY_FILL: Fill = { rows: 0, row: 'full', more: 0 };
+
 export function bodyHeight(fill: Fill): number {
   if (fill.rows === 0) return EMPTY_H;
   return fill.rows * (fill.rowH ?? ROW_H[fill.row]) + (fill.more > 0 ? MORE_H : 0);
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * What a sheet says, read once: the members of its groups, its links with their id, series, dash
+ * and cause, the stations its providers feed, its legend.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** A link of the sheet, or a feed from the providers, as the graph draws it. */
+export interface Link {
+  id: string;
+  kind: EdgeKind | 'feed';
+  from: string;
+  to: string;
+  branch: Branch;
+  dash?: string;
+  /** Why an item takes this return. */
+  cause?: FlowEvent;
+  /** The legend entry it belongs to. */
+  legend: string;
+  label?: string;
+}
+
+/** One entry of the legend per kind of link of the sheet. */
+export interface LegendEntry {
+  key: string;
+  branch: Branch;
+  dash?: string;
+  label?: string;
+}
+
+export interface SheetPlan {
+  sheet: WorkflowSheet;
+  station: ReadonlyMap<string, WorkflowStation>;
+  /** The members of each group, in the order of the sheet. */
+  members: ReadonlyMap<string, readonly WorkflowStation[]>;
+  /** Stations reached only by a branch: they hang under the line. */
+  branchStations: ReadonlySet<string>;
+  /** The stations the providers feed. */
+  fed: readonly string[];
+  links: readonly Link[];
+  legend: readonly LegendEntry[];
+  /** The series coloured from the display palette, in order: group members, then branches. */
+  series: readonly Branch[];
+  /** The line and fan links, in the order of the sheet: the ways a journey may skip along. */
+  along: readonly Link[];
+}
+
+/** A group member's key without its group: `<group>:<name>` gives `<name>`. */
+export function suffixOf(station: Pick<WorkflowStation, 'key' | 'group'>): string {
+  const prefix = `${station.group ?? ''}:`;
+  return station.group && station.key.startsWith(prefix)
+    ? station.key.slice(prefix.length)
+    : station.key;
+}
+
+/** The kind of the work done at a station, or at a group (its members share one). */
+export function kindOf(plan: SheetPlan, key: string): StationKind | null {
+  return plan.station.get(key)?.kind ?? plan.members.get(key)?.[0]?.kind ?? null;
+}
+
+/** The connector from the models node up to a station whose agent calls a model. */
+export const feedOf = (station: string): string => `${MODELS_KEY}:${station}`;
+
+/** The short id of a link without an id of the sheet, if it has one: `line:<from>`, `in:`, `out:`. */
+function linkId(edge: WorkflowEdge, station: ReadonlyMap<string, WorkflowStation>): string | null {
+  if (edge.kind === 'line') return `line:${edge.from}`;
+  const to = station.get(edge.to);
+  const from = station.get(edge.from);
+  if (edge.kind === 'fan' && to?.group) return `in:${suffixOf(to)}`;
+  if (edge.kind === 'fan' && from?.group) return `out:${suffixOf(from)}`;
+  return null;
+}
+
+/**
+ * The edges in the order they are drawn. A fan is drawn member by member, in the order of the
+ * group's members, each member's way in then its way out, where the sheet names the group's first
+ * fan edge. Every other edge keeps its place in the sheet.
+ */
+function drawOrder(
+  edges: readonly WorkflowEdge[],
+  station: ReadonlyMap<string, WorkflowStation>,
+  members: ReadonlyMap<string, WorkflowStation[]>,
+): WorkflowEdge[] {
+  const memberOf = (edge: WorkflowEdge) =>
+    edge.kind !== 'fan'
+      ? undefined
+      : station.get(edge.to)?.group
+        ? station.get(edge.to)
+        : station.get(edge.from)?.group
+          ? station.get(edge.from)
+          : undefined;
+  const drawn = new Set<string>();
+  const out: WorkflowEdge[] = [];
+  for (const edge of edges) {
+    const member = memberOf(edge);
+    if (!member?.group) {
+      out.push(edge);
+      continue;
+    }
+    if (drawn.has(member.group)) continue;
+    drawn.add(member.group);
+    const list = members.get(member.group) ?? [];
+    const rank = (other: WorkflowEdge) => {
+      const at = list.findIndex(({ key }) => key === (memberOf(other) as WorkflowStation).key);
+      return 2 * at + (memberOf(other)?.key === other.to ? 0 : 1);
+    };
+    out.push(
+      ...edges
+        .filter((other) => memberOf(other)?.group === member.group)
+        .sort((a, b) => rank(a) - rank(b)),
+    );
+  }
+  return out;
+}
+
+const plans = new WeakMap<WorkflowSheet, SheetPlan>();
+
+/** What the sheet says, worked out once per sheet. */
+export function planOf(sheet: WorkflowSheet): SheetPlan {
+  const known = plans.get(sheet);
+  if (known) return known;
+  const station = new Map(sheet.stations.map((value) => [value.key, value]));
+  const members = new Map<string, WorkflowStation[]>();
+  for (const group of sheet.groups ?? []) members.set(group.key, []);
+  for (const value of sheet.stations) if (value.group) members.get(value.group)?.push(value);
+
+  const reached = new Set(
+    sheet.edges.filter((edge) => edge.kind === 'line' || edge.kind === 'fan').map(({ to }) => to),
+  );
+  const branchStations = new Set(
+    sheet.edges
+      .filter((edge) => edge.kind === 'branch' && station.has(edge.to) && !reached.has(edge.to))
+      .map(({ to }) => to),
+  );
+  // Fed: the stations the sheet names, else every station where an agent calls a model.
+  const fed =
+    sheet.models.length > 0
+      ? sheet.models
+      : sheet.stations.filter((value) => value.kind === 'ai').map(({ key }) => key);
+
+  const kind = (key: string) => station.get(key)?.kind ?? members.get(key)?.[0]?.kind;
+  let returns = 0;
+  // Every link has an id of its own: the sheet's, else its short id when no other link without an
+  // id would take the same and the sheet gives it to none, else `<kind>:<from>:<to>`, numbered from 2
+  // if that one is taken too. The ids of the sheet and the unambiguous short ids are reserved first,
+  // so that the rule does not depend on the order of the links.
+  const shortCount = new Map<string, number>();
+  for (const edge of sheet.edges) {
+    const short = edge.id ? null : linkId(edge, station);
+    if (short !== null) shortCount.set(short, (shortCount.get(short) ?? 0) + 1);
+  }
+  const given = new Set(sheet.edges.flatMap((edge) => (edge.id ? [edge.id] : [])));
+  const shortOf = (edge: WorkflowEdge) => {
+    const short = linkId(edge, station);
+    return short !== null && shortCount.get(short) === 1 && !given.has(short) ? short : null;
+  };
+  const reserved = new Set(given);
+  for (const edge of sheet.edges) {
+    const short = edge.id ? null : shortOf(edge);
+    if (short !== null) reserved.add(short);
+  }
+  const used = new Set<string>();
+  const freeId = (edge: WorkflowEdge) => {
+    const plain = `${edge.kind}:${edge.from}:${edge.to}`;
+    let id = edge.id ?? shortOf(edge);
+    if (id === null) {
+      id = plain;
+      for (let n = 2; used.has(id) || reserved.has(id); n += 1) id = `${plain}:${n}`;
+    }
+    used.add(id);
+    return id;
+  };
+  const ids = new Map<WorkflowEdge, string>();
+  const links: Link[] = drawOrder(sheet.edges, station, members).map((edge) => {
+    const id = freeId(edge);
+    ids.set(edge, id);
+    const label = edge.label === undefined ? {} : { label: edge.label };
+    switch (edge.kind) {
+      case 'line':
+        return {
+          id,
+          kind: edge.kind,
+          from: edge.from,
+          to: edge.to,
+          branch: 'line',
+          legend: 'line',
+          ...label,
+        };
+      case 'fan': {
+        const member = station.get(edge.to)?.group ? station.get(edge.to) : station.get(edge.from);
+        const branch = member ? suffixOf(member) : edge.to;
+        return {
+          id,
+          kind: edge.kind,
+          from: edge.from,
+          to: edge.to,
+          branch,
+          legend: branch,
+          ...label,
+        };
+      }
+      case 'branch': {
+        const branch = branchStations.has(edge.from) ? edge.from : edge.to;
+        return {
+          id,
+          kind: edge.kind,
+          from: edge.from,
+          to: edge.to,
+          branch,
+          legend: branch,
+          ...label,
+        };
+      }
+      case 'return': {
+        const dash = RETURN_DASHES[returns % RETURN_DASHES.length] as string;
+        returns += 1;
+        // The owner asks for changes; anything else sends an item back after a failure.
+        const cause: FlowEvent = kind(edge.from) === 'owner' ? 'request' : 'problem';
+        return {
+          id,
+          kind: edge.kind,
+          from: edge.from,
+          to: edge.to,
+          branch: 'back',
+          dash,
+          cause,
+          legend: id,
+          ...label,
+        };
+      }
+    }
+  });
+  for (const key of fed)
+    links.push({
+      id: feedOf(key),
+      kind: 'feed',
+      from: MODELS_KEY,
+      to: key,
+      branch: MODELS_KEY,
+      dash: FEED_DASH,
+      legend: MODELS_KEY,
+    });
+
+  const legend: LegendEntry[] = [];
+  for (const link of links)
+    if (!legend.some((entry) => entry.key === link.legend))
+      legend.push({
+        key: link.legend,
+        branch: link.branch,
+        ...(link.dash === undefined ? {} : { dash: link.dash }),
+        ...(link.label === undefined ? {} : { label: link.label }),
+      });
+
+  const series = [
+    ...sheet.stations.filter((value) => value.group).map(suffixOf),
+    ...links.filter((link) => link.kind === 'branch').map(({ branch }) => branch),
+  ].filter((branch, index, all) => all.indexOf(branch) === index);
+
+  const plan: SheetPlan = {
+    sheet,
+    station,
+    members,
+    branchStations,
+    fed,
+    links,
+    legend,
+    series,
+    along: sheet.edges
+      .filter((edge) => edge.kind === 'line' || edge.kind === 'fan')
+      .map((edge) => links.find((link) => link.id === ids.get(edge)) as Link),
+  };
+  plans.set(sheet, plan);
+  return plan;
+}
+
+/** The members of the code line's group, the gate's proofs: `failfirst`, `sabotage`... */
+export const LANES: readonly GateLane[] = (planOf(CODE_LINE).members.values().next().value ?? [])
+  .map(suffixOf)
+  .filter((lane): lane is GateLane => GateLane.safeParse(lane).success);
+
+/* ------------------------------------------------------------------------------------------------
+ * The curves.
+ * ---------------------------------------------------------------------------------------------- */
 
 type Point = readonly [number, number];
 
@@ -129,10 +467,10 @@ function up([x1, y1]: Point, [x2, y2]: Point): string {
 }
 
 /** An arch from the top of a box back to the top of an earlier one, peaking at `peak`. */
-function arch([x1, y1]: Point, [x2, y2]: Point, peak: number): { d: string } {
+function arch([x1, y1]: Point, [x2, y2]: Point, peak: number): string {
   // A cubic whose two control points share a height reaches 3/4 of the way to it at its middle.
   const control = (peak - (y1 + y2) / 8) / 0.75;
-  return { d: `M ${x1} ${y1} C ${x1} ${control} ${x2} ${control} ${x2} ${y2}` };
+  return `M ${x1} ${y1} C ${x1} ${control} ${x2} ${control} ${x2} ${y2}`;
 }
 
 /** A curve leaving a right port and coming back to the right port of a box above it. */
@@ -169,71 +507,142 @@ function route(points: readonly Point[]): string {
   return d;
 }
 
-/** The connector from the models node up to a station whose agent calls a model. */
-export const feedOf = (station: 'brief' | 'implementation' | 'diagnostic'): string =>
-  `models:${station}`;
+const columnX = (col: number) => MARGIN + col * COLUMN_STEP;
 
-export function layout(fills: Record<BoxId, Fill>): Layout {
+/* ------------------------------------------------------------------------------------------------
+ * The layout.
+ * ---------------------------------------------------------------------------------------------- */
+
+export function layout(fills: Record<BoxId, Fill>, sheet: WorkflowSheet = CODE_LINE): Layout {
+  const plan = planOf(sheet);
   const box = (id: BoxId, x: number, y: number, w = COLUMN_W, head = HEAD_H): Box => ({
     id,
     x,
     y,
     w,
-    h: head + bodyHeight(fills[id]) + 2,
+    h: head + bodyHeight(fills[id] ?? EMPTY_FILL) + 2,
     head,
     portY: y + HEAD_H / 2,
   });
-  const boxes = {} as Record<BoxId, Box>;
-  const put = (value: Box) => {
-    boxes[value.id] = value;
-    return value;
-  };
+  const headOf = (station: WorkflowStation) => (station.types?.length ? PROOF_HEAD_H : HEAD_H);
+  const placed = new Map<string, Box>();
+  const bottomOf = (value: Box) => value.y + value.h;
+  const colOf = (key: string) => plan.station.get(key)?.col ?? plan.members.get(key)?.[0]?.col ?? 0;
 
-  const intake = put(box('intake', X.first, INTAKE_Y));
-  const brief = put(box('brief', X.first, TOP));
-  const impl = put(box('implementation', X.impl, TOP));
+  // The arches nest: the shortest span nearest the line, the longer ones over it.
+  const arches = plan.links
+    .filter((link) => link.kind === 'return' && colOf(link.from) !== colOf(link.to))
+    .map((link, order) => ({ link, order, span: Math.abs(colOf(link.from) - colOf(link.to)) }))
+    .sort((a, b) => a.span - b.span || a.order - b.order)
+    .map(({ link }) => link.id);
+  // The whole graph moves down when its highest arch would peak above the margin, and the landings
+  // close up so that each one stays on its station.
+  const shift = Math.max(0, ARCH_MARGIN - (ARCH_PEAK - (arches.length - 1) * ARCH_STEP));
+  const aboveY = ABOVE_Y + shift;
+  const topY = TOP + shift;
+  const landStep = Math.min(ARCH_LAND_STEP, ARCH_LAND / Math.max(1, arches.length - 1));
 
-  let proofY = TOP;
-  const proofs = LANES.map((lane) => {
-    const proof = put(box(`gate:${lane}`, X.gate, proofY, COLUMN_W, PROOF_HEAD_H));
-    proofY += proof.h + PROOF_GAP;
-    return proof;
-  });
-  const lastProof = proofs[proofs.length - 1] as Box;
-  const gate = {
-    x: X.gate - 10,
-    y: TOP - 40,
-    w: COLUMN_W + 20,
-    h: lastProof.y + lastProof.h + 10 - (TOP - 40),
-  };
-
-  // The delivery column: the line turns down after Ta revue.
-  const delivery: Box[] = [];
-  let deliveryY = TOP;
-  for (const id of ['review', 'merge', 'ci', 'deploy', 'done'] as const) {
-    const station = put(box(id, X.last, deliveryY));
-    delivery.push(station);
-    deliveryY += station.h + V_GAP;
+  // Down each column, the stations of the line by row: row 0 above the main row, row 1 on it, the
+  // next ones stacked under the one above (closer between two members of a group).
+  const columns = [...new Set(sheet.stations.map(({ col }) => col))].sort((a, b) => a - b);
+  for (const col of columns) {
+    let previous: { station: WorkflowStation; box: Box } | null = null;
+    const column = sheet.stations
+      .filter((station) => station.col === col && !plan.branchStations.has(station.key))
+      .sort((a, b) => a.row - b.row);
+    for (const station of column) {
+      const gap =
+        previous && station.group && station.group === previous.station.group ? PROOF_GAP : V_GAP;
+      const y =
+        station.row === 0
+          ? aboveY
+          : previous && previous.station.row >= 1
+            ? bottomOf(previous.box) + gap
+            : topY;
+      const value = box(station.key, columnX(col), y, COLUMN_W, headOf(station));
+      placed.set(station.key, value);
+      previous = { station, box: value };
+    }
   }
-  const [review, , ci] = delivery as [Box, Box, Box];
-  const done = delivery[delivery.length - 1] as Box;
 
-  // Under Brief, the Diagnostic branch; under both first columns, the models node as their base.
-  const diagnostic = put(
-    box('diagnostic', X.first, Math.max(brief.y + brief.h, impl.y + impl.h) + 64),
-  );
-  const modelsX = X.first + 56;
-  const models = put(
-    box(
-      'models',
-      modelsX,
-      Math.max(diagnostic.y + diagnostic.h, impl.y + impl.h) + 56,
-      X.impl + COLUMN_W - modelsX,
-      PROOF_HEAD_H,
-    ),
-  );
+  // A branch station hangs under the lowest box of its own column and of the columns its source
+  // touches: the source's own and those its line runs to. They are placed by column, then by row, so
+  // that each one hangs under those placed before it.
+  const hanging = sheet.stations
+    .filter((station) => plan.branchStations.has(station.key))
+    .sort((a, b) => a.col - b.col || a.row - b.row);
+  for (const station of hanging) {
+    const sources = sheet.edges
+      .filter((edge) => edge.kind === 'branch' && edge.to === station.key)
+      .map(({ from }) => from);
+    const cols = new Set<number>([station.col]);
+    for (const source of sources) {
+      const at = plan.station.get(source);
+      if (at) cols.add(at.col);
+      for (const edge of sheet.edges)
+        if (edge.kind === 'line' && edge.from === source) {
+          const reached = plan.station.get(edge.to);
+          if (reached) cols.add(reached.col);
+        }
+    }
+    const lowest = Math.max(
+      topY,
+      ...sheet.stations
+        .filter((other) => cols.has(other.col) && placed.has(other.key))
+        .map((other) => bottomOf(placed.get(other.key) as Box)),
+    );
+    placed.set(
+      station.key,
+      box(station.key, columnX(station.col), lowest + BRANCH_GAP, COLUMN_W, headOf(station)),
+    );
+  }
 
-  const bottom = Math.max(models.y + models.h, gate.y + gate.h, done.y + done.h) + 40;
+  const boxes: Record<BoxId, Box> = {};
+  for (const station of sheet.stations) boxes[station.key] = placed.get(station.key) as Box;
+
+  // The frame of each group, its title above its first member.
+  const groups: Record<string, Frame> = {};
+  for (const [key, list] of plan.members) {
+    const inside = list.map((member) => boxes[member.key] as Box);
+    if (inside.length === 0) continue;
+    const left = Math.min(...inside.map((value) => value.x));
+    const right = Math.max(...inside.map((value) => value.x + value.w));
+    const top = Math.min(...inside.map((value) => value.y)) - FRAME_TITLE;
+    groups[key] = {
+      x: left - FRAME_PAD,
+      y: top,
+      w: right - left + 2 * FRAME_PAD,
+      h: Math.max(...inside.map(bottomOf)) + FRAME_PAD - top,
+    };
+  }
+
+  // Under the stations it feeds, the models node is their base, clear of every box and frame above
+  // its width.
+  const fedBoxes = plan.fed.map((key) => boxes[key]).filter((value): value is Box => !!value);
+  let models: Box | null = null;
+  if (fedBoxes.length > 0) {
+    const left = Math.min(...fedBoxes.map((value) => value.x)) + FEED_INSET;
+    const right = Math.max(...fedBoxes.map((value) => value.x + value.w));
+    const above = [...Object.values(boxes), ...Object.values(groups)]
+      .filter((value) => value.x < right && left < value.x + value.w)
+      .map((value) => value.y + value.h);
+    models = box(MODELS_KEY, left, Math.max(...above) + FEED_GAP, right - left, PROOF_HEAD_H);
+    boxes[MODELS_KEY] = models;
+  }
+
+  const all = Object.values(boxes);
+  const frames = Object.values(groups);
+  const bottom =
+    Math.max(0, ...all.map(bottomOf), ...frames.map((frame) => frame.y + frame.h)) + UNDER;
+  const width = Math.max(0, ...all.map((value) => value.x + value.w)) + RIGHT_ROOM;
+
+  // A group's frame stands for it as a box, its port level with its members' ports.
+  const frameBox = (key: string): Box | undefined => {
+    const frame = groups[key];
+    const first = plan.members.get(key)?.[0];
+    if (!frame || !first) return undefined;
+    return { id: key, ...frame, head: HEAD_H, portY: (boxes[first.key] as Box).portY };
+  };
 
   const edges: Edge[] = [];
   const edge = (id: string, branch: Branch, d: string, from: Point, to: Point) =>
@@ -242,134 +651,216 @@ export function layout(fills: Record<BoxId, Fill>): Layout {
   const left = (value: Box): Point => [value.x, value.portY];
   const topAt = (value: Box, x: number): Point => [x, value.y];
   const bottomAt = (value: Box, x: number): Point => [x, value.y + value.h];
+  const middle = (value: Box) => value.x + COLUMN_W / 2;
 
-  // Intake, above Brief, drops into it.
-  const entry = X.first + COLUMN_W / 2;
-  edge(
-    'line:intake',
-    'line',
-    down(bottomAt(intake, entry), topAt(brief, entry)),
-    bottomAt(intake, entry),
-    topAt(brief, entry),
-  );
-  edge('line:brief', 'line', across(right(brief), left(impl)), right(brief), left(impl));
-
-  // The gate opens on a fan of curves, one colour per proof, and closes on another into Ta revue.
-  // Each curve has its own port on Implémentation and on Ta revue, in the order of the proofs, so
-  // that no two curves ever touch: the fans never cross nor overlap.
-  proofs.forEach((proof, index) => {
-    const lane = proof.id.slice('gate:'.length) as GateLane;
-    const out: Point = [impl.x + impl.w, impl.y + FAN_FIRST + index * FAN_STEP];
-    const into: Point = [review.x, review.y + FAN_FIRST + index * FAN_STEP];
-    edge(`in:${lane}`, lane, across(out, left(proof)), out, left(proof));
-    edge(`out:${lane}`, lane, across(right(proof), into), right(proof), into);
-  });
-
-  // Down the delivery column, from the bottom of a box to the top of the next.
-  const middle = X.last + COLUMN_W / 2;
-  for (let index = 0; index < delivery.length - 1; index += 1) {
-    const upper = delivery[index] as Box;
-    const lower = delivery[index + 1] as Box;
-    edge(
-      `line:${upper.id}`,
-      'line',
-      down(bottomAt(upper, middle), topAt(lower, middle)),
-      bottomAt(upper, middle),
-      topAt(lower, middle),
-    );
-  }
-
-  // The Diagnostic branch drops from Brief, then runs left of the models node and under the whole
-  // graph to Terminé, which it reaches from below: no PR, no gate, no review.
-  edge(
-    'diag:in',
-    'diagnostic',
-    down(bottomAt(brief, entry), topAt(diagnostic, entry)),
-    bottomAt(brief, entry),
-    topAt(diagnostic, entry),
-  );
-  const exitX = X.first + 22;
-  const diagOut: Point[] = [
-    bottomAt(diagnostic, exitX),
-    [exitX, bottom],
-    [middle, bottom],
-    bottomAt(done, middle),
-  ];
-  edge('diag:out', 'diagnostic', route(diagOut), diagOut[0] as Point, diagOut[3] as Point);
-
-  // The returns arch over the line and land on Implémentation; the revert bends back to Ta revue.
-  // The red return leaves the gate's card from its top, clear of its title.
-  const gateFrom: Point = [gate.x + gate.w - 40, gate.y];
-  // Both returns land over Implémentation's name, clear of its label on the right.
-  const gateTo: Point = [impl.x + 112, impl.y];
-  edge('loop:gate', 'back', arch(gateFrom, gateTo, ARCH_GATE).d, gateFrom, gateTo);
-  const reviewFrom: Point = [review.x + 56, review.y];
-  const reviewTo: Point = [impl.x + 72, impl.y];
-  edge('loop:review', 'back', arch(reviewFrom, reviewTo, ARCH_REVIEW).d, reviewFrom, reviewTo);
-  edge('loop:revert', 'back', bulge(right(ci), right(review), 30), right(ci), right(review));
-
-  // The models node feeds, from below, the stations where an agent calls a model: `feedOf(station)`.
-  const implFeed = impl.x + impl.w / 2;
-  edge(
-    feedOf('implementation'),
-    'models',
-    up([implFeed, models.y], bottomAt(impl, implFeed)),
-    [implFeed, models.y],
-    bottomAt(impl, implFeed),
-  );
-  const diagFeed = X.first + COLUMN_W / 2 + 40;
-  edge(
-    feedOf('diagnostic'),
-    'models',
-    up([diagFeed, models.y], bottomAt(diagnostic, diagFeed)),
-    [diagFeed, models.y],
-    bottomAt(diagnostic, diagFeed),
-  );
-  // To Brief: up between Diagnostic and Implémentation, then under Brief.
-  const between = (X.first + COLUMN_W + X.impl) / 2;
-  const briefFeed = X.first + COLUMN_W - 30;
-  const toBrief: Point[] = [
-    [between, models.y],
-    [between, brief.y + brief.h + 30],
-    [briefFeed, brief.y + brief.h + 30],
-    bottomAt(brief, briefFeed),
-  ];
-  edge(feedOf('brief'), 'models', route(toBrief), toBrief[0] as Point, toBrief[3] as Point);
-
-  return { width: CANVAS_W, height: bottom + 36, boxes, edges, gate };
-}
-
-/** The order of the line, to find the connectors between two of its stations. */
-const LINE: readonly StationId[] = [
-  'intake',
-  'brief',
-  'implementation',
-  'gate',
-  'review',
-  'merge',
-  'ci',
-  'deploy',
-  'done',
-];
-
-/** The connectors a journey ran on, in order; a loop taken twice appears twice. */
-export function journeyEdges(journey: readonly Pick<JourneyStep, 'station' | 'lane'>[]): string[] {
-  const out: string[] = [];
-  for (let index = 0; index < journey.length - 1; index += 1) {
-    const from = journey[index] as Pick<JourneyStep, 'station' | 'lane'>;
-    const to = journey[index + 1] as Pick<JourneyStep, 'station' | 'lane'>;
-    if (from.station === 'gate' && to.station === 'implementation') out.push('loop:gate');
-    else if (from.station === 'review' && to.station === 'implementation') out.push('loop:review');
-    else if (from.station === 'ci' && to.station === 'review') out.push('loop:revert');
-    else if (to.station === 'gate') out.push(`in:${to.lane ?? 'failfirst'}`);
-    else if (from.station === 'gate') out.push(`out:${from.lane ?? 'failfirst'}`);
-    else if (to.station === 'diagnostic') out.push('diag:in');
-    else if (from.station === 'diagnostic') out.push('diag:out');
-    else {
-      const start = LINE.indexOf(from.station);
-      const end = LINE.indexOf(to.station === 'stopped' ? 'done' : to.station);
-      for (let step = start; step >= 0 && step < end; step += 1) out.push(`line:${LINE[step]}`);
+  for (const link of plan.links) {
+    if (link.kind === 'feed') continue;
+    const to = boxes[link.to] ?? frameBox(link.to);
+    const from = boxes[link.from] ?? frameBox(link.from);
+    const frame = groups[link.from];
+    if (!to || !from) continue;
+    if (link.kind === 'return') {
+      const rank = arches.indexOf(link.id);
+      if (rank < 0) {
+        // Within one column: out of the right side and back into it, higher up.
+        edge(link.id, link.branch, bulge(right(from), right(to), BULGE), right(from), right(to));
+        continue;
+      }
+      // A return from a group leaves the top of its frame, clear of its title.
+      const start: Point = frame
+        ? [frame.x + frame.w - ARCH_FROM_FRAME, frame.y]
+        : [from.x + ARCH_FROM, from.y];
+      const end: Point = [to.x + ARCH_LAND - rank * landStep, to.y];
+      edge(
+        link.id,
+        link.branch,
+        arch(start, end, ARCH_PEAK + shift - rank * ARCH_STEP),
+        start,
+        end,
+      );
+      continue;
+    }
+    const member = plan.station.get(link.to)?.group ? link.to : link.from;
+    const group = plan.station.get(member)?.group;
+    if (link.kind === 'fan' && group) {
+      // Each curve of a fan has its own port on the shared box, in the order of the members, so
+      // that no two curves ever touch: the fans never cross nor overlap. The ports close up to stay
+      // within the shared box.
+      const list = plan.members.get(group) ?? [];
+      const index = list.findIndex(({ key }) => key === member);
+      const shared = member === link.to ? from : to;
+      const step = Math.min(FAN_STEP, (shared.h - 2 * FAN_FIRST) / Math.max(1, list.length - 1));
+      if (member === link.to) {
+        const out: Point = [from.x + from.w, from.y + FAN_FIRST + index * step];
+        edge(link.id, link.branch, across(out, left(to)), out, left(to));
+      } else {
+        const into: Point = [to.x, to.y + FAN_FIRST + index * step];
+        edge(link.id, link.branch, across(right(from), into), right(from), into);
+      }
+      continue;
+    }
+    if (colOf(link.from) === colOf(link.to)) {
+      // Down a column, from the bottom of a box to the top of the next, at the column's middle.
+      const x = middle(from);
+      edge(
+        link.id,
+        link.branch,
+        down(bottomAt(from, x), topAt(to, x)),
+        bottomAt(from, x),
+        topAt(to, x),
+      );
+    } else if (link.kind === 'branch') {
+      // A branch rejoining another column runs under the whole graph and reaches its box from below.
+      const exitX = from.x + BRANCH_EXIT;
+      const points: Point[] = [
+        bottomAt(from, exitX),
+        [exitX, bottom],
+        [middle(to), bottom],
+        bottomAt(to, middle(to)),
+      ];
+      edge(link.id, link.branch, route(points), points[0] as Point, points[3] as Point);
+    } else {
+      edge(link.id, link.branch, across(right(from), left(to)), right(from), left(to));
     }
   }
+
+  // The models node feeds, from below, the stations where an agent calls a model: `feedOf(station)`.
+  // The straight feeds first, then those another box stands in the way of.
+  if (models) {
+    const top = models.y;
+    const routed: Link[] = [];
+    for (const link of plan.links) {
+      if (link.kind !== 'feed') continue;
+      const station = boxes[link.to] as Box;
+      // Off the axis of a link dropping into the same box from above: the two never read as one.
+      const fromAbove = plan.links.some(
+        (other) =>
+          other.to === link.to &&
+          (other.kind === 'line' || other.kind === 'branch') &&
+          colOf(other.from) === colOf(other.to),
+      );
+      const x = middle(station) + (fromAbove ? FEED_SHIFT : 0);
+      const blocked = all.some(
+        (other) =>
+          other !== station &&
+          other !== models &&
+          other.x <= x &&
+          x <= other.x + other.w &&
+          other.y >= bottomOf(station) &&
+          other.y < top,
+      );
+      if (blocked) routed.push(link);
+      else
+        edge(
+          link.id,
+          link.branch,
+          up([x, top], bottomAt(station, x)),
+          [x, top],
+          bottomAt(station, x),
+        );
+    }
+    for (const link of routed) {
+      // Up the gap right of its column, then under the station, into it near its right side. A gap
+      // beyond the models node is reached from its right side, level with its port.
+      const station = boxes[link.to] as Box;
+      const gapX = station.x + COLUMN_W + (COLUMN_STEP - COLUMN_W) / 2;
+      const entryX = station.x + station.w - FEED_UNDER;
+      const turnY = bottomOf(station) + FEED_UNDER;
+      const points: Point[] = [
+        ...(gapX > models.x + models.w
+          ? [right(models), [gapX, models.portY] as Point]
+          : [[gapX, top] as Point]),
+        [gapX, turnY],
+        [entryX, turnY],
+        bottomAt(station, entryX),
+      ];
+      edge(
+        link.id,
+        link.branch,
+        route(points),
+        points[0] as Point,
+        points[points.length - 1] as Point,
+      );
+    }
+  }
+
+  const first = Object.values(groups)[0] ?? { x: 0, y: 0, w: 0, h: 0 };
+  return { width, height: bottom + FOOT, boxes, edges, gate: first, groups };
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * The journeys.
+ * ---------------------------------------------------------------------------------------------- */
+
+type Step = Pick<JourneyStep, 'station' | 'lane'>;
+
+/** The connectors a journey ran on, in order; a loop taken twice appears twice. */
+export function journeyEdges(journey: readonly Step[], sheet: WorkflowSheet = CODE_LINE): string[] {
+  const plan = planOf(sheet);
+  const end = sheet.stations.find((station) => station.kind === 'end')?.key;
+  const fanId = (key: string, side: 'in' | 'out', lane: string | null) => {
+    const list = plan.members.get(key) ?? [];
+    const member = list.find((value) => suffixOf(value) === lane) ?? list[0];
+    const suffix = lane ?? (member ? suffixOf(member) : '');
+    const link = plan.links.find(
+      (value) =>
+        value.kind === 'fan' && member && (side === 'in' ? value.to : value.from) === member.key,
+    );
+    return link?.id ?? `${side}:${suffix}`;
+  };
+  // A group crossed by the curves of a fan, one per member: its lane picks the curve.
+  const fanned = (key: string, side: 'in' | 'out') =>
+    plan.members.has(key) &&
+    plan.links.some(
+      (link) =>
+        link.kind === 'fan' && plan.station.get(side === 'in' ? link.to : link.from)?.group === key,
+    );
+  // A link's end at a station, or at one of the members of a group.
+  const at = (end: string, key: string) => end === key || plan.station.get(end)?.group === key;
+  const out: string[] = [];
+  for (let index = 0; index < journey.length - 1; index += 1) {
+    const from = (journey[index] as Step).station as string;
+    // A stopped item ends at the end station: every search of the step heads there.
+    const next = (journey[index + 1] as Step).station as string;
+    const to = next === 'stopped' && end ? end : next;
+    const back = plan.links.find(
+      (link) => link.kind === 'return' && link.from === from && link.to === to,
+    );
+    const direct = plan.links.find(
+      (link) =>
+        link.kind !== 'return' && link.kind !== 'feed' && at(link.from, from) && at(link.to, to),
+    );
+    if (back) out.push(back.id);
+    else if (fanned(to, 'in')) out.push(fanId(to, 'in', (journey[index + 1] as Step).lane));
+    else if (fanned(from, 'out')) out.push(fanId(from, 'out', (journey[index] as Step).lane));
+    else if (direct) out.push(direct.id);
+    else out.push(...skipped(plan, from, to));
+  }
   return out;
+}
+
+/**
+ * The line links of the shortest way from one station to another over the sheet's line and fan
+ * links, a group standing for its members; at a tie, the order of the sheet. A fan step gives
+ * nothing: its curve depends on a lane the skipped step does not say. No way, nothing.
+ */
+function skipped(plan: SheetPlan, from: string, to: string): string[] {
+  const node = (key: string) => plan.station.get(key)?.group ?? key;
+  const [start, goal] = [node(from), node(to)];
+  const reachedBy = new Map<string, Link | null>([[start, null]]);
+  const queue = [start];
+  for (let index = 0; index < queue.length && !reachedBy.has(goal); index += 1) {
+    const key = queue[index] as string;
+    for (const link of plan.along) {
+      const next = node(link.to);
+      if (node(link.from) !== key || reachedBy.has(next)) continue;
+      reachedBy.set(next, link);
+      queue.push(next);
+    }
+  }
+  if (start === goal || !reachedBy.has(goal)) return [];
+  const path: Link[] = [];
+  for (let link = reachedBy.get(goal); link; link = reachedBy.get(node(link.from)))
+    path.unshift(link);
+  return path.filter((link) => link.kind === 'line').map(({ id }) => id);
 }

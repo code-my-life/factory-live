@@ -578,6 +578,69 @@ export const en: Messages = {
     back: 'Back to the factory line',
   },
 
+  workflow: {
+    invalid: 'This workflow’s sheet is refused: the graph cannot be drawn',
+  },
+
+  components: {
+    title: 'Components',
+    intro:
+      'The standard blocks of the workflows’ graph, each in its states. A new workflow graph or screen reuses them instead of drawing others.',
+    station: {
+      title: 'Station',
+      empty: 'Empty',
+      rows: 'With rows',
+      more: 'With “and N more”',
+      selected: 'With the open row',
+    },
+    kind: {
+      title: 'Kind of station',
+      end: 'End: no chip',
+    },
+    row: {
+      title: 'Item row',
+      agent: 'With an agent calling its model',
+      waiting: 'Waiting for a slot',
+    },
+    providers: {
+      title: 'Providers',
+      empty: 'Empty',
+      idle: 'At rest',
+      busy: 'A model answers',
+    },
+    group: { title: 'Group frame' },
+    links: {
+      title: 'Links',
+      kind: { line: 'Line', return: 'Return', branch: 'Branch', fan: 'Fan' },
+      rest: 'At rest',
+      active: 'In use',
+      problem: 'Taken after a failure',
+      request: 'Taken on a request',
+      sample: (kind, state) => `${kind}: ${state}`,
+    },
+    legend: { title: 'Legend', closed: 'Closed, under a graph', open: 'Open' },
+    zoom: { title: 'Zoom' },
+    sheet: {
+      title: 'A sheet of three stations',
+      invalid: 'A refused sheet: the page stays up',
+    },
+    sample: {
+      item: 'Video',
+      write: 'Script',
+      render: 'Render',
+      approve: 'Approval',
+      again: 'Back: to redo',
+      member: 'Proofreading',
+      group: 'Checks',
+      titles: {
+        intro: 'Present the factory line in one minute',
+        demo: 'Demo of the workflows’ graph',
+        teaser: 'Studio teaser',
+        tutorial: 'Tutorial: writing a workflow sheet',
+      },
+    },
+  },
+
   line: {
     title: 'Factory line',
     openIssues: (count) => `${count} ${f.plural(count, 'issue', 'issues')} in progress`,
@@ -604,7 +667,7 @@ export const en: Messages = {
         github: 'GitHub does it, no model',
         owner: 'Your judgement: the only human decision on the line',
       },
-      gateHint: 'factory-gate.py: one proof per issue type',
+      groupHint: { gate: 'factory-gate.py: one proof per issue type' },
       lane: {
         failfirst: 'Fail-first',
         sabotage: 'Sabotage',
@@ -649,9 +712,9 @@ export const en: Messages = {
         invariance: 'Invariance proof',
         documents: 'Documents proof',
         diagnostic: 'Diagnosis, no PR',
-        gateRed: 'Back: red gate',
-        changes: 'Back: changes requested',
-        revert: 'Revert: red main',
+        'loop:gate': 'Back: red gate',
+        'loop:review': 'Back: changes requested',
+        'loop:revert': 'Revert: red main',
         models: 'Access to the models',
       },
       motion: {

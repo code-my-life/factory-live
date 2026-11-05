@@ -1,0 +1,53 @@
+/*
+ * The catalogue of the graph's blocks: each block in a cell, its state written under it. The cells
+ * wrap to the next line on a narrow screen: nothing scrolls sideways.
+ */
+.cells {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--base-size-16) var(--base-size-24);
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+}
+
+.caption {
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+}
+
+/* A block placed as in the graph (absolutely), in a stage of its own size. */
+.stage {
+  position: relative;
+  flex: none;
+  max-width: 100%;
+}
+
+.chip {
+  display: inline-flex;
+  min-height: var(--base-size-20);
+  align-items: center;
+}
+
+/* An item's row on its own, framed as in its station. */
+.row {
+  overflow: hidden;
+  width: 220px;
+  max-width: 100%;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+}
+
+.legend {
+  max-width: 100%;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  background-color: var(--bgColor-default);
+}
