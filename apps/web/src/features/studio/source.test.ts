@@ -28,11 +28,26 @@ describe('createLiveStudioSource', () => {
               unreachableSince: null,
               error: null,
             })
-          : Response.json({ error: 'erreur' }, { status: 502 }),
+          : (input instanceof Request ? input.url : input.toString()).endsWith('/items/rendu')
+            ? Response.json({
+                ...VIDEO,
+                id: 'rendu',
+                script: '# Rendu',
+                steps: [],
+                files: [],
+                links: {},
+              })
+            : (input instanceof Request ? input.url : input.toString()).endsWith(
+                  '/items/rendu/words',
+                )
+              ? Response.json({ words: [{ mot: 'Bonjour', debut: 0, fin: 0.5, garde: true }] })
+              : Response.json({ error: 'erreur' }, { status: 502 }),
       );
     });
     expect((await source.status()).sheetRead).toBe(false);
     expect(await source.items()).toEqual([VIDEO]);
+    const rendu = await source.item('rendu');
+    const renduWords = await source.words('rendu');
 
     online = false;
     // The form is free again, with why.
@@ -50,6 +65,11 @@ describe('createLiveStudioSource', () => {
     });
     expect(await source.item('inconnue')).toBeNull();
     expect(await source.words('essai')).toEqual([]);
+    // A detail and words read before the outage stay as they were.
+    expect(await source.item('rendu')).toEqual(rendu);
+    expect(rendu?.script).toBe('# Rendu');
+    expect(await source.words('rendu')).toEqual(renduWords);
+    expect(renduWords).toHaveLength(1);
     expect((await source.status()).unreachableSince).not.toBeNull();
   });
 });

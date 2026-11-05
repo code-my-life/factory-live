@@ -137,6 +137,9 @@ export function createLiveStudioSource(
   const at = `${base}/api/workflows/studio`;
   let reading: Promise<{ status: StudioStatus; items: StudioItem[] }> | null = null;
   let last: { status: StudioStatus; items: StudioItem[] } = { status: NOT_READ, items: [] };
+  // The last detail and words read of each video: an outage keeps them on screen.
+  const details = new Map<string, StudioItemDetail>();
+  const wordsRead = new Map<string, StudioWord[]>();
   const read = () => {
     reading ??= fetchImpl(at, { headers: { Accept: 'application/json' } })
       .then(async (response) => {
@@ -189,23 +192,31 @@ export function createLiveStudioSource(
     kind: 'live',
     status: async () => (await read()).status,
     items: async () => (await read()).items,
-    // The studio does not answer: the video as the last list read it, without its files.
+    // The studio does not answer: the detail last read, else the video as the last list read it.
     item: async (id) => {
       try {
         const body = await json(`/items/${encodeURIComponent(id)}`);
-        return body === null ? null : StudioItemDetail.parse(body);
+        const detail = body === null ? null : StudioItemDetail.parse(body);
+        if (detail) details.set(id, detail);
+        else details.delete(id);
+        return detail;
       } catch {
+        const kept = details.get(id);
+        if (kept) return kept;
         const known = last.items.find((item) => item.id === id);
         return known ? { ...known, script: '', steps: [], files: [], links: {} } : null;
       }
     },
-    // Words that cannot be read leave the detail without them, never without the detail.
+    // Words that cannot be read are the ones last read, never a failure of the detail.
     words: async (id) => {
       try {
         const body = await json(`/items/${encodeURIComponent(id)}/words`);
-        return body === null ? [] : z.object({ words: z.array(StudioWord) }).parse(body).words;
+        const words =
+          body === null ? [] : z.object({ words: z.array(StudioWord) }).parse(body).words;
+        wordsRead.set(id, words);
+        return words;
       } catch {
-        return [];
+        return wordsRead.get(id) ?? [];
       }
     },
     // The studio names no agent in its API: the providers' box stays empty on the live build.
