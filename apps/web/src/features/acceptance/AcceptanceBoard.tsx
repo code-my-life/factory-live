@@ -548,9 +548,11 @@ function DeviceBoard({
               canDown={place.canDown}
               github={github[id]}
               onToggle={() => {
-                // Folding a widget a link opened folds it back to the owner's layout.
-                if (id === shown && layout.collapsed.includes(id)) setShown(null);
-                else apply(toggleCollapsed(layout, id), null);
+                // A widget a link opened is open: one click folds it, whatever the layout kept.
+                if (id === shown) {
+                  setShown(null);
+                  if (!layout.collapsed.includes(id)) apply(toggleCollapsed(layout, id), null);
+                } else apply(toggleCollapsed(layout, id), null);
               }}
               onPin={() => {
                 const next = togglePin(layout, id);

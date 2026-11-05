@@ -165,6 +165,21 @@ describe('recette d’une PR', () => {
     expect(toggle('twins')).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('un lien vers des jumeaux déjà dépliés les replie au premier clic', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      'factory-live:acceptance-layout:desktop',
+      JSON.stringify({ order: [], pinned: [], collapsed: [], half: [] }),
+    );
+    const { container } = render(
+      <AcceptanceBoard issue={issue(18, 'factory-live')} view={graphAcceptance()} focus="twins" />,
+    );
+    const toggle = widget(container, 'twins').querySelector('button[aria-expanded]') as HTMLElement;
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('les retours de revue : à traiter en tête, les résolus repliés en une ligne, chacun vers sa discussion', async () => {
     const user = userEvent.setup();
     const { container, unmount } = render(
