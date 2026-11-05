@@ -419,6 +419,16 @@ const server: ServerMessages = {
     'The Claude subscription balance has no reliable source: factory-live only shows a limit when a Claude Code transcript reports one.',
   'push.test.title': () => 'factory-live: test',
   'push.test.body': () => 'Notifications work on this device.',
+  'push.studio.title': ({ station }) => `Studio: ${station} waits for you`,
+  'health.workflow': ({ name }) => `Workflow “${name}”`,
+  'health.workflow.ok': ({ count }) => `Answers, ${count} ${f.plural(count, 'item', 'items')}`,
+  'health.workflow.unreachable': ({ seconds, error }) =>
+    `Unreachable ${f.ago(seconds)}, last state kept${error ? ` (${error})` : ''}`,
+  'health.workflow.never': ({ error }) => `Never reached${error ? ` (${error})` : ''}`,
+  'health.workflow.sheetInvalid': ({ error }) => `Invalid sheet, the previous one stays: ${error}`,
+  'health.codeSheet': () => 'Sheet of the code line',
+  'health.codeSheet.published': () => 'Published by the factory (config/workflow.json)',
+  'health.codeSheet.embedded': ({ reason }) => `Embedded copy: ${reason}`,
 };
 
 export const en: Messages = {
@@ -589,7 +599,10 @@ export const en: Messages = {
       count === 0
         ? 'No video waits for you'
         : `${count} ${f.plural(count, 'video waits', 'videos wait')} for you`,
-    live: 'The live studio comes with the next piece: for now, the graph alone.',
+    none: 'This server follows no studio: WORKFLOWS in the configuration (RUNBOOK).',
+    unreachableTitle: 'The studio isn’t answering',
+    unreachable: (stay: string, error: string) =>
+      `Unreachable for ${stay}${error ? ` (${error})` : ''}: the last state received stays shown.`,
     selectHint: 'Touch a video in the graph to open its detail here.',
     loading: 'Reading the studio…',
     unknown: 'This video is not in the studio.',
@@ -1511,6 +1524,8 @@ export const en: Messages = {
       csrf_missing: 'Missing x-factory-live header',
       rate_limited: 'Too many requests, try again in a minute',
       host_refused: 'Unknown address for factory-live: open the app at its usual address',
+      workflow_refused: 'The workflow refused this gesture',
+      workflow_unreachable: 'The workflow isn’t answering',
     },
   },
 

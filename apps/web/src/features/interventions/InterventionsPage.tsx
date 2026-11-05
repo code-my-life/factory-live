@@ -13,7 +13,6 @@ import { IssueBadge } from '../../ui/badge/IssueBadge.tsx';
 import { Elapsed } from '../../ui/Elapsed.tsx';
 import { interventionHeadline, interventionTone } from '../../ui/work/workState.tsx';
 import { GestureBar } from '../studio/GestureBar.tsx';
-import { STUDIO_SHEET } from '../studio/model.ts';
 import { useStudio } from '../studio/StudioProvider.tsx';
 import { InterventionDetail } from './InterventionDetail.tsx';
 import styles from './interventions.module.css';
@@ -101,8 +100,9 @@ function sortWaiting(waiting: readonly Waiting[]): Waiting[] {
 /** A video of the studio in the list: its badge « Studio », its title, its station. */
 function StudioItemRow({ video, current }: { video: StudioItem; current: boolean }) {
   const { t } = useI18n();
-  const station = STUDIO_SHEET.ok
-    ? (STUDIO_SHEET.sheet.stations.find((candidate) => candidate.key === video.station)?.label ??
+  const parsed = useStudio().sheet;
+  const station = parsed.ok
+    ? (parsed.sheet.stations.find((candidate) => candidate.key === video.station)?.label ??
       video.station)
     : video.station;
   return (
@@ -136,7 +136,7 @@ function StudioItemRow({ video, current }: { video: StudioItem; current: boolean
 /** A video of the studio, opened among the interventions: the same gesture as on the studio's page. */
 function StudioInterventionDetail({ video }: { video: StudioItem }) {
   const { t } = useI18n();
-  const { source, version } = useStudio();
+  const { source, version, sheet: parsed } = useStudio();
   // The video's detail, for its links (the takes page while it is shot), kept with the video it is of.
   const [read, setRead] = useState<{ id: string; detail: StudioItemDetail | null } | null>(null);
 
@@ -170,12 +170,12 @@ function StudioInterventionDetail({ video }: { video: StudioItem }) {
           {t.interventions.openStudio}
         </Link>
       </header>
-      {STUDIO_SHEET.ok ? (
+      {parsed.ok ? (
         <div className={styles.studioGesture}>
           <GestureBar
             key={`${video.id}:${video.station}:${video.state}`}
             item={video}
-            sheet={STUDIO_SHEET.sheet}
+            sheet={parsed.sheet}
             links={detail?.links}
           />
         </div>

@@ -1,0 +1,59 @@
+{
+  "api": 1,
+  "id": "essai",
+  "card": "t_0001",
+  "title": "Titre à écrire",
+  "station": "revue",
+  "state": "waiting",
+  "since": "1970-01-01T00:16:41Z",
+  "waits": "Regarder le master",
+  "failure": null,
+  "script": "---\nid: \"essai\"\ntitre: \"Titre à écrire\"\nplateforme: tiktok\nduree_visee: 63\n---\n\n<!--\nGabarit de vf new : remplacer ce commentaire par le texte dit.\n- Une phrase par ligne, dans l'ordre où elle est dite.\n- Un plan de motion design plein cadre se note entre crochets, après le mot où il commence :\n  [stat: …], [etapes: …], [code: …].\n- Un zoom d'insistance : [zoom], après le mot à appuyer.\n- En-tête : duree_visee de 61 à 65 s (à peine plus d'une minute, pour TikTok Creator Rewards).\n-->\n",
+  "steps": [
+    {
+      "name": "cut",
+      "status": "done",
+      "seconds": 1.0,
+      "outputs": {
+        "edl": "973ef764babd3cd75a496dc7483f83c865880af12f20b6a0c235d5e539bb1ca8"
+      }
+    },
+    {
+      "name": "compose",
+      "status": "done",
+      "seconds": 60.0,
+      "outputs": {
+        "plan": "827258c64b99b9435880322feee654cb853c96271ede0e37043c686a5b22b886"
+      }
+    },
+    {
+      "name": "master",
+      "status": "done",
+      "seconds": 30.0,
+      "outputs": {
+        "master": "306ab6e1005fb14be7b5092051d9bf4fe7c4c23928a2ded9e66f2ee0c5140f9f",
+        "tiktok": "306ab6e1005fb14be7b5092051d9bf4fe7c4c23928a2ded9e66f2ee0c5140f9f"
+      }
+    }
+  ],
+  "files": [
+    {
+      "kind": "video",
+      "name": "master",
+      "url": "/v/essai/media/master",
+      "fps": 30
+    },
+    {
+      "kind": "video",
+      "name": "tiktok",
+      "url": "/v/essai/media/tiktok",
+      "fps": 30
+    },
+    {
+      "kind": "words",
+      "name": "words",
+      "url": "/api/items/essai/words",
+      "follows": "master"
+    }
+  ]
+}

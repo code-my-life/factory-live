@@ -299,7 +299,7 @@ describe('le Studio, ses états et sa source', () => {
     expect(within(gesture).queryByRole('textbox', { name: 'Raison' })).toBeNull();
   });
 
-  it('sans source donnée, le studio du build : la démo, ou vide sur live, avec son état', async () => {
+  it('sans source donnée, le studio du build : la démo, ou celui que suit le serveur sur live, avec son état', async () => {
     const demo = renderApp('/studio', new DemoSource());
     await waitFor(() =>
       expect(demo.container.querySelector('[data-issue="presenter-factory-live"]')).not.toBeNull(),
@@ -307,20 +307,55 @@ describe('le Studio, ses états et sa source', () => {
     expect(screen.getByText('3 vidéos t’attendent')).toBeInTheDocument();
     demo.unmount();
 
+    // The live build reads the studio through this server: here it follows none.
     vi.stubEnv('VITE_DATA_SOURCE', 'live');
-    const live = renderApp('/studio', new DemoSource());
+    const answer = { current: Response.json({ error: 'Workflow inconnu' }, { status: 404 }) };
+    vi.stubGlobal('fetch', () => Promise.resolve(answer.current.clone()));
+    const none = renderApp('/studio', new DemoSource());
     expect(
       await screen.findByText(
-        'Le direct du studio arrive avec la pièce suivante : pour l’instant, le graphe seul.',
+        'Ce serveur ne suit aucun studio : WORKFLOWS dans la configuration (RUNBOOK).',
       ),
     ).toBeInTheDocument();
     expect(screen.getByText('Aucune vidéo ne t’attend')).toBeInTheDocument();
-    expect(live.container.querySelector('[data-box="revue"]')).not.toBeNull();
-    expect(live.container.querySelector('[data-issue]')).toBeNull();
+    expect(none.container.querySelector('[data-issue]')).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Studio/ })).toBeNull();
     // The bell counts the factory's interventions only.
     expect(
       screen.getByRole('button', { name: /^Interventions : \d+ en attente$/ }),
     ).toHaveAccessibleName(`Interventions : ${openInterventions(new DemoSource())} en attente`);
+    none.unmount();
+
+    // A studio that stopped answering: its last state stays, and the page says so.
+    if (!STUDIO_SHEET.ok) throw new Error(STUDIO_SHEET.error);
+    answer.current = Response.json({
+      name: 'studio',
+      sheet: STUDIO_SHEET.sheet,
+      sheetError: null,
+      items: [
+        {
+          id: 'essai',
+          card: 't_studio1',
+          title: 'Une vidéo d’essai',
+          station: 'revue',
+          state: 'waiting',
+          since: new Date(Date.now() - 60_000).toISOString(),
+          waits: 'Regarder le master',
+          failure: null,
+        },
+      ],
+      readAt: Date.now() - 120_000,
+      unreachableSince: Date.now() - 90_000,
+      error: 'fetch failed',
+    });
+    const live = renderApp('/studio', new DemoSource());
+    expect(await screen.findByText('Le studio ne répond pas')).toBeInTheDocument();
+    expect(screen.getByText(/fetch failed/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(live.container.querySelector('[data-issue="essai"]')).not.toBeNull(),
+    );
+    expect(screen.getByText('1 vidéo t’attend')).toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 
   it('l’app monte le studio : le jeton #studio ouvre sa page, et son entrée compte les vidéos', async () => {
@@ -366,7 +401,13 @@ describe('le Studio, ses états et sa source', () => {
     // From Publication, the end.
     expect((await one.words('inconnue')).length).toBe(0);
 
-    const live = createLiveStudioSource();
+    // A server that follows no studio answers 404: an empty studio, its tab hidden.
+    const live = createLiveStudioSource(() =>
+      Promise.resolve(
+        Response.json({ error: 'Workflow inconnu', code: 'not_found' }, { status: 404 }),
+      ),
+    );
+    expect((await live.status()).configured).toBe(false);
     expect(await live.items()).toEqual([]);
     expect(await live.item('presenter-factory-live')).toBeNull();
     expect(await live.words('presenter-factory-live')).toEqual([]);

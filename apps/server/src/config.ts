@@ -75,6 +75,18 @@ const Env = z.object({
    * `host.docker.internal` from the container (docker/compose.yaml).
    */
   TWINS_HOST: z.string().default('127.0.0.1'),
+  /**
+   * The workflows factory-live follows besides the code line, each by its generic API (#31, video-factory's
+   * ADR 0006): `name=url` pairs, comma separated (`studio=http://host.docker.internal:8448`). Empty: none.
+   */
+  WORKFLOWS: list()
+    .transform((pairs) =>
+      pairs.map((pair) => {
+        const at = pair.indexOf('=');
+        return { name: pair.slice(0, at).trim(), url: pair.slice(at + 1).trim() };
+      }),
+    )
+    .pipe(z.array(z.object({ name: z.string().regex(/^[a-z][a-z0-9-]*$/), url: z.url() }))),
   FREELLMAPI_URL: z.string().default(''),
   HELD_AFTER_MINUTES: z.coerce.number().int().positive().default(30),
   /**

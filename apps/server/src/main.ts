@@ -9,6 +9,8 @@ import { CardFiles } from './adapters/hermes/files.ts';
 import { KanbanReader } from './adapters/hermes/kanban.ts';
 import { HermesPaths } from './adapters/hermes/paths.ts';
 import { TwinBench } from './adapters/twins/bench.ts';
+import { WorkflowApi } from './adapters/workflows/api.ts';
+import { publishedSheet } from './adapters/workflows/sheets.ts';
 import { ProfileConfigReader } from './adapters/hermes/profiles.ts';
 import { SessionReader } from './adapters/hermes/sessions.ts';
 import { PushNotifier, vapidKeys } from './adapters/push/webpush.ts';
@@ -19,7 +21,8 @@ import { StreamBuffer } from './http/stream.ts';
 import { DiagnosisService } from './application/diagnosis.ts';
 import { Hub } from './application/hub.ts';
 import { createLogger } from './logger.ts';
-import { notifyOpened } from './application/notify.ts';
+import { factoryBadge, notifyOpened } from './application/notify.ts';
+import { notifyArrivals, waitingForOwner } from './application/notifications.ts';
 import { KEEP_FINISHED_MS } from './application/projection.ts';
 import { trackUnblockReactions } from './application/unblock.ts';
 
@@ -93,6 +96,15 @@ const diagnoses = new DiagnosisService({
   boardName: config.HERMES_BOARD,
 });
 
+// The workflows followed by their generic API (#31, ADR 0014), and the code line's published sheet.
+const workflows = config.WORKFLOWS.map(
+  (workflow) => new WorkflowApi({ name: workflow.name, url: workflow.url }),
+);
+let codeSheet = publishedSheet(paths.factorySheet());
+/** The workflows' items that wait for the owner: the app's badge counts them with the factory's. */
+const workflowsWaiting = () =>
+  workflows.reduce((count, workflow) => count + waitingForOwner(workflow.view()).length, 0);
+
 const hub = new Hub(
   {
     owner: config.GITHUB_OWNER,
@@ -102,15 +114,25 @@ const hub = new Hub(
     heldAfterSeconds: config.HELD_AFTER_MINUTES * 60,
     keepFinishedMs: KEEP_FINISHED_MS,
   },
-  { store, profiles, github, diagnoses, log: log.child({ component: 'hub' }), now },
+  {
+    store,
+    profiles,
+    github,
+    diagnoses,
+    log: log.child({ component: 'hub' }),
+    now,
+    workflows: () => workflows.map((workflow) => workflow.view()),
+    codeSheet: () => codeSheet,
+  },
 );
 const buffer = new StreamBuffer();
 hub.subscribe((event) => buffer.push(event));
 
 const notifier = new PushNotifier(store, vapidKeys(store), config.VAPID_SUBJECT);
 hub.interventionListeners.add((opened, all) => {
-  notifyOpened({ store, notifier, log, now }, opened, all).catch((error: unknown) =>
-    log.error({ component: 'push', error: String(error) }, 'notification en échec'),
+  notifyOpened({ store, notifier, log, now }, opened, all, workflowsWaiting()).catch(
+    (error: unknown) =>
+      log.error({ component: 'push', error: String(error) }, 'notification en échec'),
   );
 });
 
@@ -161,7 +183,42 @@ const refreshGitHub = async () => {
   }
 };
 
+// A workflow is read every 5 s while someone looks at it, every 30 s otherwise: a video that arrives
+// at a station waiting for the owner is notified within that time.
+let workflowWatchedAt = 0;
+let workflowsReadAt = 0;
+let workflowsBusy = false;
+const refreshWorkflows = async () => {
+  if (workflowsBusy || workflows.length === 0) return;
+  if (now() - workflowWatchedAt > 60_000 && now() - workflowsReadAt < 30_000) return;
+  workflowsBusy = true;
+  workflowsReadAt = now();
+  try {
+    for (const workflow of workflows) {
+      if (await workflow.refresh()) hub.workflowsChanged();
+      const others =
+        factoryBadge(hub.openInterventions) +
+        workflowsWaiting() -
+        waitingForOwner(workflow.view()).length;
+      await notifyArrivals({ store, notifier, log, now }, workflow.view(), others);
+    }
+  } catch (error) {
+    log.warn({ component: 'workflows', error: String(error) }, 'lecture des workflows en échec');
+  } finally {
+    workflowsBusy = false;
+  }
+};
+const refreshCodeSheet = () => {
+  const next = publishedSheet(paths.factorySheet());
+  if (JSON.stringify(next) !== JSON.stringify(codeSheet)) {
+    codeSheet = next;
+    hub.workflowsChanged();
+  }
+};
+
 const timers = [
+  setInterval(() => void refreshWorkflows(), 5_000),
+  setInterval(refreshCodeSheet, 60_000),
   setInterval(pollKanban, 300),
   setInterval(() => hub.flush(), 250),
   setInterval(() => hub.tick(), 15_000),
@@ -172,6 +229,7 @@ const timers = [
   setInterval(() => store.purgeActivity(now() - 30 * 86_400_000), 6 * 3600_000),
 ];
 void refreshGitHub();
+void refreshWorkflows();
 
 // The factory's twin bench (#23, ADR 0013): the pair's state on the board, its ports on this PC.
 const twins = new TwinBench({
@@ -201,6 +259,11 @@ const app = createApp({
   notifier,
   githubAuth,
   twins,
+  workflows,
+  codeSheet: () => codeSheet,
+  workflowWatched: () => {
+    workflowWatchedAt = now();
+  },
   hookSecret: config.secrets.hookSecret,
   origins: config.PUBLIC_ORIGINS,
   allowedHosts: config.allowedHosts,

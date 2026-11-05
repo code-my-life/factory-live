@@ -41,9 +41,11 @@ import type {
   KanbanDelta,
   LoggerPort,
   ProfilesPort,
+  PublishedSheet,
   RootSettings,
   StationRecord,
   TrackedIssue,
+  WorkflowView,
 } from './ports.ts';
 
 export interface HubOptions {
@@ -65,6 +67,10 @@ export interface HubDeps {
   diagnoses: DiagnosisService | null;
   log: LoggerPort;
   now: () => number;
+  /** The workflows followed by their API, as last read (#31); absent: none. */
+  workflows?: () => readonly WorkflowView[];
+  /** Where the code line's sheet comes from (#31). */
+  codeSheet?: () => PublishedSheet;
 }
 
 type Slice = 'board' | 'agents' | 'health';
@@ -444,6 +450,11 @@ export class Hub {
     this.dirty.add('board').add('health');
   }
 
+  /** A workflow answered differently, or stopped answering (#31): the Health page follows. */
+  workflowsChanged(): void {
+    this.dirty.add('health');
+  }
+
   /** Suivi d'un déblocage : la carte repart quand le kanban note `unblocked` après la demande. */
   private trackUnblocks(delta: KanbanDelta, now: number): void {
     const unblocked = delta.events.filter((event) => event.kind === 'unblocked');
@@ -538,6 +549,8 @@ export class Hub {
       running: this.board.tasks.filter((task) => task.status === 'running').length,
       maxInProgress: this.root.maxInProgress,
       maxInProgressPerProfile: this.root.maxInProgressPerProfile,
+      ...(this.deps.workflows ? { workflows: this.deps.workflows() } : {}),
+      ...(this.deps.codeSheet ? { codeSheet: this.deps.codeSheet() } : {}),
     });
   }
 

@@ -1,16 +1,25 @@
-import type { StudioGestureInput, StudioItem } from '@factory-live/contracts';
+import type { StudioGestureInput, StudioItem, WorkflowSheetResult } from '@factory-live/contracts';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { STUDIO_SHEET, waitsForOwner } from './model.ts';
 import type { StudioAgent } from './model.ts';
 import { createLiveStudioSource, createStudioSource } from './source.ts';
-import type { GestureResult, StudioSource } from './source.ts';
+import type { GestureResult, StudioSource, StudioStatus } from './source.ts';
 
-/** What the studio's screens read: its videos and agents, read again after each gesture. */
+/** What the studio's screens read: its sheet, videos and agents, read again after each gesture. */
 export interface StudioState {
   source: StudioSource;
   /** False until the source has answered once. */
   ready: boolean;
+  /** False when this server follows no studio: its page and tab are hidden. */
+  configured: boolean;
+  /** False until the studio has given a sheet. */
+  sheetRead: boolean;
+  /** The studio's sheet, as its source gives it: the graph is drawn from it alone. */
+  sheet: WorkflowSheetResult;
+  /** Since when the studio does not answer (ms), and why: the last state read stays shown. */
+  unreachableSince: number | null;
+  error: string | null;
   items: readonly StudioItem[];
   agents: readonly StudioAgent[];
   /** Grows at each read: a detail reads its video again. */
@@ -20,22 +29,34 @@ export interface StudioState {
   gesture: (id: string, gesture: StudioGestureInput) => Promise<GestureResult>;
 }
 
-const sheet = STUDIO_SHEET.ok ? STUDIO_SHEET.sheet : null;
+const waitingOf = (parsed: WorkflowSheetResult, items: readonly StudioItem[]) =>
+  parsed.ok ? items.filter((item) => waitsForOwner(parsed.sheet, item)) : [];
 
-const waitingOf = (items: readonly StudioItem[]) =>
-  sheet ? items.filter((item) => waitsForOwner(sheet, item)) : [];
+/** The live studio is read again every so often: the server follows it every 5 s while watched. */
+const LIVE_EVERY_MS = 5_000;
 
-/** The videos and the agents of a source, read together. */
+/** The sheet, the videos and the agents of a source, read together. */
 async function readStudio(source: StudioSource) {
-  const [items, agents] = await Promise.all([source.items(), source.agents()]);
-  return { items, agents };
+  const [status, items, agents] = await Promise.all([
+    source.status(),
+    source.items(),
+    source.agents(),
+  ]);
+  return { status, items, agents };
 }
+
+type Read = Awaited<ReturnType<typeof readStudio>> & { version: number };
 
 /** Outside a provider (a screen tested alone): an empty studio. */
 const EMPTY_SOURCE = createLiveStudioSource();
 const StudioContext = createContext<StudioState>({
   source: EMPTY_SOURCE,
   ready: true,
+  configured: false,
+  sheetRead: true,
+  sheet: STUDIO_SHEET,
+  unreachableSince: null,
+  error: null,
   items: [],
   agents: [],
   version: 0,
@@ -52,28 +73,34 @@ export function StudioProvider({
   children: ReactNode;
 }) {
   const [source] = useState(() => given ?? createStudioSource());
-  const [read, setRead] = useState<{
-    items: readonly StudioItem[];
-    agents: readonly StudioAgent[];
-    version: number;
-  } | null>(null);
+  const [read, setRead] = useState<Read | null>(null);
 
   const reload = useCallback(
     () =>
-      readStudio(source).then(({ items, agents }) =>
-        setRead((current) => ({ items, agents, version: (current?.version ?? 0) + 1 })),
+      readStudio(source).then((value) =>
+        setRead((current) => ({ ...value, version: (current?.version ?? 0) + 1 })),
       ),
     [source],
   );
 
-  // The first read, once the source answers; a read that comes after the provider left is dropped.
+  // The first read, once the source answers, then again on the live build while the page is shown;
+  // a read that comes after the provider left is dropped.
   useEffect(() => {
     let current = true;
-    void readStudio(source).then(({ items, agents }) => {
-      if (current) setRead((last) => ({ items, agents, version: (last?.version ?? 0) + 1 }));
-    });
+    const once = () =>
+      void readStudio(source).then((value) => {
+        if (current) setRead((last) => ({ ...value, version: (last?.version ?? 0) + 1 }));
+      });
+    once();
+    const timer =
+      source.kind === 'live'
+        ? setInterval(() => {
+            if (document.visibilityState === 'visible') once();
+          }, LIVE_EVERY_MS)
+        : undefined;
     return () => {
       current = false;
+      clearInterval(timer);
     };
   }, [source]);
 
@@ -86,18 +113,29 @@ export function StudioProvider({
     [source, reload],
   );
 
-  const value = useMemo<StudioState>(
-    () => ({
+  const value = useMemo<StudioState>(() => {
+    const status: StudioStatus = read?.status ?? {
+      configured: source.kind === 'demo',
+      sheetRead: source.kind === 'demo',
+      sheet: STUDIO_SHEET,
+      unreachableSince: null,
+      error: null,
+    };
+    return {
       source,
       ready: read !== null,
+      configured: status.configured,
+      sheetRead: status.sheetRead,
+      sheet: status.sheet,
+      unreachableSince: status.unreachableSince,
+      error: status.error,
       items: read?.items ?? [],
       agents: read?.agents ?? [],
       version: read?.version ?? 0,
-      waiting: waitingOf(read?.items ?? []),
+      waiting: waitingOf(status.sheet, read?.items ?? []),
       gesture,
-    }),
-    [source, read, gesture],
-  );
+    };
+  }, [source, read, gesture]);
   return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;
 }
 

@@ -1,4 +1,5 @@
 import { msg } from '@factory-live/contracts';
+import type { PublishedSheet, WorkflowView } from './ports.ts';
 import type {
   FactoryState,
   HealthStatus,
@@ -44,6 +45,10 @@ export interface HealthSignals {
   running: number;
   maxInProgress: number;
   maxInProgressPerProfile: number;
+  /** The workflows followed by their API (#31), as last read. */
+  workflows?: readonly WorkflowView[];
+  /** Where the code line's sheet comes from (#31): the factory's, or the web's embedded copy. */
+  codeSheet?: PublishedSheet;
 }
 
 const PROBE_SILENT_MS = 90_000;
@@ -295,6 +300,40 @@ export function buildHealth(signals: HealthSignals): {
       },
     ],
   });
+
+  for (const workflow of signals.workflows ?? []) {
+    const down = workflow.unreachableSince !== null;
+    push({
+      id: `workflow:${workflow.name}`,
+      label: msg('health.workflow', { name: workflow.name }),
+      group: 'factory-live',
+      status: down || workflow.readAt === null ? 'down' : workflow.sheetError ? 'degraded' : 'ok',
+      detail:
+        workflow.readAt === null
+          ? msg('health.workflow.never', { error: workflow.error })
+          : down
+            ? msg('health.workflow.unreachable', {
+                ...age(now, workflow.unreachableSince ?? now),
+                error: workflow.error,
+              })
+            : workflow.sheetError
+              ? msg('health.workflow.sheetInvalid', { error: workflow.sheetError })
+              : msg('health.workflow.ok', { count: workflow.items.length }),
+      checkedAt: workflow.readAt === null ? null : iso(workflow.readAt),
+    });
+  }
+  if (signals.codeSheet)
+    push({
+      id: 'code-sheet',
+      label: msg('health.codeSheet'),
+      group: 'factory-live',
+      status: signals.codeSheet.source === 'published' ? 'ok' : 'degraded',
+      detail:
+        signals.codeSheet.source === 'published'
+          ? msg('health.codeSheet.published')
+          : msg('health.codeSheet.embedded', { reason: signals.codeSheet.reason }),
+      checkedAt: null,
+    });
 
   return {
     factory: {
