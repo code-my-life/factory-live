@@ -156,4 +156,15 @@ describe('parseWorkflowSheet', () => {
     expect(() => parseWorkflowSheet(hostile)).not.toThrow();
     refused(hostile);
   });
+
+  it('refuse un groupe qui prend la clé réservée aux fournisseurs', () => {
+    const result = parseWorkflowSheet({
+      ...CODE_LINE,
+      groups: [...(CODE_LINE.groups ?? []), { key: 'models', label: 'Modèles', icon: 'cpu' }],
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: 'group key "models" is reserved for the model providers',
+    });
+  });
 });
