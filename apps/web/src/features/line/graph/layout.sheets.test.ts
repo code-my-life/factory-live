@@ -205,6 +205,13 @@ describe('le graphe d’une fiche quelconque', () => {
     expect(journeyEdges([step('diagnostic'), step('implementation')])).toEqual([]);
   });
 
+  it('un saut de plusieurs postes suit chaque lien de la ligne entre eux', () => {
+    expect(journeyEdges([step('intake'), step('implementation')])).toEqual([
+      'line:intake',
+      'line:brief',
+    ]);
+  });
+
   it('chaque courbe d’un éventail touche sa station', () => {
     const members = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6'];
     const sheet = sheetOf({
