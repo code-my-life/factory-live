@@ -13,6 +13,8 @@ const VIEWS = [
   // The acceptance of a big real PR (factory-live#18, PR #19), under the graph.
   ['recette', '/issues/factory-live/18'],
   ['reglages', '/settings'],
+  // The studio, open on the master to review: the player and the aligned words in view.
+  ['studio', '/studio/presenter-factory-live'],
 ] as const;
 
 for (const [name, route] of VIEWS) {
