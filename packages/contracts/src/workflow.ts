@@ -96,6 +96,8 @@ function sheetError(sheet: WorkflowSheet): string | null {
   for (const edge of sheet.edges) {
     if (edge.id !== undefined) {
       if (ids.has(edge.id)) return `duplicate edge id "${edge.id}"`;
+      if (edge.id.startsWith(`${MODELS_KEY}:`))
+        return `edge id "${edge.id}" is reserved for the model providers' feeds`;
       ids.add(edge.id);
     }
     const name = edge.id ?? `${edge.kind} ${edge.from} -> ${edge.to}`;
