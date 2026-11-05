@@ -161,6 +161,48 @@ describe('VideoPlayer', () => {
     expect(screen.getByRole('button', { name: 'Lecture' })).toBeInTheDocument();
   });
 
+  it('pendant la lecture, une flèche, un bouton ou un mot déplacent la vidéo', () => {
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(function (
+      this: HTMLMediaElement,
+    ) {
+      this.dispatchEvent(new Event('play'));
+      return Promise.resolve();
+    });
+    let paused = true;
+    vi.spyOn(HTMLMediaElement.prototype, 'paused', 'get').mockImplementation(() => paused);
+    const { container } = render(<Harness start={24} src="/master.mp4" />);
+    const video = container.querySelector('video') as HTMLVideoElement;
+    fireEvent.keyDown(player(), { key: ' ' });
+    paused = false;
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    video.currentTime = 1.0;
+    fireEvent.timeUpdate(video);
+    expect(player()).toHaveTextContent('image 30 / 60');
+
+    // → while it plays: the video jumps one frame, and the next time update keeps it there.
+    fireEvent.keyDown(player(), { key: 'ArrowRight' });
+    expect(video.currentTime).toBeCloseTo(31 / 30);
+    fireEvent.timeUpdate(video);
+    expect(player()).toHaveTextContent('image 31 / 60');
+
+    // Shift with an arrow, one second back, still playing.
+    fireEvent.keyDown(player(), { key: 'ArrowLeft', shiftKey: true });
+    expect(video.currentTime).toBeCloseTo(1 / 30);
+    fireEvent.timeUpdate(video);
+    expect(player()).toHaveTextContent('image 1 / 60');
+
+    // The touch buttons, and a word touched, move it too.
+    fireEvent.click(screen.getByRole('button', { name: 'Image suivante' }));
+    expect(video.currentTime).toBeCloseTo(2 / 30);
+    fireEvent.click(screen.getByRole('button', { name: 'outils' }));
+    expect(video.currentTime).toBeCloseTo(24 / 30);
+    fireEvent.timeUpdate(video);
+    expect(player()).toHaveTextContent('image 24 / 60');
+    expect(lit()).toEqual(['outils']);
+    // Still playing.
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+  });
+
   it('une seule règle d’image : la tolérance absorbe l’arrondi des secondes', () => {
     expect(frameOf(0.5 + 0.3)).toBe(24);
     expect(frameOf(0.81)).toBe(25);

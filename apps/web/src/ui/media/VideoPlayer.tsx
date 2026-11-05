@@ -30,15 +30,26 @@ export function VideoPlayer({
 }) {
   const { t } = useI18n();
   const video = useRef<HTMLVideoElement>(null);
+  // The last frame the video itself reported (or was set on): a `frame` that differs is a jump asked
+  // for by a key, a button or a word; one that matches only follows the playback.
+  const reported = useRef<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const last = Math.max(total - 1, 0);
   // Without a master, playing steps the frames itself, and stops at the last one.
   const stepping = playing && src === null && frame < last;
 
-  // The video follows the frame, except while it plays: then the frame follows the video.
+  // The video follows the frame. While it plays, the frame follows the video, except for a jump.
   useEffect(() => {
     const element = video.current;
-    if (!element || playing) return;
+    if (!element) return;
+    if (playing) {
+      if (frame !== reported.current) {
+        reported.current = frame;
+        element.currentTime = secondsOf(frame);
+      }
+      return;
+    }
+    reported.current = frame;
     if (frameOf(element.currentTime) !== frame) element.currentTime = secondsOf(frame);
   }, [frame, playing]);
 
@@ -96,9 +107,11 @@ export function VideoPlayer({
           aria-label={label}
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
-          onTimeUpdate={(event) =>
-            onFrame(clampFrame(frameOf(event.currentTarget.currentTime), total))
-          }
+          onTimeUpdate={(event) => {
+            const next = clampFrame(frameOf(event.currentTarget.currentTime), total);
+            reported.current = next;
+            onFrame(next);
+          }}
         />
       )}
       <div className={styles.bar}>
