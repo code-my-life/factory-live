@@ -92,7 +92,12 @@ function sheetError(sheet: WorkflowSheet): string | null {
     if (kinds.size > 1) return `the stations of group "${group.key}" are not of one kind`;
   }
   const known = (key: string) => stations.has(key) || groups.has(key);
+  const ids = new Set<string>();
   for (const edge of sheet.edges) {
+    if (edge.id !== undefined) {
+      if (ids.has(edge.id)) return `duplicate edge id "${edge.id}"`;
+      ids.add(edge.id);
+    }
     const name = edge.id ?? `${edge.kind} ${edge.from} -> ${edge.to}`;
     if (!known(edge.from)) return `edge "${name}" leaves an unknown station "${edge.from}"`;
     if (!known(edge.to)) return `edge "${name}" reaches an unknown station "${edge.to}"`;
