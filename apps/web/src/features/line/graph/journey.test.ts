@@ -29,7 +29,7 @@ describe('journeyEdges à travers un groupe', () => {
     ).toEqual(['in:failfirst', 'out:failfirst']);
   });
 
-  it('un groupe sans fan sur sa fiche nomme encore son entrée et sa sortie d’après la lane', () => {
+  it('un groupe sans fan sur sa fiche se traverse par ses liens de ligne, quelle que soit la lane', () => {
     const parsed = parseWorkflowSheet({
       item: { type: 'video', label: 'Vidéo' },
       groups: [{ key: 'check', label: 'Contrôle', icon: 'shield-check' }],
@@ -47,6 +47,6 @@ describe('journeyEdges à travers un groupe', () => {
     if (!parsed.ok) throw new Error(parsed.error);
     expect(
       journeyEdges([step('write', 'b'), step('check', 'b'), step('done')], parsed.sheet),
-    ).toEqual(['in:b', 'out:b']);
+    ).toEqual(['line:write', 'line:check']);
   });
 });
