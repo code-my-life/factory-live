@@ -84,3 +84,27 @@ test('Studio : aucun défilement de côté, 44 px par cible, et le graphe dans s
     expect(await smallTargets(detail), 'cibles de moins de 44 px').toEqual([]);
   }
 });
+
+test("Studio : une étape done n'a pas la couleur d'échec", async ({ page }) => {
+  await page.goto('/studio/vitrine-factory-live');
+  const detail = page.getByRole('article');
+  const done = detail.locator('li[data-result="done"]');
+  await expect(done.first()).toBeVisible();
+
+  // The failure colour as this page resolves it: a probe styled with the token, then removed.
+  const danger = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--fgColor-danger)';
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
+
+  // `done` is the studio's word for a step that succeeded: none is painted as a failure.
+  const colors = await done.evaluateAll((steps) =>
+    steps.map((step) => getComputedStyle(step.querySelectorAll('span')[1] as Element).color),
+  );
+  expect(colors.length).toBeGreaterThan(0);
+  for (const color of colors) expect(color, 'étape done').not.toBe(danger);
+});

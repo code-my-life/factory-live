@@ -193,7 +193,7 @@
   overflow-wrap: anywhere;
 }
 
-.step:not([data-result='ok']) .stepResult {
+.step:not([data-result='ok'], [data-result='done']) .stepResult {
   color: var(--fgColor-danger);
 }
 
@@ -208,7 +208,10 @@
   overflow-wrap: anywhere;
 }
 
-/* The player beside the script on a wide screen, under it on a phone. */
+/* The player beside the script on a wide screen, under it on a phone.
+   On a wide screen the player column is capped: a master's <video> is as
+   wide as its source (1440 px) when the column sizes to its content, which
+   would leave the script no room at all. */
 .media {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -218,7 +221,7 @@
 
 @media (min-width: 900px) {
   .media {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: fit-content(340px) minmax(0, 1fr);
     align-items: start;
   }
 }

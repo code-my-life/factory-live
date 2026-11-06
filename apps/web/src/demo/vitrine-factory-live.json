@@ -1,0 +1,897 @@
+{
+  "item": {
+    "id": "vitrine-factory-live",
+    "card": "t_3f0efb5c",
+    "title": "Ma factory code pendant que je vis",
+    "station": "publiee",
+    "state": "done",
+    "since": "2026-11-06T00:23:42Z",
+    "waits": null,
+    "failure": null,
+    "script": "---\nid: vitrine-factory-live\ntitre: \"Ma factory code pendant que je vis\"\nplateforme: tiktok\nduree_visee: 62\ngenre: vitrine\ntheme: primer\nbandeau: \"Essaie la démo | Elle tourne dans ton navigateur · lien en bio | 24,6 | 2,4\"\nvignette: \"On dirait pas, | mais je *code*\"\nvignette_image: \"52,95\"\nicone: icone\necran_fin: \"factory-live | Open source · MIT | github\"\nlegende: \"Pendant que je joue, des agents d'IA codent pour moi, et je suis tout depuis mon téléphone avec factory-live. Open source, la démo est en lien en bio.\"\nmots_cles: \"#developpeur #ia #opensource #github #codinglife\"\nvoix_ia: ElevenLabs\n---\n\n<!--\nLa vidéo 1, validée le 5 novembre 2026 : sa voix vient d'ElevenLabs (Eleven v3), ses plans de vf capture et des rushs\ncasqués du propriétaire. Les réglages au dixième de seconde sont ceux du montage validé (montage/montage.py).\n-->\n\n[ton: chuckles] Coucou, on dirait pas mais là, je pisse du code ! [plan: plan1 | depuis 0,3 | durée 4,6]\nPendant que je geek, des agents d'IA écrivent mon code, et je vois tout sur factory-live ! [plan: plan2-iphone | durée 5 | voix 0,15]\nChaque idée devient une issue, et l'issue avance sur une ligne d'usine : le brief, le code, la vérification. [plan: plan3-graphe | durée 9 | voix 2,565]\nJe vois quel agent travaille, sur quoi, avec quel modèle, et tout ce qu'il écrit, mot pour mot ! [plan: plan4-transcription | durée 1,15 | voix 0,4] [plan: plan4-transcription | depuis 2,35 | durée 7,25]\nPour les PR, je vois le diff directement sur le résultat ! [jumeaux: plan5-pr | depuis 29,5 | durée 4,5 | voix 0,3 | avant 0 362 | après 960 362 | taille 940 612 | volet 1,3 0,5 | étiquettes Avant · sans la PR / Après · PR #37]\nEt quand un agent bloque, je reçois une notification. [plan: plan6-debloquer | durée 10,6 | voix 0,4]\n[ton: thoughtful] Je lis sa question, je réponds depuis mon téléphone, et la carte repart. [suite: voix 3,7]\nPlus d'aller-retour dans Claude, plus de PR incompréhensibles ! [plan: plan7-recul | depuis 2 | durée 8 | voix 0,9]\nfactory-live est open source. [plan: plan8 | depuis 0,6 | durée 3 | voix 0,3]\n[ton: excited] J'ai besoin [appel: github | Tes retours sur GitHub | issues et contributions : github.com/code-my-life/factory-live] de vos retours et contributions sur GitHub, essaie [appel: play | Essaie la démo | code-my-life.github.io/factory-live · lien en bio] la démo, et abonne-toi [appel: person-add | Abonne-toi | pour la suite de la factory] pour la suite ! [fin: voix 0,4]\n",
+    "steps": [
+      {
+        "name": "ingest",
+        "result": "done",
+        "durationMs": 100,
+        "outputs": [
+          {
+            "name": "work",
+            "sha256": "10cb07d2d1c6cc81cd42a9b36144a56376df9976e4591927ccf8344b64507da0"
+          },
+          {
+            "name": "probe",
+            "sha256": "af2e1b2921ece3751489acb18312b5ca30ee41ff53645ff17b7d6b8a043abc54"
+          }
+        ]
+      },
+      {
+        "name": "transcribe",
+        "result": "done",
+        "durationMs": 24800,
+        "outputs": [
+          {
+            "name": "transcript",
+            "sha256": "67f7116b0d60be645fea53ec1b5c098a10a5640393175168b9fd5a71a1b77583"
+          }
+        ]
+      },
+      {
+        "name": "align",
+        "result": "done",
+        "durationMs": 0,
+        "outputs": [
+          {
+            "name": "alignment",
+            "sha256": "dd175dbd3951b1d30e32205e34d0555ca165c35d064cfc372e4d262ab78d8840"
+          }
+        ]
+      },
+      {
+        "name": "cut",
+        "result": "done",
+        "durationMs": 0,
+        "outputs": [
+          {
+            "name": "edl",
+            "sha256": "818e87882fb809569041bec63736928de055065edf1fa8fdd7a142154928fcb4"
+          }
+        ]
+      },
+      {
+        "name": "voice",
+        "result": "done",
+        "durationMs": 1000,
+        "outputs": [
+          {
+            "name": "voice",
+            "sha256": "ceb470b37a67e0822e6bb8eef3e5d3e2fab5a0f437dc60865565fcba25276bcc"
+          }
+        ]
+      },
+      {
+        "name": "compose",
+        "result": "done",
+        "durationMs": 248500,
+        "outputs": [
+          {
+            "name": "frames",
+            "sha256": "7982a3d8d8d1ca7cbfcca730e4a282ff91c21a4194226f1900a761287edae11e"
+          },
+          {
+            "name": "music",
+            "sha256": "215b34c0e68052cd85e3a0e1a8ed9ffb9e26e48ee390033692ca63266abb1560"
+          },
+          {
+            "name": "plan",
+            "sha256": "26dc3b70ae6986f5ef2e33821c2cdf65f25d8317282d4d59bde179ea26b2dbcd"
+          },
+          {
+            "name": "text",
+            "sha256": "ce12508093aa9d0db18cb56bb93dce15d13934fc151eac815cd468709cb9e9ea"
+          }
+        ]
+      },
+      {
+        "name": "master",
+        "result": "done",
+        "durationMs": 53700,
+        "outputs": [
+          {
+            "name": "master",
+            "sha256": "bc463915af4a3a84f27f288ae7611e6fc79adbe22b9f29db4adbda8afaf61865"
+          },
+          {
+            "name": "master_framemd5",
+            "sha256": "1ca8e45ad3350ef0a546f3d0a0109603d88fcc8a46d2a7574ada4cbd3a510f94"
+          },
+          {
+            "name": "tiktok",
+            "sha256": "933ff110cc172c91042db2fb38afcc25475882feb04eb790ed1ecfd46ff8e2a0"
+          },
+          {
+            "name": "tiktok_framemd5",
+            "sha256": "696a4a7a93c6b1fd4b6b66029b8fb81f728da1b77ae432f6b9489ff54e62b095"
+          }
+        ]
+      },
+      {
+        "name": "qc",
+        "result": "done",
+        "durationMs": 400,
+        "outputs": [
+          {
+            "name": "report",
+            "sha256": "ccbc7ae6167888b266fdf80560a5ea664996e9ac028c226e70dcb479a022de19"
+          }
+        ]
+      }
+    ],
+    "files": [
+      {
+        "kind": "video",
+        "name": "master",
+        "url": "/api/workflows/studio/items/vitrine-factory-live/media/master"
+      },
+      {
+        "kind": "video",
+        "name": "tiktok",
+        "url": "/api/workflows/studio/items/vitrine-factory-live/media/tiktok"
+      },
+      {
+        "kind": "words",
+        "name": "words",
+        "url": "/api/workflows/studio/items/vitrine-factory-live/words"
+      }
+    ],
+    "links": {
+      "studio": "http://localhost:8448/v/vitrine-factory-live"
+    }
+  },
+  "words": [
+    {
+      "mot": "Coucou,",
+      "debut": 0.5,
+      "fin": 1.233,
+      "garde": true
+    },
+    {
+      "mot": "on",
+      "debut": 1.233,
+      "fin": 1.333,
+      "garde": true
+    },
+    {
+      "mot": "dirait",
+      "debut": 1.6,
+      "fin": 1.933,
+      "garde": true
+    },
+    {
+      "mot": "pas",
+      "debut": 1.933,
+      "fin": 2.1,
+      "garde": true
+    },
+    {
+      "mot": "mais",
+      "debut": 2.1,
+      "fin": 2.333,
+      "garde": true
+    },
+    {
+      "mot": "là,",
+      "debut": 2.333,
+      "fin": 2.667,
+      "garde": true
+    },
+    {
+      "mot": "je",
+      "debut": 2.767,
+      "fin": 3.033,
+      "garde": true
+    },
+    {
+      "mot": "pisse",
+      "debut": 3.133,
+      "fin": 3.333,
+      "garde": true
+    },
+    {
+      "mot": "du",
+      "debut": 3.333,
+      "fin": 3.5,
+      "garde": true
+    },
+    {
+      "mot": "code !",
+      "debut": 3.5,
+      "fin": 4,
+      "garde": true
+    },
+    {
+      "mot": "Pendant",
+      "debut": 4.733,
+      "fin": 4.967,
+      "garde": true
+    },
+    {
+      "mot": "que",
+      "debut": 4.967,
+      "fin": 5.067,
+      "garde": true
+    },
+    {
+      "mot": "je",
+      "debut": 5.067,
+      "fin": 5.167,
+      "garde": true
+    },
+    {
+      "mot": "geek,",
+      "debut": 5.167,
+      "fin": 5.467,
+      "garde": true
+    },
+    {
+      "mot": "des",
+      "debut": 5.467,
+      "fin": 5.633,
+      "garde": true
+    },
+    {
+      "mot": "agents",
+      "debut": 5.8,
+      "fin": 6.233,
+      "garde": true
+    },
+    {
+      "mot": "d'IA",
+      "debut": 6.233,
+      "fin": 6.533,
+      "garde": true
+    },
+    {
+      "mot": "écrivent",
+      "debut": 6.533,
+      "fin": 7.033,
+      "garde": true
+    },
+    {
+      "mot": "mon",
+      "debut": 7.033,
+      "fin": 7.2,
+      "garde": true
+    },
+    {
+      "mot": "code,",
+      "debut": 7.2,
+      "fin": 7.5,
+      "garde": true
+    },
+    {
+      "mot": "et",
+      "debut": 7.5,
+      "fin": 7.6,
+      "garde": true
+    },
+    {
+      "mot": "je",
+      "debut": 7.833,
+      "fin": 8,
+      "garde": true
+    },
+    {
+      "mot": "vois",
+      "debut": 8,
+      "fin": 8.167,
+      "garde": true
+    },
+    {
+      "mot": "tout",
+      "debut": 8.167,
+      "fin": 8.4,
+      "garde": true
+    },
+    {
+      "mot": "sur",
+      "debut": 8.4,
+      "fin": 8.633,
+      "garde": true
+    },
+    {
+      "mot": "factory-live !",
+      "debut": 8.633,
+      "fin": 9.6,
+      "garde": true
+    },
+    {
+      "mot": "Chaque",
+      "debut": 12.167,
+      "fin": 12.467,
+      "garde": true
+    },
+    {
+      "mot": "idée",
+      "debut": 12.467,
+      "fin": 12.667,
+      "garde": true
+    },
+    {
+      "mot": "devient",
+      "debut": 12.667,
+      "fin": 13.033,
+      "garde": true
+    },
+    {
+      "mot": "une",
+      "debut": 13.033,
+      "fin": 13.233,
+      "garde": true
+    },
+    {
+      "mot": "issue,",
+      "debut": 13.233,
+      "fin": 13.567,
+      "garde": true
+    },
+    {
+      "mot": "et",
+      "debut": 13.567,
+      "fin": 13.667,
+      "garde": true
+    },
+    {
+      "mot": "l'issue",
+      "debut": 13.967,
+      "fin": 14.367,
+      "garde": true
+    },
+    {
+      "mot": "avance",
+      "debut": 14.367,
+      "fin": 14.733,
+      "garde": true
+    },
+    {
+      "mot": "sur",
+      "debut": 14.733,
+      "fin": 14.933,
+      "garde": true
+    },
+    {
+      "mot": "une",
+      "debut": 14.933,
+      "fin": 15.067,
+      "garde": true
+    },
+    {
+      "mot": "ligne",
+      "debut": 15.067,
+      "fin": 15.233,
+      "garde": true
+    },
+    {
+      "mot": "d'usine :",
+      "debut": 15.233,
+      "fin": 15.767,
+      "garde": true
+    },
+    {
+      "mot": "le",
+      "debut": 16.133,
+      "fin": 16.233,
+      "garde": true
+    },
+    {
+      "mot": "brief,",
+      "debut": 16.233,
+      "fin": 16.633,
+      "garde": true
+    },
+    {
+      "mot": "le",
+      "debut": 16.633,
+      "fin": 16.767,
+      "garde": true
+    },
+    {
+      "mot": "code,",
+      "debut": 16.933,
+      "fin": 17.367,
+      "garde": true
+    },
+    {
+      "mot": "la",
+      "debut": 17.367,
+      "fin": 17.5,
+      "garde": true
+    },
+    {
+      "mot": "vérification.",
+      "debut": 17.7,
+      "fin": 18.6,
+      "garde": true
+    },
+    {
+      "mot": "Je",
+      "debut": 19,
+      "fin": 19.1,
+      "garde": true
+    },
+    {
+      "mot": "vois",
+      "debut": 19.1,
+      "fin": 19.267,
+      "garde": true
+    },
+    {
+      "mot": "quel",
+      "debut": 19.267,
+      "fin": 19.467,
+      "garde": true
+    },
+    {
+      "mot": "agent",
+      "debut": 19.467,
+      "fin": 19.7,
+      "garde": true
+    },
+    {
+      "mot": "travaille,",
+      "debut": 19.7,
+      "fin": 20.3,
+      "garde": true
+    },
+    {
+      "mot": "sur",
+      "debut": 20.433,
+      "fin": 20.667,
+      "garde": true
+    },
+    {
+      "mot": "quoi,",
+      "debut": 20.667,
+      "fin": 21.067,
+      "garde": true
+    },
+    {
+      "mot": "avec",
+      "debut": 21.233,
+      "fin": 21.433,
+      "garde": true
+    },
+    {
+      "mot": "quel",
+      "debut": 21.433,
+      "fin": 21.667,
+      "garde": true
+    },
+    {
+      "mot": "modèle,",
+      "debut": 21.667,
+      "fin": 22.033,
+      "garde": true
+    },
+    {
+      "mot": "et",
+      "debut": 22.033,
+      "fin": 22.167,
+      "garde": true
+    },
+    {
+      "mot": "tout",
+      "debut": 22.667,
+      "fin": 22.767,
+      "garde": true
+    },
+    {
+      "mot": "ce",
+      "debut": 22.767,
+      "fin": 22.9,
+      "garde": true
+    },
+    {
+      "mot": "qu'il",
+      "debut": 22.9,
+      "fin": 23.067,
+      "garde": true
+    },
+    {
+      "mot": "écrit,",
+      "debut": 23.067,
+      "fin": 23.467,
+      "garde": true
+    },
+    {
+      "mot": "mot",
+      "debut": 23.6,
+      "fin": 23.867,
+      "garde": true
+    },
+    {
+      "mot": "pour",
+      "debut": 23.867,
+      "fin": 24.067,
+      "garde": true
+    },
+    {
+      "mot": "mot !",
+      "debut": 24.067,
+      "fin": 24.433,
+      "garde": true
+    },
+    {
+      "mot": "Pour",
+      "debut": 27.3,
+      "fin": 27.4,
+      "garde": true
+    },
+    {
+      "mot": "les",
+      "debut": 27.4,
+      "fin": 27.667,
+      "garde": true
+    },
+    {
+      "mot": "PR,",
+      "debut": 27.667,
+      "fin": 27.933,
+      "garde": true
+    },
+    {
+      "mot": "je",
+      "debut": 27.933,
+      "fin": 28.067,
+      "garde": true
+    },
+    {
+      "mot": "vois",
+      "debut": 28.167,
+      "fin": 28.4,
+      "garde": true
+    },
+    {
+      "mot": "le",
+      "debut": 28.4,
+      "fin": 28.533,
+      "garde": true
+    },
+    {
+      "mot": "diff",
+      "debut": 28.533,
+      "fin": 28.733,
+      "garde": true
+    },
+    {
+      "mot": "directement",
+      "debut": 28.733,
+      "fin": 29.333,
+      "garde": true
+    },
+    {
+      "mot": "sur",
+      "debut": 29.333,
+      "fin": 29.6,
+      "garde": true
+    },
+    {
+      "mot": "le",
+      "debut": 29.6,
+      "fin": 29.7,
+      "garde": true
+    },
+    {
+      "mot": "résultat !",
+      "debut": 29.7,
+      "fin": 30.267,
+      "garde": true
+    },
+    {
+      "mot": "Et",
+      "debut": 31.9,
+      "fin": 32,
+      "garde": true
+    },
+    {
+      "mot": "quand",
+      "debut": 32,
+      "fin": 32.133,
+      "garde": true
+    },
+    {
+      "mot": "un",
+      "debut": 32.133,
+      "fin": 32.3,
+      "garde": true
+    },
+    {
+      "mot": "agent",
+      "debut": 32.3,
+      "fin": 32.533,
+      "garde": true
+    },
+    {
+      "mot": "bloque,",
+      "debut": 32.533,
+      "fin": 32.833,
+      "garde": true
+    },
+    {
+      "mot": "je",
+      "debut": 32.833,
+      "fin": 33,
+      "garde": true
+    },
+    {
+      "mot": "reçois",
+      "debut": 33.2,
+      "fin": 33.567,
+      "garde": true
+    },
+    {
+      "mot": "une",
+      "debut": 33.567,
+      "fin": 33.7,
+      "garde": true
+    },
+    {
+      "mot": "notification.",
+      "debut": 33.7,
+      "fin": 34.533,
+      "garde": true
+    },
+    {
+      "mot": "Je",
+      "debut": 35.2,
+      "fin": 35.3,
+      "garde": true
+    },
+    {
+      "mot": "lis",
+      "debut": 35.3,
+      "fin": 35.433,
+      "garde": true
+    },
+    {
+      "mot": "sa",
+      "debut": 35.433,
+      "fin": 35.567,
+      "garde": true
+    },
+    {
+      "mot": "question,",
+      "debut": 35.567,
+      "fin": 35.967,
+      "garde": true
+    },
+    {
+      "mot": "je",
+      "debut": 35.967,
+      "fin": 36.133,
+      "garde": true
+    },
+    {
+      "mot": "réponds",
+      "debut": 36.333,
+      "fin": 36.7,
+      "garde": true
+    },
+    {
+      "mot": "depuis",
+      "debut": 36.7,
+      "fin": 36.867,
+      "garde": true
+    },
+    {
+      "mot": "mon",
+      "debut": 36.867,
+      "fin": 37.067,
+      "garde": true
+    },
+    {
+      "mot": "téléphone,",
+      "debut": 37.067,
+      "fin": 37.533,
+      "garde": true
+    },
+    {
+      "mot": "et",
+      "debut": 37.533,
+      "fin": 37.7,
+      "garde": true
+    },
+    {
+      "mot": "la",
+      "debut": 37.933,
+      "fin": 38.1,
+      "garde": true
+    },
+    {
+      "mot": "carte",
+      "debut": 38.1,
+      "fin": 38.367,
+      "garde": true
+    },
+    {
+      "mot": "repart.",
+      "debut": 38.367,
+      "fin": 38.933,
+      "garde": true
+    },
+    {
+      "mot": "Plus",
+      "debut": 43,
+      "fin": 43.133,
+      "garde": true
+    },
+    {
+      "mot": "d'aller-retour",
+      "debut": 43.133,
+      "fin": 43.633,
+      "garde": true
+    },
+    {
+      "mot": "dans",
+      "debut": 43.633,
+      "fin": 43.767,
+      "garde": true
+    },
+    {
+      "mot": "Claude,",
+      "debut": 43.767,
+      "fin": 44.1,
+      "garde": true
+    },
+    {
+      "mot": "plus",
+      "debut": 44.1,
+      "fin": 44.3,
+      "garde": true
+    },
+    {
+      "mot": "de",
+      "debut": 44.467,
+      "fin": 44.7,
+      "garde": true
+    },
+    {
+      "mot": "PR",
+      "debut": 44.7,
+      "fin": 45.133,
+      "garde": true
+    },
+    {
+      "mot": "incompréhensibles !",
+      "debut": 45.2,
+      "fin": 46.233,
+      "garde": true
+    },
+    {
+      "mot": "factory-live",
+      "debut": 50.4,
+      "fin": 51.133,
+      "garde": true
+    },
+    {
+      "mot": "est",
+      "debut": 51.133,
+      "fin": 51.367,
+      "garde": true
+    },
+    {
+      "mot": "open",
+      "debut": 51.367,
+      "fin": 51.7,
+      "garde": true
+    },
+    {
+      "mot": "source.",
+      "debut": 51.7,
+      "fin": 52.3,
+      "garde": true
+    },
+    {
+      "mot": "J'ai",
+      "debut": 53.5,
+      "fin": 53.7,
+      "garde": true
+    },
+    {
+      "mot": "besoin",
+      "debut": 53.7,
+      "fin": 54.033,
+      "garde": true
+    },
+    {
+      "mot": "de",
+      "debut": 54.033,
+      "fin": 54.133,
+      "garde": true
+    },
+    {
+      "mot": "vos",
+      "debut": 54.133,
+      "fin": 54.233,
+      "garde": true
+    },
+    {
+      "mot": "retours",
+      "debut": 54.233,
+      "fin": 54.567,
+      "garde": true
+    },
+    {
+      "mot": "et",
+      "debut": 54.567,
+      "fin": 54.7,
+      "garde": true
+    },
+    {
+      "mot": "contributions",
+      "debut": 54.7,
+      "fin": 55.2,
+      "garde": true
+    },
+    {
+      "mot": "sur",
+      "debut": 55.2,
+      "fin": 55.5,
+      "garde": true
+    },
+    {
+      "mot": "GitHub,",
+      "debut": 55.5,
+      "fin": 56.067,
+      "garde": true
+    },
+    {
+      "mot": "essaie",
+      "debut": 56.267,
+      "fin": 56.533,
+      "garde": true
+    },
+    {
+      "mot": "la",
+      "debut": 56.533,
+      "fin": 56.6,
+      "garde": true
+    },
+    {
+      "mot": "démo,",
+      "debut": 56.6,
+      "fin": 57,
+      "garde": true
+    },
+    {
+      "mot": "et",
+      "debut": 57.2,
+      "fin": 57.267,
+      "garde": true
+    },
+    {
+      "mot": "abonne-toi",
+      "debut": 57.267,
+      "fin": 57.767,
+      "garde": true
+    },
+    {
+      "mot": "pour",
+      "debut": 57.767,
+      "fin": 57.967,
+      "garde": true
+    },
+    {
+      "mot": "la",
+      "debut": 57.967,
+      "fin": 58.067,
+      "garde": true
+    },
+    {
+      "mot": "suite !",
+      "debut": 58.067,
+      "fin": 58.5,
+      "garde": true
+    }
+  ]
+}
