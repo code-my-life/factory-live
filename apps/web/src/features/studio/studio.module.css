@@ -193,7 +193,7 @@
   overflow-wrap: anywhere;
 }
 
-.step:not([data-result='ok']) .stepResult {
+.step:not([data-result='ok'], [data-result='done']) .stepResult {
   color: var(--fgColor-danger);
 }
 
