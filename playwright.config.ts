@@ -118,6 +118,24 @@ export default defineConfig({
             testMatch: DEMO_SPECS,
             use: { ...devices['Desktop Safari'], ...DESKTOP, baseURL: DEMO },
           },
+          // The live app under Safari too: a real master's layout is Safari's own (#41).
+          {
+            name: 'webkit-live-bureau',
+            testMatch: /(live|studio-master)\.spec\.ts/,
+            grepInvert: /sur iPhone/,
+            use: {
+              ...devices['Desktop Safari'],
+              ...DESKTOP,
+              baseURL: LIVE,
+              serviceWorkers: 'block' as const,
+            },
+          },
+          {
+            name: 'webkit-live-iphone',
+            testMatch: /studio-master\.spec\.ts/,
+            grep: /sur iPhone/,
+            use: { ...devices['iPhone 15'], baseURL: LIVE, serviceWorkers: 'block' as const },
+          },
         ]
       : []),
   ],

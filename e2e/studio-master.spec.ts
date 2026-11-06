@@ -65,7 +65,7 @@ interface Layout {
   section: { left: number; width: number };
   player: { top: number; right: number; bottom: number };
   script: { top: number; left: number; width: number };
-  /** Words of the script drawn over more than one line. */
+  /** Words of the script whose text is drawn over more than one line. */
   broken: string[];
 }
 
@@ -81,6 +81,23 @@ async function layout(page: Page): Promise<Layout> {
     const player = element.parentElement as HTMLElement;
     const script = section.children[1] as HTMLElement;
     const box = (node: Element) => node.getBoundingClientRect();
+    // The lines the word's text takes, not its button's boxes: a range may give several rects on
+    // one line (one per text node or inline element), so rects that overlap vertically count as
+    // one line, and a rect that starts below the current line's bottom opens a new one.
+    const lines = (word: Element) => {
+      const range = document.createRange();
+      range.selectNodeContents(word);
+      const rects = [...range.getClientRects()]
+        .filter((rect) => rect.width > 0 && rect.height > 0)
+        .sort((a, b) => a.top - b.top);
+      let count = 0;
+      let bottom = Number.NEGATIVE_INFINITY;
+      for (const rect of rects) {
+        if (rect.top >= bottom - 1) count += 1;
+        bottom = Math.max(bottom, rect.bottom);
+      }
+      return count;
+    };
     return {
       columns: getComputedStyle(section)
         .gridTemplateColumns.split(' ')
@@ -89,7 +106,7 @@ async function layout(page: Page): Promise<Layout> {
       player: { top: box(player).top, right: box(player).right, bottom: box(player).bottom },
       script: { top: box(script).top, left: box(script).left, width: box(script).width },
       broken: [...script.querySelectorAll('button[data-start]')]
-        .filter((word) => word.getClientRects().length !== 1)
+        .filter((word) => lines(word) !== 1)
         .map((word) => word.textContent ?? ''),
     };
   });
