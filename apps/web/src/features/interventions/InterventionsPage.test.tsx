@@ -78,8 +78,8 @@ describe('InterventionsPage', () => {
     const { container } = renderApp('/interventions', factory, createDemoStudioSource());
     const list = screen.getByRole('navigation', { name: 'Interventions en attente' });
 
-    // The three videos that wait for the owner, each with its badge « Studio », among the others.
-    await waitFor(() => expect(list.querySelectorAll('[data-studio]')).toHaveLength(3));
+    // The four videos that wait for the owner, each with its badge « Studio », among the others.
+    await waitFor(() => expect(list.querySelectorAll('[data-studio]')).toHaveLength(4));
     const videos = [...list.querySelectorAll('[data-studio]')] as HTMLElement[];
     for (const video of videos)
       expect(
@@ -104,9 +104,9 @@ describe('InterventionsPage', () => {
       screen
         .getByRole('button', { name: /^Interventions : \d+ en attente$/ })
         .getAttribute('aria-label');
-    expect(bell()).toBe(`Interventions : ${openInterventions(factory) + 3} en attente`);
+    expect(bell()).toBe(`Interventions : ${openInterventions(factory) + 4} en attente`);
     const tabs = screen.getByRole('navigation', { name: 'Navigation' });
-    expect(within(tabs).getByRole('link', { name: /Studio/ })).toHaveTextContent('3');
+    expect(within(tabs).getByRole('link', { name: /Studio/ })).toHaveTextContent('4');
 
     // A video opens at `/interventions/studio:<video>`, with the same gesture as on the studio's page.
     await user.click(within(list).getByRole('link', { name: /Mon usine à code/ }));
@@ -119,8 +119,8 @@ describe('InterventionsPage', () => {
     await user.click(within(gesture).getByRole('button', { name: 'Valider' }));
 
     // Approved, it goes on to Publication and waits no more: it leaves the list and the bell.
-    await waitFor(() => expect(list.querySelectorAll('[data-studio]')).toHaveLength(2));
-    expect(bell()).toBe(`Interventions : ${openInterventions(factory) + 2} en attente`);
+    await waitFor(() => expect(list.querySelectorAll('[data-studio]')).toHaveLength(3));
+    expect(bell()).toBe(`Interventions : ${openInterventions(factory) + 3} en attente`);
     expect(screen.getByText('Cette intervention est résolue.')).toBeInTheDocument();
     expect(container.querySelector('[data-studio][aria-current="page"]')).toBeNull();
   });
@@ -177,7 +177,7 @@ describe('InterventionsPage', () => {
     const gesture = await screen.findByRole('region', { name: 'Geste' });
     expect(within(gesture).getByRole('button', { name: 'Valider' })).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Interventions : 3 en attente' }),
+      screen.getByRole('button', { name: 'Interventions : 4 en attente' }),
     ).toBeInTheDocument();
   });
 });
@@ -304,7 +304,7 @@ describe('le Studio, ses états et sa source', () => {
     await waitFor(() =>
       expect(demo.container.querySelector('[data-issue="presenter-factory-live"]')).not.toBeNull(),
     );
-    expect(screen.getByText('3 vidéos t’attendent')).toBeInTheDocument();
+    expect(screen.getByText('4 vidéos t’attendent')).toBeInTheDocument();
     demo.unmount();
 
     // The live build reads the studio through this server: here it follows none.
@@ -368,7 +368,7 @@ describe('le Studio, ses états et sa source', () => {
         expect(container.querySelector('[data-issue="presenter-factory-live"]')).not.toBeNull(),
       );
       const side = screen.getByRole('navigation', { name: 'Navigation principale' });
-      expect(within(side).getByRole('link', { name: /Studio/ })).toHaveTextContent('3');
+      expect(within(side).getByRole('link', { name: /Studio/ })).toHaveTextContent('4');
     } finally {
       window.location.hash = '';
     }

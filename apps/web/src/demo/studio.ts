@@ -1,12 +1,29 @@
-import type { ModelRef, StudioItemDetail, StudioStep, StudioWord } from '@factory-live/contracts';
+import {
+  type ModelRef,
+  StudioFile,
+  type StudioItemDetail,
+  type StudioStep,
+  type StudioWord,
+} from '@factory-live/contracts';
+import vitrine from './vitrine-factory-live.json';
 
 /**
- * The studio's demo: seven videos at the stations of the studio's sheet, as the v1 API of
+ * The studio's demo: eight videos at the stations of the studio's sheet, as the v1 API of
  * video-factory serves them. Titles, scripts, what a video waits for and why a lane failed imitate
- * what comes from the studio: written as is. Nothing here is real data; the aligned words of
+ * what comes from the studio: written as is. `vitrine-factory-live` is the real video: its detail
+ * and its 124 aligned words are those factory-live's API serves (`vitrine-factory-live.json`), with
+ * its real master, re-encoded (1440 × 2560, H.264), under `public/demo/studio/`; only where it stands
+ * differs (back at the review, waiting for the owner). The other videos are made up; the aligned words of
  * `presenter-factory-live` are derived from its script at a fixed pace, not those of a master
  * (video-content has no master for it yet).
  */
+
+/** The real video's master, served with the demo like its other media. */
+const VITRINE_MASTER: StudioFile = {
+  kind: 'video',
+  name: 'master',
+  url: `${import.meta.env.BASE_URL}demo/studio/vitrine-factory-live/master.mp4`,
+};
 
 /** The real script of `presenter-factory-live` (code-my-life/video-content, commit b1a0e79). */
 export const PRESENTER_SCRIPT = `---
@@ -95,6 +112,26 @@ Je lis sa recette : chaque critère, et le test qui le prouve.
 
 /** The videos of the demo; `minutes` says how long ago each reached its station. */
 export const DEMO_VIDEOS: readonly (Omit<StudioItemDetail, 'since'> & { minutes: number })[] = [
+  {
+    // The real video, back at the review so that its master is one to watch.
+    id: vitrine.item.id,
+    card: vitrine.item.card,
+    title: vitrine.item.title,
+    station: 'revue',
+    state: 'waiting',
+    minutes: 12,
+    waits: 'Le master attend ta revue',
+    failure: null,
+    script: vitrine.item.script,
+    steps: vitrine.item.steps,
+    files: [
+      VITRINE_MASTER,
+      ...vitrine.item.files
+        .filter((file) => file.kind === 'words')
+        .map((file) => StudioFile.parse(file)),
+    ],
+    links: vitrine.item.links,
+  },
   {
     id: 'presenter-factory-live',
     card: 't_5e0c41a2',
@@ -201,8 +238,12 @@ export const DEMO_VIDEOS: readonly (Omit<StudioItemDetail, 'since'> & { minutes:
   },
 ];
 
-/** The words of each video that has some: derived, never those of a master. */
+/**
+ * The words of each video that has some: the real ones of `vitrine-factory-live`, as its master
+ * speaks them; derived from the script for `presenter-factory-live`.
+ */
 export const DEMO_WORDS: Readonly<Record<string, readonly StudioWord[]>> = {
+  'vitrine-factory-live': vitrine.words,
   'presenter-factory-live': derivedWords(PRESENTER_SCRIPT),
 };
 
