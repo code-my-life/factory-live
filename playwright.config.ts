@@ -118,10 +118,12 @@ export default defineConfig({
             testMatch: DEMO_SPECS,
             use: { ...devices['Desktop Safari'], ...DESKTOP, baseURL: DEMO },
           },
-          // The live app under Safari too: a real master's layout is Safari's own (#41).
+          // The studio's master under Safari too: a real master's layout is Safari's own (#41).
+          // `live.spec.ts` stops and restarts the shared fake API server (port 4182), so it stays
+          // on Chromium only: two projects doing so at once would cut each other's server.
           {
             name: 'webkit-live-bureau',
-            testMatch: /(live|studio-master)\.spec\.ts/,
+            testMatch: /studio-master\.spec\.ts/,
             grepInvert: /sur iPhone/,
             use: {
               ...devices['Desktop Safari'],
