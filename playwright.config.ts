@@ -80,13 +80,21 @@ export default defineConfig({
     },
     {
       name: 'live-bureau',
-      testMatch: /live\.spec\.ts/,
+      testMatch: /(live|studio-master)\.spec\.ts/,
+      // The phone layout of the studio runs on live-iphone only.
+      grepInvert: /sur iPhone/,
       use: {
         ...devices['Desktop Chrome'],
         ...DESKTOP,
         baseURL: LIVE,
         serviceWorkers: 'block',
       },
+    },
+    {
+      name: 'live-iphone',
+      testMatch: /studio-master\.spec\.ts/,
+      grep: /sur iPhone/,
+      use: { ...devices['Desktop Chrome'], ...IPHONE, baseURL: LIVE, serviceWorkers: 'block' },
     },
     {
       name: 'captures-bureau',
