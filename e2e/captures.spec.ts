@@ -13,8 +13,8 @@ const VIEWS = [
   // The acceptance of a big real PR (factory-live#18, PR #19), under the graph.
   ['recette', '/issues/factory-live/18'],
   ['reglages', '/settings'],
-  // The studio, open on the master to review: the player and the aligned words in view.
-  ['studio', '/studio/presenter-factory-live'],
+  // The studio, open on the real video's master to review: the player and the aligned words in view.
+  ['studio', '/studio/vitrine-factory-live'],
 ] as const;
 
 for (const [name, route] of VIEWS) {
@@ -23,6 +23,11 @@ for (const [name, route] of VIEWS) {
     await page.clock.setFixedTime(new Date('2026-10-28T18:00:00Z'));
     await page.goto(route);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    // The master's first frame, so that the capture shows the picture at its real size.
+    if (name === 'studio')
+      await expect
+        .poll(() => page.evaluate(() => document.querySelector('video')?.readyState ?? 0))
+        .toBeGreaterThanOrEqual(2);
     await page.waitForTimeout(500);
     await expect(page).toHaveScreenshot(`${name}.png`, { fullPage: true, animations: 'disabled' });
   });
