@@ -247,6 +247,9 @@ export const DEMO_WORDS: Readonly<Record<string, readonly StudioWord[]>> = {
   'presenter-factory-live': derivedWords(PRESENTER_SCRIPT),
 };
 
+/** The videos of the demo whose words are derived from the script, not those of a master. */
+export const DEMO_DERIVED_WORDS: ReadonlySet<string> = new Set(['presenter-factory-live']);
+
 /** The model of the demo's writer: marked as the demo's, never a real model. */
 export const DEMO_MODEL: ModelRef = { model: 'modele-de-demo', provider: 'demo', source: 'config' };
 

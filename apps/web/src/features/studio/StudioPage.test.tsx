@@ -161,4 +161,21 @@ describe('StudioPage', () => {
     for (const label of line.querySelectorAll('[data-segment="label"]'))
       expect(label.textContent).not.toBe('presenter-factory-liv');
   });
+
+  const DERIVED = 'Démo : mots dérivés du script à cadence fixe, pas ceux d’un master.';
+
+  it("la note des mots dérivés n'apparaît pas sur vitrine-factory-live", async () => {
+    renderStudio('/studio/vitrine-factory-live');
+    // Its words are those of its master: they show, without the note.
+    const words = await screen.findByRole('group', { name: 'Mots calés' });
+    expect(words.textContent).not.toBe('');
+    expect(screen.queryByText(DERIVED)).toBeNull();
+  });
+
+  it('la note des mots dérivés reste sur presenter-factory-live', async () => {
+    renderStudio('/studio/presenter-factory-live');
+    const words = await screen.findByRole('group', { name: 'Mots calés' });
+    expect(words.textContent).not.toBe('');
+    expect(screen.getByText(DERIVED)).toBeInTheDocument();
+  });
 });

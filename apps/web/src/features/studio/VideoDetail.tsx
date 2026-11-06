@@ -168,7 +168,7 @@ export function VideoDetail({ id, sheet, now }: { id: string; sheet: WorkflowShe
           </h3>
           {words.length > 0 ? (
             <>
-              {source.kind === 'demo' ? <p className={styles.quiet}>{m.derived}</p> : null}
+              {source.wordsDerived(detail.id) ? <p className={styles.quiet}>{m.derived}</p> : null}
               <WordTrack words={words} frame={frame} onSeek={setFrame} />
             </>
           ) : detail.script ? (

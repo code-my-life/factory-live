@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createLiveStudioSource } from './source.ts';
+import { createDemoStudioSource, createLiveStudioSource } from './source.ts';
 
 const VIDEO = {
   id: 'essai',
@@ -71,5 +71,15 @@ describe('createLiveStudioSource', () => {
     expect(await source.words('rendu')).toEqual(renduWords);
     expect(renduWords).toHaveLength(1);
     expect((await source.status()).unreachableSince).not.toBeNull();
+  });
+});
+
+describe('wordsDerived', () => {
+  it('dans la démo, seuls les mots de presenter sont dérivés ; en direct, jamais', () => {
+    const demo = createDemoStudioSource();
+    expect(demo.wordsDerived('presenter-factory-live')).toBe(true);
+    expect(demo.wordsDerived('vitrine-factory-live')).toBe(false);
+    const live = createLiveStudioSource(() => Promise.reject(new Error('hors ligne')));
+    expect(live.wordsDerived('presenter-factory-live')).toBe(false);
   });
 });

@@ -12,7 +12,7 @@ import type {
   WorkflowSheetResult,
 } from '@factory-live/contracts';
 import { z } from 'zod';
-import { DEMO_AGENTS, DEMO_VIDEOS, DEMO_WORDS } from '../../demo/studio.ts';
+import { DEMO_AGENTS, DEMO_DERIVED_WORDS, DEMO_VIDEOS, DEMO_WORDS } from '../../demo/studio.ts';
 import { STUDIO_SHEET, kindAt, nextStation, returnOf } from './model.ts';
 import type { StudioAgent } from './model.ts';
 
@@ -42,6 +42,11 @@ export interface StudioSource {
   items(): Promise<StudioItem[]>;
   item(id: string): Promise<StudioItemDetail | null>;
   words(id: string): Promise<StudioWord[]>;
+  /**
+   * True when this video's aligned words are derived from its script at a fixed pace, not those of
+   * a master.
+   */
+  wordsDerived(id: string): boolean;
   agents(): Promise<StudioAgent[]>;
   /** The gesture as it comes from a form: checked here by `StudioGesture`. */
   gesture(id: string, gesture: StudioGestureInput): Promise<GestureResult>;
@@ -87,6 +92,7 @@ export function createDemoStudioSource(
     items: () => Promise.resolve([...videos.values()].map((video) => StudioItem.parse(video))),
     item: (id) => Promise.resolve(videos.get(id) ?? null),
     words: (id) => Promise.resolve([...(DEMO_WORDS[id] ?? [])]),
+    wordsDerived: (id) => DEMO_DERIVED_WORDS.has(id),
     agents: () => Promise.resolve(DEMO_AGENTS.map((agent) => ({ ...agent }))),
     gesture: (id, input) => {
       const parsed = StudioGesture.safeParse(input);
@@ -207,6 +213,8 @@ export function createLiveStudioSource(
         return known ? { ...known, script: '', steps: [], files: [], links: {} } : null;
       }
     },
+    // The studio's words are always those of a master.
+    wordsDerived: () => false,
     // Words that cannot be read are the ones last read, never a failure of the detail.
     words: async (id) => {
       try {
