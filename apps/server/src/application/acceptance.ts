@@ -37,6 +37,7 @@ const RULE_LABELS: Record<string, string> = {
   fail_first: 'Fail-first',
   invariance: 'Invariance',
   documentation: 'Documentation',
+  skill: 'Skill',
   build: 'Build hors ligne',
   couverture: 'Couverture du diff',
   controles: 'Contrôles modifiés',
@@ -49,6 +50,7 @@ const PROOF_KIND: Record<string, AcceptanceProof['kind']> = {
   fail_first: 'failfirst',
   invariance: 'invariance',
   documentation: 'documents',
+  skill: 'skill',
   build: 'build',
   couverture: 'coverage',
 };
@@ -222,7 +224,11 @@ export function acceptanceOf(
   const criteria = [...asked].map(([id, text]) => judge(id, text, given.get(id) ?? null, source));
   const gate = source.gate;
   const textual: AcceptanceProof[] = proofs.map((proof) => {
-    const rule = gate?.rules.find((each) => each.rule === (RULE_LABELS[proof.rule] ?? proof.rule));
+    // The gate names a rule by its label, or by its key when it has none yet (`skill`, today).
+    const label = normalize(RULE_LABELS[proof.rule] ?? proof.rule);
+    const rule = gate?.rules.find(
+      (each) => normalize(each.rule) === label || normalize(each.rule) === normalize(proof.rule),
+    );
     return {
       kind: PROOF_KIND[proof.rule] ?? 'run',
       status: proofStatus(rule),

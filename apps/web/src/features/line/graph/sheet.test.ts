@@ -45,7 +45,7 @@ describe('la fiche de la ligne du code', () => {
     );
     expect(geometry.width).toBe(1174);
     expect(geometry.height).toBe(1336);
-    expect(geometry.gate).toEqual({ x: 622, y: 136, w: 240, h: 622 });
+    expect(geometry.gate).toEqual({ x: 622, y: 136, w: 240, h: 728 });
     expect(Object.values(geometry.boxes).map(({ id, x, y, w, h }) => [id, x, y, w, h])).toEqual([
       ['intake', 40, 24, 220, 72],
       ['brief', 40, 176, 220, 238],
@@ -54,6 +54,7 @@ describe('la fiche de la ligne du code', () => {
       ['gate:sabotage', 632, 448, 220, 88],
       ['gate:invariance', 632, 554, 220, 88],
       ['gate:documents', 632, 660, 220, 88],
+      ['gate:skill', 632, 766, 220, 88],
       ['review', 928, 176, 220, 138],
       ['merge', 928, 358, 220, 72],
       ['ci', 928, 474, 220, 72],
@@ -73,6 +74,8 @@ describe('la fiche de la ligne du code', () => {
       ['out:invariance', 'M 852 572 C 890 572 890 216 928 216'],
       ['in:documents', 'M 556 231 C 594 231 594 678 632 678'],
       ['out:documents', 'M 852 678 C 890 678 890 231 928 231'],
+      ['in:skill', 'M 556 246 C 594 246 594 784 632 784'],
+      ['out:skill', 'M 852 784 C 890 784 890 246 928 246'],
       ['line:review', 'M 1038 314 C 1038 336 1038 336 1038 358'],
       ['line:merge', 'M 1038 430 C 1038 452 1038 452 1038 474'],
       ['line:ci', 'M 1038 546 C 1038 568 1038 568 1038 590'],

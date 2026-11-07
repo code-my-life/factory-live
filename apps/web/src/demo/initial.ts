@@ -63,6 +63,7 @@ export const KEYS = {
   overlap: 'claude-cockpit#52',
   codeowners: 'cv-site#46',
   graph: 'factory-live#18',
+  skill: 'skills#3',
 } as const;
 
 export const CARDS = {
@@ -98,6 +99,9 @@ export const CARDS = {
   breakerBrief: 't_3b9a0c11',
   breakerImpl: 't_3b9a1d22',
   breakerRelease: 't_3b9a2e33',
+  skillBrief: 't_5c11a0b2',
+  skillImpl: 't_5c11b1c3',
+  skillRelease: 't_5c11c2d4',
 } as const;
 
 export const RUNS = { teamBrief: 181, contactImpl: 179, contactGate: 183, teamImpl: 184 } as const;
@@ -106,6 +110,7 @@ const REPOS: Record<string, string> = {
   'claude-cockpit': 'https://github.com/code-my-life/claude-cockpit',
   'cv-site': 'https://github.com/code-my-life/cv-site',
   'factory-live': 'https://github.com/code-my-life/factory-live',
+  skills: 'https://github.com/code-my-life/skills',
 };
 
 function issueUrl(key: string): string {
@@ -164,6 +169,7 @@ const TYPE_LABEL = {
   tests: { name: 'type:tests', color: '0e8a16' },
   maintenance: { name: 'type:maintenance', color: 'c5def5' },
   documentation: { name: 'type:documentation', color: '0075ca' },
+  skill: { name: 'type:skill', color: '5319e7' },
 } as const satisfies Record<IssueType, IssueLabel>;
 
 type Step = readonly [JourneyStep['station'], number, JourneyStep['outcome']?];
@@ -534,6 +540,40 @@ export function createInitialState(now: number): DemoState {
         ['brief', 46 * min],
         ['implementation', 40 * min],
         ['gate', 9 * min],
+      ]),
+    },
+    {
+      key: KEYS.skill,
+      repo: 'skills',
+      number: 3,
+      title: 'factory-issue : nommer les tests existants que le changement rend faux',
+      url: issueUrl(KEYS.skill),
+      labels: [TYPE_LABEL.skill, FACTORY_LABEL],
+      station: 'gate',
+      previousStation: null,
+      stationChangedAt: null,
+      status: 'active',
+      claudeModel: null,
+      harness: 'coder',
+      pr: pr('skills', 4, {
+        title: 'skill: factory-issue nomme les tests existants que le changement rend faux (#3)',
+        state: 'open',
+        checks: 'pending',
+        additions: 9,
+        deletions: 1,
+        changedFiles: 1,
+      }),
+      activeProfiles: [],
+      interventionIds: [],
+      startedAt: ago(70 * min),
+      updatedAt: ago(3 * min),
+      type: 'skill',
+      lane: 'skill',
+      journey: trail(ago, 'skill', [
+        ['intake', 40 * min],
+        ['brief', 37 * min],
+        ['implementation', 30 * min],
+        ['gate', 3 * min],
       ]),
     },
     {
@@ -1290,6 +1330,46 @@ export function createInitialState(now: number): DemoState {
     breakerDiag.runs.find((verdict) => verdict.runId === runId) ?? null;
   const localModel = model('llamacpp', QWEN_LOCAL, 'session');
   const [firstGate = 0, secondGate = 0, thirdGate = 0] = BREAKER.runs;
+  details[KEYS.skill] = {
+    issue: find(KEYS.skill),
+    tokens: 61_000,
+    costUsd: 0,
+    cards: [
+      card(
+        CARDS.skillBrief,
+        `${KEYS.skill} : nommer les tests existants que le changement rend faux`,
+        {
+          kind: 'brief',
+          status: 'done',
+          assignee: 'coordinator',
+          station: 'brief',
+        },
+      ),
+      card(CARDS.skillImpl, `impl ${KEYS.skill} : texte proposé de factory-issue`, {
+        kind: 'impl',
+        status: 'review',
+        assignee: 'gate',
+        station: 'gate',
+        parents: [CARDS.skillBrief],
+        changedFiles: [{ path: 'factory-issue/SKILL.md', edits: 1 }],
+      }),
+      card(CARDS.skillRelease, `release ${KEYS.skill}`, {
+        kind: 'release',
+        status: 'todo',
+        assignee: 'coordinator',
+        station: 'release',
+        parents: [CARDS.skillImpl],
+      }),
+    ],
+    timeline: [
+      timeline(ago(40 * min), LABELED, { source: 'github' }),
+      timeline(ago(3 * min), msg('timeline.reviewRequested', { reviewer: 'gate' }), {
+        profile: 'coder',
+        cardId: CARDS.skillImpl,
+      }),
+    ],
+  };
+
   details[KEYS.breaker] = {
     issue: find(KEYS.breaker),
     tokens: 2_310_000,

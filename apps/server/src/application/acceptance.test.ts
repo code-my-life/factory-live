@@ -338,6 +338,42 @@ describe('la recette d’une PR', () => {
     expect(view.proofs.map((proof) => proof.kind)).toEqual(['unproven', 'unproven']);
   });
 
+  it('la règle skill de la gate devient une preuve Skill', () => {
+    const proofs: GateProof[] = [
+      { order: 6, rule: 'skill', text: '`demo/SKILL.md` : texte proposé' },
+    ];
+    // The gate names the rule by its key until it has a label, then by its label: both are read.
+    for (const name of ['skill', 'Skill']) {
+      const view = acceptanceOf(
+        source({
+          gate: {
+            status: 'ok',
+            head: HEAD.slice(0, 7),
+            at: '2026-11-07T10:00:00Z',
+            url: `${PR}#issuecomment-2`,
+            rules: [
+              {
+                rule: name,
+                status: 'ok',
+                detail: '`demo/SKILL.md` : skill nouvelle avec le texte proposé',
+              },
+            ],
+          },
+        }),
+        proofs,
+      );
+      expect(view.proofs[0]).toEqual({
+        kind: 'skill',
+        status: 'ok',
+        detail: '`demo/SKILL.md` : skill nouvelle avec le texte proposé',
+        url: `${PR}#issuecomment-2`,
+        content: '`demo/SKILL.md` : texte proposé',
+        before: null,
+        after: null,
+      });
+    }
+  });
+
   it('les preuves : celles de la gate avec leur texte, les captures avant et après, ce que la PR ne prouve pas', () => {
     const proofs: GateProof[] = [
       { order: 9, rule: 'fail_first', text: '$ npx vitest run\n1 failed' },

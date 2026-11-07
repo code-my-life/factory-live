@@ -96,7 +96,7 @@ test.describe('ligne d’usine (démo)', () => {
     await page.getByRole('button', { name: 'Légende' }).click();
     await expect(
       page.getByRole('list', { name: 'Légende des liens' }).getByRole('listitem'),
-    ).toHaveCount(10);
+    ).toHaveCount(11);
   });
 
   test('au repos, un lien pâlit à 0,42 sans être rouge ; seuls les liens actifs portent des comètes', async ({

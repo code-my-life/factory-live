@@ -93,6 +93,7 @@ export const AcceptanceProof = z.object({
     'sabotage',
     'invariance',
     'documents',
+    'skill',
     'build',
     'coverage',
     'run',

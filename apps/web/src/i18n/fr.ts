@@ -56,6 +56,7 @@ const issueType = {
   tests: 'Tests',
   maintenance: 'Maintenance',
   documentation: 'Documentation',
+  skill: 'Skill',
 } satisfies Record<IssueType, string>;
 
 const intervention = {
@@ -820,6 +821,7 @@ export const fr = {
         sabotage: 'Sabotages',
         invariance: 'Invariance',
         documents: 'Documents',
+        skill: 'Skill',
       } satisfies Record<GateLane, string>,
       providers: 'Fournisseurs',
       providersHint: 'accès aux modèles',
@@ -860,6 +862,7 @@ export const fr = {
         sabotage: 'Preuve par sabotages',
         invariance: 'Preuve d’invariance',
         documents: 'Preuve documents',
+        skill: 'Preuve skill',
         diagnostic: 'Diagnostic, sans PR',
         'loop:gate': 'Retour : gate rouge',
         'loop:review': 'Retour : changements demandés',
@@ -1086,6 +1089,7 @@ export const fr = {
         sabotage: 'Sabotages',
         invariance: 'Invariance',
         documents: 'Documents',
+        skill: 'Skill',
         build: 'Build hors ligne',
         coverage: 'Couverture du diff',
         run: 'Exécution',
@@ -1097,6 +1101,7 @@ export const fr = {
         | 'sabotage'
         | 'invariance'
         | 'documents'
+        | 'skill'
         | 'build'
         | 'coverage'
         | 'run'
