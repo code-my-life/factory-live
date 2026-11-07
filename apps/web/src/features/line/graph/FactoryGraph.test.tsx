@@ -110,7 +110,7 @@ describe('FactoryGraph', () => {
       );
   });
 
-  it('une issue Skill à la gate est dans la boîte Skill, nommée « Skill » sous son titre', () => {
+  it('une issue Skill à la gate est dans la boîte Skill, nommée Skill sous son titre', () => {
     const skill: IssueSummary = {
       ...issue('skills#3', 'factory-issue : nommer les tests existants', 'gate'),
       type: 'skill',
