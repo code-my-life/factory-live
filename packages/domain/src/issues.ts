@@ -102,10 +102,17 @@ export type LineStation =
 
 /** The factory's issue types (ADR 0017 of hermes-software-factory), read on the `type:*` label. */
 export type IssueType =
-  'bug' | 'interface' | 'fonctionnalite' | 'diagnostic' | 'tests' | 'maintenance' | 'documentation';
+  | 'bug'
+  | 'interface'
+  | 'fonctionnalite'
+  | 'diagnostic'
+  | 'tests'
+  | 'maintenance'
+  | 'documentation'
+  | 'skill';
 
 /** The gate's proofs: one per family of types (`proof` in the factory's `config/types.yaml`). */
-export type GateLane = 'failfirst' | 'sabotage' | 'invariance' | 'documents';
+export type GateLane = 'failfirst' | 'sabotage' | 'invariance' | 'documents' | 'skill';
 
 const LANE_OF_TYPE: Readonly<Record<IssueType, GateLane | null>> = {
   bug: 'failfirst',
@@ -114,6 +121,7 @@ const LANE_OF_TYPE: Readonly<Record<IssueType, GateLane | null>> = {
   tests: 'sabotage',
   maintenance: 'invariance',
   documentation: 'documents',
+  skill: 'skill',
   diagnostic: null,
 };
 

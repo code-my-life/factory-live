@@ -110,6 +110,24 @@ describe('FactoryGraph', () => {
       );
   });
 
+  it('une issue Skill à la gate est dans la boîte Skill, nommée « Skill » sous son titre', () => {
+    const skill: IssueSummary = {
+      ...issue('skills#3', 'factory-issue : nommer les tests existants', 'gate'),
+      type: 'skill',
+      lane: 'skill',
+    };
+    const { container } = renderGraph([
+      ...ITEMS,
+      { issue: skill, box: boxOf(skill), agent: null, intervention: null },
+    ]);
+    const box = container.querySelector('[data-box="gate:skill"]') as HTMLElement;
+    expect(box.querySelector('[data-issue="skills#3"]')).not.toBeNull();
+    expect(container.querySelectorAll('[data-issue="skills#3"]')).toHaveLength(1);
+    // Its name, and the type it judges under it: never the raw key.
+    expect(within(box).getAllByText('Skill').length).toBeGreaterThanOrEqual(2);
+    expect(within(box).queryByText('skill')).toBeNull();
+  });
+
   it('la légende est repliée à l’ouverture et s’ouvre au bouton', () => {
     renderGraph();
     const toggle = screen.getByRole('button', { name: 'Légende' });
@@ -118,7 +136,9 @@ describe('FactoryGraph', () => {
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     const links = screen.getByRole('list', { name: 'Légende des liens' });
-    expect(within(links).getAllByRole('listitem')).toHaveLength(10);
+    expect(within(links).getAllByRole('listitem')).toHaveLength(11);
+    // The Skill proof has its link in the legend, named in the PWA's language.
+    expect(within(links).getByText('Preuve skill')).toBeInTheDocument();
   });
 
   it('Terminé montre l’issue terminée ouverte ou cherchée, même au-delà des deux dernières', async () => {

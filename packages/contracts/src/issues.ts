@@ -66,11 +66,12 @@ export const IssueType = z.enum([
   'tests',
   'maintenance',
   'documentation',
+  'skill',
 ]);
 export type IssueType = z.infer<typeof IssueType>;
 
 /** The gate's proofs, one per family of types. */
-export const GateLane = z.enum(['failfirst', 'sabotage', 'invariance', 'documents']);
+export const GateLane = z.enum(['failfirst', 'sabotage', 'invariance', 'documents', 'skill']);
 export type GateLane = z.infer<typeof GateLane>;
 
 /** A step of the issue on the line, worked out from the facts (cards, gate verdicts, reviews, main). */

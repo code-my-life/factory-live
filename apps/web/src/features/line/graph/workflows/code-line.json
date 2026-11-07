@@ -59,6 +59,16 @@
       "group": "gate",
       "types": ["documentation"]
     },
+    {
+      "key": "gate:skill",
+      "label": "Skill",
+      "icon": "shield-check",
+      "kind": "script",
+      "col": 2,
+      "row": 5,
+      "group": "gate",
+      "types": ["skill"]
+    },
     { "key": "review", "label": "Ta revue", "icon": "eye", "kind": "owner", "col": 3, "row": 1 },
     {
       "key": "merge",
@@ -101,10 +111,12 @@
     { "from": "implementation", "to": "gate:sabotage", "kind": "fan" },
     { "from": "implementation", "to": "gate:invariance", "kind": "fan" },
     { "from": "implementation", "to": "gate:documents", "kind": "fan" },
+    { "from": "implementation", "to": "gate:skill", "kind": "fan" },
     { "from": "gate:failfirst", "to": "review", "kind": "fan" },
     { "from": "gate:sabotage", "to": "review", "kind": "fan" },
     { "from": "gate:invariance", "to": "review", "kind": "fan" },
     { "from": "gate:documents", "to": "review", "kind": "fan" },
+    { "from": "gate:skill", "to": "review", "kind": "fan" },
     { "from": "review", "to": "merge", "kind": "line" },
     { "from": "merge", "to": "ci", "kind": "line" },
     { "from": "ci", "to": "deploy", "kind": "line" },

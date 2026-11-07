@@ -235,6 +235,12 @@ describe('gateLaneOf', () => {
     expect(gateLaneOf(null)).toBe('failfirst');
   });
 
+  it('une issue type:skill passe par la voie skill de la gate', () => {
+    const type = issueTypeOf([{ name: 'factory' }, { name: 'type:skill' }]);
+    expect(type).toBe('skill');
+    expect(gateLaneOf(type)).toBe('skill');
+  });
+
   it('le type se lit sur l’étiquette type:*, rien sans elle', () => {
     expect(issueTypeOf([{ name: 'type:fonctionnalite' }])).toBe('fonctionnalite');
     expect(issueTypeOf([{ name: 'type:inconnu' }, { name: 'bug' }])).toBeNull();
