@@ -208,6 +208,27 @@ describe('contrôle de l’hôte, contre le DNS rebinding', () => {
   });
 });
 
+describe('santé du kanban dans /healthz', () => {
+  const healthz = () => h.app.request('/healthz', { headers: FROM_HERMES });
+  const UNREADABLE = 'unable to open database file';
+
+  it('/healthz répond 503 après 60 s de lecture du kanban en échec', async () => {
+    h.kanbanWatch.failed(UNREADABLE, h.clock.now);
+    h.clock.now += 61_000;
+    const response = await healthz();
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ ok: false, version: 'test' });
+  });
+
+  it('/healthz reste 200 pendant une coupure du kanban de moins de 60 s', async () => {
+    h.kanbanWatch.failed(UNREADABLE, h.clock.now);
+    h.clock.now += 59_000;
+    const response = await healthz();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, version: 'test' });
+  });
+});
+
 describe('ingestion des webhooks d’Hermès', () => {
   it('applique un webhook signé : l’agent et le fil changent', async () => {
     const response = await postHook(
