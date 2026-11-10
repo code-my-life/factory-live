@@ -197,6 +197,22 @@ describe('lineStationOf', () => {
     );
   });
 
+  it('une issue livrée sans aucun contrôle sur main est terminée', () => {
+    expect(shipped(pr({ state: 'merged', mergedAt: 3_000, mainChecks: 'none' }))).toBe('done');
+  });
+
+  it('une release en cours sans contrôle sur main reste en CI de main', () => {
+    expect(releasing(pr({ state: 'merged', mergedAt: 3_000, mainChecks: 'none' }))).toBe('ci');
+  });
+
+  it('une issue livrée sans contrôle sur main dont le déploiement est inachevé reste au Déploiement', () => {
+    const merged = { state: 'merged', mergedAt: 3_000, mainChecks: 'none' } as const;
+    expect(shipped(pr({ ...merged, deployment: 'pending' }))).toBe('deploy');
+    expect(shipped(pr({ ...merged, deployment: 'failure' }))).toBe('deploy');
+    expect(shipped(pr({ ...merged, deployment: 'success' }))).toBe('done');
+    expect(shipped(pr({ ...merged, deployment: 'none' }))).toBe('done');
+  });
+
   it('sans GitHub, le vert de la gate attend à Ta revue et la release faite est terminée', () => {
     expect(atGreen(null)).toBe('review');
     expect(shipped(null)).toBe('done');
