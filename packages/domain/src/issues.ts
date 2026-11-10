@@ -163,7 +163,8 @@ const isDiagnostic = (task: Task) => cardKindOf(task) === 'diagnostic';
 /**
  * The station of an issue on the line: the kanban's step, then, once past the gate, what GitHub says
  * of its PR. Gate green: Ta revue; PR approved: Fusion; merged: CI de main; main red: the revert PR
- * goes back through Ta revue; main green and a deployment under way: Déploiement.
+ * goes back through Ta revue; main green and a deployment under way: Déploiement. A merged issue
+ * whose cards are finished while no check ran on main is Terminée.
  */
 export function lineStationOf(
   tasks: readonly Task[],
@@ -185,6 +186,7 @@ export function lineStationOf(
     return delivery.reviewDecision === 'approved' ? 'merge' : 'review';
   }
   if (delivery.mainChecks === 'failure') return station === 'done' ? 'done' : 'review';
+  if (delivery.mainChecks === 'none' && station === 'done') return 'done';
   if (delivery.mainChecks !== 'success') return 'ci';
   if (delivery.deployment === 'pending' || delivery.deployment === 'failure') return 'deploy';
   if (delivery.deployment === 'success' || station === 'done') return 'done';
