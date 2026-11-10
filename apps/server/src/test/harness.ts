@@ -19,6 +19,7 @@ import type { WorkflowApi } from '../adapters/workflows/api.ts';
 import { StreamBuffer } from '../http/stream.ts';
 import { DiagnosisService } from '../application/diagnosis.ts';
 import { Hub } from '../application/hub.ts';
+import { KanbanWatch } from '../application/kanban-watch.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
 import { createLogger } from '../logger.ts';
 import { allowedHosts, appAddresses } from '../config.ts';
@@ -47,6 +48,10 @@ export interface Harness {
   unblock: UnblockDeps;
   pushes: { subscription: StoredSubscription; payload: string }[];
   clock: { now: number };
+  /** The kanban read watch behind `/healthz` (#50), on the harness clock. */
+  kanbanWatch: KanbanWatch;
+  /** The exit codes the kanban watch asked for. */
+  exits: number[];
   syncKanban(): void;
   /** One pass of the GitHub cache over the tracked issues, as `main.ts` runs every 30 s. */
   refreshGitHub(): Promise<boolean>;
@@ -257,6 +262,8 @@ export function harness(
     if (kanban.changed()) hub.applyKanban(kanban.read(), clock.now);
   };
   syncKanban();
+  const exits: number[] = [];
+  const kanbanWatch = new KanbanWatch({ now, log, requestExit: (code) => exits.push(code) });
   const pushes: Harness['pushes'] = [];
   const notifier = new PushNotifier(
     store,
@@ -299,6 +306,7 @@ export function harness(
     githubAuth,
     ...(options.twins ? { twins: options.twins } : {}),
     ...(options.workflows ? { workflows: options.workflows } : {}),
+    kanbanHealthy: () => kanbanWatch.healthy(),
     hookSecret: SECRET,
     origins: ORIGINS,
     allowedHosts: allowedHosts(8446, ORIGINS),
@@ -322,6 +330,8 @@ export function harness(
     unblock,
     pushes,
     clock,
+    kanbanWatch,
+    exits,
     syncKanban,
     refreshGitHub: () => cache.refresh(hub.trackedIssues(), clock.now),
     close: () => {

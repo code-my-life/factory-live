@@ -74,6 +74,8 @@ export interface AppDeps {
   codeSheet?: () => PublishedSheet;
   /** Someone looks at a workflow: it is read more often for a while. */
   workflowWatched?: () => void;
+  /** False while the kanban read has been failing for a minute (#50): `/healthz` answers 503. True by default. */
+  kanbanHealthy?: () => boolean;
   hookSecret: string | null;
   origins: readonly string[];
   /** Valeurs de l'en-tête `Host` acceptées (configuration) ; tout autre hôte reçoit 421. */
@@ -185,7 +187,11 @@ export function createApp(deps: AppDeps) {
     return c.json({ error: 'Erreur interne de factory-live', code: 'internal' }, 500);
   });
 
-  app.get('/healthz', (c) => c.json({ ok: true, version: deps.version }));
+  app.get('/healthz', (c) =>
+    deps.kanbanHealthy?.() === false
+      ? c.json({ ok: false, version: deps.version }, 503)
+      : c.json({ ok: true, version: deps.version }),
+  );
 
   // --- Ingestion signée (Hermès, sonde) ------------------------------------------------------
 

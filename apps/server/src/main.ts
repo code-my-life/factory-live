@@ -20,6 +20,7 @@ import { createApp } from './http/app.ts';
 import { StreamBuffer } from './http/stream.ts';
 import { DiagnosisService } from './application/diagnosis.ts';
 import { Hub } from './application/hub.ts';
+import { KanbanWatch } from './application/kanban-watch.ts';
 import { createLogger } from './logger.ts';
 import { factoryBadge, notifyOpened } from './application/notify.ts';
 import { notifyArrivals, waitingForOwner } from './application/notifications.ts';
@@ -137,17 +138,21 @@ hub.interventionListeners.add((opened, all) => {
 });
 
 // Kanban : data_version toutes les 300 ms, comme le dashboard d'Hermès ; réouverture si la base disparaît.
+// A long outage turns /healthz to 503, then stops the process for Docker to restart it (#50).
 let kanban: KanbanReader | null = null;
+const kanbanWatch = new KanbanWatch({
+  now,
+  log: log.child({ component: 'kanban', path: config.kanbanDb }),
+  requestExit: (code) => shutdown('kanban', code),
+});
 const pollKanban = () => {
   try {
     kanban ??= new KanbanReader(config.kanbanDb);
     if (kanban.changed()) hub.applyKanban(kanban.read(), now());
+    kanbanWatch.read(now());
   } catch (error) {
     hub.kanbanFailed(String(error instanceof Error ? error.message : error));
-    log.error(
-      { component: 'kanban', path: config.kanbanDb, error: String(error) },
-      'lecture du kanban en échec',
-    );
+    kanbanWatch.failed(String(error), now());
     kanban?.close();
     kanban = null;
   }
@@ -264,6 +269,7 @@ const app = createApp({
   workflowWatched: () => {
     workflowWatchedAt = now();
   },
+  kanbanHealthy: () => kanbanWatch.healthy(),
   hookSecret: config.secrets.hookSecret,
   origins: config.PUBLIC_ORIGINS,
   allowedHosts: config.allowedHosts,
@@ -290,16 +296,25 @@ const server = serve({ fetch: app.fetch, port: config.PORT, hostname: config.HOS
   );
 });
 
-const stop = (signal: string) => {
-  log.info({ component: 'server', signal }, 'arrêt demandé');
+/** Stops the timers and the server, closes the databases, then exits with `code`; only once. */
+let shuttingDown = false;
+function shutdown(reason: string, code: number): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  log.debug({ component: 'server', reason, code }, 'nettoyage avant arrêt');
   for (const timer of timers) clearInterval(timer);
   server.close(() => {
     kanban?.close();
     sessions.close();
     store.close();
-    process.exit(0);
+    process.exit(code);
   });
-  setTimeout(() => process.exit(0), 5_000).unref();
+  setTimeout(() => process.exit(code), 5_000).unref();
+}
+
+const stop = (signal: string) => {
+  log.info({ component: 'server', signal }, 'arrêt demandé');
+  shutdown(signal, 0);
 };
 process.on('SIGTERM', () => stop('SIGTERM'));
 process.on('SIGINT', () => stop('SIGINT'));
