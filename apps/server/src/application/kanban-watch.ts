@@ -1,4 +1,4 @@
-import type { Logger } from '../logger.ts';
+import type { LoggerPort } from './ports.ts';
 
 /** An outage of the kanban read this long makes `/healthz` answer 503. */
 export const KANBAN_UNHEALTHY_AFTER_MS = 60_000;
@@ -7,7 +7,7 @@ export const KANBAN_EXIT_AFTER_MS = 180_000;
 
 export interface KanbanWatchDeps {
   now: () => number;
-  log: Logger;
+  log: LoggerPort;
   /** Asks the composition root to stop the process with this exit code. */
   requestExit: (code: number) => void;
 }

@@ -1,22 +1,33 @@
-import { pino } from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import { KanbanWatch } from './kanban-watch.ts';
+import type { LoggerPort } from './ports.ts';
 
 const T = Date.parse('2026-11-10T08:00:00Z');
 const UNREADABLE = 'unable to open database file';
 
-/** A watch on a hand-driven clock, with its log lines captured as pino writes them. */
+type LogLevel = 'info' | 'warn' | 'error' | 'debug';
+
+interface LogLine {
+  level: LogLevel;
+  context: object;
+  message: string;
+}
+
+/** A watch on a hand-driven clock, with a spy logger that records every line it receives. */
 function setup() {
   const clock = { now: T };
-  const lines: { level: number; msg: string; outageSeconds?: number }[] = [];
-  const log = pino(
-    { level: 'info' },
-    {
-      write: (line: string) => {
-        lines.push(JSON.parse(line) as { level: number; msg: string; outageSeconds?: number });
-      },
-    },
-  );
+  const lines: LogLine[] = [];
+  const record =
+    (level: LogLevel) =>
+    (context: object, message: string): void => {
+      lines.push({ level, context, message });
+    };
+  const log: LoggerPort = {
+    info: record('info'),
+    warn: record('warn'),
+    error: record('error'),
+    debug: record('debug'),
+  };
   const requestExit = vi.fn<(code: number) => void>();
   const watch = new KanbanWatch({ now: () => clock.now, log, requestExit });
   return { clock, lines, requestExit, watch };
@@ -52,10 +63,10 @@ describe('KanbanWatch', () => {
       watch.failed(UNREADABLE, at);
       at += 30;
     }
-    expect(lines.filter((line) => line.level === 50)).toHaveLength(1);
+    expect(lines.filter((line) => line.level === 'error')).toHaveLength(1);
     watch.read(at);
-    const infos = lines.filter((line) => line.level === 30);
+    const infos = lines.filter((line) => line.level === 'info');
     expect(infos).toHaveLength(1);
-    expect(infos[0]!.outageSeconds).toBe(30);
+    expect(infos[0]!.context).toHaveProperty('outageSeconds', 30);
   });
 });
