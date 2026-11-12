@@ -344,4 +344,34 @@ describe('interventions lues par le socle (workflow-core, #59)', () => {
     await until(() => !interventionOf(side, 'needs_input:t_1a9f0049:1'), 2_000);
     expect(performance.now() - sent).toBeLessThan(1_000);
   });
+
+  it('deux lectures des verdicts d’une même carte ne se croisent pas', async () => {
+    const side = await start(coreState());
+    // Each read of the card's verdicts takes 300 ms; when they arrive is noted.
+    const arrivals: number[] = [];
+    core!.delay = (path) => {
+      if (!path.endsWith('/t_b1ef0049/run-verdicts')) return 0;
+      arrivals.push(performance.now());
+      return 300;
+    };
+    core!.state.verdicts = { t_b1ef0049: [] };
+    const failed: Record<string, unknown> = { ...structuredClone(CORE_ITEMS[0]!), status: 'done' };
+    (failed['runs'] as { outcome: string }[])[0]!.outcome = 'crashed';
+    for (const n of [6, 7, 8])
+      core!.send({
+        cursor: `1762900000:${n}`,
+        workflow: 'factory',
+        item: 't_b1ef0049',
+        kind: 'changed',
+        at: '2026-11-12T10:00:00.000Z',
+        state: failed,
+      });
+    await until(() => arrivals.length >= 2, 2_000);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    // The changes asked while a read ran give one more read, after it: never two at once.
+    expect(arrivals).toHaveLength(2);
+    expect(arrivals[1]! - arrivals[0]!).toBeGreaterThanOrEqual(290);
+    expect(side.failures).toEqual([]);
+  });
 });

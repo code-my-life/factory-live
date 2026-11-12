@@ -136,7 +136,8 @@ export class WorkflowCoreReader {
   private diagnosesAgain = false;
   private readonly verdictsQueue: string[] = [];
   private readonly verdictsQueued = new Set<string>();
-  private verdictReads = 0;
+  private readonly verdictsReading = new Set<string>();
+  private readonly verdictsAgain = new Set<string>();
   /** The code line's agents the core follows, by agent. */
   private agents = new Map<string, CoreAgent>();
   private cursor: string | null = null;
@@ -390,8 +391,16 @@ export class WorkflowCoreReader {
     });
   }
 
-  /** Reads a card's verdicts without holding the stream, `VERDICT_READS` at a time (#59). */
+  /**
+   * Reads a card's verdicts without holding the stream, `VERDICT_READS` at a time (#59). A card is read
+   * once at a time: asked again during its read, it is read once more after it, so an older answer never
+   * replaces a newer one.
+   */
   private scheduleVerdicts(cardId: string): void {
+    if (this.verdictsReading.has(cardId)) {
+      this.verdictsAgain.add(cardId);
+      return;
+    }
     if (this.verdictsQueued.has(cardId)) return;
     this.verdictsQueued.add(cardId);
     this.verdictsQueue.push(cardId);
@@ -399,12 +408,17 @@ export class WorkflowCoreReader {
   }
 
   private pumpVerdicts(): void {
-    while (this.running && this.verdictReads < VERDICT_READS && this.verdictsQueue.length > 0) {
+    while (
+      this.running &&
+      this.verdictsReading.size < VERDICT_READS &&
+      this.verdictsQueue.length > 0
+    ) {
       const cardId = this.verdictsQueue.shift()!;
       this.verdictsQueued.delete(cardId);
-      this.verdictReads += 1;
+      this.verdictsReading.add(cardId);
       void this.refreshVerdicts(cardId).finally(() => {
-        this.verdictReads -= 1;
+        this.verdictsReading.delete(cardId);
+        if (this.verdictsAgain.delete(cardId)) this.scheduleVerdicts(cardId);
         this.pumpVerdicts();
       });
     }
