@@ -358,22 +358,19 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
   },
   security: {
     title: 'En lecture seule, par construction',
-    text: 'factory-live regarde la factory sans jamais la piloter. Sa seule écriture est le commentaire que tu demandes.',
+    text: 'factory-live n’écrit que ce que tu demandes, en ton nom : un geste comme <code>/factory unblock</code>, ou une issue qu’il ouvre pour toi.',
     groups: [
       {
         title: 'Lit',
         rows: [
-          ['<code>kanban.db</code>, sessions des agents, logs des cartes', 'lecture seule'],
-          ['Transcriptions de Claude Code', 'montage en lecture seule'],
+          ['API de workflow-core', 'secret partagé'],
+          ['GitHub', 'jeton de la GitHub App'],
           ['Base d’OpenCode et ses jetons', 'jamais ouverte'],
         ],
       },
       {
         title: 'Reçoit',
-        rows: [
-          ['Webhooks d’Hermès', 'HMAC-SHA256, anti-rejeu'],
-          ['Sonde de santé', 'HMAC-SHA256'],
-        ],
+        rows: [['Flux des changements de workflow-core', 'secret partagé, curseur']],
       },
       {
         title: 'Écrit',

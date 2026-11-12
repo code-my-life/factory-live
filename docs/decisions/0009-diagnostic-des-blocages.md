@@ -1,6 +1,6 @@
 # ADR 0009 : diagnostic des blocages, des règles et pas de LLM
 
-Date : 2026-10-29. Statut : accepté (Clément, 2026-10-29).
+Date : 2026-10-29. Statut : accepté (Clément, 2026-10-29), remplacée par l'ADR 0017.
 
 ## Contexte
 

@@ -1,6 +1,6 @@
 # ADR 0003 : débloquer par un commentaire /factory unblock
 
-Date : 2026-10-28, révisée le même jour pour la GitHub App. Statut : accepté.
+Date : 2026-10-28, révisée le même jour pour la GitHub App. Statut : remplacée par l'ADR 0016.
 
 ## Décision
 
