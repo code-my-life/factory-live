@@ -108,15 +108,15 @@ const Env = z.object({
   VAPID_SUBJECT: z.string().default('https://github.com/code-my-life/factory-live'),
   DEMO: flag,
   /**
-   * Where the server reads the factory (#57, ADR 0015): Hermes itself, as before, or workflow-core. One
-   * choice for the whole process; switching back means changing it and restarting the container.
+   * Where the server reads the factory (#57, ADR 0015): workflow-core by default since #68, or Hermes itself,
+   * the way back. One choice for the whole process; switching means changing it and restarting the container.
    */
   LIVE_SOURCE: z
     .enum(['hermes', 'workflow-core'], {
       error: (issue) =>
         `LIVE_SOURCE vaut « ${String(issue.input)} » : hermes ou workflow-core attendu`,
     })
-    .default('hermes'),
+    .default('workflow-core'),
   /** workflow-core's address (`http://host.docker.internal:8447` from the container). */
   WORKFLOW_CORE_URL: z
     .union([z.literal(''), z.url()])

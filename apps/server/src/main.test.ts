@@ -36,6 +36,7 @@ const ENV_KEYS = [
   'OPENCODE_DB',
   'WEB_DIST',
   'LOG_LEVEL',
+  'LIVE_SOURCE',
 ] as const;
 
 let root: TempDir;
@@ -80,6 +81,8 @@ beforeAll(async () => {
     CLAUDE_PROJECTS: dir('claude-projects'),
     OPENCODE_DB: join(root.path, 'opencode.db'),
     WEB_DIST: dir('web-dist'),
+    // These tests follow the kanban read on Hermes' side: since #68, the default is workflow-core.
+    LIVE_SOURCE: 'hermes',
     LOG_LEVEL: 'fatal',
   });
 
