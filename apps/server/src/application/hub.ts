@@ -71,6 +71,11 @@ export interface HubDeps {
   workflows?: () => readonly WorkflowView[];
   /** Where the code line's sheet comes from (#31). */
   codeSheet?: () => PublishedSheet;
+  /**
+   * Whether the board starts from the kanban mirror (true by default). On workflow-core's side (#57) it
+   * starts empty: the mirror holds Hermes' cards, not the core's.
+   */
+  restoreMirror?: boolean;
 }
 
 type Slice = 'board' | 'agents' | 'health';
@@ -143,7 +148,10 @@ export class Hub {
   constructor(options: HubOptions, deps: HubDeps) {
     this.options = options;
     this.deps = deps;
-    this.board = deps.store.board();
+    this.board =
+      deps.restoreMirror === false
+        ? { tasks: [], runs: [], links: [], events: [], comments: [] }
+        : deps.store.board();
     this.issueOfCard = issueOfCards(this.board);
     this.stations = deps.store.stations();
     this.activity = deps.store.recentActivity(ACTIVITY_KEPT);
@@ -220,6 +228,29 @@ export class Hub {
     this.issueOfCard = issueOfCards(this.board);
     this.kanbanStatus = { state: 'read', cards: this.board.tasks.length, error: null, readAt };
     this.trackUnblocks(delta, readAt);
+    this.trackInterventions();
+    this.dirty.add('board').add('agents').add('health');
+  }
+
+  /**
+   * The whole board, read from workflow-core (#57): it replaces the one held, so a card gone from the
+   * core is gone here too. Nothing is written in the kanban mirror (ADR 0019): the core holds the state.
+   */
+  replaceBoard(board: KanbanDelta, readAt: number): void {
+    const seenEvents = new Set(this.board.events.map((event) => event.id));
+    this.board = {
+      tasks: [...board.tasks],
+      runs: [...board.runs].sort((left, right) => left.id - right.id),
+      links: [...board.links],
+      events: [...board.events],
+      comments: [...board.comments],
+    };
+    this.issueOfCard = issueOfCards(this.board);
+    this.kanbanStatus = { state: 'read', cards: this.board.tasks.length, error: null, readAt };
+    this.trackUnblocks(
+      { ...board, events: board.events.filter((event) => !seenEvents.has(event.id)) },
+      readAt,
+    );
     this.trackInterventions();
     this.dirty.add('board').add('agents').add('health');
   }

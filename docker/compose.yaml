@@ -35,6 +35,10 @@ services:
       TWINS_HOST: host.docker.internal
       # Les workflows suivis par leur API générique (ADR 0014) : le studio de video-factory sur ce PC.
       WORKFLOWS: ${WORKFLOWS:-studio=http://host.docker.internal:8448}
+      # La source de la lecture (ADR 0015) : hermes, ou workflow-core, le socle sur ce PC ; son secret est
+      # le fichier workflow-core-secret du dossier des secrets.
+      LIVE_SOURCE: ${LIVE_SOURCE:-hermes}
+      WORKFLOW_CORE_URL: ${WORKFLOW_CORE_URL:-http://host.docker.internal:8447}
     extra_hosts:
       - host.docker.internal:host-gateway
     volumes:

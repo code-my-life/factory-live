@@ -42,6 +42,7 @@ import type { HistoryStore } from '../adapters/store/history.ts';
 import { toHookEvent } from '../ingest/hermes.ts';
 import { ReplayGuard, verifySignature } from '../ingest/signature.ts';
 import type { Hub } from '../application/hub.ts';
+import type { WorkflowView } from '../application/ports.ts';
 import {
   historyStats,
   issueDetail,
@@ -70,6 +71,8 @@ export interface AppDeps {
   twins?: TwinBench | null;
   /** The workflows followed by their generic API (#31): the studio's videos, today. */
   workflows?: readonly WorkflowApi[];
+  /** The other workflows workflow-core declares (#57), listed with their sheet; their screen is #65. */
+  coreWorkflows?: () => readonly WorkflowView[];
   /** The code line's sheet as the factory publishes it, or why the embedded copy is drawn (#31). */
   codeSheet?: () => PublishedSheet;
   /** Someone looks at a workflow: it is read more often for a while. */
@@ -860,7 +863,10 @@ export function createApp(deps: AppDeps) {
     c.header('Cache-Control', 'no-store');
     return c.json(
       {
-        workflows: (deps.workflows ?? []).map((workflow) => workflow.view()),
+        workflows: [
+          ...(deps.workflows ?? []).map((workflow) => workflow.view()),
+          ...(deps.coreWorkflows?.() ?? []),
+        ],
         code: deps.codeSheet?.() ?? null,
       },
       200,

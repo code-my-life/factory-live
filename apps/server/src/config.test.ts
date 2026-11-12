@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from './config.ts';
 
@@ -77,5 +80,37 @@ describe('configuration, fuseau du journal d’Hermès', () => {
       'America/Montreal',
     );
     expect(() => loadConfig({ ...BASE, HERMES_TZ: 'Mars/Olympus' })).toThrow();
+  });
+});
+
+describe('configuration, source de la lecture (interrupteur LIVE_SOURCE, #57)', () => {
+  it('la source du socle exige son adresse et son secret', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'factory-live-secrets-'));
+    try {
+      // The default: Hermes, as before; nothing about the core is needed.
+      expect(loadConfig({ SECRETS_DIR: dir }).LIVE_SOURCE).toBe('hermes');
+
+      // An unknown value stops the start, naming it.
+      expect(() => loadConfig({ SECRETS_DIR: dir, LIVE_SOURCE: 'socle' })).toThrow(/LIVE_SOURCE/);
+
+      // The core's side without its address, then without its secret.
+      expect(() => loadConfig({ SECRETS_DIR: dir, LIVE_SOURCE: 'workflow-core' })).toThrow(
+        /WORKFLOW_CORE_URL/,
+      );
+      const core = {
+        SECRETS_DIR: dir,
+        LIVE_SOURCE: 'workflow-core',
+        WORKFLOW_CORE_URL: 'http://host.docker.internal:8447',
+      };
+      expect(() => loadConfig(core)).toThrow(/workflow-core-secret/);
+
+      writeFileSync(join(dir, 'workflow-core-secret'), 'secret-du-socle\n');
+      const config = loadConfig(core);
+      expect(config.LIVE_SOURCE).toBe('workflow-core');
+      expect(config.WORKFLOW_CORE_URL).toBe('http://host.docker.internal:8447');
+      expect(config.secrets.workflowCoreSecret).toBe('secret-du-socle');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
