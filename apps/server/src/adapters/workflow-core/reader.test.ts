@@ -227,6 +227,46 @@ describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => 
     );
   });
 
+  it('un changement dont l’écriture échoue est redemandé à la reprise du flux', async () => {
+    dir = tempDir();
+    core = await fakeCore(SECRET, coreState());
+    side = coreSide(dir, core);
+    // The base refuses the first write of a card's change, as SQLite may when it is busy.
+    const sink = (
+      side.reader as unknown as { options: { sink: { history: (...args: unknown[]) => void } } }
+    ).options.sink;
+    const write = sink.history.bind(sink);
+    let refusals = 0;
+    sink.history = (...args: unknown[]) => {
+      if (args[2] === false && refusals === 0) {
+        refusals += 1;
+        throw new Error('database is locked');
+      }
+      write(...args);
+    };
+    const change = {
+      cursor: '1762900000:6',
+      workflow: 'factory',
+      item: 't_1a9f0049',
+      kind: 'changed',
+      at: '2026-11-12T10:00:01.000Z',
+      state: { ...structuredClone(CORE_ITEMS[1]!), status: 'review', block_kind: null },
+    };
+    // The core sends again what follows the cursor a client resumes from.
+    core.backlog = (lastEventId) => (lastEventId === '1762900000:5' ? [change] : []);
+    side.reader.start();
+    await until(() => side!.boards.length > 0 && core!.openStreams() === 1);
+
+    core.send(change);
+    await until(
+      () => side!.hub.boardData.tasks.find((task) => task.id === 't_1a9f0049')?.status === 'review',
+      3_000,
+    );
+    expect(refusals).toBe(1);
+    const resumed = core.requests.filter((request) => request.path === '/api/events');
+    expect(resumed.at(-1)?.lastEventId).toBe('1762900000:5');
+  });
+
   it('socle arrêté, la dernière fiche et les derniers éléments restent', async () => {
     dir = tempDir();
     core = await fakeCore(SECRET, coreState());

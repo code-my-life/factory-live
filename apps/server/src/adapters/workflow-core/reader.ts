@@ -13,6 +13,7 @@ import {
 } from '@factory-live/contracts/workflow-core';
 import type {
   CoreAgent,
+  CoreEvent,
   CoreFact,
   CoreIntervention,
   CoreItem,
@@ -320,43 +321,52 @@ export class WorkflowCoreReader {
   private async follow(): Promise<boolean> {
     const stream = this.client.events(this.cursor, this.abort.signal, () => this.answered());
     for await (const event of stream) {
-      this.cursor = event.cursor;
       this.answered();
-      if (event.kind === 'reset') return true;
-      if (event.kind === 'machine') {
-        this.checks = (event.state as CoreMachineCheck[]).map(checkState);
-        this.checksCursor = event.cursor;
-        this.options.sink.checks(this.checks);
-        continue;
-      }
-      if (event.workflow === null || event.state === null) continue;
-      if (this.options.own.includes(event.workflow)) continue;
-      // A fact of activity may name no card (a tick of the dispatcher): only a card's change needs one.
-      if (event.kind === 'live' || event.kind === 'activity') {
-        if (event.workflow === this.options.code) this.live(event.kind, event.state);
-        continue;
-      }
-      if (event.kind === 'intervention_opened' || event.kind === 'intervention_closed') {
-        if (event.workflow === this.options.code) this.intervention(event.kind, event.state);
-        continue;
-      }
-      if (event.item === null) continue;
-      const held = this.items.get(event.workflow);
-      // A workflow declared since the last full read: read it all.
-      if (!held) return true;
-      const item = event.state as CoreItem;
-      held.set(event.item, item);
-      this.options.sink.history(event.workflow, [item], false);
-      // A card no longer in progress has no agent on it any more: the core sends no departure (#34).
-      if (event.workflow === this.options.code && item.current_run_id === null)
-        this.dropAgentsOf(event.item);
-      this.readAt.set(event.workflow, this.options.now());
-      this.emit(event.workflow);
-      if (event.workflow === this.options.code) {
-        // A card with an open intervention: its diagnosis may have changed; a failed run: its verdict.
-        if ([...this.openCards.values()].includes(event.item)) this.scheduleDiagnoses();
-        if (hasFailedRun(item)) this.scheduleVerdicts(event.item);
-      }
+      // The cursor moves only once the event is applied: an event whose handling fails (a write the base
+      // refuses) is asked for again when the stream resumes, instead of being skipped.
+      const fullRead = this.apply(event);
+      this.cursor = event.cursor;
+      if (fullRead) return true;
+    }
+    return false;
+  }
+
+  /** Applies one event of the stream; true when it asks for a full read. */
+  private apply(event: CoreEvent): boolean {
+    if (event.kind === 'reset') return true;
+    if (event.kind === 'machine') {
+      this.checks = (event.state as CoreMachineCheck[]).map(checkState);
+      this.checksCursor = event.cursor;
+      this.options.sink.checks(this.checks);
+      return false;
+    }
+    if (event.workflow === null || event.state === null) return false;
+    if (this.options.own.includes(event.workflow)) return false;
+    // A fact of activity may name no card (a tick of the dispatcher): only a card's change needs one.
+    if (event.kind === 'live' || event.kind === 'activity') {
+      if (event.workflow === this.options.code) this.live(event.kind, event.state);
+      return false;
+    }
+    if (event.kind === 'intervention_opened' || event.kind === 'intervention_closed') {
+      if (event.workflow === this.options.code) this.intervention(event.kind, event.state);
+      return false;
+    }
+    if (event.item === null) return false;
+    const held = this.items.get(event.workflow);
+    // A workflow declared since the last full read: read it all.
+    if (!held) return true;
+    const item = event.state as CoreItem;
+    held.set(event.item, item);
+    this.options.sink.history(event.workflow, [item], false);
+    // A card no longer in progress has no agent on it any more: the core sends no departure (#34).
+    if (event.workflow === this.options.code && item.current_run_id === null)
+      this.dropAgentsOf(event.item);
+    this.readAt.set(event.workflow, this.options.now());
+    this.emit(event.workflow);
+    if (event.workflow === this.options.code) {
+      // A card with an open intervention: its diagnosis may have changed; a failed run: its verdict.
+      if ([...this.openCards.values()].includes(event.item)) this.scheduleDiagnoses();
+      if (hasFailedRun(item)) this.scheduleVerdicts(event.item);
     }
     return false;
   }
