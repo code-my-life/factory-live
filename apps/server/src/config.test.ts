@@ -4,8 +4,11 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from './config.ts';
 
-/** Aucun secret réel n'est lu par ces tests : le dossier des secrets n'existe pas. */
-const BASE = { SECRETS_DIR: '/nonexistent/factory-live-secrets' };
+/**
+ * No real secret is read by these tests: the secrets folder does not exist. Hermes' side is named: since #68,
+ * without LIVE_SOURCE, factory-live reads the core and requires its address and its secret.
+ */
+const BASE = { SECRETS_DIR: '/nonexistent/factory-live-secrets', LIVE_SOURCE: 'hermes' };
 
 describe('configuration, hôtes autorisés (contrôle contre le DNS rebinding)', () => {
   it('ce PC sur le port du service, les hôtes des origines publiques, puis ALLOWED_HOSTS', () => {
@@ -87,8 +90,8 @@ describe('configuration, source de la lecture (interrupteur LIVE_SOURCE, #57)', 
   it('la source du socle exige son adresse et son secret', () => {
     const dir = mkdtempSync(join(tmpdir(), 'factory-live-secrets-'));
     try {
-      // The default: Hermes, as before; nothing about the core is needed.
-      expect(loadConfig({ SECRETS_DIR: dir }).LIVE_SOURCE).toBe('hermes');
+      // Hermes, named: nothing about the core is needed.
+      expect(loadConfig({ SECRETS_DIR: dir, LIVE_SOURCE: 'hermes' }).LIVE_SOURCE).toBe('hermes');
 
       // An unknown value stops the start, naming it.
       expect(() => loadConfig({ SECRETS_DIR: dir, LIVE_SOURCE: 'socle' })).toThrow(/LIVE_SOURCE/);
@@ -109,6 +112,47 @@ describe('configuration, source de la lecture (interrupteur LIVE_SOURCE, #57)', 
       expect(config.LIVE_SOURCE).toBe('workflow-core');
       expect(config.WORKFLOW_CORE_URL).toBe('http://host.docker.internal:8447');
       expect(config.secrets.workflowCoreSecret).toBe('secret-du-socle');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('configuration, le socle par défaut (#68)', () => {
+  const core = (dir: string) => ({
+    SECRETS_DIR: dir,
+    WORKFLOW_CORE_URL: 'http://host.docker.internal:8447',
+  });
+
+  it('sans LIVE_SOURCE, factory-live lit le socle', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'factory-live-secrets-'));
+    try {
+      writeFileSync(join(dir, 'workflow-core-secret'), 'secret-du-socle');
+      expect(loadConfig(core(dir)).LIVE_SOURCE).toBe('workflow-core');
+      // An empty value, as compose passes an unset variable without its default, is the default too.
+      expect(loadConfig({ ...core(dir), LIVE_SOURCE: undefined }).LIVE_SOURCE).toBe(
+        'workflow-core',
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('LIVE_SOURCE=hermes ramène la lecture d’Hermès', () => {
+    // The way back: Hermes again, with nothing of the core needed (no address, no secret).
+    const config = loadConfig({
+      SECRETS_DIR: '/nonexistent/factory-live-secrets',
+      LIVE_SOURCE: 'hermes',
+    });
+    expect(config.LIVE_SOURCE).toBe('hermes');
+    expect(config.WORKFLOW_CORE_URL).toBeNull();
+  });
+
+  it('la source par défaut exige l’adresse et le secret du socle', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'factory-live-secrets-'));
+    try {
+      expect(() => loadConfig({ SECRETS_DIR: dir })).toThrow(/WORKFLOW_CORE_URL/);
+      expect(() => loadConfig(core(dir))).toThrow(/workflow-core-secret/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
