@@ -2,6 +2,7 @@ import { msg } from '@factory-live/contracts';
 import type {
   AcceptanceTwins,
   CardView,
+  ConfigDrift,
   HistoryStats,
   IssueDetail,
   ModelRef,
@@ -36,11 +37,14 @@ import type { Hub } from './hub.ts';
 import type {
   AgentLogPort,
   CardFilesPort,
+  GateProof,
   GitHubReadPort,
   HistoryPort,
   ProfilesPort,
+  RunTranscripts,
   SessionInfo,
   SessionsPort,
+  TranscriptLine,
 } from './ports.ts';
 import { iso, projectInterventions, projectIssues } from './projection.ts';
 
@@ -113,7 +117,31 @@ function cardStation(task: Task, reviewing: boolean): StationId {
   }
 }
 
-export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
+/**
+ * What the recette of an issue's PR asks workflow-core for, on the core's side (#60): the PR, its head and
+ * the issue's cards; `null` without a PR.
+ */
+export function acceptanceSubject(
+  deps: ViewDeps,
+  key: string,
+): { repo: string; pr: number; head: string; cardIds: string[] } | null {
+  const tasks = groupByIssue(deps.hub.boardData).get(key);
+  const source = tasks ? (deps.github?.acceptance(key) ?? null) : null;
+  const repo = source ? repoOf(source.prUrl) : null;
+  return source && repo && tasks
+    ? { repo, pr: source.pr, head: source.head, cardIds: tasks.map((task) => task.id) }
+    : null;
+}
+
+/**
+ * The detail of an issue. On the core's side, the gate's proofs of the PR's head come read from the core
+ * (`proofs`, #60) instead of the cards' evidence.
+ */
+export function issueDetail(
+  deps: ViewDeps,
+  key: string,
+  prepared: { proofs?: GateProof[] } = {},
+): IssueDetail | null {
   const board = deps.hub.boardData;
   const tasks = groupByIssue(board).get(key);
   if (!tasks) return null;
@@ -244,7 +272,8 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
     acceptance: source
       ? acceptanceOf(
           source,
-          ids.flatMap((id) => deps.files.gateProofs(id, source.head.slice(0, 7))),
+          prepared.proofs ??
+            ids.flatMap((id) => deps.files.gateProofs(id, source.head.slice(0, 7))),
           twinsOf(deps, source.prUrl, source.pr),
         )
       : null,
@@ -253,16 +282,29 @@ export function issueDetail(deps: ViewDeps, key: string): IssueDetail | null {
 
 /** The PR's twin pair on the factory's bench (#23), by its repository read in the PR's address. */
 function twinsOf(deps: ViewDeps, prUrl: string, pr: number): AcceptanceTwins | null {
-  const repo = /^https:\/\/github\.com\/[^/]+\/([^/]+)\/pull\/\d+/.exec(prUrl)?.[1];
+  const repo = repoOf(prUrl);
   return repo ? (deps.twins?.view(repo, pr) ?? null) : null;
 }
 
-/** Transcripts of a run: Hermes session (with card raw log), then Claude Code lane if any. */
-export function transcripts(deps: ViewDeps, runId: number): TranscriptView[] | null {
+/** The repository of a PR, read in its address. */
+function repoOf(prUrl: string): string | null {
+  return /^https:\/\/github\.com\/[^/]+\/([^/]+)\/pull\/\d+/.exec(prUrl)?.[1] ?? null;
+}
+
+/**
+ * Transcripts of a run: Hermes session (with card raw log), then Claude Code lane if any. On the core's
+ * side, they come read from the core (`prepared`, #60).
+ */
+export function transcripts(
+  deps: ViewDeps,
+  runId: number,
+  prepared?: RunTranscripts | null,
+): TranscriptView[] | null {
   const board = deps.hub.boardData;
   const run = board.runs.find((item) => item.id === runId);
   const task = run ? board.tasks.find((item) => item.id === run.taskId) : undefined;
   if (!run || !task) return null;
+  if (prepared !== undefined) return preparedTranscripts(runId, run.profile, prepared);
   const session = sessionOf(deps, run);
   const terminal = deps.files.cardLog(task.id) ?? [];
   const views: TranscriptView[] = [
@@ -310,6 +352,40 @@ export function transcripts(deps: ViewDeps, runId: number): TranscriptView[] | n
   return views;
 }
 
+/** A run's transcripts as the core gives them (#60): no session id, start, end nor cost is published. */
+function preparedTranscripts(
+  runId: number,
+  profile: string,
+  prepared: RunTranscripts | null,
+): TranscriptView[] {
+  const entries = (lines: TranscriptLine[]) =>
+    lines.map((entry) => ({ ...entry, at: iso(entry.at) }));
+  return [
+    {
+      runId,
+      source: 'hermes',
+      title: msg('transcript.hermes', { profile, session: null }),
+      name: null,
+      startedAt: null,
+      endedAt: null,
+      costUsd: null,
+      entries: entries(prepared?.hermes ?? []),
+      terminal: prepared?.terminal ?? [],
+    },
+    ...(prepared?.lanes ?? []).map((lane): TranscriptView => ({
+      runId,
+      source: 'claude-code',
+      title: msg('transcript.claudeCode', { costUsd: null }),
+      name: lane.name,
+      startedAt: null,
+      endedAt: null,
+      costUsd: null,
+      entries: entries(lane.entries),
+      terminal: [],
+    })),
+  ];
+}
+
 /** Hermes timeouts that cut agent work: set in its config, or defaults. */
 function limitsOf(facts: ProfileFacts | null): ProfileLimit[] {
   if (!facts) return [];
@@ -338,7 +414,15 @@ function limitsOf(facts: ProfileFacts | null): ProfileLimit[] {
   ];
 }
 
-export function profileViews(deps: ViewDeps, periodDays = 30): ProfileView[] {
+/**
+ * The agents' screen. On the core's side, each agent's drift comes read from the core (`drift`, #60)
+ * instead of its configurations.
+ */
+export function profileViews(
+  deps: ViewDeps,
+  periodDays = 30,
+  drift?: ReadonlyMap<string, ConfigDrift[]>,
+): ProfileView[] {
   const manifest = deps.profiles.manifest();
   const board = deps.hub.boardData;
   const since = deps.now() / 1000 - periodDays * 86_400;
@@ -380,7 +464,11 @@ export function profileViews(deps: ViewDeps, periodDays = 30): ProfileView[] {
       })),
       limits: limitsOf(facts),
       mcp: live?.mcp ?? [],
-      drift: live && repo ? configDrift(live, repo, manifest.profiles[name]?.plugins ?? null) : [],
+      drift: drift
+        ? (drift.get(name) ?? [])
+        : live && repo
+          ? configDrift(live, repo, manifest.profiles[name]?.plugins ?? null)
+          : [],
       stats: {
         runs: runs.length,
         gatePassRate: passes.length

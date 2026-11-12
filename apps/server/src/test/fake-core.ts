@@ -22,6 +22,11 @@ export interface FakeCoreState {
   machine?: unknown;
   /** The usage of each workflow, by the `days` asked (#66); absent: 404. */
   usage?: Record<string, (days: number) => unknown>;
+  /**
+   * The declared data of each workflow, by `<subject>:<id>` (#60): the `data` list of the answer. Absent: the
+   * core declares nothing for it (an empty list); `invalid_id`: the core refuses the id (422).
+   */
+  data?: Record<string, Record<string, unknown[] | 'invalid_id'>>;
 }
 
 export interface FakeCoreRequest {
@@ -122,7 +127,7 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
         response.write(frame(event as { cursor: string; kind: string }));
       return;
     }
-    const route = /^\/api\/workflows\/([\w-]+)\/(sheet|items|live|activity|usage)$/.exec(path);
+    const route = /^\/api\/workflows\/([\w-]+)\/(sheet|items|live|activity|usage|data)$/.exec(path);
     const key = route?.[1];
     if (!route || !key || !state.workflows.some((workflow) => workflow.key === key))
       return json(response, 404, { error: 'unknown_workflow', detail: `workflow "${key}"` });
@@ -138,6 +143,15 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
         workflow: key,
         facts: state.activity?.[key] ?? [],
       });
+    if (route[2] === 'data') {
+      const query = new URL(request.url ?? '/', 'http://core').searchParams;
+      const subject = query.get('subject') ?? '';
+      const id = query.get('id') ?? '';
+      const data = state.data?.[key]?.[`${subject}:${id}`] ?? [];
+      return data === 'invalid_id'
+        ? json(response, 422, { error: 'invalid_id', detail: `id "${id}"` })
+        : json(response, 200, { schema_version: 1, workflow: key, subject, id, data });
+    }
     if (route[2] === 'usage') {
       const usage = state.usage?.[key];
       const days = Number(new URL(request.url ?? '/', 'http://core').searchParams.get('days') ?? 7);

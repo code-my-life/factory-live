@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ActivityFact, ActivityResponse } from './workflow-core/generated/activity.ts';
+import type { DeclaredDataResponse } from './workflow-core/generated/declared-data.ts';
 import type { ErrorResponse } from './workflow-core/generated/error.ts';
 import type { StreamEvent } from './workflow-core/generated/event.ts';
 import type { ItemsResponse } from './workflow-core/generated/items.ts';
@@ -10,6 +11,7 @@ import type { UsageResponse } from './workflow-core/generated/usage.ts';
 import type { WorkflowsResponse } from './workflow-core/generated/workflows.ts';
 import {
   activitySchema,
+  declaredDataSchema,
   errorSchema,
   eventSchema,
   itemsSchema,
@@ -30,6 +32,7 @@ export type {
   ActivityFact as CoreFact,
   ActivityResponse,
   AgentLive as CoreAgent,
+  DeclaredDataResponse,
   ErrorResponse,
   ItemsResponse,
   LiveResponse,
@@ -70,3 +73,6 @@ export const coreError = check<ErrorResponse>(errorSchema);
 export const coreLive = check<LiveResponse>(liveSchema);
 export const coreActivity = check<ActivityResponse>(activitySchema);
 export const coreUsage = check<UsageResponse>(usageSchema);
+export const coreDeclaredData = check<DeclaredDataResponse>(declaredDataSchema);
+export type CoreDeclaredData = DeclaredDataResponse['data'][number];
+export type CoreValue = CoreDeclaredData['values'][number];
