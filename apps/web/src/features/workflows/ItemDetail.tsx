@@ -1,0 +1,103 @@
+import type { WorkflowSheet } from '@factory-live/contracts';
+import { Heading } from '@primer/react';
+import { useI18n } from '../../i18n/I18nProvider.tsx';
+import { AgentBadge } from '../../ui/badge/AgentBadge.tsx';
+import { CardBadge } from '../../ui/badge/CardBadge.tsx';
+import { ActivityTimeline } from '../../ui/timeline/ActivityTimeline.tsx';
+import { fromTimelineEntry } from '../../ui/timeline/rows.ts';
+import { WorkStateLabel, cardWorkState, issueWorkState } from '../../ui/work/workState.tsx';
+import { RunsTable } from '../issues/IssuePage.tsx';
+import { DeclaredDataList } from './DeclaredData.tsx';
+import type { GenericItem } from './model.ts';
+import styles from './workflows.module.css';
+
+/**
+ * An item under the graph (#65): its landmarks (station and since when, state), its cards with their
+ * runs, the data its workflow declares for it, then its life, newest first.
+ */
+export function ItemDetail({
+  item,
+  sheet,
+  now,
+}: {
+  item: GenericItem;
+  sheet: WorkflowSheet | null;
+  now: number;
+}) {
+  const i18n = useI18n();
+  const { t, fmt } = i18n;
+  const station = sheet?.stations.find((each) => each.key === item.station)?.label ?? item.station;
+  const titleId = `item-${item.id}`;
+  return (
+    <article className={styles.detail} aria-labelledby={titleId}>
+      <header className={styles.detailHead}>
+        <Heading as="h2" variant="small" id={titleId} className={styles.detailTitle}>
+          {item.title}
+        </Heading>
+        <dl className={styles.marks} aria-label={t.workflows.marks.label}>
+          <div className={styles.mark}>
+            <dt className={styles.markLabel}>{t.workflows.marks.station}</dt>
+            <dd className={styles.markValue}>
+              {station} · {t.workflows.marks.since(fmt.stay(now - Date.parse(item.since)))}
+            </dd>
+          </div>
+          <div className={styles.mark}>
+            <dt className={styles.markLabel}>{t.workflows.marks.state}</dt>
+            <dd className={styles.markValue}>
+              <WorkStateLabel state={issueWorkState(item, null, t)} />
+            </dd>
+          </div>
+          <div className={styles.mark}>
+            <dt className={styles.markLabel}>{t.workflows.marks.item}</dt>
+            <dd className={`${styles.markValue} fl-mono`}>{item.id}</dd>
+          </div>
+        </dl>
+      </header>
+
+      <section className={styles.section} aria-labelledby={`${titleId}-cards`}>
+        <Heading as="h3" variant="small" id={`${titleId}-cards`}>
+          {t.workflows.cards(item.cards.length)}
+        </Heading>
+        {item.cards.length === 0 ? (
+          <p className={styles.quiet}>{t.workflows.noCard}</p>
+        ) : (
+          <ul className={styles.cards}>
+            {item.cards.map((card) => (
+              <li key={card.id} className={styles.card}>
+                <p className={styles.cardHead}>
+                  <CardBadge id={card.id} />
+                  <WorkStateLabel state={cardWorkState(card, null, t)} />
+                  {card.assignee ? <AgentBadge profile={card.assignee} /> : null}
+                </p>
+                <p className={styles.cardTitle}>{card.title}</p>
+                {card.blockReason ? (
+                  <blockquote className={styles.blockReason}>{card.blockReason}</blockquote>
+                ) : null}
+                <RunsTable card={card} selectedRunId={null} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className={styles.section} aria-labelledby={`${titleId}-data`}>
+        <Heading as="h3" variant="small" id={`${titleId}-data`}>
+          {t.workflows.data}
+        </Heading>
+        <DeclaredDataList data={item.data} />
+      </section>
+
+      <section className={styles.section} aria-labelledby={`${titleId}-activity`}>
+        <Heading as="h3" variant="small" id={`${titleId}-activity`}>
+          {t.workflows.activity}
+        </Heading>
+        <ActivityTimeline
+          rows={[...item.timeline]
+            .sort((left, right) => right.at.localeCompare(left.at))
+            .map((entry) => fromTimelineEntry(entry, i18n))}
+          label={t.workflows.activityOf(item.title)}
+        />
+      </section>
+    </article>
+  );
+}

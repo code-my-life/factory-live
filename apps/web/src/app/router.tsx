@@ -9,6 +9,7 @@ import { InterventionsPage } from '../features/interventions/InterventionsPage.t
 import { FactoryLinePage } from '../features/line/FactoryLinePage.tsx';
 import { SettingsPage } from '../features/settings/SettingsPage.tsx';
 import { StudioPage } from '../features/studio/StudioPage.tsx';
+import { FirstWorkflow, WorkflowPage } from '../features/workflows/WorkflowPage.tsx';
 import { AppShell } from './AppShell.tsx';
 import { NotFoundPage } from './NotFoundPage.tsx';
 
@@ -25,6 +26,10 @@ const routes: RouteObject[] = [
       { path: 'interventions/:id', element: <InterventionsPage /> },
       { path: 'studio', element: <StudioPage /> },
       { path: 'studio/:video', element: <StudioPage /> },
+      // A workflow the core declares besides the code line and the studio (#65).
+      { path: 'workflows', element: <FirstWorkflow /> },
+      { path: 'workflows/:workflow', element: <WorkflowPage /> },
+      { path: 'workflows/:workflow/:item', element: <WorkflowPage /> },
       { path: 'agents', element: <AgentsPage /> },
       { path: 'health', element: <HealthPage /> },
       { path: 'costs', element: <CostsPage /> },
@@ -47,6 +52,8 @@ const VIEW_TOKENS: Record<string, string> = {
   jumeaux: '/issues/factory-live/18?widget=twins',
   interventions: '/interventions',
   studio: '/studio',
+  // The first generic workflow (#65): in the demo, its made-up workflow.
+  workflow: '/workflows',
   agents: '/agents',
   sante: '/health',
   couts: '/costs',
