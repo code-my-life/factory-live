@@ -160,6 +160,7 @@ const hub = new Hub(
     now,
     workflows: () => workflows.map((workflow) => workflow.view()),
     codeSheet: () => codeSheet,
+    restoreMirror: !onCore,
   },
 );
 const buffer = new StreamBuffer();

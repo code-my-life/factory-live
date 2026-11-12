@@ -90,6 +90,8 @@ export class WorkflowCoreReader {
           fullRead = false;
         }
         fullRead = await this.follow();
+        // A stream that ended without a reset: wait before opening it again, as after a failure.
+        if (!fullRead && this.running) await this.pause();
       } catch (error) {
         if (!this.running) break;
         this.failed(error);
@@ -110,16 +112,15 @@ export class WorkflowCoreReader {
 
   private pause(): Promise<void> {
     const ms = Math.min(this.options.retryMs ?? RETRY_MS, RETRY_MS);
+    const signal = this.abort.signal;
     return new Promise((resolve) => {
-      const timer = setTimeout(resolve, ms);
-      this.abort.signal.addEventListener(
-        'abort',
-        () => {
-          clearTimeout(timer);
-          resolve();
-        },
-        { once: true },
-      );
+      const done = () => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', done);
+        resolve();
+      };
+      const timer = setTimeout(done, ms);
+      signal.addEventListener('abort', done, { once: true });
     });
   }
 
@@ -182,8 +183,13 @@ export class WorkflowCoreReader {
 
   private emitAll(): void {
     const code = this.options.code;
-    if (this.items.has(code)) this.emit(code);
-    else this.options.sink.workflows(this.views());
+    if (this.items.has(code)) {
+      this.emit(code);
+      return;
+    }
+    // The code line is no longer declared by the core: its cards go too.
+    this.options.sink.board(boardOf([]), this.options.now());
+    this.options.sink.workflows(this.views());
   }
 
   private emit(key: string): void {

@@ -71,6 +71,11 @@ export interface HubDeps {
   workflows?: () => readonly WorkflowView[];
   /** Where the code line's sheet comes from (#31). */
   codeSheet?: () => PublishedSheet;
+  /**
+   * Whether the board starts from the kanban mirror (true by default). On workflow-core's side (#57) it
+   * starts empty: the mirror holds Hermes' cards, not the core's.
+   */
+  restoreMirror?: boolean;
 }
 
 type Slice = 'board' | 'agents' | 'health';
@@ -143,7 +148,10 @@ export class Hub {
   constructor(options: HubOptions, deps: HubDeps) {
     this.options = options;
     this.deps = deps;
-    this.board = deps.store.board();
+    this.board =
+      deps.restoreMirror === false
+        ? { tasks: [], runs: [], links: [], events: [], comments: [] }
+        : deps.store.board();
     this.issueOfCard = issueOfCards(this.board);
     this.stations = deps.store.stations();
     this.activity = deps.store.recentActivity(ACTIVITY_KEPT);

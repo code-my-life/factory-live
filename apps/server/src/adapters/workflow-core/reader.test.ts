@@ -278,7 +278,7 @@ const coreState = (): FakeCoreState => ({
   cursor: '1762900000:5',
 });
 
-function newHub(dir: TempDir, name: string): Hub {
+function newHub(dir: TempDir, name: string, restoreMirror = true): Hub {
   return new Hub(
     {
       owner: 'code-my-life',
@@ -295,6 +295,7 @@ function newHub(dir: TempDir, name: string): Hub {
       diagnoses: null,
       log,
       now: () => NOW,
+      restoreMirror,
     },
   );
 }
@@ -310,7 +311,7 @@ interface Side {
 
 /** The core's side of the switch, as main.ts wires it: the reader feeds the hub, the sheet and the list. */
 function coreSide(dir: TempDir, core: FakeCore): Side {
-  const hub = newHub(dir, 'core-data');
+  const hub = newHub(dir, 'core-data', false);
   let sheet: PublishedSheet | null = null;
   let generic: readonly WorkflowView[] = [];
   const boards: KanbanDelta[] = [];
@@ -591,6 +592,61 @@ describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => 
       expect(row.n, table).toBe(0);
     }
     data.close();
+  });
+
+  it('côté socle, le hub ne reprend pas les cartes du miroir d’Hermès', () => {
+    dir = tempDir();
+    // A mirror written by an earlier run on Hermes' side.
+    const store = new HistoryStore(join(dir.path, 'core-data'));
+    const path = join(dir.path, 'kanban.db');
+    writeHermesBoard(path);
+    const kanban = new KanbanReader(path);
+    store.mirror(kanban.read());
+    kanban.close();
+    store.close();
+
+    expect(newHub(dir, 'core-data').boardData.tasks).toHaveLength(3);
+    // On the core's side, nothing is shown before the core answers, even with the core down.
+    expect(newHub(dir, 'core-data', false).boardData.tasks).toEqual([]);
+  });
+
+  it('un workflow de la ligne du code retiré du socle vide le tableau', async () => {
+    dir = tempDir();
+    core = await fakeCore(SECRET, coreState());
+    side = coreSide(dir, core);
+    side.reader.start();
+    await until(() => side!.hub.boardData.tasks.length === 3 && core!.openStreams() === 1);
+
+    core.state.workflows = core.state.workflows.filter((workflow) => workflow.key !== 'factory');
+    core.send({
+      cursor: '1762999999:1',
+      workflow: null,
+      item: null,
+      kind: 'reset',
+      at: '2026-11-12T10:05:00.000Z',
+      state: null,
+    });
+    await until(() => side!.hub.boardData.tasks.length === 0, 2_000);
+    expect(side.hub.snapshot().issues).toEqual([]);
+  });
+
+  it('un flux fermé normalement attend avant de se rouvrir', async () => {
+    dir = tempDir();
+    core = await fakeCore(SECRET, coreState());
+    // A core (or a proxy) that ends every stream at once.
+    core.backlog = () => {
+      setTimeout(() => core?.finish(), 0);
+      return [];
+    };
+    side = coreSide(dir, core);
+    side.reader.start();
+    await until(() => side!.boards.length > 0);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // retryMs is 50 ms in these tests: about ten reopenings in 500 ms, not hundreds.
+    const opened = core.requests.filter((request) => request.path === '/api/events').length;
+    expect(opened).toBeGreaterThan(1);
+    expect(opened).toBeLessThanOrEqual(12);
   });
 
   it('un workflow générique du socle est listé avec sa fiche', async () => {

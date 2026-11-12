@@ -32,6 +32,8 @@ export interface FakeCore {
   send(event: { cursor: string; kind: string } & Record<string, unknown>): number;
   /** Cuts every open stream, as a restart of the core would. */
   cut(): void;
+  /** Ends every open stream normally, as a proxy that closes long requests would. */
+  finish(): void;
   openStreams(): number;
   /** Stops answering: the port closes. */
   close(): Promise<void>;
@@ -54,6 +56,10 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
     },
     cut() {
       for (const stream of streams) stream.destroy();
+      streams.clear();
+    },
+    finish() {
+      for (const stream of streams) stream.end();
       streams.clear();
     },
     openStreams: () => streams.size,
