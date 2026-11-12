@@ -3,8 +3,9 @@
 export type Cursor = string;
 export type Workflow = string | null;
 export type Item = string | null;
-export type Kind = 'changed' | 'reset';
+export type Kind = 'changed' | 'reset' | 'live' | 'activity';
 export type At = string;
+export type State = Item1 | AgentLive | ActivityFact | null;
 export type Id = string;
 export type Title = string;
 export type Body = string | null;
@@ -41,10 +42,31 @@ export type RunId = number | null;
 export type Kind1 = string;
 export type CreatedAt2 = number;
 export type Events = CardEvent[];
+export type Agent = string;
+export type Item2 = string;
+export type Run1 = number | null;
+export type State1 = 'thinking' | 'tool' | 'cli' | 'blocked';
+export type Kind2 = 'llm' | 'tool' | 'cli';
+export type Label = string;
+export type Detail = string | null;
+export type StartedAt2 = string;
+export type Name = string;
+export type Provider = string | null;
+export type Source = 'live' | 'session';
+export type LaneModel = string | null;
+export type HeartbeatAt = string | null;
+export type Id4 = string;
+export type At1 = string;
+export type Kind3 = 'tool' | 'llm' | 'kanban' | 'guard' | 'system';
+export type Agent1 = string | null;
+export type Item3 = string | null;
+export type Text = string;
+export type Status2 = ('ok' | 'running' | 'error' | 'blocked') | null;
 
 /**
  * One event of GET /api/events. `reset` opens an epoch: the client reads the full state again; it names no
- * workflow, no item and carries no state. `changed` carries the full state of the item.
+ * workflow, no item and carries no state. `changed` carries the full state of the item, `live` the live state of an
+ * agent (its item: the card it holds), `activity` one new fact of the board.
  */
 export interface StreamEvent {
   cursor: Cursor;
@@ -52,7 +74,7 @@ export interface StreamEvent {
   item: Item;
   kind: Kind;
   at: At;
-  state: Item1 | null;
+  state: State;
   [k: string]: unknown;
 }
 /**
@@ -119,5 +141,54 @@ export interface CardEvent {
   [k: string]: unknown;
 }
 export interface Payload {
+  [k: string]: unknown;
+}
+/**
+ * The live state of an agent holding a card in progress.
+ */
+export interface AgentLive {
+  agent: Agent;
+  item: Item2;
+  run: Run1;
+  state: State1;
+  action: LiveAction | null;
+  model: LiveModel | null;
+  lane_model: LaneModel;
+  heartbeat_at: HeartbeatAt;
+  [k: string]: unknown;
+}
+/**
+ * What the agent is doing: a tool call (`tool`), a delegated command line (`cli`, its label the command's name),
+ * or waiting for the model (`llm`). `detail`: the command, the path or the name given to the tool, secrets masked,
+ * 2 000 characters at most; for `llm`, the model.
+ */
+export interface LiveAction {
+  kind: Kind2;
+  label: Label;
+  detail: Detail;
+  started_at: StartedAt2;
+  [k: string]: unknown;
+}
+/**
+ * The agent's model. `source`: `live` for a served model read in the agent's journal, `session` for the model
+ * its session notes (which may be the one asked for, not the one served).
+ */
+export interface LiveModel {
+  name: Name;
+  provider: Provider;
+  source: Source;
+  [k: string]: unknown;
+}
+/**
+ * One recent fact of a board: a tool call and its outcome, a model call, a card's event, a guard's refusal.
+ */
+export interface ActivityFact {
+  id: Id4;
+  at: At1;
+  kind: Kind3;
+  agent: Agent1;
+  item: Item3;
+  text: Text;
+  status: Status2;
   [k: string]: unknown;
 }

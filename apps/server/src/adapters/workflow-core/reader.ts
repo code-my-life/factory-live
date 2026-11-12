@@ -1,14 +1,30 @@
 import type { WorkflowSheet } from '@factory-live/contracts';
-import { coreItems, coreSheetResponse, coreWorkflows } from '@factory-live/contracts/workflow-core';
-import type { CoreItem, CoreSheet } from '@factory-live/contracts/workflow-core';
+import {
+  coreActivity,
+  coreItems,
+  coreLive,
+  coreSheetResponse,
+  coreUsage,
+  coreWorkflows,
+} from '@factory-live/contracts/workflow-core';
 import type {
+  CoreAgent,
+  CoreFact,
+  CoreItem,
+  CoreSheet,
+} from '@factory-live/contracts/workflow-core';
+import type {
+  CoreActivityFact,
+  CoreAgentState,
   KanbanDelta,
   LoggerPort,
   PublishedSheet,
+  UsageRow,
   WorkflowView,
 } from '../../application/ports.ts';
 import { boardOf } from './cards.ts';
 import { WorkflowCoreClient } from './client.ts';
+import { coreActivityFact, coreAgentState } from './live.ts';
 
 /** Where the reader sends what it reads: main.ts wires it to the hub, the code line's sheet and the list. */
 export interface CoreSink {
@@ -20,6 +36,12 @@ export interface CoreSink {
   workflows(views: WorkflowView[]): void;
   /** A read or the stream failed: the last state stays. */
   failed(error: string, at: number): void;
+  /** Every agent of the code line the core follows, replacing those held (#66). */
+  live(agents: CoreAgentState[]): void;
+  /** Facts of the code line's activity, oldest first; those already sent come again after a full read. */
+  activity(facts: CoreActivityFact[]): void;
+  /** The code line's usage, one row per day, model, provider and agent (#66). */
+  usage(rows: UsageRow[]): void;
 }
 
 export interface WorkflowCoreReaderOptions {
@@ -38,6 +60,10 @@ export interface WorkflowCoreReaderOptions {
 }
 
 const RETRY_MS = 2_000;
+/** The facts of activity read at a full read: as many as the screen keeps. */
+const ACTIVITY_LIMIT = 200;
+/** The days of usage read at a full read: as many as the core serves. */
+export const USAGE_DAYS = 90;
 
 /**
  * Reads the code line and every generic workflow from workflow-core (ADR 0015, #57): the full state at
@@ -51,6 +77,8 @@ export class WorkflowCoreReader {
   private items = new Map<string, Map<string, CoreItem>>();
   private readonly sheets = new Map<string, CoreSheet>();
   private readonly readAt = new Map<string, number>();
+  /** The code line's agents the core follows, by agent. */
+  private agents = new Map<string, CoreAgent>();
   private cursor: string | null = null;
   private unreachableSince: number | null = null;
   private lastError: string | null = null;
@@ -150,11 +178,25 @@ export class WorkflowCoreReader {
       const answer = await this.client.get(`${path}/items`, coreItems, signal);
       items.set(key, new Map(answer.items.map((item) => [item.id, item])));
     }
+    let agents: CoreAgent[] = [];
+    let facts: CoreFact[] = [];
+    const code = this.options.code;
+    if (items.has(code)) {
+      const path = `/api/workflows/${encodeURIComponent(code)}`;
+      agents = (await this.client.get(`${path}/live`, coreLive, signal)).agents;
+      facts = (
+        await this.client.get(`${path}/activity?limit=${ACTIVITY_LIMIT}`, coreActivity, signal)
+      ).facts;
+    }
     this.items = items;
+    this.agents = new Map(agents.map((agent) => [agent.agent, agent]));
     this.cursor = cursor;
     this.answered();
     for (const key of keys) this.readAt.set(key, this.options.now());
     this.emitAll();
+    this.options.sink.live(this.liveAgents());
+    this.options.sink.activity(facts.map(coreActivityFact));
+    if (items.has(code)) await this.refreshUsage(USAGE_DAYS);
   }
 
   /** Follows the stream until it ends (false: resume from the cursor) or asks for a full read (true). */
@@ -163,16 +205,76 @@ export class WorkflowCoreReader {
       this.cursor = event.cursor;
       this.answered();
       if (event.kind === 'reset') return true;
-      if (event.workflow === null || event.item === null || event.state === null) continue;
+      if (event.workflow === null || event.state === null) continue;
       if (this.options.own.includes(event.workflow)) continue;
+      // A fact of activity may name no card (a tick of the dispatcher): only a card's change needs one.
+      if (event.kind === 'live' || event.kind === 'activity') {
+        if (event.workflow === this.options.code) this.live(event.kind, event.state);
+        continue;
+      }
+      if (event.item === null) continue;
       const held = this.items.get(event.workflow);
       // A workflow declared since the last full read: read it all.
       if (!held) return true;
-      held.set(event.item, event.state);
+      const item = event.state as CoreItem;
+      held.set(event.item, item);
+      // A card no longer in progress has no agent on it any more: the core sends no departure (#34).
+      if (event.workflow === this.options.code && item.current_run_id === null)
+        this.dropAgentsOf(event.item);
       this.readAt.set(event.workflow, this.options.now());
       this.emit(event.workflow);
     }
     return false;
+  }
+
+  /**
+   * Reads the code line's usage over the last `days` days and sends its rows; a failure is logged and
+   * leaves the stored days as they are (main.ts asks again every minute).
+   */
+  async refreshUsage(days: number): Promise<void> {
+    const path = `/api/workflows/${encodeURIComponent(this.options.code)}/usage?days=${days}`;
+    try {
+      const usage = await this.client.get(path, coreUsage, this.abort.signal);
+      this.options.sink.usage(
+        usage.rows.map((row) => ({
+          day: row.day,
+          model: row.model,
+          provider: row.provider,
+          profile: row.agent,
+          calls: row.calls,
+          input: row.input_tokens,
+          output: row.output_tokens,
+          rateLimited: row.rate_limited,
+          errors: row.errors,
+        })),
+      );
+    } catch (error) {
+      if (this.abort.signal.aborted) return;
+      this.options.log.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        'usage du socle illisible : les jours gardés restent',
+      );
+    }
+  }
+
+  private live(kind: 'live' | 'activity', state: unknown): void {
+    if (kind === 'activity') {
+      this.options.sink.activity([coreActivityFact(state as CoreFact)]);
+      return;
+    }
+    const agent = state as CoreAgent;
+    this.agents.set(agent.agent, agent);
+    this.options.sink.live(this.liveAgents());
+  }
+
+  private dropAgentsOf(item: string): void {
+    const before = this.agents.size;
+    for (const [name, agent] of this.agents) if (agent.item === item) this.agents.delete(name);
+    if (this.agents.size !== before) this.options.sink.live(this.liveAgents());
+  }
+
+  private liveAgents(): CoreAgentState[] {
+    return [...this.agents.values()].map(coreAgentState);
   }
 
   private answered(): void {

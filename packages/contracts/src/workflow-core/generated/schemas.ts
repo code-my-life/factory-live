@@ -274,6 +274,44 @@ export const machineSchema: unknown = {
 };
 export const eventSchema: unknown = {
   $defs: {
+    ActivityFact: {
+      description:
+        "One recent fact of a board: a tool call and its outcome, a model call, a card's event, a guard's refusal.",
+      properties: {
+        id: { title: 'Id', type: 'string' },
+        at: { title: 'At', type: 'string' },
+        kind: { enum: ['tool', 'llm', 'kanban', 'guard', 'system'], title: 'Kind', type: 'string' },
+        agent: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Agent' },
+        item: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Item' },
+        text: { title: 'Text', type: 'string' },
+        status: {
+          anyOf: [
+            { enum: ['ok', 'running', 'error', 'blocked'], type: 'string' },
+            { type: 'null' },
+          ],
+          title: 'Status',
+        },
+      },
+      required: ['id', 'at', 'kind', 'agent', 'item', 'text', 'status'],
+      title: 'ActivityFact',
+      type: 'object',
+    },
+    AgentLive: {
+      description: 'The live state of an agent holding a card in progress.',
+      properties: {
+        agent: { title: 'Agent', type: 'string' },
+        item: { title: 'Item', type: 'string' },
+        run: { anyOf: [{ type: 'integer' }, { type: 'null' }], title: 'Run' },
+        state: { enum: ['thinking', 'tool', 'cli', 'blocked'], title: 'State', type: 'string' },
+        action: { anyOf: [{ $ref: '#/$defs/LiveAction' }, { type: 'null' }] },
+        model: { anyOf: [{ $ref: '#/$defs/LiveModel' }, { type: 'null' }] },
+        lane_model: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Lane Model' },
+        heartbeat_at: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Heartbeat At' },
+      },
+      required: ['agent', 'item', 'run', 'state', 'action', 'model', 'lane_model', 'heartbeat_at'],
+      title: 'AgentLive',
+      type: 'object',
+    },
     CardEvent: {
       description:
         "One event of a card's life (created, claimed, blocked...): its payload a JSON object, empty when absent or\nunreadable. Dates are Unix seconds.",
@@ -360,6 +398,31 @@ export const eventSchema: unknown = {
       title: 'Item',
       type: 'object',
     },
+    LiveAction: {
+      description:
+        "What the agent is doing: a tool call (`tool`), a delegated command line (`cli`, its label the command's name),\nor waiting for the model (`llm`). `detail`: the command, the path or the name given to the tool, secrets masked,\n2 000 characters at most; for `llm`, the model.",
+      properties: {
+        kind: { enum: ['llm', 'tool', 'cli'], title: 'Kind', type: 'string' },
+        label: { title: 'Label', type: 'string' },
+        detail: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Detail' },
+        started_at: { title: 'Started At', type: 'string' },
+      },
+      required: ['kind', 'label', 'detail', 'started_at'],
+      title: 'LiveAction',
+      type: 'object',
+    },
+    LiveModel: {
+      description:
+        "The agent's model. `source`: `live` for a served model read in the agent's journal, `session` for the model\nits session notes (which may be the one asked for, not the one served).",
+      properties: {
+        name: { title: 'Name', type: 'string' },
+        provider: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Provider' },
+        source: { enum: ['live', 'session'], title: 'Source', type: 'string' },
+      },
+      required: ['name', 'provider', 'source'],
+      title: 'LiveModel',
+      type: 'object',
+    },
     Run: {
       description: 'One run of a card: who worked on it, how it ended. Dates are Unix seconds.',
       properties: {
@@ -387,14 +450,22 @@ export const eventSchema: unknown = {
     },
   },
   description:
-    'One event of GET /api/events. `reset` opens an epoch: the client reads the full state again; it names no\nworkflow, no item and carries no state. `changed` carries the full state of the item.',
+    'One event of GET /api/events. `reset` opens an epoch: the client reads the full state again; it names no\nworkflow, no item and carries no state. `changed` carries the full state of the item, `live` the live state of an\nagent (its item: the card it holds), `activity` one new fact of the board.',
   properties: {
     cursor: { title: 'Cursor', type: 'string' },
     workflow: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Workflow' },
     item: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Item' },
-    kind: { enum: ['changed', 'reset'], title: 'Kind', type: 'string' },
+    kind: { enum: ['changed', 'reset', 'live', 'activity'], title: 'Kind', type: 'string' },
     at: { title: 'At', type: 'string' },
-    state: { anyOf: [{ $ref: '#/$defs/Item' }, { type: 'null' }] },
+    state: {
+      anyOf: [
+        { $ref: '#/$defs/Item' },
+        { $ref: '#/$defs/AgentLive' },
+        { $ref: '#/$defs/ActivityFact' },
+        { type: 'null' },
+      ],
+      title: 'State',
+    },
   },
   required: ['cursor', 'workflow', 'item', 'kind', 'at', 'state'],
   title: 'StreamEvent',
@@ -408,5 +479,186 @@ export const errorSchema: unknown = {
   },
   required: ['error', 'detail'],
   title: 'ErrorResponse',
+  type: 'object',
+};
+export const liveSchema: unknown = {
+  $defs: {
+    AgentLive: {
+      description: 'The live state of an agent holding a card in progress.',
+      properties: {
+        agent: { title: 'Agent', type: 'string' },
+        item: { title: 'Item', type: 'string' },
+        run: { anyOf: [{ type: 'integer' }, { type: 'null' }], title: 'Run' },
+        state: { enum: ['thinking', 'tool', 'cli', 'blocked'], title: 'State', type: 'string' },
+        action: { anyOf: [{ $ref: '#/$defs/LiveAction' }, { type: 'null' }] },
+        model: { anyOf: [{ $ref: '#/$defs/LiveModel' }, { type: 'null' }] },
+        lane_model: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Lane Model' },
+        heartbeat_at: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Heartbeat At' },
+      },
+      required: ['agent', 'item', 'run', 'state', 'action', 'model', 'lane_model', 'heartbeat_at'],
+      title: 'AgentLive',
+      type: 'object',
+    },
+    LiveAction: {
+      description:
+        "What the agent is doing: a tool call (`tool`), a delegated command line (`cli`, its label the command's name),\nor waiting for the model (`llm`). `detail`: the command, the path or the name given to the tool, secrets masked,\n2 000 characters at most; for `llm`, the model.",
+      properties: {
+        kind: { enum: ['llm', 'tool', 'cli'], title: 'Kind', type: 'string' },
+        label: { title: 'Label', type: 'string' },
+        detail: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Detail' },
+        started_at: { title: 'Started At', type: 'string' },
+      },
+      required: ['kind', 'label', 'detail', 'started_at'],
+      title: 'LiveAction',
+      type: 'object',
+    },
+    LiveModel: {
+      description:
+        "The agent's model. `source`: `live` for a served model read in the agent's journal, `session` for the model\nits session notes (which may be the one asked for, not the one served).",
+      properties: {
+        name: { title: 'Name', type: 'string' },
+        provider: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Provider' },
+        source: { enum: ['live', 'session'], title: 'Source', type: 'string' },
+      },
+      required: ['name', 'provider', 'source'],
+      title: 'LiveModel',
+      type: 'object',
+    },
+  },
+  description:
+    'GET /api/workflows/<key>/live: the live state of each agent holding a card in progress.',
+  properties: {
+    schema_version: { const: 1, title: 'Schema Version', type: 'integer' },
+    workflow: { title: 'Workflow', type: 'string' },
+    agents: { items: { $ref: '#/$defs/AgentLive' }, title: 'Agents', type: 'array' },
+  },
+  required: ['schema_version', 'workflow', 'agents'],
+  title: 'LiveResponse',
+  type: 'object',
+};
+export const activitySchema: unknown = {
+  $defs: {
+    ActivityFact: {
+      description:
+        "One recent fact of a board: a tool call and its outcome, a model call, a card's event, a guard's refusal.",
+      properties: {
+        id: { title: 'Id', type: 'string' },
+        at: { title: 'At', type: 'string' },
+        kind: { enum: ['tool', 'llm', 'kanban', 'guard', 'system'], title: 'Kind', type: 'string' },
+        agent: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Agent' },
+        item: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Item' },
+        text: { title: 'Text', type: 'string' },
+        status: {
+          anyOf: [
+            { enum: ['ok', 'running', 'error', 'blocked'], type: 'string' },
+            { type: 'null' },
+          ],
+          title: 'Status',
+        },
+      },
+      required: ['id', 'at', 'kind', 'agent', 'item', 'text', 'status'],
+      title: 'ActivityFact',
+      type: 'object',
+    },
+  },
+  description:
+    'GET /api/workflows/<key>/activity?limit=<n>: the last facts of the board, oldest first (200 at most).',
+  properties: {
+    schema_version: { const: 1, title: 'Schema Version', type: 'integer' },
+    workflow: { title: 'Workflow', type: 'string' },
+    facts: { items: { $ref: '#/$defs/ActivityFact' }, title: 'Facts', type: 'array' },
+  },
+  required: ['schema_version', 'workflow', 'facts'],
+  title: 'ActivityResponse',
+  type: 'object',
+};
+export const usageSchema: unknown = {
+  $defs: {
+    AgentUsage: {
+      properties: {
+        agent: { title: 'Agent', type: 'string' },
+        tokens: { title: 'Tokens', type: 'integer' },
+      },
+      required: ['agent', 'tokens'],
+      title: 'AgentUsage',
+      type: 'object',
+    },
+    DayUsage: {
+      properties: {
+        day: { title: 'Day', type: 'string' },
+        tokens: { title: 'Tokens', type: 'integer' },
+        rate_limited: { title: 'Rate Limited', type: 'integer' },
+      },
+      required: ['day', 'tokens', 'rate_limited'],
+      title: 'DayUsage',
+      type: 'object',
+    },
+    ModelUsage: {
+      properties: {
+        model: { title: 'Model', type: 'string' },
+        provider: { title: 'Provider', type: 'string' },
+        calls: { title: 'Calls', type: 'integer' },
+        input_tokens: { title: 'Input Tokens', type: 'integer' },
+        output_tokens: { title: 'Output Tokens', type: 'integer' },
+        cost_usd: { anyOf: [{ type: 'number' }, { type: 'null' }], title: 'Cost Usd' },
+        rate_limited: { title: 'Rate Limited', type: 'integer' },
+        errors: { title: 'Errors', type: 'integer' },
+      },
+      required: [
+        'model',
+        'provider',
+        'calls',
+        'input_tokens',
+        'output_tokens',
+        'cost_usd',
+        'rate_limited',
+        'errors',
+      ],
+      title: 'ModelUsage',
+      type: 'object',
+    },
+    UsageRow: {
+      description:
+        'The usage of one model by one agent on one day: summed, the rows give `models`, `agents` and `daily`.',
+      properties: {
+        day: { title: 'Day', type: 'string' },
+        agent: { title: 'Agent', type: 'string' },
+        model: { title: 'Model', type: 'string' },
+        provider: { title: 'Provider', type: 'string' },
+        calls: { title: 'Calls', type: 'integer' },
+        input_tokens: { title: 'Input Tokens', type: 'integer' },
+        output_tokens: { title: 'Output Tokens', type: 'integer' },
+        cost_usd: { anyOf: [{ type: 'number' }, { type: 'null' }], title: 'Cost Usd' },
+        rate_limited: { title: 'Rate Limited', type: 'integer' },
+        errors: { title: 'Errors', type: 'integer' },
+      },
+      required: [
+        'day',
+        'agent',
+        'model',
+        'provider',
+        'calls',
+        'input_tokens',
+        'output_tokens',
+        'cost_usd',
+        'rate_limited',
+        'errors',
+      ],
+      title: 'UsageRow',
+      type: 'object',
+    },
+  },
+  description: 'GET /api/workflows/<key>/usage?days=<n>: usage and costs over n days (90 at most).',
+  properties: {
+    days: { title: 'Days', type: 'integer' },
+    models: { items: { $ref: '#/$defs/ModelUsage' }, title: 'Models', type: 'array' },
+    agents: { items: { $ref: '#/$defs/AgentUsage' }, title: 'Agents', type: 'array' },
+    daily: { items: { $ref: '#/$defs/DayUsage' }, title: 'Daily', type: 'array' },
+    rows: { items: { $ref: '#/$defs/UsageRow' }, title: 'Rows', type: 'array' },
+    schema_version: { const: 1, title: 'Schema Version', type: 'integer' },
+    workflow: { title: 'Workflow', type: 'string' },
+  },
+  required: ['days', 'models', 'agents', 'daily', 'rows', 'schema_version', 'workflow'],
+  title: 'UsageResponse',
   type: 'object',
 };

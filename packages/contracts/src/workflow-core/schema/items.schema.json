@@ -32,7 +32,13 @@
           "type": "integer"
         }
       },
-      "required": ["id", "run_id", "kind", "payload", "created_at"],
+      "required": [
+        "id",
+        "run_id",
+        "kind",
+        "payload",
+        "created_at"
+      ],
       "title": "CardEvent",
       "type": "object"
     },
@@ -55,7 +61,12 @@
           "type": "integer"
         }
       },
-      "required": ["id", "author", "body", "created_at"],
+      "required": [
+        "id",
+        "author",
+        "body",
+        "created_at"
+      ],
       "title": "Comment",
       "type": "object"
     },
@@ -378,7 +389,11 @@
       "type": "array"
     }
   },
-  "required": ["schema_version", "workflow", "items"],
+  "required": [
+    "schema_version",
+    "workflow",
+    "items"
+  ],
   "title": "ItemsResponse",
   "type": "object"
 }

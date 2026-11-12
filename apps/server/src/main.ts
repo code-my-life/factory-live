@@ -160,7 +160,7 @@ const hub = new Hub(
     now,
     workflows: () => workflows.map((workflow) => workflow.view()),
     codeSheet: () => codeSheet,
-    restoreMirror: !onCore,
+    source: config.LIVE_SOURCE,
   },
 );
 const buffer = new StreamBuffer();
@@ -219,6 +219,9 @@ const core = onCore
         },
         // The health of the core on the screen comes with #62; the last state stays meanwhile.
         failed: (error) => hub.kanbanFailed(error),
+        live: (agents) => hub.replaceCoreAgents(agents),
+        activity: (facts) => hub.addCoreActivity(facts),
+        usage: (rows) => store.setUsage(rows),
       },
     })
   : null;
@@ -298,6 +301,8 @@ const timers = [
   setInterval(() => hub.reloadConfig(), 5 * 60_000),
   setInterval(() => void refreshGitHub(), 30_000),
   setInterval(() => store.purgeActivity(now() - 30 * 86_400_000), 6 * 3600_000),
+  // On the core's side, today's and yesterday's usage are read again every minute (#66).
+  setInterval(() => void core?.refreshUsage(2), 60_000),
 ];
 void refreshGitHub();
 void refreshWorkflows();

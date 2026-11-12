@@ -10,7 +10,10 @@
       "type": "string"
     }
   },
-  "required": ["error", "detail"],
+  "required": [
+    "error",
+    "detail"
+  ],
   "title": "ErrorResponse",
   "type": "object"
 }

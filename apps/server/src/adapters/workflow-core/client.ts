@@ -9,6 +9,9 @@ import type { CoreCheck, CoreEvent } from '@factory-live/contracts/workflow-core
 
 export class CoreError extends Error {}
 
+/** The kinds of event this copy of the core's schema knows: the others are skipped. */
+const KNOWN_KINDS = new Set(['changed', 'reset', 'live', 'activity']);
+
 export class WorkflowCoreClient {
   private readonly url: string;
   private readonly secret: string;
@@ -77,7 +80,7 @@ export class WorkflowCoreClient {
         const event: unknown = JSON.parse(data);
         // A kind of event added to the contract later (ADR 0018: additions only) is skipped, not an error.
         const kind = (event as { kind?: unknown } | null)?.kind;
-        if (kind !== 'changed' && kind !== 'reset') continue;
+        if (typeof kind !== 'string' || !KNOWN_KINDS.has(kind)) continue;
         const parsed = coreEvent.safeParse(event);
         if (!parsed.success)
           throw new CoreError(`/api/events : événement hors schéma (${parsed.error.message})`);

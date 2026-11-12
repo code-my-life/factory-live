@@ -8,3 +8,4 @@ fixtures/hermes-schema/
 evidence/
 fixtures/github-gate/
 fixtures/diagnosis-references/
+packages/contracts/src/workflow-core/schema/

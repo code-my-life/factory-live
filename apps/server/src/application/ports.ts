@@ -330,6 +330,11 @@ export interface HistoryPort {
   // Most recent lines of these kinds, across all cards (guard refusals).
   activityOfKinds(kinds: readonly string[], limit: number): ActivityEvent[];
   addUsage(delta: UsageDelta): void;
+  /**
+   * Usage rows as workflow-core serves them (#66): each one sets its day, model, provider and agent, so a
+   * day served again is not counted twice, and a day the core no longer serves stays.
+   */
+  setUsage(rows: readonly UsageRow[]): void;
   usageSince(day: string): UsageRow[];
   claimNotification(interventionId: string, now: number): boolean;
   unblock(interventionId: string): UnblockRecord | null;
@@ -356,6 +361,37 @@ export interface PushPort {
 }
 
 /** A workflow followed by its generic API (#31), as last read (`adapters/workflows/api.ts`). */
+/**
+ * An agent's live state as workflow-core serves it (#66), in factory-live's units: times in ms epoch, a
+ * model's provider never null. `cardId` is the card its run is on.
+ */
+export interface CoreAgentState {
+  profile: string;
+  cardId: string;
+  runId: number | null;
+  state: 'thinking' | 'tool' | 'cli' | 'blocked';
+  action: {
+    kind: 'llm' | 'tool' | 'cli';
+    label: string;
+    detail: string | null;
+    startedAt: number;
+  } | null;
+  model: { model: string; provider: string; source: 'live' | 'session' } | null;
+  laneModel: { model: string; provider: string } | null;
+  lastHeartbeatAt: number | null;
+}
+
+/** One recent fact of the board's activity, as workflow-core serves it (#66); `at` in ms epoch. */
+export interface CoreActivityFact {
+  id: string;
+  at: number;
+  kind: 'tool' | 'llm' | 'kanban' | 'guard' | 'system';
+  profile: string | null;
+  cardId: string | null;
+  text: string;
+  status: 'ok' | 'running' | 'error' | 'blocked' | null;
+}
+
 export interface WorkflowView {
   name: string;
   /** The sheet the workflow serves; `null` until read, or while it is invalid (`sheetError`). */

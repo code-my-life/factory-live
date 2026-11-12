@@ -15,7 +15,11 @@
           "type": "boolean"
         }
       },
-      "required": ["key", "board", "sheet_valid"],
+      "required": [
+        "key",
+        "board",
+        "sheet_valid"
+      ],
       "title": "ListedWorkflow",
       "type": "object"
     }
@@ -47,7 +51,10 @@
       "type": "array"
     }
   },
-  "required": ["schema_version", "workflows"],
+  "required": [
+    "schema_version",
+    "workflows"
+  ],
   "title": "WorkflowsResponse",
   "type": "object"
 }
