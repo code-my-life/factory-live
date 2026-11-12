@@ -276,7 +276,11 @@ export function createApp(deps: AppDeps) {
         deps.declared && subject
           ? await deps.declared.acceptance(subject.repo, subject.pr, subject.cardIds, subject.head)
           : undefined;
-      const detail = issueDetail(deps.views, key, proofs ? { proofs } : {});
+      const detail = issueDetail(
+        deps.views,
+        key,
+        proofs && subject ? { proofs, head: subject.head } : {},
+      );
       return detail
         ? c.json(detail, 200)
         : c.json({ error: 'Issue inconnue de la factory', code: 'not_found' as const }, 404);

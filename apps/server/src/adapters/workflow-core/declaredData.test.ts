@@ -7,8 +7,8 @@ import type * as NodeSqlite from 'node:sqlite';
 import { ProfileView } from '@factory-live/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { acceptanceOf } from '../../application/acceptance.ts';
-import type { AcceptanceSource } from '../../application/ports.ts';
-import { profileViews, transcripts } from '../../application/views.ts';
+import type { AcceptanceSource, GitHubReadPort } from '../../application/ports.ts';
+import { issueDetail, profileViews, transcripts } from '../../application/views.ts';
 import type { ViewDeps } from '../../application/views.ts';
 import { createLogger } from '../../logger.ts';
 import { fakeCore } from '../../test/fake-core.ts';
@@ -492,6 +492,56 @@ describe('données déclarées de la factory lues par le socle (#60)', () => {
     expect(view.proofs.map((proof) => proof.content)).toEqual(['illisible : droits']);
     expect(view.twins).toBeNull();
     expect(view.twinsAbsent).toBe('no_build');
+  });
+
+  it('des preuves lues pour une autre tête ne sont pas montrées', () => {
+    h = harness();
+    // GitHub's side moved to a new head while the proofs of the old one were read.
+    const github = {
+      issueInfo: () => null,
+      pullRequest: () => null,
+      acceptance: () => ({ ...source(), head: 'b'.repeat(40) }),
+    } as unknown as GitHubReadPort;
+    const deps = { ...coreViewDeps(h), github };
+    const old = [{ order: 1, rule: 'failfirst', text: "preuve de l'ancienne tête" }];
+
+    const stale = issueDetail(deps, 'cv-site#49', { proofs: old, head: HEAD });
+    const fresh = issueDetail(deps, 'cv-site#49', { proofs: old, head: 'b'.repeat(40) });
+
+    expect(stale?.acceptance?.proofs).toEqual([]);
+    expect(fresh?.acceptance?.proofs.map((proof) => proof.content)).toEqual([
+      "preuve de l'ancienne tête",
+    ]);
+  });
+
+  it('un port de miroir hors des ports possibles ne donne pas de paire', async () => {
+    const { views, bench } = await coreSide({ [`pr:${REPO}#${PR}`]: coreTwins(0) });
+    for (const port of [0, 70_000]) {
+      core!.state.data!['factory']![`pr:${REPO}#${PR}`] = coreTwins(port);
+      await views.acceptance(REPO, PR, [], HEAD);
+      expect(bench.view(REPO, PR), String(port)).toBeNull();
+    }
+  });
+
+  it('la dernière réponse du socle n’est gardée que pour les sujets récents', async () => {
+    const { views } = await coreSide({});
+    const run = (n: number) => [
+      {
+        name: 'card-log',
+        label: 'Journal de la carte',
+        values: [{ type: 'text', label: 'Journal de la carte', text: `journal ${n}` }],
+      },
+    ];
+    for (let n = 1; n <= 150; n += 1) {
+      core!.state.data!['factory']![`run:${n}`] = run(n);
+      await views.transcripts(n);
+    }
+    await core!.close();
+    core = null;
+
+    // The core gone: the latest subjects keep their last answer, the oldest ones are no longer held.
+    expect((await views.transcripts(150))?.terminal).toEqual(['journal 150']);
+    expect((await views.transcripts(1))?.terminal).toEqual([]);
   });
 
   it('côté socle, ni Hermès, ni le dépôt de la factory, ni Claude Code ne sont lus', async () => {

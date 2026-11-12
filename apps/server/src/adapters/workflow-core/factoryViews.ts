@@ -90,7 +90,8 @@ function pairOf(values: readonly CoreValue[]): DeclaredPair | null {
   const table = tables(values).find((value) => value.label === TWINS.surfaces);
   const rows = table ? records(table, TWINS.columns) : null;
   const port = mirror?.type === 'text' ? Number(mirror.text) : Number.NaN;
-  if (!state || state.type !== 'status' || !rows || !Number.isInteger(port)) return null;
+  const reachable = Number.isInteger(port) && port >= 1 && port <= 65_535;
+  if (!state || state.type !== 'status' || !rows || !reachable) return null;
   const twins = AcceptanceTwins.safeParse({
     state: state.text,
     divergence: divergence?.type === 'text' ? divergence.text : null,
@@ -159,6 +160,9 @@ function driftOf(values: readonly CoreValue[]): ConfigDrift[] {
   );
 }
 
+/** The subjects whose last answer is kept for when the core does not answer: the most recently read. */
+const KEPT_SUBJECTS = 100;
+
 export interface FactoryViewsOptions {
   url: string;
   secret: string;
@@ -198,7 +202,13 @@ export class FactoryViews implements DeclaredViewsPort {
         `/api/workflows/${encodeURIComponent(this.options.workflow)}/data?${query}`,
         coreDeclaredData,
       );
+      // The most recent last: past KEPT_SUBJECTS, the subject read longest ago is dropped.
+      this.last.delete(key);
       this.last.set(key, answer.data);
+      for (const oldest of this.last.keys()) {
+        if (this.last.size <= KEPT_SUBJECTS) break;
+        this.last.delete(oldest);
+      }
       return answer.data;
     } catch (error) {
       this.options.log.warn(

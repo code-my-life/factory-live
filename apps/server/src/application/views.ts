@@ -135,12 +135,12 @@ export function acceptanceSubject(
 
 /**
  * The detail of an issue. On the core's side, the gate's proofs of the PR's head come read from the core
- * (`proofs`, #60) instead of the cards' evidence.
+ * (`proofs`, #60, for the commit `head`) instead of the cards' evidence.
  */
 export function issueDetail(
   deps: ViewDeps,
   key: string,
-  prepared: { proofs?: GateProof[] } = {},
+  prepared: { proofs?: GateProof[]; head?: string } = {},
 ): IssueDetail | null {
   const board = deps.hub.boardData;
   const tasks = groupByIssue(board).get(key);
@@ -272,8 +272,10 @@ export function issueDetail(
     acceptance: source
       ? acceptanceOf(
           source,
-          prepared.proofs ??
-            ids.flatMap((id) => deps.files.gateProofs(id, source.head.slice(0, 7))),
+          // Proofs read for another head (GitHub moved meanwhile) are not this head's: none is shown.
+          prepared.proofs && (prepared.head === undefined || prepared.head === source.head)
+            ? prepared.proofs
+            : ids.flatMap((id) => deps.files.gateProofs(id, source.head.slice(0, 7))),
           twinsOf(deps, source.prUrl, source.pr),
         )
       : null,
