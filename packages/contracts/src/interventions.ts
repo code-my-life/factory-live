@@ -84,6 +84,8 @@ export const GestureRequest = z.union([
     gesture: z.string().min(1).max(100),
     item: z.string().min(1).max(200),
     note: z.string().max(4000).default(''),
+    /** Post it even though the item's diagnosis says the cause is still there (`cause_present`). */
+    acknowledgeCause: z.boolean().default(false),
   }),
   z.object({
     workflow: z.string().min(1).max(100),

@@ -148,7 +148,9 @@ export async function unblockIntervention(
     );
   } catch (error) {
     deps.store.forgetUnblock(interventionId);
-    if (error instanceof GestureError && error.status === 409)
+    // A gesture not declared, an item without an issue, or a workflow the core no longer declares: nothing was
+    // posted, GitHub is not to blame.
+    if (error instanceof GestureError && (error.status === 409 || error.status === 404))
       throw new UnblockError(
         409,
         'unblock_not_available',

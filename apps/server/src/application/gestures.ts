@@ -24,7 +24,9 @@ export const HERMES_SIDE_GESTURES: Readonly<Record<string, readonly DeclaredGest
 };
 
 export const hermesSideGestures: GesturesPort = {
-  declared: (workflow) => HERMES_SIDE_GESTURES[workflow] ?? null,
+  // Own keys only: a name every object inherits (`toString`) is not a workflow.
+  declared: (workflow) =>
+    Object.hasOwn(HERMES_SIDE_GESTURES, workflow) ? (HERMES_SIDE_GESTURES[workflow] ?? null) : null,
 };
 
 export class GestureError extends Error {
@@ -49,10 +51,15 @@ export interface GestureDeps {
   store: Pick<HistoryPort, 'audit'>;
   log: LoggerPort;
   now: () => number;
+  /**
+   * Whether an item's open intervention still has its cause present (diagnosis `after_fix`): a comment on it
+   * then needs `acknowledgeCause`, as the unblocking always did (`cause_present`). Absent: never.
+   */
+  causePresent?: (workflow: string, item: string) => boolean;
 }
 
 export type GestureRequest =
-  | { workflow: string; gesture: string; item: string; note: string }
+  | { workflow: string; gesture: string; item: string; note: string; acknowledgeCause?: boolean }
   | { workflow: string; gesture: string; title: string; body: string };
 
 export interface GestureSent {
@@ -113,6 +120,12 @@ export async function postGesture(
         409,
         'gesture_not_declared',
         `Geste ${what} : commentaire sans élément`,
+      );
+    if (deps.causePresent?.(request.workflow, request.item) && !request.acknowledgeCause)
+      throw new GestureError(
+        409,
+        'cause_present',
+        'La cause du blocage est encore là : corrige-la, ou confirme le geste quand même',
       );
     const issueKey = deps.issueOf(request.workflow, request.item);
     if (!issueKey)

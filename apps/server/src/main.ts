@@ -266,7 +266,10 @@ const unblockDeps = {
   // The gestures factory-live may post (#61): those each workflow declares to the core, on its side; the
   // code line's default list on Hermes' side.
   gestures: onCore
-    ? { declared: (workflow: string) => coreGestures[workflow] ?? null }
+    ? {
+        declared: (workflow: string) =>
+          Object.hasOwn(coreGestures, workflow) ? (coreGestures[workflow] ?? null) : null,
+      }
     : hermesSideGestures,
   workflow: CODE_WORKFLOW,
 };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GestureError, postGesture } from './gestures.ts';
+import { GestureError, hermesSideGestures, postGesture } from './gestures.ts';
 import type { GestureDeps } from './gestures.ts';
 import type { DeclaredGesture, LoggerPort } from './ports.ts';
 
@@ -16,7 +16,9 @@ function setup() {
   const calls: { kind: string; args: unknown[] }[] = [];
   const audit: string[] = [];
   const deps: GestureDeps = {
-    gestures: { declared: (workflow) => DECLARED[workflow] ?? null },
+    gestures: {
+      declared: (workflow) => (Object.hasOwn(DECLARED, workflow) ? DECLARED[workflow]! : null),
+    },
     github: {
       comment: (repo, number, body) => {
         calls.push({ kind: 'comment', args: [repo, number, body] });
@@ -76,6 +78,16 @@ describe('gestes déclarés (#61)', () => {
       note: '',
     });
     expect(unknown).toMatchObject({ status: 404, code: 'unknown_workflow' });
+    // A name an object inherits is not a workflow either.
+    const inherited = await refused({
+      workflow: 'toString',
+      gesture: 'unblock',
+      item: 't_1a9f0049',
+      note: '',
+    });
+    expect(inherited).toMatchObject({ status: 404, code: 'unknown_workflow' });
+    expect(hermesSideGestures.declared('toString')).toBeNull();
+    expect(hermesSideGestures.declared('constructor')).toBeNull();
 
     expect(calls).toEqual([]);
   });
@@ -108,6 +120,35 @@ describe('gestes déclarés (#61)', () => {
       'cddev',
     ).catch((error: unknown) => error);
     expect(orphan).toMatchObject({ status: 409, code: 'no_issue' });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('un geste sur un élément dont la cause est encore là demande une confirmation', async () => {
+    const { deps, calls } = setup();
+    const guarded: GestureDeps = {
+      ...deps,
+      causePresent: (_workflow, item) => item === 't_1a9f0049',
+    };
+
+    const refused = await postGesture(
+      guarded,
+      { workflow: 'factory', gesture: 'unblock', item: 't_1a9f0049', note: 'ok' },
+      'cddev',
+    ).catch((error: unknown) => error);
+    expect(refused).toMatchObject({ status: 409, code: 'cause_present' });
+    expect(calls).toEqual([]);
+
+    await postGesture(
+      guarded,
+      {
+        workflow: 'factory',
+        gesture: 'unblock',
+        item: 't_1a9f0049',
+        note: 'ok',
+        acknowledgeCause: true,
+      },
+      'cddev',
+    );
     expect(calls).toHaveLength(1);
   });
 

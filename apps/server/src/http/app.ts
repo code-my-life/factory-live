@@ -421,6 +421,14 @@ export function createApp(deps: AppDeps) {
             ...(deps.unblock.canWrite ? { canWrite: deps.unblock.canWrite } : {}),
             // Only the code line's items have an issue known here; another workflow's item gets none.
             issueOf: (workflow, item) => (workflow === code ? deps.hub.issueKeyOfCard(item) : null),
+            // The same guard as the unblocking: a card whose open intervention still has its cause present.
+            causePresent: (workflow, item) =>
+              workflow === code &&
+              deps.hub.openInterventions.some(
+                (intervention) =>
+                  intervention.cardId === item &&
+                  intervention.diagnosis?.unblock.when === 'after_fix',
+              ),
             store: deps.store,
             log: deps.log,
             now: deps.now,

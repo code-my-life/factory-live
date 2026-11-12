@@ -535,6 +535,33 @@ describe('gestes déclarés (#61)', () => {
     }
   });
 
+  it('un nom hérité ou un workflow retiré du socle n’est ni une erreur interne ni un refus de GitHub', async () => {
+    expect(
+      await refusal(
+        await gesture(h, {
+          workflow: 'toString',
+          gesture: 'unblock',
+          item: 't_1a9f0049',
+          note: '',
+        }),
+      ),
+    ).toEqual([404, 'unknown_workflow']);
+
+    // The core no longer declares the factory: the unblocking posts nothing, and blames no one on GitHub.
+    const gone = harness({ gestures: { declared: () => null } });
+    try {
+      const id = (await snapshotOf(gone)).interventions[0]?.id as string;
+      const refused = await gone.app.request(
+        `/api/interventions/${encodeURIComponent(id)}/unblock`,
+        { method: 'POST', headers: LOCAL, body: JSON.stringify({ text: 'ok' }) },
+      );
+      expect(await refusal(refused)).toEqual([409, 'unblock_not_available']);
+      expect(posts(gone)).toEqual([]);
+    } finally {
+      gone.close();
+    }
+  });
+
   it('la route des gestes est gardée comme le déblocage', async () => {
     const body = { workflow: 'factory', gesture: 'unblock', item: 't_1a9f0049', note: 'ok' };
     expect(await refusal(await gesture(h, body, { ...LOCAL, 'x-factory-live': '' }))).toEqual([
