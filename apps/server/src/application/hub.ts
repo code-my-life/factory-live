@@ -25,9 +25,11 @@ import type { DiagnosisService } from './diagnosis.ts';
 import { buildHealth } from './health.ts';
 import type { HealthSignals } from './health.ts';
 import {
+  coreActivityEvent,
   foundInterventions,
   issueOfCards,
   projectAgents,
+  projectCoreAgents,
   projectInterventions,
   projectIssues,
   projectSideCards,
@@ -36,6 +38,8 @@ import {
 } from './projection.ts';
 import type { ProjectionInput, ResolvedIntervention } from './projection.ts';
 import type {
+  CoreActivityFact,
+  CoreAgentState,
   GitHubReadPort,
   HistoryPort,
   KanbanDelta,
@@ -72,10 +76,11 @@ export interface HubDeps {
   /** Where the code line's sheet comes from (#31). */
   codeSheet?: () => PublishedSheet;
   /**
-   * Whether the board starts from the kanban mirror (true by default). On workflow-core's side (#57) it
-   * starts empty: the mirror holds Hermes' cards, not the core's.
+   * Where the factory is read (#57, ADR 0015); `hermes` by default. On workflow-core's side, the board
+   * starts empty (the kanban mirror holds Hermes' cards, not the core's), the agents and the activity come
+   * from the core (#66), and Hermes' webhooks no longer change anything.
    */
-  restoreMirror?: boolean;
+  source?: 'hermes' | 'workflow-core';
 }
 
 type Slice = 'board' | 'agents' | 'health';
@@ -126,6 +131,9 @@ export class Hub {
   private readonly lastSent = new Map<Slice, string>();
   private readonly dirty = new Set<Slice>(['board', 'agents', 'health']);
   private interventions: Intervention[] = [];
+  /** On workflow-core's side (#66): the agents it announces, and the ids of its facts already in the feed. */
+  private coreAgents: CoreAgentState[] = [];
+  private readonly coreFacts = new Set<string>();
   /** Les interventions du kanban au dernier passage, et celles fermées depuis moins de 30 min. */
   private found: FoundIntervention[] = [];
   private readonly resolved = new Map<
@@ -149,7 +157,7 @@ export class Hub {
     this.options = options;
     this.deps = deps;
     this.board =
-      deps.restoreMirror === false
+      deps.source === 'workflow-core'
         ? { tasks: [], runs: [], links: [], events: [], comments: [] }
         : deps.store.board();
     this.issueOfCard = issueOfCards(this.board);
@@ -373,7 +381,27 @@ export class Hub {
     this.dirty.add('health');
   }
 
+  /** The agents workflow-core announces, all of them: they replace those held (#66). */
+  replaceCoreAgents(agents: readonly CoreAgentState[]): void {
+    this.coreAgents = [...agents];
+    this.dirty.add('agents');
+  }
+
+  /** Facts of workflow-core's activity (#66): those not yet in the feed join it, in their order. */
+  addCoreActivity(facts: readonly CoreActivityFact[]): void {
+    const lines = facts
+      .filter((fact) => !this.coreFacts.has(fact.id))
+      .map((fact) => coreActivityEvent(fact, this.issueOfCard));
+    for (const fact of facts) this.coreFacts.add(fact.id);
+    if (lines.length === 0) return;
+    this.activity = [...this.activity, ...lines].slice(-ACTIVITY_KEPT);
+    this.pendingActivity.push(...lines);
+    this.deps.store.appendActivity(lines);
+  }
+
   applyHook(event: HookEvent): void {
+    // On workflow-core's side, the live state comes from the core: a webhook still received changes nothing.
+    if (this.deps.source === 'workflow-core') return;
     const now = this.deps.now();
     this.lastHookAt = now;
     this.hookTimes.push(now);
@@ -632,6 +660,8 @@ export class Hub {
   }
 
   private agentsSlice() {
+    if (this.deps.source === 'workflow-core')
+      return projectCoreAgents(this.coreAgents, this.board.runs, this.issueOfCard);
     const now = this.deps.now();
     const running = new Set(
       this.board.tasks.filter((task) => task.status === 'running').map((task) => task.id),

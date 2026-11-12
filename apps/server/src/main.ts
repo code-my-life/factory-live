@@ -160,7 +160,7 @@ const hub = new Hub(
     now,
     workflows: () => workflows.map((workflow) => workflow.view()),
     codeSheet: () => codeSheet,
-    restoreMirror: !onCore,
+    source: config.LIVE_SOURCE,
   },
 );
 const buffer = new StreamBuffer();
@@ -219,6 +219,8 @@ const core = onCore
         },
         // The health of the core on the screen comes with #62; the last state stays meanwhile.
         failed: (error) => hub.kanbanFailed(error),
+        live: (agents) => hub.replaceCoreAgents(agents),
+        activity: (facts) => hub.addCoreActivity(facts),
       },
     })
   : null;

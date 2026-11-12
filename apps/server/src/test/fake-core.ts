@@ -14,6 +14,12 @@ export interface FakeCoreState {
   items: Record<string, unknown[]>;
   /** The cursor the read routes carry; `null`: none (the stream does not run). */
   cursor: string | null;
+  /** The live state of each workflow's agents (#66); absent: none. */
+  live?: Record<string, unknown[]>;
+  /** The recent facts of each workflow's activity, oldest first (#66); absent: none. */
+  activity?: Record<string, unknown[]>;
+  /** The usage of each workflow, by the `days` asked (#66); absent: 404. */
+  usage?: Record<string, (days: number) => unknown>;
 }
 
 export interface FakeCoreRequest {
@@ -100,10 +106,29 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
         response.write(frame(event as { cursor: string; kind: string }));
       return;
     }
-    const route = /^\/api\/workflows\/([\w-]+)\/(sheet|items)$/.exec(path);
+    const route = /^\/api\/workflows\/([\w-]+)\/(sheet|items|live|activity|usage)$/.exec(path);
     const key = route?.[1];
     if (!route || !key || !state.workflows.some((workflow) => workflow.key === key))
       return json(response, 404, { error: 'unknown_workflow', detail: `workflow "${key}"` });
+    if (route[2] === 'live')
+      return json(response, 200, {
+        schema_version: 1,
+        workflow: key,
+        agents: state.live?.[key] ?? [],
+      });
+    if (route[2] === 'activity')
+      return json(response, 200, {
+        schema_version: 1,
+        workflow: key,
+        facts: state.activity?.[key] ?? [],
+      });
+    if (route[2] === 'usage') {
+      const usage = state.usage?.[key];
+      const days = Number(new URL(request.url ?? '/', 'http://core').searchParams.get('days') ?? 7);
+      return usage
+        ? json(response, 200, { schema_version: 1, workflow: key, ...(usage(days) as object) })
+        : json(response, 404, { error: 'not_found', detail: 'no usage' });
+    }
     if (route[2] === 'sheet')
       return key in state.sheets
         ? json(response, 200, { schema_version: 1, workflow: key, sheet: state.sheets[key] })

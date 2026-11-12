@@ -35,7 +35,7 @@ import type {
   Run,
   Task,
 } from '@factory-live/domain';
-import type { UnblockRecord } from './ports.ts';
+import type { CoreActivityFact, CoreAgentState, UnblockRecord } from './ports.ts';
 
 export interface IssueInfoView {
   title: string;
@@ -358,6 +358,53 @@ export function projectAgents(
       lastHeartbeatAt: running?.lastHeartbeatAt ? isoSeconds(running.lastHeartbeatAt) : null,
     };
   });
+}
+
+/**
+ * The agents workflow-core announces (#66), as the PWA shows them: one line per agent holding a card, its
+ * model with the source the core gives (`live`, or `session` when the served model is not on disk).
+ */
+export function projectCoreAgents(
+  agents: readonly CoreAgentState[],
+  runs: readonly Run[],
+  issueOfCard: ReadonlyMap<string, string>,
+): AgentActivity[] {
+  const runById = new Map(runs.map((run) => [run.id, run]));
+  return agents.map((agent) => {
+    const run = agent.runId === null ? undefined : runById.get(agent.runId);
+    return {
+      profile: agent.profile,
+      station: profileStation(agent.profile),
+      state: agent.state,
+      cardId: agent.cardId,
+      issueKey: issueOfCard.get(agent.cardId) ?? null,
+      model: agent.model,
+      laneModel: liveModel(agent.laneModel, 'live'),
+      action: agent.action ? { ...agent.action, startedAt: iso(agent.action.startedAt) } : null,
+      runStartedAt: run ? isoSeconds(run.startedAt) : null,
+      lastHeartbeatAt: agent.lastHeartbeatAt === null ? null : iso(agent.lastHeartbeatAt),
+    };
+  });
+}
+
+/** A fact of workflow-core's activity (#66) as a line of the feed, its issue found from its card. */
+export function coreActivityEvent(
+  fact: CoreActivityFact,
+  issueOfCard: ReadonlyMap<string, string>,
+): ActivityEvent {
+  return {
+    id: `core-${fact.id}`,
+    at: iso(fact.at),
+    kind: fact.kind,
+    profile: fact.profile,
+    issueKey: fact.cardId ? (issueOfCard.get(fact.cardId) ?? null) : null,
+    cardId: fact.cardId,
+    label: fact.text,
+    detail: null,
+    status: fact.status,
+    durationMs: null,
+    model: null,
+  };
 }
 
 /** Ligne du domaine vers l'événement du fil : identifiant de séquence, issue retrouvée par la carte. */
