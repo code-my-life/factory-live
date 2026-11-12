@@ -40,6 +40,8 @@ import type { ProjectionInput, ResolvedIntervention } from './projection.ts';
 import type {
   CoreActivityFact,
   CoreAgentState,
+  CoreCheckState,
+  CoreMachineState,
   GitHubReadPort,
   HistoryPort,
   KanbanDelta,
@@ -134,6 +136,10 @@ export class Hub {
   /** On workflow-core's side (#66): the agents it announces, and the ids of its facts already in the feed. */
   private coreAgents: CoreAgentState[] = [];
   private readonly coreFacts = new Set<string>();
+  /** On workflow-core's side (#62): since when it does not answer, why, and the machine it last published. */
+  private coreUnreachableSince: number | null = null;
+  private coreError: string | null = null;
+  private coreMachine: CoreMachineState | null = null;
   /** Les interventions du kanban au dernier passage, et celles fermées depuis moins de 30 min. */
   private found: FoundIntervention[] = [];
   private readonly resolved = new Map<
@@ -381,6 +387,36 @@ export class Hub {
     this.dirty.add('health');
   }
 
+  /** workflow-core answered (#62): a read or an event of its stream. */
+  coreAnswered(): void {
+    if (this.coreUnreachableSince === null) return;
+    this.coreUnreachableSince = null;
+    this.coreError = null;
+    this.dirty.add('health').add('board');
+  }
+
+  /** A read or a reconnection to workflow-core failed (#62): the last state stays. */
+  coreFailed(error: string, at: number): void {
+    const first = this.coreUnreachableSince === null;
+    this.coreUnreachableSince ??= at;
+    this.coreError = error;
+    this.dirty.add('health');
+    if (first) this.dirty.add('board');
+  }
+
+  /** The state of the machine workflow-core publishes (#62), read in full. */
+  applyCoreMachine(machine: CoreMachineState): void {
+    this.coreMachine = machine;
+    this.dirty.add('health');
+  }
+
+  /** The machine's checks, from an event of the core's stream (#62): they replace those held. */
+  applyCoreChecks(checks: readonly CoreCheckState[]): void {
+    if (this.coreMachine === null) return;
+    this.coreMachine = { ...this.coreMachine, checks: [...checks] };
+    this.dirty.add('health');
+  }
+
   /** The agents workflow-core announces, all of them: they replace those held (#66). */
   replaceCoreAgents(agents: readonly CoreAgentState[]): void {
     this.coreAgents = [...agents];
@@ -610,12 +646,23 @@ export class Hub {
       maxInProgressPerProfile: this.root.maxInProgressPerProfile,
       ...(this.deps.workflows ? { workflows: this.deps.workflows() } : {}),
       ...(this.deps.codeSheet ? { codeSheet: this.deps.codeSheet() } : {}),
+      ...(this.deps.source === 'workflow-core'
+        ? {
+            core: {
+              unreachableSince: this.coreUnreachableSince,
+              error: this.coreError,
+              machine: this.coreMachine,
+            },
+          }
+        : {}),
     });
   }
 
   private boardSlice() {
     const input = this.projectionInput();
     const interventions = projectInterventions(input, this.found);
+    if (this.deps.source === 'workflow-core' && this.coreUnreachableSince !== null)
+      interventions.unshift(this.coreDown(this.coreUnreachableSince));
     const issues = projectIssues(input, interventions);
     const now = this.deps.now();
     for (const issue of issues) {
@@ -637,6 +684,28 @@ export class Hub {
       issues,
       sideCards: projectSideCards(input),
       interventions,
+    };
+  }
+
+  /** workflow-core does not answer (#62): the intervention of a service down, with the tile's text. */
+  private coreDown(since: number): Intervention {
+    const seconds = Math.max(0, Math.round((this.deps.now() - since) / 1000));
+    return {
+      id: 'service_down:workflow-core',
+      kind: 'service_down',
+      severity: 'critical',
+      title: msg('health.core.unreachableTitle'),
+      issueKey: null,
+      cardId: null,
+      profile: null,
+      question: msg('health.core.unreachable', { seconds }),
+      openedAt: new Date(since).toISOString(),
+      push: false,
+      actions: [],
+      unblock: null,
+      diagnosis: null,
+      resolvedAt: null,
+      followUp: null,
     };
   }
 

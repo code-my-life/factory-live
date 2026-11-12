@@ -505,6 +505,18 @@ const server: ServerMessages = {
   'health.codeSheet': () => 'Fiche de la ligne du code',
   'health.codeSheet.published': () => 'Publiée par la factory (config/workflow.json)',
   'health.codeSheet.embedded': ({ reason }) => `Copie embarquée : ${reason}`,
+  'health.core': () => 'Socle (workflow-core)',
+  'health.core.ok': () => 'Répond',
+  'health.core.unreachable': ({ seconds }) =>
+    `Socle injoignable depuis ${secs(seconds)}, dernier état gardé`,
+  'health.core.unreachableTitle': () => 'Socle injoignable',
+  'health.core.observer': ({ problem }) => `En mode observateur${problem ? ` : ${problem}` : ''}`,
+  'health.core.contract.ok': () => 'Tenu',
+  'health.core.contract.broken': ({ problem }) => `Rompu${problem ? ` : ${problem}` : ''}`,
+  'health.metric.coreVersion': () => 'Version d’Hermès',
+  'health.metric.contract': () => 'Contrat',
+  'health.metric.mode': () => 'Mode',
+  'health.metric.boardRead': ({ board }) => `Lecture du tableau ${board}`,
 };
 
 export const fr = {

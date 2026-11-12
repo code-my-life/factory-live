@@ -4,7 +4,7 @@ import type { ErrorResponse } from './workflow-core/generated/error.ts';
 import type { StreamEvent } from './workflow-core/generated/event.ts';
 import type { ItemsResponse } from './workflow-core/generated/items.ts';
 import type { AgentLive, LiveResponse } from './workflow-core/generated/live.ts';
-import type { MachineResponse } from './workflow-core/generated/machine.ts';
+import type { MachineCheck, MachineResponse } from './workflow-core/generated/machine.ts';
 import type { SheetResponse } from './workflow-core/generated/sheet-response.ts';
 import type { UsageResponse } from './workflow-core/generated/usage.ts';
 import type { WorkflowsResponse } from './workflow-core/generated/workflows.ts';
@@ -33,6 +33,7 @@ export type {
   ErrorResponse,
   ItemsResponse,
   LiveResponse,
+  MachineCheck as CoreMachineCheck,
   MachineResponse,
   SheetResponse,
   StreamEvent as CoreEvent,
