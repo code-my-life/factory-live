@@ -91,6 +91,11 @@ export interface ProfilesPort {
   facts(profile: string): ProfileFacts | null;
   // Fingerprint of files read by `facts` (modification times); it changes when any of them changes.
   factsStamp(profile: string): string;
+  /**
+   * How many times each plugin's hook ran past its delay, when the source counts them itself (workflow-core,
+   * #93); absent: the agents' screen counts them in the agent's journal.
+   */
+  hookTimeouts?(profile: string): ReadonlyMap<string, number> | null;
 }
 
 // --- Sessions des workers ------------------------------------------------------------------------

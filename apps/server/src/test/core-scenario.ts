@@ -1,11 +1,17 @@
 import { join } from 'node:path';
 import type { Snapshot } from '@factory-live/contracts';
 import { Hub } from '../application/hub.ts';
-import type { KanbanDelta, PublishedSheet, WorkflowView } from '../application/ports.ts';
+import type {
+  KanbanDelta,
+  ProfilesPort,
+  PublishedSheet,
+  WorkflowView,
+} from '../application/ports.ts';
 import { KEEP_FINISHED_MS } from '../application/projection.ts';
 import { createLogger } from '../logger.ts';
 import { HistoryStore } from '../adapters/store/history.ts';
 import { noProfiles } from '../adapters/workflow-core/absent.ts';
+import { CoreProfiles } from '../adapters/workflow-core/agents.ts';
 import { WorkflowCoreReader } from '../adapters/workflow-core/reader.ts';
 import type { FakeCore, FakeCoreState } from './fake-core.ts';
 import { insertEvent, insertRun, insertTask, kanbanDb } from './hermes-fixtures.ts';
@@ -266,6 +272,7 @@ export function newHub(
   dir: TempDir,
   name: string,
   source: 'hermes' | 'workflow-core' = 'hermes',
+  profiles: ProfilesPort = noProfiles,
 ): Hub {
   return new Hub(
     {
@@ -278,7 +285,7 @@ export function newHub(
     },
     {
       store: new HistoryStore(join(dir.path, name)),
-      profiles: noProfiles,
+      profiles,
       github: null,
       diagnoses: null,
       log,
@@ -291,6 +298,7 @@ export function newHub(
 export interface Side {
   hub: Hub;
   reader: WorkflowCoreReader;
+  profiles: CoreProfiles;
   sheet: () => PublishedSheet | null;
   generic: () => readonly WorkflowView[];
   boards: KanbanDelta[];
@@ -299,7 +307,9 @@ export interface Side {
 
 /** The core's side of the switch, as main.ts wires it: the reader feeds the hub, the sheet and the list. */
 export function coreSide(dir: TempDir, core: FakeCore): Side {
-  const hub = newHub(dir, 'core-data', 'workflow-core');
+  // The agents the core publishes fill the profiles' port on its side (#93).
+  const profiles = new CoreProfiles();
+  const hub = newHub(dir, 'core-data', 'workflow-core', profiles);
   let sheet: PublishedSheet | null = null;
   let generic: readonly WorkflowView[] = [];
   const boards: KanbanDelta[] = [];
@@ -338,9 +348,13 @@ export function coreSide(dir: TempDir, core: FakeCore): Side {
       interventionClosed: (id) => hub.closeCoreIntervention(id),
       diagnoses: (entries) => hub.applyCoreDiagnoses(entries),
       verdicts: (cardId, verdicts) => hub.applyCoreVerdicts(cardId, verdicts),
+      agents: (answer) => {
+        profiles.update(answer);
+        hub.reloadConfig();
+      },
     },
   });
-  return { hub, reader, sheet: () => sheet, generic: () => generic, boards, failures };
+  return { hub, reader, profiles, sheet: () => sheet, generic: () => generic, boards, failures };
 }
 
 /** What the PWA is sent of the line, without the times of computation. */

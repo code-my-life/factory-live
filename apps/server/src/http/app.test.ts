@@ -1701,6 +1701,7 @@ describe('coûts lus par le socle (#66)', () => {
         failed: () => undefined,
         live: () => undefined,
         activity: () => undefined,
+        agents: () => undefined,
         usage: (usage) => core.store.setUsage(usage),
         interventions: () => undefined,
         interventionOpened: () => undefined,

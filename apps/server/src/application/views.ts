@@ -447,9 +447,11 @@ export function profileViews(
     const passes = verdicts.filter((verdict) => verdict.implementer === name);
     const chain = live ? [...(live.model ? [live.model] : []), ...live.fallbacks] : [];
     const facts = safeFacts(deps, name);
-    const timeouts = facts
-      ? hookTimeoutsByPlugin(safeLogs(deps, name, since, deps.now() / 1000), facts)
-      : new Map<string, number>();
+    const timeouts =
+      deps.profiles.hookTimeouts?.(name) ??
+      (facts
+        ? hookTimeoutsByPlugin(safeLogs(deps, name, since, deps.now() / 1000), facts)
+        : new Map<string, number>());
     return {
       name,
       role: (manifest.profiles[name]?.skills ?? []).join(', ') || msg('agent.role.default'),

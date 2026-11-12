@@ -14,12 +14,8 @@ import { publishedSheet } from './adapters/workflows/sheets.ts';
 import { ProfileConfigReader } from './adapters/hermes/profiles.ts';
 import { SessionReader } from './adapters/hermes/sessions.ts';
 import { PushNotifier, vapidKeys } from './adapters/push/webpush.ts';
-import {
-  noAgentLog,
-  noCardFiles,
-  noProfiles,
-  noSessions,
-} from './adapters/workflow-core/absent.ts';
+import { noAgentLog, noCardFiles, noSessions } from './adapters/workflow-core/absent.ts';
+import { CoreProfiles } from './adapters/workflow-core/agents.ts';
 import { FactoryViews } from './adapters/workflow-core/factoryViews.ts';
 import { WorkflowCoreReader } from './adapters/workflow-core/reader.ts';
 import { HistoryStore } from './adapters/store/history.ts';
@@ -78,9 +74,10 @@ const paths = new HermesPaths({
   boardDir: config.boardDir,
   factoryRepo: config.FACTORY_REPO,
 });
-const profiles: ProfilesPort = onCore
-  ? noProfiles
-  : new ProfileConfigReader(config.HERMES_HOME, config.FACTORY_REPO, paths);
+// On the core's side, the agents and their configuration come from workflow-core (#93).
+const coreProfiles = onCore ? new CoreProfiles() : null;
+const profiles: ProfilesPort =
+  coreProfiles ?? new ProfileConfigReader(config.HERMES_HOME, config.FACTORY_REPO, paths);
 const sessionReader = onCore ? null : new SessionReader(config.profilesDir);
 const sessions: SessionsPort = sessionReader ?? noSessions;
 const files: CardFilesPort = onCore
@@ -239,6 +236,10 @@ const core = onCore
         live: (agents) => hub.replaceCoreAgents(agents),
         activity: (facts) => hub.addCoreActivity(facts),
         usage: (rows) => store.setUsage(rows),
+        agents: (answer) => {
+          coreProfiles?.update(answer);
+          hub.reloadConfig();
+        },
         interventions: (items) => hub.replaceCoreInterventions(items),
         interventionOpened: (item) => hub.openCoreIntervention(item),
         interventionClosed: (id) => hub.closeCoreIntervention(id),
@@ -320,7 +321,8 @@ const timers = [
   setInterval(() => hub.tick(), 15_000),
   // Une config ou un plugin corrigé se voit en direct : seules les empreintes des fichiers sont relues.
   setInterval(() => hub.refreshDiagnoses(), 2_000),
-  setInterval(() => hub.reloadConfig(), 5 * 60_000),
+  // On the core's side, the agents are read again from the core, which reloads the hub (#93).
+  setInterval(() => (core ? void core.refreshAgents() : hub.reloadConfig()), 5 * 60_000),
   setInterval(() => void refreshGitHub(), 30_000),
   setInterval(() => store.purgeActivity(now() - 30 * 86_400_000), 6 * 3600_000),
   // On the core's side, today's and yesterday's usage are read again every minute (#66).

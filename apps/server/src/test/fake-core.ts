@@ -33,6 +33,8 @@ export interface FakeCoreState {
   diagnoses?: Record<string, unknown[]>;
   /** The run verdicts of each card, by card id (#59); absent: none. */
   verdicts?: Record<string, unknown[]>;
+  /** The agents of each workflow, `{kanban, agents}` (#93); absent: 404. */
+  agents?: Record<string, unknown>;
 }
 
 export interface FakeCoreRequest {
@@ -143,12 +145,18 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
         verdicts: state.verdicts?.[verdicts[2] ?? ''] ?? [],
       });
     const route =
-      /^\/api\/workflows\/([\w-]+)\/(sheet|items|live|activity|usage|interventions|diagnoses|data)$/.exec(
+      /^\/api\/workflows\/([\w-]+)\/(sheet|items|live|activity|usage|interventions|diagnoses|data|agents)$/.exec(
         path,
       );
     const key = route?.[1];
     if (!route || !key || !state.workflows.some((workflow) => workflow.key === key))
       return json(response, 404, { error: 'unknown_workflow', detail: `workflow "${key}"` });
+    if (route[2] === 'agents') {
+      const agents = state.agents?.[key];
+      return agents
+        ? json(response, 200, { schema_version: 1, workflow: key, ...agents })
+        : json(response, 404, { error: 'not_found', detail: 'no agents' });
+    }
     if (route[2] === 'interventions')
       return json(response, 200, {
         schema_version: 1,

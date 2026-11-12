@@ -1,6 +1,7 @@
 import type { Diagnosis, RunVerdict, WorkflowSheet } from '@factory-live/contracts';
 import {
   coreActivity,
+  coreAgents,
   coreDiagnosis,
   coreInterventions,
   coreItems,
@@ -12,6 +13,7 @@ import {
   coreWorkflows,
 } from '@factory-live/contracts/workflow-core';
 import type {
+  AgentsResponse,
   CoreAgent,
   CoreFact,
   CoreIntervention,
@@ -52,6 +54,8 @@ export interface CoreSink {
   activity(facts: CoreActivityFact[]): void;
   /** The code line's usage, one row per day, model, provider and agent (#66). */
   usage(rows: UsageRow[]): void;
+  /** The code line's agents and the kanban's settings (#93): they replace those held. */
+  agents(answer: AgentsResponse): void;
   /** Every open intervention of the code line, from a full read (#59). */
   interventions(items: CoreInterventionState[]): void;
   /** An intervention the core announces as opened, then as closed (#59). */
@@ -85,6 +89,8 @@ export interface WorkflowCoreReaderOptions {
 }
 
 const RETRY_MS = 2_000;
+/** The period of the agents' statistics the core counts (hook timeouts): the agents' screen's. */
+const AGENTS_DAYS = 30;
 /** The reads of run verdicts at once (#59): enough to fill a board at start, without flooding the core. */
 const VERDICT_READS = 4;
 
@@ -262,6 +268,7 @@ export class WorkflowCoreReader {
     this.options.sink.activity(facts.map(coreActivityFact));
     if (items.has(code)) {
       await this.refreshUsage(USAGE_DAYS);
+      await this.refreshAgents();
       await this.readInterventions();
       for (const item of this.items.get(code)?.values() ?? [])
         if (hasFailedRun(item)) this.scheduleVerdicts(item.id);
@@ -477,6 +484,23 @@ export class WorkflowCoreReader {
    * Reads the code line's usage over the last `days` days and sends its rows; a failure is logged and
    * leaves the stored days as they are (main.ts asks again every minute).
    */
+  /**
+   * Reads the code line's agents and the kanban's settings (#93); a failure is logged and leaves the last
+   * ones received (main.ts asks again every 5 minutes).
+   */
+  async refreshAgents(): Promise<void> {
+    const path = `/api/workflows/${encodeURIComponent(this.options.code)}/agents?days=${AGENTS_DAYS}`;
+    try {
+      this.options.sink.agents(await this.client.get(path, coreAgents, this.abort.signal));
+    } catch (error) {
+      if (this.abort.signal.aborted) return;
+      this.options.log.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        'agents du socle illisibles : les derniers reçus restent',
+      );
+    }
+  }
+
   async refreshUsage(days: number): Promise<void> {
     const path = `/api/workflows/${encodeURIComponent(this.options.code)}/usage?days=${days}`;
     try {
