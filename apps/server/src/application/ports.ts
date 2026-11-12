@@ -3,7 +3,9 @@ import type {
   AcceptanceGate,
   AcceptanceTestSuite,
   AcceptanceThread,
+  AcceptanceTwins,
   ActivityEvent,
+  ConfigDrift,
   IssueLabel,
   PullRequestView,
   PushPayload,
@@ -169,6 +171,40 @@ export interface LaneTranscript {
 }
 
 /** A proof of the gate for a head (#22): its rule, its place in the gate's order, its text (cut). */
+/**
+ * What a run's transcripts are made of, read from workflow-core's declared data (#60): the agent's session,
+ * each Claude Code session, the card's raw log. Times in ms epoch.
+ */
+export interface RunTranscripts {
+  hermes: TranscriptLine[];
+  lanes: { name: string | null; entries: TranscriptLine[] }[];
+  terminal: string[];
+}
+
+/**
+ * The factory's declared data, as the views of the core's side read them before showing (#60): only
+ * `adapters/workflow-core/factoryViews.ts` knows their names. A route asks for them, then gives them to its
+ * view; the twins it reads stay for the bench (`TwinBench`, ADR 0013).
+ */
+/** A PR's twin pair as workflow-core publishes it (#60): its state and its mirror's port, no session nor password. */
+export interface DeclaredPair {
+  twins: AcceptanceTwins;
+  mirror: number;
+}
+
+export interface DeclaredViewsPort {
+  /** The gate's proofs of the PR's head for these cards, and the PR's twins read for the bench. */
+  acceptance(
+    repo: string,
+    pr: number,
+    cardIds: readonly string[],
+    head: string,
+  ): Promise<GateProof[]>;
+  transcripts(runId: number): Promise<RunTranscripts | null>;
+  /** The drift of each of these agents; an agent the core does not answer for has none. */
+  drift(agents: readonly string[]): Promise<ReadonlyMap<string, ConfigDrift[]>>;
+}
+
 export interface GateProof {
   order: number;
   rule: string;

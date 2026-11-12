@@ -42,9 +42,10 @@ import type { HistoryStore } from '../adapters/store/history.ts';
 import { toHookEvent } from '../ingest/hermes.ts';
 import { ReplayGuard, verifySignature } from '../ingest/signature.ts';
 import type { Hub } from '../application/hub.ts';
-import type { WorkflowView } from '../application/ports.ts';
+import type { DeclaredViewsPort, WorkflowView } from '../application/ports.ts';
 import {
   historyStats,
+  acceptanceSubject,
   issueDetail,
   profileViews,
   transcripts,
@@ -71,6 +72,11 @@ export interface AppDeps {
   twins?: TwinBench | null;
   /** The workflows followed by their generic API (#31): the studio's videos, today. */
   workflows?: readonly WorkflowApi[];
+  /**
+   * On workflow-core's side (#60): the factory's declared data the recette, the transcripts and the agents'
+   * screen read before showing; absent on Hermes' side.
+   */
+  declared?: DeclaredViewsPort;
   /** The other workflows workflow-core declares (#57), listed with their sheet; their screen is #65. */
   coreWorkflows?: () => readonly WorkflowView[];
   /** The code line's sheet as the factory publishes it, or why the embedded copy is drawn (#31). */
@@ -262,9 +268,19 @@ export function createApp(deps: AppDeps) {
       },
       responses: { 200: json(IssueDetail, 'Détail d’une issue'), ...errors },
     }),
-    (c) => {
+    async (c) => {
       const { repo, number } = c.req.valid('param');
-      const detail = issueDetail(deps.views, `${repo}#${number}`);
+      const key = `${repo}#${number}`;
+      const subject = deps.declared ? acceptanceSubject(deps.views, key) : null;
+      const proofs =
+        deps.declared && subject
+          ? await deps.declared.acceptance(subject.repo, subject.pr, subject.cardIds, subject.head)
+          : undefined;
+      const detail = issueDetail(
+        deps.views,
+        key,
+        proofs && subject ? { proofs, head: subject.head } : {},
+      );
       return detail
         ? c.json(detail, 200)
         : c.json({ error: 'Issue inconnue de la factory', code: 'not_found' as const }, 404);
@@ -278,8 +294,11 @@ export function createApp(deps: AppDeps) {
       request: { params: z.object({ id: z.coerce.number().int().positive() }) },
       responses: { 200: json(z.array(TranscriptView), 'Transcriptions du run'), ...errors },
     }),
-    (c) => {
-      const views = transcripts(deps.views, c.req.valid('param').id);
+    async (c) => {
+      const id = c.req.valid('param').id;
+      const views = deps.declared
+        ? transcripts(deps.views, id, await deps.declared.transcripts(id))
+        : transcripts(deps.views, id);
       return views
         ? c.json(views, 200)
         : c.json({ error: 'Run inconnu', code: 'not_found' as const }, 404);
@@ -292,7 +311,13 @@ export function createApp(deps: AppDeps) {
       path: '/api/profiles',
       responses: { 200: json(z.array(ProfileView), 'Profils de la factory') },
     }),
-    (c) => c.json(profileViews(deps.views), 200),
+    async (c) =>
+      c.json(
+        deps.declared
+          ? profileViews(deps.views, 30, await deps.declared.drift(deps.views.hub.profiles))
+          : profileViews(deps.views),
+        200,
+      ),
   );
 
   const period = z.object({
