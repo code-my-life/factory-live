@@ -70,6 +70,13 @@ export interface WorkflowCoreReaderOptions {
 }
 
 const RETRY_MS = 2_000;
+
+/** Whether cursor `a` (`<epoch>:<n>`) comes before cursor `b`. */
+function older(a: string, b: string): boolean {
+  const [ea = 0, na = 0] = a.split(':').map(Number);
+  const [eb = 0, nb = 0] = b.split(':').map(Number);
+  return ea < eb || (ea === eb && na < nb);
+}
 /** A check of the machine, in factory-live's units (#62). */
 function checkState(check: CoreMachineCheck): CoreCheckState {
   return {
@@ -103,6 +110,9 @@ export class WorkflowCoreReader {
   /** The code line's agents the core follows, by agent. */
   private agents = new Map<string, CoreAgent>();
   private cursor: string | null = null;
+  /** The machine's last checks, and the cursor of the event or read they come from (#62). */
+  private checks: CoreCheckState[] = [];
+  private checksCursor: string | null = null;
   private unreachableSince: number | null = null;
   private lastError: string | null = null;
   private running = false;
@@ -231,6 +241,13 @@ export class WorkflowCoreReader {
     try {
       const machine = await this.client.get('/api/machine', coreMachine, this.abort.signal);
       this.answered();
+      // An answer older than the last `machine` event (its cursor was taken before the read) keeps the
+      // event's checks: an older answer never undoes a newer one.
+      const cursor = machine.cursor ?? null;
+      if (cursor === null || this.checksCursor === null || !older(cursor, this.checksCursor)) {
+        this.checks = (machine.checks ?? []).map(checkState);
+        if (cursor !== null) this.checksCursor = cursor;
+      }
       this.options.sink.machine({
         runtimeVersion: machine.runtime_version,
         contract: machine.contract
@@ -241,10 +258,12 @@ export class WorkflowCoreReader {
           board,
           lastReadAt: read.last_read_at === null ? null : Date.parse(read.last_read_at),
         })),
-        checks: (machine.checks ?? []).map(checkState),
+        checks: this.checks,
       });
     } catch (error) {
       if (this.abort.signal.aborted) return;
+      // A read that fails, or hangs past its timeout, is a failed contact.
+      this.failed(error);
       this.options.log.warn(
         { error: error instanceof Error ? error.message : String(error) },
         'état de la machine du socle illisible : le dernier reste',
@@ -260,7 +279,9 @@ export class WorkflowCoreReader {
       this.answered();
       if (event.kind === 'reset') return true;
       if (event.kind === 'machine') {
-        this.options.sink.checks((event.state as CoreMachineCheck[]).map(checkState));
+        this.checks = (event.state as CoreMachineCheck[]).map(checkState);
+        this.checksCursor = event.cursor;
+        this.options.sink.checks(this.checks);
         continue;
       }
       if (event.workflow === null || event.state === null) continue;

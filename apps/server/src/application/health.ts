@@ -57,6 +57,8 @@ export interface HealthSignals {
     unreachableSince: number | null;
     error: string | null;
     machine: CoreMachineState | null;
+    /** The machine's latest checks, from a read or an event, kept apart from the machine's other state. */
+    checks?: CoreCheckState[];
   };
 }
 
@@ -106,7 +108,9 @@ export function buildHealth(signals: HealthSignals): {
   const { now, probe, core } = signals;
   const probeFresh = probe !== null && now - probe.receivedAt < PROBE_SILENT_MS;
   // On the core's side, the core's checks stand for the probe's, with their own statuses and times.
-  const coreChecks = new Map((core?.machine?.checks ?? []).map((check) => [check.id, check]));
+  const coreChecks = new Map(
+    (core?.checks ?? core?.machine?.checks ?? []).map((check) => [check.id, check]),
+  );
   const checks: Map<string, ReportedCheck> = core
     ? new Map([...coreChecks].map(([id, check]) => [id, fromCore(check)]))
     : new Map((probe?.report.checks ?? []).map((check) => [check.id, check]));

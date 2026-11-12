@@ -9,6 +9,9 @@ import type { CoreCheck, CoreEvent } from '@factory-live/contracts/workflow-core
 
 export class CoreError extends Error {}
 
+/** The longest a read of the core's API may take. */
+const READ_TIMEOUT_MS = 10_000;
+
 /** The kinds of event this copy of the core's schema knows: the others are skipped. */
 const KNOWN_KINDS = new Set(['changed', 'reset', 'live', 'activity', 'machine']);
 
@@ -29,9 +32,11 @@ export class WorkflowCoreClient {
 
   /** One read route, its answer checked by its schema. */
   async get<T>(path: string, check: CoreCheck<T>, signal?: AbortSignal): Promise<T> {
+    // A read never waits more than READ_TIMEOUT_MS: a hung core is a failed read, not a silent one.
+    const timeout = AbortSignal.timeout(READ_TIMEOUT_MS);
     const response = await this.fetchImpl(`${this.url}${path}`, {
       headers: this.headers({ Accept: 'application/json' }),
-      ...(signal ? { signal } : {}),
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
     const body: unknown = await response.json().catch(() => null);
     if (!response.ok) {
@@ -51,7 +56,7 @@ export class WorkflowCoreClient {
 
   /**
    * The SSE stream from `lastEventId` (none: from now on), one checked event at a time; `opened` is called
-   * once it is open. It ends when the core closes it; it throws when it cannot open, or when an event is
+   * once it is open, then at every chunk received (keep-alive included). It ends when the core closes it; it throws when it cannot open, or when an event is
    * out of schema.
    */
   async *events(
@@ -72,6 +77,8 @@ export class WorkflowCoreClient {
     const decoder = new TextDecoder();
     let buffer = '';
     for await (const chunk of response.body) {
+      // Every chunk is a sign of life, the core's keep-alive comment included.
+      opened();
       buffer += decoder.decode(chunk as Uint8Array, { stream: true });
       let end: number;
       while ((end = buffer.indexOf('\n\n')) !== -1) {

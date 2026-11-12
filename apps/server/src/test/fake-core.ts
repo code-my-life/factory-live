@@ -97,15 +97,19 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
     if (request.headers.authorization !== `Bearer ${secret}`)
       return json(response, 401, { error: 'unauthorized', detail: 'missing or wrong secret' });
     if (path === '/api/machine')
-      return json(response, 200, {
-        schema_version: 1,
-        ...(state.machine ?? {
-          runtime_version: null,
-          contract: null,
-          mode: 'normal',
-          boards: {},
+      return json(
+        response,
+        200,
+        withCursor({
+          schema_version: 1,
+          ...((state.machine as object | undefined) ?? {
+            runtime_version: null,
+            contract: null,
+            mode: 'normal',
+            boards: {},
+          }),
         }),
-      });
+      );
     if (path === '/api/workflows')
       return json(response, 200, withCursor({ schema_version: 1, workflows: state.workflows }));
     if (path === '/api/events') {

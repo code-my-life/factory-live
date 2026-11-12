@@ -374,6 +374,15 @@ describe('buildHealth, côté socle', () => {
     );
   });
 
+  it('côté socle, un événement machine reçu avant la première lecture de la machine est montré', () => {
+    const hub = coreHub();
+    hub.applyCoreChecks(MACHINE.checks);
+    const snapshot = hub.snapshot();
+
+    expect(service(snapshot, 'gateway')).toMatchObject({ status: 'down' });
+    expect(service(snapshot, 'freellmapi')).toMatchObject({ status: 'ok' });
+  });
+
   it('côté socle, les tuiles de la sonde viennent des contrôles publiés par le socle', () => {
     const hub = coreHub();
     hub.applyCoreMachine(MACHINE);

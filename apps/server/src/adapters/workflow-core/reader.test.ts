@@ -404,6 +404,51 @@ describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => 
     expect(side.failures).toEqual([]);
   });
 
+  it('une lecture de la machine plus ancienne qu’un événement machine ne le défait pas', async () => {
+    dir = tempDir();
+    const gateway = {
+      id: 'gateway',
+      label: 'Gateway',
+      group: 'hermes',
+      status: 'down',
+      detail: 'Dernier battement il y a 240 s',
+      metrics: {},
+      checked_at: '2026-11-12T09:59:55Z',
+    };
+    core = await fakeCore(SECRET, {
+      ...coreState(),
+      machine: {
+        runtime_version: '0.22.2',
+        contract: { ok: true, checked_at: '2026-11-12T09:59:00Z', problems: [] },
+        mode: 'normal',
+        boards: { factory: { last_read_at: '2026-11-12T09:59:50Z' } },
+        checks: [gateway],
+      },
+    });
+    side = coreSide(dir, core);
+    side.reader.start();
+    const tile = (id: string) => side!.hub.snapshot().health.find((item) => item.id === id);
+    await until(() => tile('gateway')?.status === 'down' && core!.openStreams() === 1);
+
+    // The event (cursor 9) is newer than what the core answers to /api/machine (its cursor, 5).
+    core.send({
+      cursor: '1762900000:9',
+      workflow: null,
+      item: null,
+      kind: 'machine',
+      at: '2026-11-12T10:00:05Z',
+      state: [{ ...gateway, status: 'ok', detail: 'Battement il y a 4 s' }],
+    });
+    await until(() => tile('gateway')?.status === 'ok', 2_000);
+    await side.reader.refreshMachine();
+    expect(tile('gateway')?.status).toBe('ok');
+
+    // A read newer than the last event wins.
+    core.state.cursor = '1762900000:12';
+    await side.reader.refreshMachine();
+    expect(tile('gateway')?.status).toBe('down');
+  });
+
   it('un workflow générique du socle est listé avec sa fiche', async () => {
     dir = tempDir();
     const state = coreState();

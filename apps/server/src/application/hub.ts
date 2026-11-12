@@ -139,6 +139,7 @@ export class Hub {
   private coreUnreachableSince: number | null = null;
   private coreError: string | null = null;
   private coreMachine: CoreMachineState | null = null;
+  private coreChecks: CoreCheckState[] = [];
   /** Les interventions du kanban au dernier passage, et celles fermées depuis moins de 30 min. */
   private found: FoundIntervention[] = [];
   private readonly resolved = new Map<
@@ -406,13 +407,16 @@ export class Hub {
   /** The state of the machine workflow-core publishes (#62), read in full. */
   applyCoreMachine(machine: CoreMachineState): void {
     this.coreMachine = machine;
+    this.coreChecks = [...machine.checks];
     this.dirty.add('health');
   }
 
-  /** The machine's checks, from an event of the core's stream (#62): they replace those held. */
+  /**
+   * The machine's checks, from an event of the core's stream (#62): they replace those held, even before
+   * the machine's first read has succeeded.
+   */
   applyCoreChecks(checks: readonly CoreCheckState[]): void {
-    if (this.coreMachine === null) return;
-    this.coreMachine = { ...this.coreMachine, checks: [...checks] };
+    this.coreChecks = [...checks];
     this.dirty.add('health');
   }
 
@@ -659,6 +663,7 @@ export class Hub {
               unreachableSince: this.coreUnreachableSince,
               error: this.coreError,
               machine: this.coreMachine,
+              checks: this.coreChecks,
             },
           }
         : {}),

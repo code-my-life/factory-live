@@ -56,4 +56,19 @@ describe('CoreWatch (#62)', () => {
     expect(watch.healthy()).toBe(false);
     expect(requestExit).not.toHaveBeenCalled();
   });
+
+  it('un socle muet, sans échec ni contact, rend /healthz en échec après 60 secondes', () => {
+    const { clock, watch } = setup();
+    // Never answered since the start: a minute later, unhealthy, as after the last contact.
+    clock.now = T + 59_000;
+    expect(watch.healthy()).toBe(true);
+    clock.now = T + 60_000;
+    expect(watch.healthy()).toBe(false);
+
+    // A contact, then silence (a stream left open that no longer sends anything, not even a keep-alive).
+    watch.answered(clock.now);
+    expect(watch.healthy()).toBe(true);
+    clock.now += 60_000;
+    expect(watch.healthy()).toBe(false);
+  });
 });
