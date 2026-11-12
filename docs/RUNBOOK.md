@@ -47,7 +47,7 @@ L'en-tête dit l'état du lien : « En direct », « Connexion… », « Hors li
 
 ## Tests de bout en bout
 
-`npm run e2e` lance Playwright sous Chromium : la démo (bureau et iPhone), et l'app « live » branchée sur un faux serveur d'API (`e2e/fake-api.mjs`) que les tests coupent et rétablissent. WebKit (Safari, iPhone) et les captures de référence tournent dans l'image officielle de Playwright, comme en CI (il manque à WSL des bibliothèques pour WebKit) :
+`npm run e2e` lance Playwright sous Chromium : la démo (bureau et iPhone), et l'app « live », servie par le vrai serveur de factory-live côté socle (`LIVE_SOURCE=workflow-core`, lancé par `e2e/live-server.mjs` avec une base et des secrets temporaires) et branchée sur un faux workflow-core (`e2e/fake-api.mjs`, scénario dans `e2e/fake-core-scenario.mjs`). Le faux socle vérifie chacune de ses réponses avec les JSON Schema copiés du socle, répond aussi aux appels à GitHub, et se pilote par ses routes `/__control/…` : couper et rétablir le socle, annoncer un changement de carte, ouvrir une nouvelle époque par un `reset`, lire les commentaires postés. Les quatre projets `live-*` partagent ce montage et passent l'un après l'autre. WebKit (Safari, iPhone) et les captures de référence tournent dans l'image officielle de Playwright, comme en CI (il manque à WSL des bibliothèques pour WebKit) :
 
 ```sh
 docker run --rm --ipc=host --user "$(id -u):$(id -g)" -e HOME=/tmp -e E2E_WEBKIT=1 \

@@ -1,14 +1,20 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Tests de bout en bout de la PWA : sur la démo (scénario rejoué, sans serveur) et sur l'app
- * « live » (API de factory-live simulée par interception). Chromium partout ; WebKit (Safari, iPhone)
- * avec `E2E_WEBKIT=1`, en CI dans l'image officielle de Playwright (il manque des bibliothèques
- * système à ce PC pour WebKit). Les captures de référence se produisent dans la même image.
+ * The PWA's end-to-end tests: on the demo (a replayed scenario, no server) and on the « live » app,
+ * served by factory-live's real server on the core's side (LIVE_SOURCE=workflow-core), reading a fake
+ * workflow-core (e2e/fake-api.mjs, #67). Chromium everywhere; WebKit (Safari, iPhone) with
+ * `E2E_WEBKIT=1`, on CI in Playwright's official image (this PC lacks system libraries for WebKit).
+ * The reference captures are made in that same image.
  */
 const webkit = process.env.E2E_WEBKIT === '1';
 const DEMO = 'http://127.0.0.1:4180';
 const LIVE = 'http://127.0.0.1:4181';
+/** The fake workflow-core and factory-live's real server between it and the live build (#67). */
+const CORE = 'http://127.0.0.1:4182';
+const SERVER = 'http://127.0.0.1:4183';
+/** The tests of live.spec.ts: all of them on every live project, phone layouts included. */
+const LIVE_TESTS = /lecture par le socle/;
 const DESKTOP = { viewport: { width: 1440, height: 900 } };
 const IPHONE = {
   viewport: { width: 390, height: 844 },
@@ -56,15 +62,22 @@ export default defineConfig({
         FACTORY_LIVE_OUT_DIR: 'dist-e2e/live',
         FACTORY_LIVE_SOURCEMAP: '0',
         VITE_DATA_SOURCE: 'live',
-        FACTORY_LIVE_API: 'http://127.0.0.1:4182',
+        FACTORY_LIVE_API: SERVER,
       },
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,
     },
     {
       command: 'node e2e/fake-api.mjs',
-      url: 'http://127.0.0.1:4182/healthz',
+      url: `${CORE}/__control/healthz`,
       reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: 'node e2e/live-server.mjs',
+      url: `${SERVER}/healthz`,
+      env: { PORT: '4183', FAKE_CORE_URL: CORE },
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
     },
   ],
   projects: [
@@ -78,10 +91,12 @@ export default defineConfig({
       testMatch: DEMO_SPECS,
       use: { ...devices['Desktop Chrome'], ...IPHONE, baseURL: DEMO },
     },
+    // The four live projects share the fake core and the server, which the tests stop, change and reset:
+    // each one waits for the previous one (`dependencies`), so that none cuts the core under another.
     {
       name: 'live-bureau',
       testMatch: /(live|studio-master)\.spec\.ts/,
-      // The phone layout of the studio runs on live-iphone only.
+      // The phone layout of the studio runs on the iPhone projects only.
       grepInvert: /sur iPhone/,
       use: {
         ...devices['Desktop Chrome'],
@@ -92,8 +107,9 @@ export default defineConfig({
     },
     {
       name: 'live-iphone',
-      testMatch: /studio-master\.spec\.ts/,
-      grep: /sur iPhone/,
+      testMatch: /(live|studio-master)\.spec\.ts/,
+      grep: [LIVE_TESTS, /sur iPhone/],
+      dependencies: ['live-bureau'],
       use: { ...devices['Desktop Chrome'], ...IPHONE, baseURL: LIVE, serviceWorkers: 'block' },
     },
     {
@@ -118,13 +134,13 @@ export default defineConfig({
             testMatch: DEMO_SPECS,
             use: { ...devices['Desktop Safari'], ...DESKTOP, baseURL: DEMO },
           },
-          // The studio's master under Safari too: a real master's layout is Safari's own (#41).
-          // `live.spec.ts` stops and restarts the shared fake API server (port 4182), so it stays
-          // on Chromium only: two projects doing so at once would cut each other's server.
+          // The live screens under Safari too, the studio's master included (a real master's layout is
+          // Safari's own, #41), after the Chromium ones: they share the fake core.
           {
             name: 'webkit-live-bureau',
-            testMatch: /studio-master\.spec\.ts/,
+            testMatch: /(live|studio-master)\.spec\.ts/,
             grepInvert: /sur iPhone/,
+            dependencies: ['live-iphone'],
             use: {
               ...devices['Desktop Safari'],
               ...DESKTOP,
@@ -134,8 +150,9 @@ export default defineConfig({
           },
           {
             name: 'webkit-live-iphone',
-            testMatch: /studio-master\.spec\.ts/,
-            grep: /sur iPhone/,
+            testMatch: /(live|studio-master)\.spec\.ts/,
+            grep: [LIVE_TESTS, /sur iPhone/],
+            dependencies: ['webkit-live-bureau'],
             use: { ...devices['iPhone 15'], baseURL: LIVE, serviceWorkers: 'block' as const },
           },
         ]
