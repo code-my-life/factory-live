@@ -205,12 +205,14 @@ export class WorkflowCoreReader {
       this.cursor = event.cursor;
       this.answered();
       if (event.kind === 'reset') return true;
-      if (event.workflow === null || event.item === null || event.state === null) continue;
+      if (event.workflow === null || event.state === null) continue;
       if (this.options.own.includes(event.workflow)) continue;
+      // A fact of activity may name no card (a tick of the dispatcher): only a card's change needs one.
       if (event.kind === 'live' || event.kind === 'activity') {
         if (event.workflow === this.options.code) this.live(event.kind, event.state);
         continue;
       }
+      if (event.item === null) continue;
       const held = this.items.get(event.workflow);
       // A workflow declared since the last full read: read it all.
       if (!held) return true;

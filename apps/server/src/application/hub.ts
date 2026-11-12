@@ -131,9 +131,8 @@ export class Hub {
   private readonly lastSent = new Map<Slice, string>();
   private readonly dirty = new Set<Slice>(['board', 'agents', 'health']);
   private interventions: Intervention[] = [];
-  /** On workflow-core's side (#66): the agents it announces, and the ids of its facts already in the feed. */
+  /** On workflow-core's side (#66): the agents it announces. */
   private coreAgents: CoreAgentState[] = [];
-  private readonly coreFacts = new Set<string>();
   /** Les interventions du kanban au dernier passage, et celles fermées depuis moins de 30 min. */
   private found: FoundIntervention[] = [];
   private readonly resolved = new Map<
@@ -387,12 +386,20 @@ export class Hub {
     this.dirty.add('agents');
   }
 
-  /** Facts of workflow-core's activity (#66): those not yet in the feed join it, in their order. */
+  /**
+   * Facts of workflow-core's activity (#66): those not yet in the feed join it, in their order. The feed
+   * itself (200 lines, restored from the base at start) says which are already there: the core serves its
+   * last 200 facts at most, so nothing it sends again falls out of it, and nothing grows without bound.
+   */
   addCoreActivity(facts: readonly CoreActivityFact[]): void {
-    const lines = facts
-      .filter((fact) => !this.coreFacts.has(fact.id))
-      .map((fact) => coreActivityEvent(fact, this.issueOfCard));
-    for (const fact of facts) this.coreFacts.add(fact.id);
+    const known = new Set(this.activity.map((line) => line.id));
+    const lines: ActivityEvent[] = [];
+    for (const fact of facts) {
+      const line = coreActivityEvent(fact, this.issueOfCard);
+      if (known.has(line.id)) continue;
+      known.add(line.id);
+      lines.push(line);
+    }
     if (lines.length === 0) return;
     this.activity = [...this.activity, ...lines].slice(-ACTIVITY_KEPT);
     this.pendingActivity.push(...lines);
