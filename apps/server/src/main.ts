@@ -21,6 +21,7 @@ import {
   noSessions,
 } from './adapters/workflow-core/absent.ts';
 import { FactoryViews } from './adapters/workflow-core/factoryViews.ts';
+import { CoreHistory } from './adapters/workflow-core/history.ts';
 import { WorkflowCoreReader } from './adapters/workflow-core/reader.ts';
 import { HistoryStore } from './adapters/store/history.ts';
 import { loadConfig } from './config.ts';
@@ -206,6 +207,10 @@ const coreWatch = new CoreWatch({
   log: log.child({ component: 'workflow-core' }),
   requestExit: (code) => shutdown('workflow-core', code),
 });
+// factory-live's own history on the core's side (#63): the kanban mirror poured once at the first start,
+// then every item read from the core; the code line keeps the items Hermes purged.
+const coreHistory = new CoreHistory(store, now);
+if (onCore) coreHistory.seed(CODE_WORKFLOW, store.board());
 const core = onCore
   ? new WorkflowCoreReader({
       url: config.WORKFLOW_CORE_URL ?? '',
@@ -216,7 +221,9 @@ const core = onCore
       now,
       log: log.child({ component: 'workflow-core' }),
       sink: {
-        board: (board, readAt) => hub.replaceBoard(board, readAt),
+        board: (board, readAt, declared) =>
+          hub.replaceBoard(declared ? coreHistory.withGone(CODE_WORKFLOW, board) : board, readAt),
+        history: (workflow, items, complete) => coreHistory.record(workflow, items, complete),
         sheet: (next) => {
           if (JSON.stringify(next) === JSON.stringify(codeSheet)) return;
           codeSheet = next;
