@@ -3,6 +3,7 @@ import {
   coreActivity,
   coreItems,
   coreLive,
+  coreMachine,
   coreSheetResponse,
   coreUsage,
   coreWorkflows,
@@ -11,11 +12,14 @@ import type {
   CoreAgent,
   CoreFact,
   CoreItem,
+  CoreMachineCheck,
   CoreSheet,
 } from '@factory-live/contracts/workflow-core';
 import type {
   CoreActivityFact,
   CoreAgentState,
+  CoreCheckState,
+  CoreMachineState,
   KanbanDelta,
   LoggerPort,
   PublishedSheet,
@@ -42,6 +46,12 @@ export interface CoreSink {
   activity(facts: CoreActivityFact[]): void;
   /** The code line's usage, one row per day, model, provider and agent (#66). */
   usage(rows: UsageRow[]): void;
+  /** The core answered: a read succeeded, or its stream is open or sent an event (#62). */
+  answered(at: number): void;
+  /** The state of the machine the core publishes, read in full (#62). */
+  machine(machine: CoreMachineState): void;
+  /** The machine's checks, from an event of the stream (#62). */
+  checks(checks: CoreCheckState[]): void;
 }
 
 export interface WorkflowCoreReaderOptions {
@@ -60,6 +70,26 @@ export interface WorkflowCoreReaderOptions {
 }
 
 const RETRY_MS = 2_000;
+
+/** Whether cursor `a` (`<epoch>:<n>`) comes before cursor `b`. */
+function older(a: string, b: string): boolean {
+  const [ea = 0, na = 0] = a.split(':').map(Number);
+  const [eb = 0, nb = 0] = b.split(':').map(Number);
+  return ea < eb || (ea === eb && na < nb);
+}
+/** A check of the machine, in factory-live's units (#62). */
+function checkState(check: CoreMachineCheck): CoreCheckState {
+  return {
+    id: check.id,
+    label: check.label,
+    group: check.group,
+    status: check.status,
+    detail: check.detail,
+    metrics: check.metrics ?? {},
+    checkedAt: Date.parse(check.checked_at),
+  };
+}
+
 /** The facts of activity read at a full read: as many as the screen keeps. */
 const ACTIVITY_LIMIT = 200;
 /** The days of usage read at a full read: as many as the core serves. */
@@ -80,6 +110,9 @@ export class WorkflowCoreReader {
   /** The code line's agents the core follows, by agent. */
   private agents = new Map<string, CoreAgent>();
   private cursor: string | null = null;
+  /** The machine's last checks, and the cursor of the event or read they come from (#62). */
+  private checks: CoreCheckState[] = [];
+  private checksCursor: string | null = null;
   private unreachableSince: number | null = null;
   private lastError: string | null = null;
   private running = false;
@@ -197,14 +230,60 @@ export class WorkflowCoreReader {
     this.options.sink.live(this.liveAgents());
     this.options.sink.activity(facts.map(coreActivityFact));
     if (items.has(code)) await this.refreshUsage(USAGE_DAYS);
+    await this.refreshMachine();
+  }
+
+  /**
+   * Reads the state of the machine the core publishes and sends it (#62); a failure is logged and leaves the
+   * last state as it is (main.ts asks again every 30 seconds).
+   */
+  async refreshMachine(): Promise<void> {
+    try {
+      const machine = await this.client.get('/api/machine', coreMachine, this.abort.signal);
+      this.answered();
+      // An answer older than the last `machine` event (its cursor was taken before the read) keeps the
+      // event's checks: an older answer never undoes a newer one.
+      const cursor = machine.cursor ?? null;
+      if (cursor === null || this.checksCursor === null || !older(cursor, this.checksCursor)) {
+        this.checks = (machine.checks ?? []).map(checkState);
+        if (cursor !== null) this.checksCursor = cursor;
+      }
+      this.options.sink.machine({
+        runtimeVersion: machine.runtime_version,
+        contract: machine.contract
+          ? { ok: machine.contract.ok, problems: machine.contract.problems }
+          : null,
+        mode: machine.mode,
+        boards: Object.entries(machine.boards).map(([board, read]) => ({
+          board,
+          lastReadAt: read.last_read_at === null ? null : Date.parse(read.last_read_at),
+        })),
+        checks: this.checks,
+      });
+    } catch (error) {
+      if (this.abort.signal.aborted) return;
+      // A read that fails, or hangs past its timeout, is a failed contact.
+      this.failed(error);
+      this.options.log.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        'état de la machine du socle illisible : le dernier reste',
+      );
+    }
   }
 
   /** Follows the stream until it ends (false: resume from the cursor) or asks for a full read (true). */
   private async follow(): Promise<boolean> {
-    for await (const event of this.client.events(this.cursor, this.abort.signal)) {
+    const stream = this.client.events(this.cursor, this.abort.signal, () => this.answered());
+    for await (const event of stream) {
       this.cursor = event.cursor;
       this.answered();
       if (event.kind === 'reset') return true;
+      if (event.kind === 'machine') {
+        this.checks = (event.state as CoreMachineCheck[]).map(checkState);
+        this.checksCursor = event.cursor;
+        this.options.sink.checks(this.checks);
+        continue;
+      }
       if (event.workflow === null || event.state === null) continue;
       if (this.options.own.includes(event.workflow)) continue;
       // A fact of activity may name no card (a tick of the dispatcher): only a card's change needs one.
@@ -281,6 +360,7 @@ export class WorkflowCoreReader {
     if (this.unreachableSince !== null) this.options.log.info({}, 'lecture du socle rétablie');
     this.unreachableSince = null;
     this.lastError = null;
+    this.options.sink.answered(this.options.now());
   }
 
   private emitAll(): void {

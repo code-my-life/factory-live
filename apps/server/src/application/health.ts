@@ -1,5 +1,5 @@
 import { msg } from '@factory-live/contracts';
-import type { PublishedSheet, WorkflowView } from './ports.ts';
+import type { CoreCheckState, CoreMachineState, PublishedSheet, WorkflowView } from './ports.ts';
 import type {
   FactoryState,
   HealthStatus,
@@ -49,7 +49,33 @@ export interface HealthSignals {
   workflows?: readonly WorkflowView[];
   /** Where the code line's sheet comes from (#31): the factory's, or the web's embedded copy. */
   codeSheet?: PublishedSheet;
+  /**
+   * On workflow-core's side of the switch (#62): whether the core answers, and the state of the machine it
+   * last published. Present, the core's checks replace the probe's report and its tile replaces the sources'.
+   */
+  core?: {
+    unreachableSince: number | null;
+    error: string | null;
+    machine: CoreMachineState | null;
+    /** The machine's latest checks, from a read or an event, kept apart from the machine's other state. */
+    checks?: CoreCheckState[];
+  };
 }
+
+/** A check of the probe, or of the core (#62): what a tile reads of it. */
+interface ReportedCheck {
+  status: HealthStatus;
+  label: string;
+  detail: string;
+  metrics: Record<string, string>;
+}
+
+const fromCore = (check: CoreCheckState): ReportedCheck => ({
+  status: check.status,
+  label: check.label,
+  detail: check.detail,
+  metrics: check.metrics,
+});
 
 const PROBE_SILENT_MS = 90_000;
 const DISPATCHER_SILENT_MS = 3 * 60_000;
@@ -79,12 +105,24 @@ export function buildHealth(signals: HealthSignals): {
   factory: FactoryState;
   health: ServiceHealth[];
 } {
-  const { now, probe } = signals;
+  const { now, probe, core } = signals;
   const probeFresh = probe !== null && now - probe.receivedAt < PROBE_SILENT_MS;
-  const checks = new Map((probe?.report.checks ?? []).map((check) => [check.id, check]));
-  const checkedAt = probe ? iso(probe.receivedAt) : null;
+  // On the core's side, the core's checks stand for the probe's, with their own statuses and times.
+  const coreChecks = new Map(
+    (core?.checks ?? core?.machine?.checks ?? []).map((check) => [check.id, check]),
+  );
+  const checks: Map<string, ReportedCheck> = core
+    ? new Map([...coreChecks].map(([id, check]) => [id, fromCore(check)]))
+    : new Map((probe?.report.checks ?? []).map((check) => [check.id, check]));
+  const reported = core !== undefined || probeFresh;
+  const checkedAtOf = (id: string): string | null => {
+    if (!core) return probe ? iso(probe.receivedAt) : null;
+    const at = coreChecks.get(id)?.checkedAt;
+    return at === null || at === undefined ? null : iso(at);
+  };
+  const checkedAt = checkedAtOf('gateway');
   const pause = checks.get('pause');
-  const paused = probeFresh && pause?.status === 'degraded';
+  const paused = reported && pause?.status === 'degraded';
   const pauseReason = paused
     ? pause?.detail.replace(/^Factory en pause\s*:?\s*/, '') || null
     : null;
@@ -92,19 +130,31 @@ export function buildHealth(signals: HealthSignals): {
   const push = (item: Omit<ServiceHealth, 'metrics'> & { metrics?: ServiceHealth['metrics'] }) =>
     health.push({ metrics: [], ...item });
 
-  push({
-    id: 'gateway',
-    label: msg('health.gateway'),
-    group: 'hermes',
-    status: probeFresh ? 'ok' : probe ? 'down' : 'unknown',
-    detail: probeFresh
-      ? msg('health.gateway.running', age(now, probe.receivedAt))
-      : probe
-        ? msg('health.gateway.silent', age(now, probe.receivedAt))
-        : msg('health.gateway.never'),
-    checkedAt,
-    metrics: probe ? [{ label: 'PID', value: String(probe.report.gatewayPid) }] : [],
-  });
+  const gateway = core ? checks.get('gateway') : undefined;
+  if (core)
+    push({
+      id: 'gateway',
+      label: msg('health.gateway'),
+      group: 'hermes',
+      status: gateway?.status ?? 'unknown',
+      detail: gateway?.detail ?? msg('health.notReported'),
+      checkedAt,
+      metrics: gateway?.metrics['pid'] ? [{ label: 'PID', value: gateway.metrics['pid'] }] : [],
+    });
+  else
+    push({
+      id: 'gateway',
+      label: msg('health.gateway'),
+      group: 'hermes',
+      status: probeFresh ? 'ok' : probe ? 'down' : 'unknown',
+      detail: probeFresh
+        ? msg('health.gateway.running', age(now, probe.receivedAt))
+        : probe
+          ? msg('health.gateway.silent', age(now, probe.receivedAt))
+          : msg('health.gateway.never'),
+      checkedAt,
+      metrics: probe ? [{ label: 'PID', value: String(probe.report.gatewayPid) }] : [],
+    });
 
   const tickStatus: HealthStatus =
     signals.lastTickAt === null
@@ -165,9 +215,9 @@ export function buildHealth(signals: HealthSignals): {
       id,
       label: LABELS[id] ?? check.label,
       group,
-      status: probeFresh ? check.status : 'unknown',
+      status: reported ? check.status : 'unknown',
       detail: check.detail,
-      checkedAt,
+      checkedAt: checkedAtOf(id),
       metrics,
     });
   }
@@ -267,39 +317,44 @@ export function buildHealth(signals: HealthSignals): {
     });
   }
 
-  push({
-    id: 'probe',
-    label: msg('health.probe'),
-    group: 'factory-live',
-    status: probeFresh ? 'ok' : probe ? 'down' : 'unknown',
-    detail: probe ? msg('health.probe.last', age(now, probe.receivedAt)) : msg('health.probe.none'),
-    checkedAt,
-  });
+  if (core) pushCore(push, now, core);
+  else
+    push({
+      id: 'probe',
+      label: msg('health.probe'),
+      group: 'factory-live',
+      status: probeFresh ? 'ok' : probe ? 'down' : 'unknown',
+      detail: probe
+        ? msg('health.probe.last', age(now, probe.receivedAt))
+        : msg('health.probe.none'),
+      checkedAt,
+    });
 
   const sourcesOk = signals.kanban.state === 'read' && signals.sessions.error === null;
-  push({
-    id: 'sources',
-    label: msg('health.sources'),
-    group: 'factory-live',
-    status: sourcesOk ? 'ok' : 'down',
-    detail: msg('health.sources.detail', {
-      kanban: signals.kanban.state,
-      cards: signals.kanban.cards,
-      kanbanError: signals.kanban.error,
-      sessionsError: signals.sessions.error,
-    }),
-    checkedAt: signals.kanban.readAt === null ? null : iso(signals.kanban.readAt),
-    metrics: [
-      { label: msg('health.metric.hooksPerMinute'), value: String(signals.hooksPerMinute) },
-      {
-        label: msg('health.metric.lastHook'),
-        value:
-          signals.lastHookAt === null
-            ? msg('health.value.none')
-            : msg('health.value.ago', age(now, signals.lastHookAt)),
-      },
-    ],
-  });
+  if (!core)
+    push({
+      id: 'sources',
+      label: msg('health.sources'),
+      group: 'factory-live',
+      status: sourcesOk ? 'ok' : 'down',
+      detail: msg('health.sources.detail', {
+        kanban: signals.kanban.state,
+        cards: signals.kanban.cards,
+        kanbanError: signals.kanban.error,
+        sessionsError: signals.sessions.error,
+      }),
+      checkedAt: signals.kanban.readAt === null ? null : iso(signals.kanban.readAt),
+      metrics: [
+        { label: msg('health.metric.hooksPerMinute'), value: String(signals.hooksPerMinute) },
+        {
+          label: msg('health.metric.lastHook'),
+          value:
+            signals.lastHookAt === null
+              ? msg('health.value.none')
+              : msg('health.value.ago', age(now, signals.lastHookAt)),
+        },
+      ],
+    });
 
   for (const workflow of signals.workflows ?? []) {
     const down = workflow.unreachableSince !== null;
@@ -337,7 +392,9 @@ export function buildHealth(signals: HealthSignals): {
 
   return {
     factory: {
-      live: probeFresh || (signals.lastHookAt !== null && now - signals.lastHookAt < 10 * 60_000),
+      live: core
+        ? core.unreachableSince === null && gateway?.status === 'ok'
+        : probeFresh || (signals.lastHookAt !== null && now - signals.lastHookAt < 10 * 60_000),
       paused,
       pauseReason,
       maxInProgress: signals.maxInProgress,
@@ -345,4 +402,54 @@ export function buildHealth(signals: HealthSignals): {
     },
     health,
   };
+}
+
+/** The core's tile (#62): whether it answers, its mode and contract, the age of each board's last read. */
+function pushCore(
+  push: (item: Omit<ServiceHealth, 'metrics'> & { metrics?: ServiceHealth['metrics'] }) => void,
+  now: number,
+  core: NonNullable<HealthSignals['core']>,
+): void {
+  const machine = core.machine;
+  const problem = machine?.contract?.problems[0] ?? null;
+  const observer = machine?.mode === 'observer';
+  const metrics: ServiceHealth['metrics'] = machine
+    ? [
+        {
+          label: msg('health.metric.coreVersion'),
+          value: machine.runtimeVersion ?? msg('health.value.none'),
+        },
+        {
+          label: msg('health.metric.contract'),
+          value:
+            machine.contract === null
+              ? msg('health.value.none')
+              : machine.contract.ok
+                ? msg('health.core.contract.ok')
+                : msg('health.core.contract.broken', { problem }),
+        },
+        { label: msg('health.metric.mode'), value: machine.mode },
+        ...machine.boards.map((board) => ({
+          label: msg('health.metric.boardRead', { board: board.board }),
+          value:
+            board.lastReadAt === null
+              ? msg('health.value.none')
+              : msg('health.value.ago', age(now, board.lastReadAt)),
+        })),
+      ]
+    : [];
+  push({
+    id: 'core',
+    label: msg('health.core'),
+    group: 'factory-live',
+    status: core.unreachableSince !== null ? 'down' : observer ? 'degraded' : 'ok',
+    detail:
+      core.unreachableSince !== null
+        ? msg('health.core.unreachable', age(now, core.unreachableSince))
+        : observer
+          ? msg('health.core.observer', { problem })
+          : msg('health.core.ok'),
+    checkedAt: null,
+    metrics,
+  });
 }

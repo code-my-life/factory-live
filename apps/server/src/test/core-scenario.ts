@@ -297,9 +297,13 @@ export function coreSide(dir: TempDir, core: FakeCore): Side {
       workflows: (views) => {
         generic = views;
       },
-      failed: (error) => {
+      failed: (error, at) => {
         failures.push(error);
+        hub.coreFailed(error, at);
       },
+      answered: () => hub.coreAnswered(),
+      machine: (machine) => hub.applyCoreMachine(machine),
+      checks: (checks) => hub.applyCoreChecks(checks),
       live: (agents) => hub.replaceCoreAgents(agents),
       activity: (facts) => hub.addCoreActivity(facts),
       usage: () => undefined,

@@ -3,9 +3,9 @@
 export type Cursor = string;
 export type Workflow = string | null;
 export type Item = string | null;
-export type Kind = 'changed' | 'reset' | 'live' | 'activity';
+export type Kind = 'changed' | 'reset' | 'live' | 'activity' | 'machine';
 export type At = string;
-export type State = Item1 | AgentLive | ActivityFact | null;
+export type State = Item1 | AgentLive | ActivityFact | MachineCheck[] | null;
 export type Id = string;
 export type Title = string;
 export type Body = string | null;
@@ -62,11 +62,18 @@ export type Agent1 = string | null;
 export type Item3 = string | null;
 export type Text = string;
 export type Status2 = ('ok' | 'running' | 'error' | 'blocked') | null;
+export type Id5 = string;
+export type Label1 = string;
+export type Group = string;
+export type Status3 = 'ok' | 'degraded' | 'down' | 'unknown';
+export type Detail1 = string;
+export type CheckedAt = string;
 
 /**
  * One event of GET /api/events. `reset` opens an epoch: the client reads the full state again; it names no
  * workflow, no item and carries no state. `changed` carries the full state of the item, `live` the live state of an
- * agent (its item: the card it holds), `activity` one new fact of the board.
+ * agent (its item: the card it holds), `activity` one new fact of the board, `machine` the full list of the machine's
+ * checks when a status changed (no workflow, no item).
  */
 export interface StreamEvent {
   cursor: Cursor;
@@ -191,4 +198,20 @@ export interface ActivityFact {
   text: Text;
   status: Status2;
   [k: string]: unknown;
+}
+/**
+ * One tile of the machine's state.
+ */
+export interface MachineCheck {
+  id: Id5;
+  label: Label1;
+  group: Group;
+  status: Status3;
+  detail: Detail1;
+  metrics?: Metrics;
+  checked_at: CheckedAt;
+  [k: string]: unknown;
+}
+export interface Metrics {
+  [k: string]: string;
 }

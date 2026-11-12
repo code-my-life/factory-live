@@ -8,6 +8,13 @@ export type CheckedAt = string;
 export type Problems = string[];
 export type Mode = 'observer' | 'normal';
 export type LastReadAt = string | null;
+export type Id = string;
+export type Label = string;
+export type Group = string;
+export type Status = 'ok' | 'degraded' | 'down' | 'unknown';
+export type Detail = string;
+export type CheckedAt1 = string;
+export type Checks = MachineCheck[];
 
 /**
  * GET /api/machine: what the core holds about itself.
@@ -19,6 +26,7 @@ export interface MachineResponse {
   contract: ContractVerdict | null;
   mode: Mode;
   boards: Boards;
+  checks?: Checks;
   [k: string]: unknown;
 }
 export interface ContractVerdict {
@@ -33,4 +41,20 @@ export interface Boards {
 export interface BoardRead {
   last_read_at: LastReadAt;
   [k: string]: unknown;
+}
+/**
+ * One tile of the machine's state.
+ */
+export interface MachineCheck {
+  id: Id;
+  label: Label;
+  group: Group;
+  status: Status;
+  detail: Detail;
+  metrics?: Metrics;
+  checked_at: CheckedAt1;
+  [k: string]: unknown;
+}
+export interface Metrics {
+  [k: string]: string;
 }

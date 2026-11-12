@@ -1702,6 +1702,9 @@ describe('coûts lus par le socle (#66)', () => {
         live: () => undefined,
         activity: () => undefined,
         usage: (usage) => core.store.setUsage(usage),
+        answered: () => undefined,
+        machine: () => undefined,
+        checks: () => undefined,
       },
     });
     try {

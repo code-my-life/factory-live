@@ -18,6 +18,8 @@ export interface FakeCoreState {
   live?: Record<string, unknown[]>;
   /** The recent facts of each workflow's activity, oldest first (#66); absent: none. */
   activity?: Record<string, unknown[]>;
+  /** The state of the machine, as /api/machine serves it without `schema_version` (#62); absent: none. */
+  machine?: unknown;
   /** The usage of each workflow, by the `days` asked (#66); absent: 404. */
   usage?: Record<string, (days: number) => unknown>;
 }
@@ -94,6 +96,20 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
     });
     if (request.headers.authorization !== `Bearer ${secret}`)
       return json(response, 401, { error: 'unauthorized', detail: 'missing or wrong secret' });
+    if (path === '/api/machine')
+      return json(
+        response,
+        200,
+        withCursor({
+          schema_version: 1,
+          ...((state.machine as object | undefined) ?? {
+            runtime_version: null,
+            contract: null,
+            mode: 'normal',
+            boards: {},
+          }),
+        }),
+      );
     if (path === '/api/workflows')
       return json(response, 200, withCursor({ schema_version: 1, workflows: state.workflows }));
     if (path === '/api/events') {

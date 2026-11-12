@@ -429,6 +429,18 @@ const server: ServerMessages = {
   'health.codeSheet': () => 'Sheet of the code line',
   'health.codeSheet.published': () => 'Published by the factory (config/workflow.json)',
   'health.codeSheet.embedded': ({ reason }) => `Embedded copy: ${reason}`,
+  'health.core': () => 'Core (workflow-core)',
+  'health.core.ok': () => 'Answering',
+  'health.core.unreachable': ({ seconds }) =>
+    `Core unreachable for ${secs(seconds)}, last state kept`,
+  'health.core.unreachableTitle': () => 'Core unreachable',
+  'health.core.observer': ({ problem }) => `In observer mode${problem ? `: ${problem}` : ''}`,
+  'health.core.contract.ok': () => 'Holds',
+  'health.core.contract.broken': ({ problem }) => `Broken${problem ? `: ${problem}` : ''}`,
+  'health.metric.coreVersion': () => 'Hermes version',
+  'health.metric.contract': () => 'Contract',
+  'health.metric.mode': () => 'Mode',
+  'health.metric.boardRead': ({ board }) => `Read of board ${board}`,
 };
 
 export const en: Messages = {
