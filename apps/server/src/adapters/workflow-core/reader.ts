@@ -1,6 +1,7 @@
 import type { Diagnosis, RunVerdict, WorkflowSheet } from '@factory-live/contracts';
 import {
   coreActivity,
+  coreAgents,
   coreDiagnosis,
   coreInterventions,
   coreItems,
@@ -12,6 +13,7 @@ import {
   coreWorkflows,
 } from '@factory-live/contracts/workflow-core';
 import type {
+  AgentsResponse,
   CoreAgent,
   CoreEvent,
   CoreFact,
@@ -57,6 +59,8 @@ export interface CoreSink {
   activity(facts: CoreActivityFact[]): void;
   /** The code line's usage, one row per day, model, provider and agent (#66). */
   usage(rows: UsageRow[]): void;
+  /** The code line's agents and the kanban's settings (#93): they replace those held. */
+  agents(answer: AgentsResponse): void;
   /**
    * Items read from the core, for factory-live's own history (#63), before the board they make is sent.
    * `complete`: all the items of the workflow (a full read).
@@ -100,6 +104,8 @@ export interface WorkflowCoreReaderOptions {
 }
 
 const RETRY_MS = 2_000;
+/** The period of the agents' statistics the core counts (hook timeouts): the agents' screen's. */
+const AGENTS_DAYS = 30;
 /** The reads of run verdicts at once (#59): enough to fill a board at start, without flooding the core. */
 const VERDICT_READS = 4;
 
@@ -156,6 +162,9 @@ export class WorkflowCoreReader {
   /** The code line's agents the core follows, by agent. */
   private agents = new Map<string, CoreAgent>();
   private cursor: string | null = null;
+  /** The number of the last read of the agents started, and of the last one sent (#93). */
+  private agentsRead = 0;
+  private agentsApplied = 0;
   /** The gestures each workflow declares, from the last full read (#61). */
   private declared: Record<string, DeclaredGesture[]> = {};
   /** The machine's last checks, and the cursor of the event or read they come from (#62). */
@@ -291,6 +300,7 @@ export class WorkflowCoreReader {
     this.options.sink.activity(facts.map(coreActivityFact));
     if (items.has(code)) {
       await this.refreshUsage(USAGE_DAYS);
+      await this.refreshAgents();
       await this.readInterventions();
       for (const item of this.items.get(code)?.values() ?? [])
         if (hasFailedRun(item)) this.scheduleVerdicts(item.id);
@@ -523,6 +533,28 @@ export class WorkflowCoreReader {
    * Reads the code line's usage over the last `days` days and sends its rows; a failure is logged and
    * leaves the stored days as they are (main.ts asks again every minute).
    */
+  /**
+   * Reads the code line's agents and the kanban's settings (#93); a failure is logged and leaves the last
+   * ones received (main.ts asks again every 5 minutes).
+   */
+  async refreshAgents(): Promise<void> {
+    const path = `/api/workflows/${encodeURIComponent(this.options.code)}/agents?days=${AGENTS_DAYS}`;
+    // Reads may overlap (the timer and a full read after a reset): only the latest one started counts.
+    const read = ++this.agentsRead;
+    try {
+      const answer = await this.client.get(path, coreAgents, this.abort.signal);
+      if (read < this.agentsApplied) return;
+      this.agentsApplied = read;
+      this.options.sink.agents(answer);
+    } catch (error) {
+      if (this.abort.signal.aborted) return;
+      this.options.log.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        'agents du socle illisibles : les derniers reçus restent',
+      );
+    }
+  }
+
   async refreshUsage(days: number): Promise<void> {
     const path = `/api/workflows/${encodeURIComponent(this.options.code)}/usage?days=${days}`;
     try {

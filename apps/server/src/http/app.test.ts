@@ -1829,6 +1829,7 @@ describe('coûts lus par le socle (#66)', () => {
         failed: () => undefined,
         live: () => undefined,
         activity: () => undefined,
+        agents: () => undefined,
         usage: (usage) => core.store.setUsage(usage),
         history: () => undefined,
         interventions: () => undefined,
@@ -1981,6 +1982,7 @@ describe('historique lu par le socle (#63)', () => {
         interventionClosed: () => undefined,
         diagnoses: () => undefined,
         verdicts: () => undefined,
+        agents: () => undefined,
         gestures: () => undefined,
       },
     });

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ActivityFact, ActivityResponse } from './workflow-core/generated/activity.ts';
+import type { AgentsResponse } from './workflow-core/generated/agents.ts';
 import type { DeclaredDataResponse } from './workflow-core/generated/declared-data.ts';
 import type { Diagnosis } from './workflow-core/generated/diagnosis.ts';
 import type { ErrorResponse } from './workflow-core/generated/error.ts';
@@ -17,6 +18,7 @@ import type { UsageResponse } from './workflow-core/generated/usage.ts';
 import type { WorkflowsResponse } from './workflow-core/generated/workflows.ts';
 import {
   activitySchema,
+  agentsSchema,
   declaredDataSchema,
   diagnosisSchema,
   errorSchema,
@@ -39,6 +41,7 @@ import {
 
 export type {
   ActivityFact as CoreFact,
+  AgentsResponse,
   ActivityResponse,
   AgentLive as CoreAgent,
   DeclaredDataResponse,
@@ -92,3 +95,4 @@ export type CoreValue = CoreDeclaredData['values'][number];
 export const coreInterventions = check<InterventionsResponse>(interventionsSchema);
 export const coreDiagnosis = check<Diagnosis>(diagnosisSchema);
 export const coreRunVerdicts = check<RunVerdicts>(runVerdictsSchema);
+export const coreAgents = check<AgentsResponse>(agentsSchema);
