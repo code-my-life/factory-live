@@ -7,3 +7,4 @@ package-lock.json
 fixtures/hermes-schema/
 evidence/
 fixtures/github-gate/
+fixtures/diagnosis-references/

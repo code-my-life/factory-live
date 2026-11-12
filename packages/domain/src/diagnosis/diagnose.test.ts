@@ -3,6 +3,7 @@ import { aTask } from '../fixtures.test-helpers.ts';
 import { diagnose } from './diagnose.ts';
 import { coderProfile, incidentInput } from './incidents.fixture-builder.test-helpers.ts';
 import { INCIDENTS } from './incidents.test-helpers.ts';
+import { atBlock } from './references.test-helpers.ts';
 import type { Diagnosis, DiagnosisInput } from './types.ts';
 
 /*
@@ -10,23 +11,7 @@ import type { Diagnosis, DiagnosisInput } from './types.ts';
  * diagnostic aurait dit à Clément au moment de chaque blocage.
  */
 
-const HOOK = INCIDENTS.hookTimeout;
 const CONFIG_FIXED_AT = Date.parse('2026-10-29T09:13:08Z') / 1000;
-
-/** factory-live#2 à 09:47, au blocage : sans le run 192, qui n'existait pas encore. */
-function atBlock(patch: Partial<DiagnosisInput> = {}): DiagnosisInput {
-  return incidentInput('hookTimeout', {
-    profile: coderProfile(),
-    sessions: HOOK.sessions.filter((session) => session.runId !== 192),
-    runs: HOOK.runs.filter((run) => run.id !== 192),
-    branch: 'fix/2-server-version-in-settings',
-    evidence: [
-      { name: '01-test-fails-on-base.txt', bytes: 6715, at: 1_793_253_600 },
-      { name: '07-e2e.txt', bytes: 18_903, at: 1_793_262_000 },
-    ],
-    ...patch,
-  });
-}
 
 function codes(diagnosis: Diagnosis): string[] {
   return [diagnosis.primary.code, ...diagnosis.others.map((finding) => finding.code)];
