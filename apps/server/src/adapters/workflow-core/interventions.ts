@@ -14,7 +14,8 @@ type CoreText = CoreIntervention['title'];
 function text(value: CoreText): ScreenText {
   if ('quote' in value) return String(value.quote);
   const code = String(value.code);
-  const coded = Text.safeParse({ code, params: value.params });
+  // `params` may be left out by the core for a code without parameters; the catalogue wants `{}`.
+  const coded = Text.safeParse({ code, params: value.params ?? {} });
   // A code factory-live does not know is shown as itself rather than lost.
   return coded.success ? coded.data : code;
 }

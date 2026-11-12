@@ -44,6 +44,8 @@ export interface FakeCore {
   backlog: (lastEventId: string | null) => object[];
   /** Sends one event to every open stream; returns the number of streams it reached. */
   send(event: { cursor: string; kind: string } & Record<string, unknown>): number;
+  /** How long the core waits before answering a path (#59: a slow route); none by default. */
+  delay: (path: string) => number;
   /** Cuts every open stream, as a restart of the core would. */
   cut(): void;
   /** Ends every open stream normally, as a proxy that closes long requests would. */
@@ -64,6 +66,7 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
     state,
     requests,
     backlog: () => [],
+    delay: () => 0,
     send(event) {
       for (const stream of streams) stream.write(frame(event));
       return streams.size;
@@ -183,7 +186,12 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
     );
   };
 
-  const server: Server = createServer(handle);
+  const server: Server = createServer((request, response) => {
+    const path = new URL(request.url ?? '/', 'http://core').pathname;
+    const wait = core.delay(path);
+    if (wait > 0) setTimeout(() => handle(request, response), wait);
+    else handle(request, response);
+  });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   core.url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   return core;

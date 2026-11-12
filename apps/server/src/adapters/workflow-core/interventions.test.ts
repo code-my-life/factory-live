@@ -15,6 +15,8 @@ import {
 } from '../../test/core-scenario.ts';
 import type { Side } from '../../test/core-scenario.ts';
 import { tempDir } from '../../test/hermes-fixtures.ts';
+import type { CoreIntervention } from '@factory-live/contracts/workflow-core';
+import { coreInterventionState } from './interventions.ts';
 import type { TempDir } from '../../test/hermes-fixtures.ts';
 
 /** A real diagnosis, as factory-live computed it on an incident (a question of the agent). */
@@ -290,5 +292,56 @@ describe('interventions lues par le socle (workflow-core, #59)', () => {
       kind: 'main_red',
       push: false,
     });
+  });
+
+  it('un workflow de la ligne du code retiré du socle retire ses interventions', async () => {
+    const side = await start(coreState());
+    await until(() => !!interventionOf(side, 'needs_input:t_1a9f0049:1'));
+
+    core!.state.workflows = core!.state.workflows.filter((workflow) => workflow.key !== 'factory');
+    core!.send({
+      cursor: '1762999999:1',
+      workflow: null,
+      item: null,
+      kind: 'reset',
+      at: '2026-11-12T10:05:00.000Z',
+      state: null,
+    });
+    await until(() => side.hub.boardData.tasks.length === 0);
+    expect(side.hub.snapshot().interventions).toEqual([]);
+  });
+
+  it('un texte en code sans paramètres reste une phrase du catalogue', () => {
+    const { params: _params, ...bare } = NEEDS_INPUT.title;
+    const state = coreInterventionState({ ...NEEDS_INPUT, title: bare } as CoreIntervention);
+    expect(state.title).toEqual(msg('intervention.title.needsInput'));
+  });
+
+  it('une lecture lente des verdicts ne retarde pas le flux', async () => {
+    const state = coreState();
+    const side = await start(state);
+    // The run-verdicts route answers after 2 s, as a core busy computing them would.
+    core!.delay = (path) => (path.endsWith('/run-verdicts') ? 2_000 : 0);
+    const failed: Record<string, unknown> = { ...structuredClone(CORE_ITEMS[0]!), status: 'done' };
+    (failed['runs'] as { outcome: string }[])[0]!.outcome = 'crashed';
+    core!.send({
+      cursor: '1762900000:6',
+      workflow: 'factory',
+      item: 't_b1ef0049',
+      kind: 'changed',
+      at: '2026-11-12T10:00:00.000Z',
+      state: failed,
+    });
+    const sent = performance.now();
+    core!.send({
+      cursor: '1762900000:7',
+      workflow: 'factory',
+      item: null,
+      kind: 'intervention_closed',
+      at: '2026-11-12T10:00:01.000Z',
+      state: { id: 'needs_input:t_1a9f0049:1' },
+    });
+    await until(() => !interventionOf(side, 'needs_input:t_1a9f0049:1'), 2_000);
+    expect(performance.now() - sent).toBeLessThan(1_000);
   });
 });

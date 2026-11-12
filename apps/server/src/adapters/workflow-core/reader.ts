@@ -85,6 +85,8 @@ export interface WorkflowCoreReaderOptions {
 }
 
 const RETRY_MS = 2_000;
+/** The reads of run verdicts at once (#59): enough to fill a board at start, without flooding the core. */
+const VERDICT_READS = 4;
 
 /** A card with a run that ended otherwise than completed: the core gives its runs' verdicts (#59). */
 function hasFailedRun(item: CoreItem): boolean {
@@ -129,6 +131,12 @@ export class WorkflowCoreReader {
   private readonly readAt = new Map<string, number>();
   /** The code line's open interventions, by id, with their card (#59). */
   private openCards = new Map<string, string>();
+  /** The reads of diagnoses and verdicts, done beside the stream (#59). */
+  private diagnosesBusy = false;
+  private diagnosesAgain = false;
+  private readonly verdictsQueue: string[] = [];
+  private readonly verdictsQueued = new Set<string>();
+  private verdictReads = 0;
   /** The code line's agents the core follows, by agent. */
   private agents = new Map<string, CoreAgent>();
   private cursor: string | null = null;
@@ -255,7 +263,7 @@ export class WorkflowCoreReader {
       await this.refreshUsage(USAGE_DAYS);
       await this.readInterventions();
       for (const item of this.items.get(code)?.values() ?? [])
-        if (hasFailedRun(item)) await this.refreshVerdicts(item.id);
+        if (hasFailedRun(item)) this.scheduleVerdicts(item.id);
     }
     await this.refreshMachine();
   }
@@ -319,7 +327,7 @@ export class WorkflowCoreReader {
         continue;
       }
       if (event.kind === 'intervention_opened' || event.kind === 'intervention_closed') {
-        if (event.workflow === this.options.code) await this.intervention(event.kind, event.state);
+        if (event.workflow === this.options.code) this.intervention(event.kind, event.state);
         continue;
       }
       if (event.item === null) continue;
@@ -335,8 +343,8 @@ export class WorkflowCoreReader {
       this.emit(event.workflow);
       if (event.workflow === this.options.code) {
         // A card with an open intervention: its diagnosis may have changed; a failed run: its verdict.
-        if ([...this.openCards.values()].includes(event.item)) await this.refreshDiagnoses();
-        if (hasFailedRun(item)) await this.refreshVerdicts(event.item);
+        if ([...this.openCards.values()].includes(event.item)) this.scheduleDiagnoses();
+        if (hasFailedRun(item)) this.scheduleVerdicts(event.item);
       }
     }
     return false;
@@ -348,13 +356,10 @@ export class WorkflowCoreReader {
     const answer = await this.client.get(path, coreInterventions, this.abort.signal);
     this.openCards = new Map(answer.interventions.map((item) => [item.id, item.item]));
     this.options.sink.interventions(answer.interventions.map(coreInterventionState));
-    await this.refreshDiagnoses();
+    this.scheduleDiagnoses();
   }
 
-  private async intervention(
-    kind: 'intervention_opened' | 'intervention_closed',
-    state: unknown,
-  ): Promise<void> {
+  private intervention(kind: 'intervention_opened' | 'intervention_closed', state: unknown): void {
     if (kind === 'intervention_closed') {
       const id = (state as { id: string }).id;
       this.openCards.delete(id);
@@ -364,7 +369,45 @@ export class WorkflowCoreReader {
     const item = state as CoreIntervention;
     this.openCards.set(item.id, item.item);
     this.options.sink.interventionOpened(coreInterventionState(item));
-    await this.refreshDiagnoses();
+    this.scheduleDiagnoses();
+  }
+
+  /**
+   * Reads the diagnoses again without holding the stream: a read already running is followed by one more,
+   * never by several (#59).
+   */
+  private scheduleDiagnoses(): void {
+    if (this.diagnosesBusy) {
+      this.diagnosesAgain = true;
+      return;
+    }
+    this.diagnosesBusy = true;
+    void this.refreshDiagnoses().finally(() => {
+      this.diagnosesBusy = false;
+      if (!this.diagnosesAgain || !this.running) return;
+      this.diagnosesAgain = false;
+      this.scheduleDiagnoses();
+    });
+  }
+
+  /** Reads a card's verdicts without holding the stream, `VERDICT_READS` at a time (#59). */
+  private scheduleVerdicts(cardId: string): void {
+    if (this.verdictsQueued.has(cardId)) return;
+    this.verdictsQueued.add(cardId);
+    this.verdictsQueue.push(cardId);
+    this.pumpVerdicts();
+  }
+
+  private pumpVerdicts(): void {
+    while (this.running && this.verdictReads < VERDICT_READS && this.verdictsQueue.length > 0) {
+      const cardId = this.verdictsQueue.shift()!;
+      this.verdictsQueued.delete(cardId);
+      this.verdictReads += 1;
+      void this.refreshVerdicts(cardId).finally(() => {
+        this.verdictReads -= 1;
+        this.pumpVerdicts();
+      });
+    }
   }
 
   /**
@@ -479,8 +522,10 @@ export class WorkflowCoreReader {
       this.emit(code);
       return;
     }
-    // The code line is no longer declared by the core: its cards go too.
+    // The code line is no longer declared by the core: its cards and its interventions go too.
     this.options.sink.board(boardOf([]), this.options.now());
+    this.openCards = new Map();
+    this.options.sink.interventions([]);
     this.options.sink.workflows(this.views());
   }
 

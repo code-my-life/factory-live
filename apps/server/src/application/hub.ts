@@ -331,8 +331,8 @@ export class Hub {
     const next = this.found.find(
       (item) => item.cardId === intervention.cardId && DIAGNOSED.has(item.kind),
     );
-    const before = this.deps.diagnoses?.primaryOf(intervention.id) ?? null;
-    const after = next ? (this.deps.diagnoses?.primaryOf(next.id) ?? null) : null;
+    const before = this.primaryOf(intervention.id);
+    const after = next ? this.primaryOf(next.id) : null;
     return {
       runId: run.id,
       outcome: run.outcome,
@@ -419,17 +419,42 @@ export class Hub {
     this.dirty.add('board');
   }
 
-  /** The core's diagnoses, by intervention; `null` for one whose form the core's schema refused (#59). */
+  /**
+   * The core's diagnoses, by intervention; `null` for one whose form the core's schema refused (#59). The
+   * core lists the open interventions only: the diagnosis of one resolved in the last 30 minutes is kept,
+   * so its follow-up can still say whether the card blocked again for the same cause.
+   */
   applyCoreDiagnoses(entries: readonly (readonly [string, Diagnosis | null])[]): void {
-    this.coreDiagnoses = new Map(
+    const next = new Map(
       entries.flatMap(([id, diagnosis]) => (diagnosis ? [[id, diagnosis] as const] : [])),
     );
+    for (const id of this.resolved.keys()) {
+      const kept = this.coreDiagnoses.get(id);
+      if (kept && !next.has(id)) next.set(id, kept);
+    }
+    this.coreDiagnoses = next;
     this.dirty.add('board');
   }
 
-  /** The verdicts of a card's failed runs, as the core computes them (#59). */
+  /**
+   * The verdicts of a card's failed runs, as the core computes them (#59). New verdicts send the board
+   * again even when it did not change: the app reads an issue's details again on a board event.
+   */
   applyCoreVerdicts(cardId: string, verdicts: readonly RunVerdict[]): void {
-    this.coreVerdicts.set(cardId, new Map(verdicts.map((verdict) => [verdict.runId, verdict])));
+    const next = new Map(verdicts.map((verdict) => [verdict.runId, verdict]));
+    const held = this.coreVerdicts.get(cardId);
+    const same = held !== undefined && JSON.stringify([...held]) === JSON.stringify([...next]);
+    this.coreVerdicts.set(cardId, next);
+    if (same) return;
+    this.lastSent.delete('board');
+    this.dirty.add('board');
+  }
+
+  /** The cause a diagnosis names first, from the core on its side, else from the diagnosis service. */
+  private primaryOf(interventionId: string): string | null {
+    if (this.deps.source === 'workflow-core')
+      return this.coreDiagnoses.get(interventionId)?.primary.code ?? null;
+    return this.deps.diagnoses?.primaryOf(interventionId) ?? null;
   }
 
   /** Le verdict des runs en échec d'une carte (page d'une issue), calculé à la demande et gardé. */
