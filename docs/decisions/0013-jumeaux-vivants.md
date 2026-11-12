@@ -1,6 +1,6 @@
 # ADR 0013 : les jumeaux vivants dans la recette
 
-Date : 2026-11-04. Statut : accepté (issue #23, décisions du propriétaire du 2026-11-04 : « Resynchroniser » ramène les deux jumeaux à l'accueil de l'app ; la factory démarre la paire à la gate verte et l'arrête à la fusion ou à la fermeture, hermes-software-factory#29).
+Date : 2026-11-04. Statut : accepté, amendée par l'ADR 0020 (issue #23, décisions du propriétaire du 2026-11-04 : « Resynchroniser » ramène les deux jumeaux à l'accueil de l'app ; la factory démarre la paire à la gate verte et l'arrête à la fusion ou à la fermeture, hermes-software-factory#29).
 
 ## Contexte
 

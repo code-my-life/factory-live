@@ -1,6 +1,6 @@
 # ADR 0002 : sources de données sans fichier écrit pour l'occasion
 
-Date : 2026-10-28. Statut : accepté.
+Date : 2026-10-28. Statut : remplacée par l'ADR 0015.
 
 ## Contexte
 
