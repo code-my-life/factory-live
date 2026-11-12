@@ -50,6 +50,14 @@ Les règles sont vérifiées en CI par dependency-cruiser (`.dependency-cruiser.
 | Recette d'une PR          | API REST et GraphQL GitHub, artefacts JUnit de la CI, `evidence/gate/<sha7>/` | partie par partie, chaque lecture isolée ; rapports lus une fois par artefact (ADR 0012) |
 | Diagnostic d'un blocage   | `state.db`, `logs/agent.log`, configs, plugins                                | liste blanche (`adapters/hermes/paths.ts`), recalcul sur empreinte (ADR 0009)            |
 
+Avec `LIVE_SOURCE=workflow-core` (ADR 0015, #57), les cartes, leurs runs et la fiche de la ligne du code viennent du
+socle, `adapters/workflow-core/` : l'état complet au démarrage, puis son flux SSE (`Last-Event-ID` à la reprise, relecture
+complète après un `reset`), chaque réponse vérifiée par le schéma que `z.fromJSONSchema` tire de la copie du JSON
+Schema du socle (`packages/contracts/src/workflow-core/`, types générés par `npm run types:core`). De ce côté, rien
+n'est lu sous `HERMES_HOME` ni dans le dépôt de la factory, et le miroir du kanban n'est pas écrit ; ce que le socle ne
+sert pas encore (sessions, journaux, fichiers des cartes, configs des agents, diagnostic) reste vide jusqu'aux
+stories qui l'amènent.
+
 ## Front
 
 - Une seule interface de données (`apps/web/src/data/source.ts`) : la démo (`DemoSource`) et l'API (REST + SSE) la réalisent.

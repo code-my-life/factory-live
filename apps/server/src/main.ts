@@ -14,6 +14,13 @@ import { publishedSheet } from './adapters/workflows/sheets.ts';
 import { ProfileConfigReader } from './adapters/hermes/profiles.ts';
 import { SessionReader } from './adapters/hermes/sessions.ts';
 import { PushNotifier, vapidKeys } from './adapters/push/webpush.ts';
+import {
+  noAgentLog,
+  noCardFiles,
+  noProfiles,
+  noSessions,
+} from './adapters/workflow-core/absent.ts';
+import { WorkflowCoreReader } from './adapters/workflow-core/reader.ts';
 import { HistoryStore } from './adapters/store/history.ts';
 import { loadConfig } from './config.ts';
 import { createApp } from './http/app.ts';
@@ -26,6 +33,14 @@ import { factoryBadge, notifyOpened } from './application/notify.ts';
 import { notifyArrivals, waitingForOwner } from './application/notifications.ts';
 import { KEEP_FINISHED_MS } from './application/projection.ts';
 import { trackUnblockReactions } from './application/unblock.ts';
+import type {
+  AgentLogPort,
+  CardFilesPort,
+  ProfilesPort,
+  PublishedSheet,
+  SessionsPort,
+  WorkflowView,
+} from './application/ports.ts';
 
 /** Racine de composition : configuration, adaptateurs, hub, minuteries, serveur HTTP. */
 const config = loadConfig();
@@ -36,6 +51,13 @@ const version = (
   }
 ).version;
 const now = () => Date.now();
+/**
+ * The switch (#57, ADR 0015): on the core's side, the code line and every generic workflow are read from
+ * workflow-core, and nothing is opened under Hermes' home nor in the factory's repository.
+ */
+const onCore = config.LIVE_SOURCE === 'workflow-core';
+/** The code line's workflow, as workflow-core declares it. */
+const CODE_WORKFLOW = 'factory';
 
 const store = (() => {
   try {
@@ -54,13 +76,20 @@ const paths = new HermesPaths({
   boardDir: config.boardDir,
   factoryRepo: config.FACTORY_REPO,
 });
-const profiles = new ProfileConfigReader(config.HERMES_HOME, config.FACTORY_REPO, paths);
-const sessions = new SessionReader(config.profilesDir);
-const files = new CardFiles(config.boardDir, config.CLAUDE_PROJECTS, paths);
+const profiles: ProfilesPort = onCore
+  ? noProfiles
+  : new ProfileConfigReader(config.HERMES_HOME, config.FACTORY_REPO, paths);
+const sessionReader = onCore ? null : new SessionReader(config.profilesDir);
+const sessions: SessionsPort = sessionReader ?? noSessions;
+const files: CardFilesPort = onCore
+  ? noCardFiles
+  : new CardFiles(config.boardDir, config.CLAUDE_PROJECTS, paths);
 // Une ligne du journal sans session prend la seule session ouverte de l'agent à ce moment.
-const agentLog = new AgentLogReader(paths, config.HERMES_TZ, (profile, at) =>
-  sessions.sessionsActiveAt(profile, at),
-);
+const agentLog: AgentLogPort = onCore
+  ? noAgentLog
+  : new AgentLogReader(paths, config.HERMES_TZ, (profile, at) =>
+      sessions.sessionsActiveAt(profile, at),
+    );
 // GitHub : App factory-live (lectures, quota propre) et connexion de Clément (déblocage) ; le jeton
 // fine-grained de ~/.config/factory-live/github-token sert de repli tant que l'App n'existe pas.
 const githubAuth = new GitHubAppAuth({
@@ -87,21 +116,28 @@ const github = new GitHubCache(
   },
 );
 
-const diagnoses = new DiagnosisService({
-  sessions,
-  profiles,
-  files,
-  agentLog,
-  pullRequests: github,
-  log: log.child({ component: 'diagnosis' }),
-  boardName: config.HERMES_BOARD,
-});
+// On the core's side, the diagnosis comes from workflow-core in a later story (#59): none is computed here.
+const diagnoses = onCore
+  ? null
+  : new DiagnosisService({
+      sessions,
+      profiles,
+      files,
+      agentLog,
+      pullRequests: github,
+      log: log.child({ component: 'diagnosis' }),
+      boardName: config.HERMES_BOARD,
+    });
 
 // The workflows followed by their generic API (#31, ADR 0014), and the code line's published sheet.
 const workflows = config.WORKFLOWS.map(
   (workflow) => new WorkflowApi({ name: workflow.name, url: workflow.url }),
 );
-let codeSheet = publishedSheet(paths.factorySheet());
+let codeSheet: PublishedSheet = onCore
+  ? { source: 'embedded', reason: 'fiche du socle pas encore reçue' }
+  : publishedSheet(paths.factorySheet());
+/** The workflows workflow-core declares besides the code line and the studio (#57); their screen is #65. */
+let coreWorkflows: readonly WorkflowView[] = [];
 /** The workflows' items that wait for the owner: the app's badge counts them with the factory's. */
 const workflowsWaiting = () =>
   workflows.reduce((count, workflow) => count + waitingForOwner(workflow.view()).length, 0);
@@ -146,6 +182,7 @@ const kanbanWatch = new KanbanWatch({
   requestExit: (code) => shutdown('kanban', code),
 });
 const pollKanban = () => {
+  if (onCore) return;
   try {
     kanban ??= new KanbanReader(config.kanbanDb);
     if (kanban.changed()) hub.applyKanban(kanban.read(), now());
@@ -158,6 +195,33 @@ const pollKanban = () => {
   }
 };
 pollKanban();
+
+// The core's side: the full state, then its stream; without an answer, the last state stays (#57).
+const core = onCore
+  ? new WorkflowCoreReader({
+      url: config.WORKFLOW_CORE_URL ?? '',
+      secret: config.secrets.workflowCoreSecret ?? '',
+      code: CODE_WORKFLOW,
+      // The studio keeps its own adapter (WORKFLOWS) until its epic, whatever the source.
+      own: [...new Set(['studio', ...config.WORKFLOWS.map((workflow) => workflow.name)])],
+      now,
+      log: log.child({ component: 'workflow-core' }),
+      sink: {
+        board: (board, readAt) => hub.replaceBoard(board, readAt),
+        sheet: (next) => {
+          if (JSON.stringify(next) === JSON.stringify(codeSheet)) return;
+          codeSheet = next;
+          hub.workflowsChanged();
+        },
+        workflows: (views) => {
+          coreWorkflows = views;
+        },
+        // The health of the core on the screen comes with #62; the last state stays meanwhile.
+        failed: (error) => hub.kanbanFailed(error),
+      },
+    })
+  : null;
+core?.start();
 
 const unblockDeps = {
   hub,
@@ -214,6 +278,7 @@ const refreshWorkflows = async () => {
   }
 };
 const refreshCodeSheet = () => {
+  if (onCore) return;
   const next = publishedSheet(paths.factorySheet());
   if (JSON.stringify(next) !== JSON.stringify(codeSheet)) {
     codeSheet = next;
@@ -238,7 +303,8 @@ void refreshWorkflows();
 
 // The factory's twin bench (#23, ADR 0013): the pair's state on the board, its ports on this PC.
 const twins = new TwinBench({
-  file: (repo, pr) => paths.twins(repo, pr),
+  // On the core's side, the twins come from the core's declared data (#60): none is read on the board.
+  file: (repo, pr) => (onCore ? null : paths.twins(repo, pr)),
   host: config.TWINS_HOST,
 });
 const app = createApp({
@@ -265,6 +331,7 @@ const app = createApp({
   githubAuth,
   twins,
   workflows,
+  coreWorkflows: () => coreWorkflows,
   codeSheet: () => codeSheet,
   workflowWatched: () => {
     workflowWatchedAt = now();
@@ -286,7 +353,8 @@ const server = serve({ fetch: app.fetch, port: config.PORT, hostname: config.HOS
       component: 'server',
       port: info.port,
       host: config.HOST,
-      kanban: config.kanbanDb,
+      source: config.LIVE_SOURCE,
+      kanban: onCore ? config.WORKFLOW_CORE_URL : config.kanbanDb,
       github: githubAuth.status().mode,
       ingestion: config.secrets.hookSecret ? 'secret présent' : 'désactivée (secret absent)',
       tailscaleLogins: config.TAILSCALE_LOGINS,
@@ -304,8 +372,9 @@ function shutdown(reason: string, code: number): void {
   log.debug({ component: 'server', reason, code }, 'nettoyage avant arrêt');
   for (const timer of timers) clearInterval(timer);
   server.close(() => {
+    void core?.stop();
     kanban?.close();
-    sessions.close();
+    sessionReader?.close();
     store.close();
     process.exit(code);
   });

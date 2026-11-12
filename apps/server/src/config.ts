@@ -107,11 +107,28 @@ const Env = z.object({
   /** Contact exigé par Web Push (claim `sub`) : l'URL du dépôt plutôt qu'une adresse e-mail. */
   VAPID_SUBJECT: z.string().default('https://github.com/code-my-life/factory-live'),
   DEMO: flag,
+  /**
+   * Where the server reads the factory (#57, ADR 0015): Hermes itself, as before, or workflow-core. One
+   * choice for the whole process; switching back means changing it and restarting the container.
+   */
+  LIVE_SOURCE: z
+    .enum(['hermes', 'workflow-core'], {
+      error: (issue) =>
+        `LIVE_SOURCE vaut « ${String(issue.input)} » : hermes ou workflow-core attendu`,
+    })
+    .default('hermes'),
+  /** workflow-core's address (`http://host.docker.internal:8447` from the container). */
+  WORKFLOW_CORE_URL: z
+    .union([z.literal(''), z.url()])
+    .default('')
+    .transform((value) => value || null),
 });
 
 export interface Secrets {
   hookSecret: string | null;
   githubToken: string | null;
+  /** The shared secret of workflow-core (`workflow-core-secret`). */
+  workflowCoreSecret: string | null;
 }
 
 export type Config = z.infer<typeof Env> & {
@@ -170,6 +187,15 @@ export function appAddresses(origins: readonly string[], port: number): AppAddre
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = Env.parse(env);
+  const workflowCoreSecret = readSecret(parsed.SECRETS_DIR, 'workflow-core-secret');
+  if (parsed.LIVE_SOURCE === 'workflow-core') {
+    if (!parsed.WORKFLOW_CORE_URL)
+      throw new Error('LIVE_SOURCE=workflow-core : WORKFLOW_CORE_URL manque (adresse du socle)');
+    if (!workflowCoreSecret)
+      throw new Error(
+        `LIVE_SOURCE=workflow-core : le secret du socle manque (${join(parsed.SECRETS_DIR, 'workflow-core-secret')})`,
+      );
+  }
   const boardDir = join(parsed.HERMES_HOME, 'kanban', 'boards', parsed.HERMES_BOARD);
   const origins =
     parsed.PUBLIC_ORIGINS.length > 0 ? parsed.PUBLIC_ORIGINS : [`http://localhost:${parsed.PORT}`];
@@ -184,6 +210,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     secrets: {
       hookSecret: readSecret(parsed.SECRETS_DIR, 'hook-secret'),
       githubToken: readSecret(parsed.SECRETS_DIR, 'github-token'),
+      workflowCoreSecret,
     },
   };
 }
