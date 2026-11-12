@@ -684,6 +684,7 @@ export const fr = {
     },
     cards: (count: number) => `${count} ${f.plural(count, 'carte', 'cartes')}`,
     noCard: 'Aucune carte pour cet élément.',
+    transcriptOf: (run: number) => `Transcription du run #${run}`,
     data: 'Données déclarées',
     noData: 'Le workflow ne déclare aucune donnée pour cet élément.',
     noValue: 'Aucune valeur pour l’instant.',
@@ -699,7 +700,7 @@ export const fr = {
       unknown: 'inconnu',
     },
     preview: {
-      label: 'Maquette : états à juger',
+      label: 'Outil de maquette, absent de l’écran final : états à juger',
       normal: 'Normal',
       empty: 'Vide',
       loading: 'Chargement',

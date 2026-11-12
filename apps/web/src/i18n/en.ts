@@ -630,6 +630,7 @@ export const en: Messages = {
     },
     cards: (count: number) => `${count} ${f.plural(count, 'card', 'cards')}`,
     noCard: 'No card for this item.',
+    transcriptOf: (run: number) => `Transcript of run #${run}`,
     data: 'Declared data',
     noData: 'The workflow declares no data for this item.',
     noValue: 'No value yet.',
@@ -645,7 +646,7 @@ export const en: Messages = {
       unknown: 'unknown',
     },
     preview: {
-      label: 'Mockup: states to judge',
+      label: 'Mockup tool, not in the final screen: states to judge',
       normal: 'Normal',
       empty: 'Empty',
       loading: 'Loading',

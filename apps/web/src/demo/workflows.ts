@@ -124,11 +124,108 @@ function entry(
   return { id, at: at(now, minutesAgo), source, profile, cardId, label, detail, tone };
 }
 
+/** A run's transcript, as the core publishes it in declared data of subject `run` (#36): the agent's
+ * session as a table, the Claude Code sessions, the card's log. */
+function transcript(now: number, startedMinutesAgo: number, blocked: boolean) {
+  const clock = (minutes: number) =>
+    new Date(now - minutes * MINUTE).toLocaleTimeString('fr-FR', { hour12: false });
+  const s = startedMinutesAgo;
+  return [
+    {
+      name: 'agent-session',
+      label: 'Session de l’agent',
+      values: [
+        {
+          type: 'table' as const,
+          label: 'Session de l’agent',
+          columns: ['Heure', 'Rôle', 'Texte', 'Outil', 'Modèle', 'Statut'],
+          rows: [
+            [clock(s), 'user', 'work kanban task t_e0002b', null, null, null],
+            [
+              clock(s - 1),
+              'assistant',
+              'Je lis les extraits préparés.',
+              null,
+              'agnes-2.5-flash',
+              null,
+            ],
+            [clock(s - 1), 'tool_call', 'cat extraits/*.csv', 'terminal', null, null],
+            [clock(s - 2), 'tool_result', '4 fichiers, 4 742 lignes', 'terminal', null, 'ok'],
+            [
+              clock(s - 20),
+              'assistant',
+              blocked
+                ? 'Le seuil de tolérance n’est pas fixé : je demande une décision.'
+                : 'Synthèse rédigée.',
+              null,
+              'agnes-2.5-flash',
+              null,
+            ],
+            ...(blocked
+              ? [
+                  [
+                    clock(s - 24),
+                    'tool_call',
+                    'kanban_block needs_input',
+                    'kanban',
+                    null,
+                    'blocked',
+                  ],
+                ]
+              : []),
+          ],
+        },
+      ],
+    },
+    {
+      name: 'claude-sessions',
+      label: 'Sessions de Claude Code',
+      values: [
+        {
+          type: 'table' as const,
+          label: 'Comparaison des sources',
+          columns: ['Heure', 'Rôle', 'Texte', 'Outil', 'Modèle', 'Statut'],
+          rows: [
+            [
+              clock(s - 3),
+              'user',
+              'Compare les quatre sources et liste les écarts.',
+              null,
+              null,
+              null,
+            ],
+            [clock(s - 4), 'tool_call', 'python3 ecarts.py', 'Bash', null, null],
+            [clock(s - 6), 'tool_result', '2 écarts au-delà de 5 %', 'Bash', null, 'ok'],
+            [clock(s - 7), 'assistant', 'Deux sources dépassent 5 %.', null, 'claude-sonnet', null],
+          ],
+        },
+      ],
+    },
+    {
+      name: 'card-log',
+      label: 'Journal de la carte',
+      values: [
+        {
+          type: 'text' as const,
+          label: 'Terminal',
+          text:
+            `[${clock(s)}] worker démarré pour t_e0002b\n` +
+            `[${clock(s - 2)}] extraits lus : 4 fichiers\n` +
+            (blocked
+              ? `[${clock(s - 24)}] carte bloquée : needs_input`
+              : `[${clock(s - 24)}] carte terminée`),
+        },
+      ],
+    },
+  ];
+}
+
 /** The five items of `essai`, at `now`. */
 export function essaiItems(now: number): GenericItem[] {
   return [
     {
       id: 'e_0001',
+      runData: { 41: transcript(now, 12, false) },
       title: 'Préparer le jeu de données d’essai',
       station: 'preparation',
       status: 'active',
@@ -139,8 +236,8 @@ export function essaiItems(now: number): GenericItem[] {
         ]),
       ],
       timeline: [
-        entry(now, 'k1', 14, 'Carte créée', 'neutral', 't_e0001a'),
-        entry(now, 'k2', 12, 'Carte prise', 'neutral', 't_e0001a', 'preparateur'),
+        entry(now, 'k1', 14, 'created', 'neutral', 't_e0001a'),
+        entry(now, 'k2', 12, 'claimed', 'neutral', 't_e0001a', 'preparateur'),
       ],
       data: [
         {
@@ -158,6 +255,7 @@ export function essaiItems(now: number): GenericItem[] {
     },
     {
       id: 'e_0002',
+      runData: { 37: transcript(now, 140, false), 38: transcript(now, 120, true) },
       title: 'Rédiger la note de synthèse',
       station: 'redaction',
       status: 'blocked',
@@ -177,14 +275,14 @@ export function essaiItems(now: number): GenericItem[] {
         ),
       ],
       timeline: [
-        entry(now, 'k3', 140, 'Carte prise', 'neutral', 't_e0002a', 'preparateur'),
-        entry(now, 'k4', 128, 'Carte terminée', 'success', 't_e0002a', 'preparateur'),
-        entry(now, 'k5', 120, 'Carte prise', 'neutral', 't_e0002b', 'redacteur'),
+        entry(now, 'k3', 140, 'claimed', 'neutral', 't_e0002a', 'preparateur'),
+        entry(now, 'k4', 128, 'completed', 'success', 't_e0002a', 'preparateur'),
+        entry(now, 'k5', 120, 'claimed', 'neutral', 't_e0002b', 'redacteur'),
         entry(
           now,
           'k6',
           96,
-          'Carte bloquée',
+          'blocked',
           'danger',
           't_e0002b',
           'redacteur',
@@ -260,16 +358,18 @@ export function essaiItems(now: number): GenericItem[] {
     },
     {
       id: 'e_0003',
+      runData: {},
       title: LONG_TITLE,
       station: 'redaction',
       status: 'queued',
       since: at(now, 30),
       cards: [card('t_e0003a', 'rédaction : comparaison', 'ready', 'redacteur', 'redaction', [])],
-      timeline: [entry(now, 'k7', 30, 'Carte créée', 'neutral', 't_e0003a')],
+      timeline: [entry(now, 'k7', 30, 'created', 'neutral', 't_e0003a')],
       data: [],
     },
     {
       id: 'e_0004',
+      runData: { 35: transcript(now, 75, false) },
       title: 'Relire le compte rendu de la série 12',
       station: 'validation',
       status: 'waiting_human',
@@ -281,9 +381,9 @@ export function essaiItems(now: number): GenericItem[] {
         card('t_e0004b', 'validation : compte rendu', 'review', null, 'validation', []),
       ],
       timeline: [
-        entry(now, 'k8', 75, 'Carte prise', 'neutral', 't_e0004a', 'redacteur'),
-        entry(now, 'k9', 50, 'Carte terminée', 'success', 't_e0004a', 'redacteur'),
-        entry(now, 'k10', 48, 'Carte créée', 'neutral', 't_e0004b'),
+        entry(now, 'k8', 75, 'claimed', 'neutral', 't_e0004a', 'redacteur'),
+        entry(now, 'k9', 50, 'completed', 'success', 't_e0004a', 'redacteur'),
+        entry(now, 'k10', 48, 'created', 'neutral', 't_e0004b'),
       ],
       data: [
         {
@@ -308,6 +408,7 @@ export function essaiItems(now: number): GenericItem[] {
     },
     {
       id: 'e_0005',
+      runData: { 30: transcript(now, 330, false) },
       title: 'Archiver le lot précédent',
       station: 'validation',
       status: 'done',
@@ -317,7 +418,7 @@ export function essaiItems(now: number): GenericItem[] {
           run(now, 30, 'preparateur', 330, 310, 'completed', 'Lot archivé.'),
         ]),
       ],
-      timeline: [entry(now, 'k11', 310, 'Carte terminée', 'success', 't_e0005a', 'preparateur')],
+      timeline: [entry(now, 'k11', 310, 'completed', 'success', 't_e0005a', 'preparateur')],
       data: [
         {
           name: 'controle',
