@@ -466,7 +466,7 @@ export function profileViews(
         timeouts: timeouts.get(plugin) ?? 0,
         longestSeconds: facts?.longestCommands?.[plugin] ?? null,
       })),
-      limits: limitsOf(facts),
+      limits: deps.profiles.limits?.(name) ?? limitsOf(facts),
       mcp: live?.mcp ?? [],
       drift: drift
         ? (drift.get(name) ?? [])

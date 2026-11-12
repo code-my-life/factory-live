@@ -1,0 +1,533 @@
+{
+  "schema_version": 1,
+  "workflow": "factory",
+  "kanban": {
+    "max_in_progress": 2,
+    "max_in_progress_per_profile": 1
+  },
+  "agents": [
+    {
+      "name": "coder",
+      "skills": [],
+      "model": {
+        "name": "auto",
+        "provider": "freellmapi"
+      },
+      "fallbacks": [
+        {
+          "name": "dots3-note-preview",
+          "provider": "freellmapi"
+        },
+        {
+          "name": "nvidia/nemotron-3-ultra-550b-a55b",
+          "provider": "nvidia"
+        },
+        {
+          "name": "auto",
+          "provider": "freellmapi"
+        },
+        {
+          "name": "gpt-oss-20b-MXFP4",
+          "provider": "llamacpp"
+        }
+      ],
+      "effort": "medium",
+      "toolsets": [
+        "terminal",
+        "file",
+        "browser",
+        "kanban",
+        "memory",
+        "web",
+        "clarify",
+        "todo",
+        "skills",
+        "session_search",
+        "mcp-graphify"
+      ],
+      "plugins": [
+        {
+          "name": "coder-guard",
+          "longest_seconds": 10.0,
+          "hook_timeouts": 3
+        },
+        {
+          "name": "comment-guard",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "factory-notify",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        }
+      ],
+      "mcp": ["graphify"],
+      "limits": [
+        {
+          "key": "hook_callback_timeout",
+          "value": 600.0,
+          "default": 30.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "tool_deadline",
+          "value": null,
+          "default": 420.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "terminal_timeout",
+          "value": 900.0,
+          "default": 180.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "max_turns",
+          "value": 400.0,
+          "default": null,
+          "unit": "turns"
+        }
+      ]
+    },
+    {
+      "name": "coder-claude",
+      "skills": [],
+      "model": {
+        "name": "claude-opus-5-5",
+        "provider": "anthropic"
+      },
+      "fallbacks": [
+        {
+          "name": "dots3-note-preview",
+          "provider": "freellmapi"
+        },
+        {
+          "name": "nvidia/nemotron-3-ultra-550b-a55b",
+          "provider": "nvidia"
+        },
+        {
+          "name": "auto",
+          "provider": "freellmapi"
+        },
+        {
+          "name": "gpt-oss-20b-MXFP4",
+          "provider": "llamacpp"
+        }
+      ],
+      "effort": "medium",
+      "toolsets": ["terminal", "file", "kanban", "memory", "clarify", "todo", "skills"],
+      "plugins": [
+        {
+          "name": "coder-guard",
+          "longest_seconds": 10.0,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "comment-guard",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "factory-notify",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        }
+      ],
+      "mcp": [],
+      "limits": [
+        {
+          "key": "hook_callback_timeout",
+          "value": 600.0,
+          "default": 30.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "tool_deadline",
+          "value": null,
+          "default": 420.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "terminal_timeout",
+          "value": 1800.0,
+          "default": 180.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "max_turns",
+          "value": 150.0,
+          "default": null,
+          "unit": "turns"
+        }
+      ]
+    },
+    {
+      "name": "coder-opencode",
+      "skills": [],
+      "model": {
+        "name": "nvidia/nemotron-3-ultra-550b-a55b",
+        "provider": "nvidia"
+      },
+      "fallbacks": [
+        {
+          "name": "dots3-note-preview",
+          "provider": "freellmapi"
+        },
+        {
+          "name": "auto",
+          "provider": "freellmapi"
+        },
+        {
+          "name": "gpt-oss-20b-MXFP4",
+          "provider": "llamacpp"
+        }
+      ],
+      "effort": "low",
+      "toolsets": ["terminal", "file", "kanban", "memory", "clarify", "todo", "skills"],
+      "plugins": [
+        {
+          "name": "coder-guard",
+          "longest_seconds": 10.0,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "comment-guard",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "factory-notify",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        }
+      ],
+      "mcp": [],
+      "limits": [
+        {
+          "key": "hook_callback_timeout",
+          "value": 600.0,
+          "default": 30.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "tool_deadline",
+          "value": null,
+          "default": 420.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "terminal_timeout",
+          "value": 1800.0,
+          "default": 180.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "max_turns",
+          "value": 150.0,
+          "default": null,
+          "unit": "turns"
+        }
+      ]
+    },
+    {
+      "name": "coordinator",
+      "skills": [],
+      "model": {
+        "name": "mix",
+        "provider": "moa"
+      },
+      "fallbacks": [
+        {
+          "name": "agnes-2.5-flash",
+          "provider": "freellmapi"
+        },
+        {
+          "name": "dots3-note-preview",
+          "provider": "freellmapi"
+        },
+        {
+          "name": "nvidia/nemotron-3-ultra-550b-a55b",
+          "provider": "nvidia"
+        },
+        {
+          "name": "auto",
+          "provider": "freellmapi"
+        },
+        {
+          "name": "gpt-oss-20b-MXFP4",
+          "provider": "llamacpp"
+        }
+      ],
+      "effort": "high",
+      "toolsets": [
+        "kanban",
+        "memory",
+        "web",
+        "clarify",
+        "todo",
+        "skills",
+        "session_search",
+        "mcp-graphify"
+      ],
+      "plugins": [
+        {
+          "name": "comment-guard",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "coordinator-guard",
+          "longest_seconds": 5.0,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "factory-notify",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "merge-guard",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        }
+      ],
+      "mcp": ["graphify"],
+      "limits": [
+        {
+          "key": "hook_callback_timeout",
+          "value": null,
+          "default": 30.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "tool_deadline",
+          "value": null,
+          "default": 420.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "terminal_timeout",
+          "value": null,
+          "default": 180.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "max_turns",
+          "value": 200.0,
+          "default": null,
+          "unit": "turns"
+        }
+      ]
+    },
+    {
+      "name": "coordinator-claude",
+      "skills": [],
+      "model": {
+        "name": "claude-opus-5-5",
+        "provider": "anthropic"
+      },
+      "fallbacks": [
+        {
+          "name": "dots3-note-preview",
+          "provider": "freellmapi"
+        },
+        {
+          "name": "nvidia/nemotron-3-ultra-550b-a55b",
+          "provider": "nvidia"
+        },
+        {
+          "name": "auto",
+          "provider": "freellmapi"
+        }
+      ],
+      "effort": "medium",
+      "toolsets": [
+        "terminal",
+        "file",
+        "kanban",
+        "memory",
+        "clarify",
+        "todo",
+        "skills",
+        "mcp-graphify"
+      ],
+      "plugins": [
+        {
+          "name": "comment-guard",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "coordinator-guard",
+          "longest_seconds": 5.0,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "factory-notify",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "merge-guard",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        }
+      ],
+      "mcp": ["graphify"],
+      "limits": [
+        {
+          "key": "hook_callback_timeout",
+          "value": null,
+          "default": 30.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "tool_deadline",
+          "value": null,
+          "default": 420.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "terminal_timeout",
+          "value": 1200.0,
+          "default": 180.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "max_turns",
+          "value": 150.0,
+          "default": null,
+          "unit": "turns"
+        }
+      ]
+    },
+    {
+      "name": "scribe",
+      "skills": [],
+      "model": {
+        "name": "auto",
+        "provider": "freellmapi"
+      },
+      "fallbacks": [
+        {
+          "name": "dots3-note-preview",
+          "provider": "freellmapi"
+        },
+        {
+          "name": "nvidia/nemotron-3-ultra-550b-a55b",
+          "provider": "nvidia"
+        },
+        {
+          "name": "auto",
+          "provider": "freellmapi"
+        },
+        {
+          "name": "Qwen3.5-9B-The-Defiant-Fable-Uncnr-Heretic-plusIQ-TOOLS-NEO-MAX-MTP-Q4_K_M",
+          "provider": "llamacpp"
+        }
+      ],
+      "effort": "low",
+      "toolsets": ["terminal", "file", "kanban", "memory", "clarify", "todo", "skills"],
+      "plugins": [
+        {
+          "name": "coder-guard",
+          "longest_seconds": 10.0,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "comment-guard",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "factory-notify",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        }
+      ],
+      "mcp": [],
+      "limits": [
+        {
+          "key": "hook_callback_timeout",
+          "value": 600.0,
+          "default": 30.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "tool_deadline",
+          "value": null,
+          "default": 420.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "terminal_timeout",
+          "value": 900.0,
+          "default": 180.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "max_turns",
+          "value": 120.0,
+          "default": null,
+          "unit": "turns"
+        }
+      ]
+    },
+    {
+      "name": "tool-setup",
+      "skills": [],
+      "model": {
+        "name": "auto",
+        "provider": "freellmapi"
+      },
+      "fallbacks": [],
+      "effort": null,
+      "toolsets": [],
+      "plugins": [
+        {
+          "name": "comment-guard",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "factory-notify",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        },
+        {
+          "name": "skill-proposal",
+          "longest_seconds": null,
+          "hook_timeouts": 0
+        }
+      ],
+      "mcp": [],
+      "limits": [
+        {
+          "key": "hook_callback_timeout",
+          "value": null,
+          "default": 30.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "tool_deadline",
+          "value": null,
+          "default": 420.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "terminal_timeout",
+          "value": null,
+          "default": 180.0,
+          "unit": "seconds"
+        },
+        {
+          "key": "max_turns",
+          "value": null,
+          "default": null,
+          "unit": "turns"
+        }
+      ]
+    }
+  ]
+}

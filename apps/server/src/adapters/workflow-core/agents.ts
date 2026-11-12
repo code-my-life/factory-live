@@ -1,3 +1,5 @@
+import { LimitKey } from '@factory-live/contracts';
+import type { ProfileLimit } from '@factory-live/contracts';
 import type { AgentsResponse } from '@factory-live/contracts/workflow-core';
 import type { ProfileFacts } from '@factory-live/domain';
 import type {
@@ -110,6 +112,24 @@ export class CoreProfiles implements ProfilesPort {
   /** Changes when the core's answer for this agent changes: the hub reads its facts again then. */
   factsStamp(name: string): string {
     return JSON.stringify(this.agent(name) ?? null);
+  }
+
+  /** The agent's limits with the defaults the core publishes, in the core's order. */
+  limits(name: string): ProfileLimit[] | null {
+    const agent = this.agent(name);
+    if (!agent) return null;
+    return agent.limits.flatMap((entry) => {
+      const key = LimitKey.safeParse(entry.key);
+      if (!key.success) return [];
+      return [
+        {
+          key: key.data,
+          value: entry.value,
+          defaultValue: entry.default,
+          unit: entry.unit === 'turns' ? ('turns' as const) : ('seconds' as const),
+        },
+      ];
+    });
   }
 
   hookTimeouts(name: string): ReadonlyMap<string, number> | null {

@@ -8,6 +8,7 @@ import type {
   ConfigDrift,
   IssueLabel,
   PullRequestView,
+  ProfileLimit,
   PushPayload,
   StudioItem,
   Text,
@@ -96,6 +97,11 @@ export interface ProfilesPort {
    * #93); absent: the agents' screen counts them in the agent's journal.
    */
   hookTimeouts?(profile: string): ReadonlyMap<string, number> | null;
+  /**
+   * The agent's limits with their defaults, when the source publishes them (workflow-core, #93); absent:
+   * the agents' screen takes them from `facts` and Hermes' defaults.
+   */
+  limits?(profile: string): ProfileLimit[] | null;
 }
 
 // --- Sessions des workers ------------------------------------------------------------------------

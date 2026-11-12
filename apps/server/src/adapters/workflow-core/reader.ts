@@ -147,6 +147,9 @@ export class WorkflowCoreReader {
   /** The code line's agents the core follows, by agent. */
   private agents = new Map<string, CoreAgent>();
   private cursor: string | null = null;
+  /** The number of the last read of the agents started, and of the last one sent (#93). */
+  private agentsRead = 0;
+  private agentsApplied = 0;
   /** The machine's last checks, and the cursor of the event or read they come from (#62). */
   private checks: CoreCheckState[] = [];
   private checksCursor: string | null = null;
@@ -490,8 +493,13 @@ export class WorkflowCoreReader {
    */
   async refreshAgents(): Promise<void> {
     const path = `/api/workflows/${encodeURIComponent(this.options.code)}/agents?days=${AGENTS_DAYS}`;
+    // Reads may overlap (the timer and a full read after a reset): only the latest one started counts.
+    const read = ++this.agentsRead;
     try {
-      this.options.sink.agents(await this.client.get(path, coreAgents, this.abort.signal));
+      const answer = await this.client.get(path, coreAgents, this.abort.signal);
+      if (read < this.agentsApplied) return;
+      this.agentsApplied = read;
+      this.options.sink.agents(answer);
     } catch (error) {
       if (this.abort.signal.aborted) return;
       this.options.log.warn(

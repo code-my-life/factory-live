@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs';
 import type * as NodeFs from 'node:fs';
 import type * as NodeSqlite from 'node:sqlite';
 import { ProfileView } from '@factory-live/contracts';
+import { coreAgents } from '@factory-live/contracts/workflow-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { profileViews } from '../../application/views.ts';
 import type { ViewDeps } from '../../application/views.ts';
@@ -14,6 +16,7 @@ import type { Harness } from '../../test/harness.ts';
 import { tempDir } from '../../test/hermes-fixtures.ts';
 import type { TempDir } from '../../test/hermes-fixtures.ts';
 import { noAgentLog, noCardFiles, noSessions } from './absent.ts';
+import { CoreProfiles } from './agents.ts';
 import { FactoryViews } from './factoryViews.ts';
 
 // What the core's side opens, recorded at the boundary (C5): every path given to node:fs and node:sqlite.
@@ -250,5 +253,77 @@ describe('écran Agents lu par le socle (#93)', () => {
     expect(opened.paths.filter((path) => !path.includes('core-data'))).toEqual([]);
     const agentsCalls = core!.requests.filter((request) => request.path.endsWith('/agents'));
     expect(agentsCalls.length).toBeGreaterThan(1);
+  });
+});
+
+describe('écran Agents lu par le socle, revue (#93)', () => {
+  it('la réponse réelle des agents du socle remplit l’écran Agents', () => {
+    // Captured from workflow-core 0.4.0 (#129) on the factory's machine, read-only: no secret in it.
+    const real = coreAgents.parse(
+      JSON.parse(
+        readFileSync(
+          new URL('../../../../../fixtures/workflow-core/agents-factory.json', import.meta.url),
+          'utf8',
+        ),
+      ),
+    );
+    const profiles = new CoreProfiles();
+    profiles.update(real);
+
+    expect(profiles.profiles()).toEqual(real.agents.map((agent) => agent.name));
+    expect(profiles.root()).toEqual({ maxInProgress: 2, maxInProgressPerProfile: 1 });
+    const coder = real.agents.find((agent) => agent.name === 'coder')!;
+    expect(profiles.live('coder')?.fallbacks).toHaveLength(coder.fallbacks.length);
+    expect(profiles.hookTimeouts('coder')?.get('coder-guard')).toBe(
+      coder.plugins.find((plugin) => plugin.name === 'coder-guard')?.hook_timeouts,
+    );
+    expect(profiles.limits('coder')?.[0]).toEqual({
+      key: 'hook_callback_timeout',
+      value: 600,
+      defaultValue: 30,
+      unit: 'seconds',
+    });
+  });
+
+  it('les valeurs par défaut des limites publiées par le socle s’affichent', async () => {
+    h = harness();
+    await start({
+      agents: {
+        factory: {
+          ...AGENTS,
+          agents: [
+            agent('coder', 'factory-author-proof', {
+              limits: [{ ...LIMITS[0], default: 45 }, ...LIMITS.slice(1)],
+            }),
+          ],
+        },
+      },
+    });
+
+    const [coder] = profileViews(coreViews(h, side!), 30, new Map());
+
+    expect(coder?.limits[0]).toEqual({
+      key: 'hook_callback_timeout',
+      value: null,
+      defaultValue: 45,
+      unit: 'seconds',
+    });
+  });
+
+  it('une réponse des agents plus ancienne qu’une plus récente ne la remplace pas', async () => {
+    const { hub, reader } = await start({ agents: { factory: AGENTS } });
+    // The first request answers the old settings slowly, the second the new ones at once.
+    const calls = () => core!.requests.filter((r) => r.path.endsWith('/agents')).length;
+    const before = calls();
+    core!.state.agentsDelays = [300, 0];
+    const first = reader.refreshAgents();
+    await until(() => calls() > before);
+    core!.state.agents = {
+      factory: { ...AGENTS, kanban: { max_in_progress: 5, max_in_progress_per_profile: 3 } },
+    };
+    await reader.refreshAgents();
+    await first;
+
+    expect(hub.settings).toEqual({ maxInProgress: 5, maxInProgressPerProfile: 3 });
   });
 });

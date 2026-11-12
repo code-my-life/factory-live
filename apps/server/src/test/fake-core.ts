@@ -35,6 +35,8 @@ export interface FakeCoreState {
   verdicts?: Record<string, unknown[]>;
   /** The agents of each workflow, `{kanban, agents}` (#93); absent: 404. */
   agents?: Record<string, unknown>;
+  /** The delay of each next `/agents` answer, in ms, in the order of the requests (#93). */
+  agentsDelays?: number[];
 }
 
 export interface FakeCoreRequest {
@@ -152,10 +154,16 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
     if (!route || !key || !state.workflows.some((workflow) => workflow.key === key))
       return json(response, 404, { error: 'unknown_workflow', detail: `workflow "${key}"` });
     if (route[2] === 'agents') {
+      // The answer is taken when the request arrives, then sent after its delay, if any.
       const agents = state.agents?.[key];
-      return agents
-        ? json(response, 200, { schema_version: 1, workflow: key, ...agents })
-        : json(response, 404, { error: 'not_found', detail: 'no agents' });
+      const answer = () =>
+        agents
+          ? json(response, 200, { schema_version: 1, workflow: key, ...agents })
+          : json(response, 404, { error: 'not_found', detail: 'no agents' });
+      const delay = state.agentsDelays?.shift() ?? 0;
+      if (delay > 0) setTimeout(answer, delay);
+      else answer();
+      return;
     }
     if (route[2] === 'interventions')
       return json(response, 200, {
