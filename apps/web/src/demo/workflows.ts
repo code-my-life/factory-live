@@ -1,6 +1,21 @@
 import { parseWorkflowSheet } from '@factory-live/contracts';
-import type { CardView, RunView, TimelineEntry } from '@factory-live/contracts';
+import type {
+  DeclaredData,
+  GenericCardView,
+  RunView,
+  TimelineEntry,
+} from '@factory-live/contracts';
 import type { GenericItem, GenericWorkflow } from '../features/workflows/model.ts';
+
+/** An item of the demo, with the data its workflow declares for it and for each of its runs. */
+type DemoItem = GenericItem & { data: DeclaredData[]; runData: Record<number, DeclaredData[]> };
+
+/** A workflow of the demo, and the declared data its source serves. */
+export interface DemoWorkflow {
+  workflow: GenericWorkflow;
+  itemData: Record<string, DeclaredData[]>;
+  runData: Record<number, DeclaredData[]>;
+}
 
 /**
  * The demo's generic workflow (#64, #65): `essai`, a made-up workflow the core would declare besides
@@ -22,16 +37,16 @@ export const ESSAI_SHEET = parseWorkflowSheet({
       icon: 'package',
       kind: 'script',
       col: 0,
-      row: 0,
+      row: 1,
     },
-    { key: 'redaction', label: 'Rédaction', icon: 'pencil', kind: 'ai', col: 1, row: 0 },
+    { key: 'redaction', label: 'Rédaction', icon: 'pencil', kind: 'ai', col: 1, row: 1 },
     {
       key: 'validation',
       label: 'Validation',
       icon: 'check-circle',
       kind: 'owner',
       col: 2,
-      row: 0,
+      row: 1,
     },
   ],
   edges: [
@@ -84,20 +99,20 @@ function run(
 function card(
   id: string,
   title: string,
-  status: CardView['status'],
+  status: GenericCardView['status'],
   assignee: string | null,
   station: string,
   runs: RunView[],
   blockReason: string | null = null,
-): CardView {
+): GenericCardView {
   return {
     id,
     title,
-    // The code line's kind of card; a generic workflow's cards have none of their own yet.
-    kind: 'impl',
+    // A generic workflow's card has no kind of its own.
+    kind: null,
     status,
     assignee,
-    station: station as CardView['station'],
+    station,
     blockKind: status === 'blocked' ? 'needs_input' : null,
     blockReason,
     parents: [],
@@ -221,7 +236,7 @@ function transcript(now: number, startedMinutesAgo: number, blocked: boolean) {
 }
 
 /** The five items of `essai`, at `now`. */
-export function essaiItems(now: number): GenericItem[] {
+export function essaiItems(now: number): DemoItem[] {
   return [
     {
       id: 'e_0001',
@@ -430,7 +445,22 @@ export function essaiItems(now: number): GenericItem[] {
   ];
 }
 
-/** The demo's generic workflows, at `now`: `essai`, answering. */
-export function demoWorkflows(now: number): GenericWorkflow[] {
-  return [{ key: 'essai', sheet: ESSAI_SHEET, items: essaiItems(now), unreachableSince: null }];
+/** The demo's generic workflows, at `now`: `essai`, answering, with the data it declares. */
+export function demoWorkflows(now: number): DemoWorkflow[] {
+  const items = essaiItems(now);
+  return [
+    {
+      workflow: {
+        key: 'essai',
+        sheet: ESSAI_SHEET,
+        items: items.map(({ data: _data, runData: _runData, ...item }) => item),
+        unreachableSince: null,
+      },
+      itemData: Object.fromEntries(items.map((item) => [item.id, item.data])),
+      runData: Object.assign({}, ...items.map((item) => item.runData)) as Record<
+        number,
+        DeclaredData[]
+      >,
+    },
+  ];
 }

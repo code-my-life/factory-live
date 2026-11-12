@@ -1,7 +1,14 @@
-import type { Diagnosis, RunVerdict, WorkflowSheet } from '@factory-live/contracts';
+import type {
+  DeclaredData,
+  Diagnosis,
+  GenericWorkflowView,
+  RunVerdict,
+  WorkflowSheet,
+} from '@factory-live/contracts';
 import {
   coreActivity,
   coreAgents,
+  coreDeclaredData,
   coreDiagnosis,
   coreInterventions,
   coreItems,
@@ -25,6 +32,7 @@ import type {
 import type {
   CoreActivityFact,
   DeclaredGesture,
+  GenericWorkflowsPort,
   CoreAgentState,
   CoreCheckState,
   CoreInterventionState,
@@ -36,7 +44,8 @@ import type {
   WorkflowView,
 } from '../../application/ports.ts';
 import { boardOf } from './cards.ts';
-import { WorkflowCoreClient } from './client.ts';
+import { CoreError, WorkflowCoreClient } from './client.ts';
+import { genericItem } from './generic.ts';
 import { commentGestures, coreInterventionState } from './interventions.ts';
 import { coreActivityFact, coreAgentState } from './live.ts';
 
@@ -144,11 +153,13 @@ export const USAGE_DAYS = 90;
  * last cursor; a `reset` (or a cursor the core no longer knows, which it answers with a `reset`) makes
  * it read the full state again. Without an answer, the last state stays and it tries again.
  */
-export class WorkflowCoreReader {
+export class WorkflowCoreReader implements GenericWorkflowsPort {
   private readonly client: WorkflowCoreClient;
   private readonly options: WorkflowCoreReaderOptions;
   private items = new Map<string, Map<string, CoreItem>>();
   private readonly sheets = new Map<string, CoreSheet>();
+  /** Why the core refuses a workflow's sheet, as it says it (#65); absent while it accepts it. */
+  private readonly sheetErrors = new Map<string, string>();
   private readonly readAt = new Map<string, number>();
   /** The code line's open interventions, by id, with their card (#59). */
   private openCards = new Map<string, string>();
@@ -268,9 +279,12 @@ export class WorkflowCoreReader {
       try {
         const answer = await this.client.get(`${path}/sheet`, coreSheetResponse, signal);
         this.sheets.set(key, answer.sheet);
+        this.sheetErrors.delete(key);
       } catch (error) {
-        // A sheet of a wrong form, or none: the last good one stays.
+        // A sheet of a wrong form, or none: the last good one stays. The core's refusal is kept to say why.
         if (signal.aborted) throw error;
+        if (error instanceof CoreError && error.code === 'invalid_sheet')
+          this.sheetErrors.set(key, error.detail ?? error.message);
         this.options.log.warn(
           { workflow: key, error: error instanceof Error ? error.message : String(error) },
           'fiche du socle refusée : la dernière reçue reste',
@@ -638,6 +652,48 @@ export class WorkflowCoreReader {
   }
 
   /** The generic workflows: their sheet and the state of their read; their screen comes later (#65). */
+  /** The workflows the core declares besides the code line and those read by their own adapter (#65). */
+  genericWorkflows(): GenericWorkflowView[] {
+    const since =
+      this.unreachableSince === null ? null : new Date(this.unreachableSince).toISOString();
+    return [...this.items.entries()]
+      .filter(([key]) => key !== this.options.code)
+      .map(([key, items]) => ({
+        name: key,
+        sheet: this.sheets.get(key) ?? null,
+        sheetError: this.sheetErrors.get(key) ?? null,
+        items: [...items.values()].map(genericItem),
+        unreachableSince: since,
+      }));
+  }
+
+  /**
+   * The data a generic workflow declares for an item (a card of the core) or a run, as the core serves
+   * it; none when it answers none; `null` when the workflow is not a generic one.
+   */
+  async genericData(
+    workflow: string,
+    subject: 'card' | 'run',
+    id: string,
+  ): Promise<DeclaredData[] | null> {
+    if (workflow === this.options.code || !this.items.has(workflow)) return null;
+    const query = `subject=${subject}&id=${encodeURIComponent(id)}`;
+    try {
+      const answer = await this.client.get(
+        `/api/workflows/${encodeURIComponent(workflow)}/data?${query}`,
+        coreDeclaredData,
+        this.abort.signal,
+      );
+      return answer.data;
+    } catch (error) {
+      this.options.log.warn(
+        { workflow, subject, id, error: error instanceof Error ? error.message : String(error) },
+        'données déclarées du socle illisibles',
+      );
+      return [];
+    }
+  }
+
   private views(): WorkflowView[] {
     return [...this.items.keys()]
       .filter((key) => key !== this.options.code)

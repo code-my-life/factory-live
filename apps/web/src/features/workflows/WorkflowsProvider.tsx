@@ -1,62 +1,63 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { demoWorkflows } from '../../demo/workflows.ts';
 import type { GenericWorkflow } from './model.ts';
-
-/**
- * The states the mockup of the generic screen can show (#64): the workflow as it is, then no item,
- * the first read, the core not answering, the sheet refused. Only the demo offers to switch them.
- */
-export type Preview = 'normal' | 'empty' | 'loading' | 'unreachable' | 'refused';
+import { createLiveWorkflowsSource, createWorkflowsSource } from './source.ts';
+import type { WorkflowsSource } from './source.ts';
 
 export interface WorkflowsState {
+  source: WorkflowsSource;
   /** False until the generic workflows have been read once. */
   ready: boolean;
   /** The workflows the core declares besides the code line and the studio. */
   workflows: readonly GenericWorkflow[];
-  /** Whether the build offers to switch the mockup's states (the demo). */
-  previewable: boolean;
-  preview: Preview;
-  setPreview: (preview: Preview) => void;
 }
 
+const EMPTY_SOURCE = createLiveWorkflowsSource();
 const WorkflowsContext = createContext<WorkflowsState>({
+  source: EMPTY_SOURCE,
   ready: true,
   workflows: [],
-  previewable: false,
-  preview: 'normal',
-  setPreview: () => {},
 });
 
-/** The core's refusal of a sheet, as the screen shows it (the mockup's text, imitating the core's). */
-const REFUSED = 'duplicate-station : la station « redaction » est déclarée deux fois.';
+/** The live workflows are read again every so often, while the page is shown. */
+const LIVE_EVERY_MS = 5_000;
 
-/** The workflow in the state the mockup shows. */
-function inPreview(workflow: GenericWorkflow, preview: Preview, now: number): GenericWorkflow {
-  if (preview === 'empty') return { ...workflow, items: [] };
-  if (preview === 'unreachable') return { ...workflow, unreachableSince: now - 7 * 60_000 };
-  if (preview === 'refused') return { ...workflow, sheet: { ok: false, error: REFUSED } };
-  return workflow;
-}
+/** The generic workflows for the screens under it (#65): the given source, else the build's. */
+export function WorkflowsProvider({
+  source: given,
+  children,
+}: {
+  source?: WorkflowsSource;
+  children: ReactNode;
+}) {
+  const [source] = useState(() => given ?? createWorkflowsSource());
+  const [workflows, setWorkflows] = useState<readonly GenericWorkflow[] | null>(null);
 
-/**
- * The generic workflows for the screens under it (#65). The demo serves its made-up workflow; the
- * live build reads none yet: the screen comes with #65, from the core's `GET /api/workflows`.
- */
-export function WorkflowsProvider({ children }: { children: ReactNode }) {
-  const demo = import.meta.env.VITE_DATA_SOURCE !== 'live';
-  const [now] = useState(() => Date.now());
-  const [preview, setPreview] = useState<Preview>('normal');
-  const value = useMemo<WorkflowsState>(() => {
-    const workflows = demo ? demoWorkflows(now) : [];
-    return {
-      ready: preview !== 'loading',
-      workflows: workflows.map((workflow) => inPreview(workflow, preview, now)),
-      previewable: demo,
-      preview,
-      setPreview,
+  useEffect(() => {
+    let current = true;
+    const once = () =>
+      void source.workflows().then((read) => {
+        // A failed read keeps the last workflows: the screen says the core does not answer.
+        if (current && read !== null) setWorkflows(read);
+        else if (current) setWorkflows((last) => last ?? []);
+      });
+    once();
+    const timer =
+      source.kind === 'live'
+        ? setInterval(() => {
+            if (document.visibilityState === 'visible') once();
+          }, LIVE_EVERY_MS)
+        : undefined;
+    return () => {
+      current = false;
+      clearInterval(timer);
     };
-  }, [demo, now, preview]);
+  }, [source]);
+
+  const value = useMemo<WorkflowsState>(
+    () => ({ source, ready: workflows !== null, workflows: workflows ?? [] }),
+    [source, workflows],
+  );
   return <WorkflowsContext.Provider value={value}>{children}</WorkflowsContext.Provider>;
 }
 

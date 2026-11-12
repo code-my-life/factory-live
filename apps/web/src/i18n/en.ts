@@ -621,6 +621,9 @@ export const en: Messages = {
     unreachable: (stay: string) =>
       `Core unreachable for ${stay}: the last sheet and items received stay shown.`,
     items: 'Items',
+    unplaced: 'Items at no known station',
+    noStation: 'unknown station',
+    reading: 'Reading…',
     marks: {
       label: 'Landmarks',
       station: 'Station',
@@ -644,14 +647,6 @@ export const en: Messages = {
       warning: 'to see',
       error: 'failed',
       unknown: 'unknown',
-    },
-    preview: {
-      label: 'Mockup tool, not in the final screen: states to judge',
-      normal: 'Normal',
-      empty: 'Empty',
-      loading: 'Loading',
-      unreachable: 'Core unreachable',
-      refused: 'Sheet refused',
     },
   },
 

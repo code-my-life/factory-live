@@ -398,6 +398,7 @@ const app = createApp({
   twins,
   workflows,
   coreWorkflows: () => coreWorkflows,
+  ...(core ? { generic: core } : {}),
   ...(factoryViews ? { declared: factoryViews } : {}),
   codeSheet: () => codeSheet,
   workflowWatched: () => {

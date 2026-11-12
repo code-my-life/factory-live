@@ -675,6 +675,9 @@ export const fr = {
     unreachable: (stay: string) =>
       `Socle injoignable depuis ${stay} : la dernière fiche et les derniers éléments reçus restent affichés.`,
     items: 'Éléments',
+    unplaced: 'Éléments sans station connue',
+    noStation: 'station inconnue',
+    reading: 'Lecture…',
     marks: {
       label: 'Repères',
       station: 'Station',
@@ -698,14 +701,6 @@ export const fr = {
       warning: 'à voir',
       error: 'en erreur',
       unknown: 'inconnu',
-    },
-    preview: {
-      label: 'Outil de maquette, absent de l’écran final : états à juger',
-      normal: 'Normal',
-      empty: 'Vide',
-      loading: 'Chargement',
-      unreachable: 'Socle injoignable',
-      refused: 'Fiche refusée',
     },
   },
 

@@ -1,71 +1,40 @@
 import type {
-  CardView,
-  IssueStatus,
+  GenericItemView,
   IssueSummary,
-  TimelineEntry,
   WorkflowSheet,
   WorkflowSheetResult,
 } from '@factory-live/contracts';
 import type { LineIssue } from '../line/graph/model.ts';
 import { pathTo } from '../studio/model.ts';
 
+export type { DeclaredData, DeclaredValue } from '@factory-live/contracts';
+
 /**
  * A workflow the core declares besides the code line and the studio (#65), as its generic screen
- * reads it: its sheet, its items with their cards and runs, and the data it declares for each item in
- * generic values (text, link, table, status), the form workflow-core publishes (#36). Nothing here
- * knows one workflow: its sheet draws it.
+ * shows it: its sheet, its items with their cards and runs. The data it declares for an item or a
+ * run is read on demand (`WorkflowsSource.data`). Nothing here knows one workflow: its sheet draws it.
  */
 
-/** One value of a declared data, as workflow-core publishes it. */
-export type DeclaredValue =
-  | { type: 'text'; label: string; text: string }
-  | { type: 'link'; label: string; url: string }
-  | {
-      type: 'table';
-      label: string;
-      columns: string[];
-      rows: (string | number | boolean | null)[][];
-    }
-  | {
-      type: 'status';
-      label: string;
-      status: 'ok' | 'running' | 'warning' | 'error' | 'unknown';
-      text: string;
-    };
-
-/** A data a workflow declares for an item: its name, its label and its values. */
-export interface DeclaredData {
-  name: string;
-  label: string;
-  values: DeclaredValue[];
-}
-
-/** An item of a generic workflow: where it stands, its cards and runs, its life and its data. */
-export interface GenericItem {
-  id: string;
-  title: string;
-  station: string;
-  status: IssueStatus;
-  /** When it reached its station (ISO). */
-  since: string;
-  cards: CardView[];
-  timeline: TimelineEntry[];
-  data: DeclaredData[];
-  /** The data the workflow declares for each run of the item (subject `run`): its transcript. */
-  runData: Record<number, DeclaredData[]>;
-}
+export type GenericItem = GenericItemView;
 
 /** A generic workflow, as its screen shows it. */
 export interface GenericWorkflow {
   key: string;
+  /** The sheet the core judged, or why it refuses it (or why this screen cannot read it). */
   sheet: WorkflowSheetResult;
   items: GenericItem[];
   /** Since when the core does not answer (ms); the last sheet and items stay. */
   unreachableSince: number | null;
 }
 
+/** Whether an item stands at a station of the sheet: only those are drawn on the graph. */
+export function placed(item: GenericItem, sheet: WorkflowSheet): boolean {
+  return item.station !== null && sheet.stations.some((station) => station.key === item.station);
+}
+
 /** An item as a row of the standard graph: its box is its station, its key its id. */
 export function itemIssue(item: GenericItem, sheet: WorkflowSheet, workflow: string): LineIssue {
+  const station = item.station ?? '';
   const issue: IssueSummary = {
     key: item.id,
     repo: workflow,
@@ -73,7 +42,7 @@ export function itemIssue(item: GenericItem, sheet: WorkflowSheet, workflow: str
     title: item.title,
     url: '',
     labels: [],
-    station: item.station as IssueSummary['station'],
+    station: station as IssueSummary['station'],
     previousStation: null,
     stationChangedAt: item.since,
     status: item.status,
@@ -87,12 +56,12 @@ export function itemIssue(item: GenericItem, sheet: WorkflowSheet, workflow: str
     updatedAt: item.since,
     type: null,
     lane: null,
-    journey: pathTo(sheet, item.station).map((at) => ({
+    journey: pathTo(sheet, station).map((at) => ({
       station: at as IssueSummary['station'],
       lane: null,
       outcome: null,
       at: item.since,
     })),
   };
-  return { issue, box: item.station, agent: null, intervention: null };
+  return { issue, box: station, agent: null, intervention: null };
 }

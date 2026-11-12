@@ -13,10 +13,21 @@ const ROUTES = [
   '/costs',
   '/history',
   '/settings',
+  // The screen of a generic workflow (#65), on the demo's made-up workflow, and an item's detail.
+  '/workflows/essai',
+  '/workflows/essai/e_0002',
 ];
 
-for (const route of ROUTES) {
-  test(`accessibilité : ${route}`, async ({ page }) => {
+/** The routes checked in the light theme too (the app opens dark). */
+const LIGHT = new Set(['/workflows/essai', '/workflows/essai/e_0002']);
+
+for (const [route, theme] of [
+  ...ROUTES.map((each) => [each, 'dark'] as const),
+  ...[...LIGHT].map((each) => [each, 'light'] as const),
+]) {
+  test(`accessibilité : ${route}${theme === 'light' ? ' (clair)' : ''}`, async ({ page }) => {
+    if (theme === 'light')
+      await page.addInitScript(() => localStorage.setItem('factory-live:color-mode', 'light'));
     await page.goto(route);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     // La page posée : Mona Sans chargée (elle change la largeur des textes, donc ce qui déborde), puis
@@ -25,6 +36,19 @@ for (const route of ROUTES) {
       await document.fonts.ready;
       await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
     });
+    // On a generic workflow's screen (#65), the rows of its item's activity fade in when its detail
+    // opens: their contrast is measured once they are in place. (The animations in a loop never end:
+    // only those that do are waited for.)
+    if (route.startsWith('/workflows/'))
+      await page.waitForFunction(() =>
+        document
+          .getAnimations()
+          .every(
+            (animation) =>
+              animation.playState !== 'running' ||
+              animation.effect?.getTiming().iterations === Number.POSITIVE_INFINITY,
+          ),
+      );
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
       .analyze();

@@ -73,7 +73,7 @@ export function RunsTable({
   selectedRunId,
   onSelectRun,
 }: {
-  card: CardView;
+  card: Pick<CardView, 'id' | 'runs'>;
   selectedRunId: number | null;
   onSelectRun?: (runId: number) => void;
 }) {

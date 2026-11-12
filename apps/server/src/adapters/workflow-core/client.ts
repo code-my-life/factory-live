@@ -7,7 +7,17 @@ import type { CoreCheck, CoreEvent } from '@factory-live/contracts/workflow-core
  * core's JSON Schema: an answer of another form is an error, never a half-read state.
  */
 
-export class CoreError extends Error {}
+export class CoreError extends Error {
+  /** The core's code and sentence for its refusal (`invalid_sheet`…), when it gave them. */
+  readonly code: string | null;
+  readonly detail: string | null;
+
+  constructor(message: string, code: string | null = null, detail: string | null = null) {
+    super(message);
+    this.code = code;
+    this.detail = detail;
+  }
+}
 
 /** The longest a read of the core's API may take. */
 const READ_TIMEOUT_MS = 10_000;
@@ -55,11 +65,13 @@ export class WorkflowCoreClient {
     const body: unknown = await response.json().catch(() => null);
     if (!response.ok) {
       const failure = coreError.safeParse(body);
-      throw new CoreError(
-        failure.success
-          ? `${path} : ${response.status} ${failure.data.error} (${failure.data.detail})`
-          : `${path} : ${response.status}`,
-      );
+      throw failure.success
+        ? new CoreError(
+            `${path} : ${response.status} ${failure.data.error} (${failure.data.detail})`,
+            failure.data.error,
+            failure.data.detail,
+          )
+        : new CoreError(`${path} : ${response.status}`);
     }
     if (check === null) return body;
     const parsed = check.safeParse(body);

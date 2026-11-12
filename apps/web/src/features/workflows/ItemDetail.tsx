@@ -1,6 +1,7 @@
 import type { WorkflowSheet } from '@factory-live/contracts';
 import { Heading } from '@primer/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { DeclaredData } from '@factory-live/contracts';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { AgentBadge } from '../../ui/badge/AgentBadge.tsx';
 import { CardBadge } from '../../ui/badge/CardBadge.tsx';
@@ -10,28 +11,53 @@ import { WorkStateLabel, cardWorkState, issueWorkState } from '../../ui/work/wor
 import { RunsTable } from '../issues/IssuePage.tsx';
 import { DeclaredDataList } from './DeclaredData.tsx';
 import type { GenericItem } from './model.ts';
+import { useWorkflows } from './WorkflowsProvider.tsx';
 import styles from './workflows.module.css';
 
 /**
  * An item under the graph (#65): its landmarks (station and since when, state), its cards with their
  * runs, the data its workflow declares for it, then its life, newest first.
  */
+/** The data a workflow declares for one subject, read when it changes; `null` while it is read. */
+function useDeclared(workflow: string, subject: 'card' | 'run', id: string | null) {
+  const { source } = useWorkflows();
+  const [read, setRead] = useState<{ id: string; data: DeclaredData[] } | null>(null);
+  useEffect(() => {
+    if (id === null) return;
+    let current = true;
+    void source.data(workflow, subject, id).then((data) => {
+      if (current) setRead({ id, data });
+    });
+    return () => {
+      current = false;
+    };
+  }, [source, workflow, subject, id]);
+  return read !== null && read.id === id ? read.data : null;
+}
+
 export function ItemDetail({
+  workflow,
   item,
   sheet,
   now,
 }: {
+  workflow: string;
   item: GenericItem;
   sheet: WorkflowSheet | null;
   now: number;
 }) {
   const i18n = useI18n();
   const { t, fmt } = i18n;
-  const station = sheet?.stations.find((each) => each.key === item.station)?.label ?? item.station;
+  const station =
+    sheet?.stations.find((each) => each.key === item.station)?.label ??
+    item.station ??
+    t.workflows.noStation;
   const titleId = `item-${item.id}`;
   // The run whose transcript is open: the last run of the item, until another is picked.
   const lastRun = item.cards.flatMap((card) => card.runs).at(-1)?.id ?? null;
   const [runId, setRunId] = useState<number | null>(lastRun);
+  const itemData = useDeclared(workflow, 'card', item.id);
+  const runData = useDeclared(workflow, 'run', runId === null ? null : String(runId));
   return (
     <article className={styles.detail} aria-labelledby={titleId}>
       <header className={styles.detailHead}>
@@ -89,7 +115,11 @@ export function ItemDetail({
           <Heading as="h3" variant="small" id={`${titleId}-transcript`}>
             {t.workflows.transcriptOf(runId)}
           </Heading>
-          <DeclaredDataList data={item.runData[runId] ?? []} idPrefix={`run-${runId}`} />
+          {runData === null ? (
+            <p className={styles.quiet}>{t.workflows.reading}</p>
+          ) : (
+            <DeclaredDataList data={runData} idPrefix={`run-${runId}`} />
+          )}
         </section>
       ) : null}
 
@@ -97,7 +127,11 @@ export function ItemDetail({
         <Heading as="h3" variant="small" id={`${titleId}-data`}>
           {t.workflows.data}
         </Heading>
-        <DeclaredDataList data={item.data} />
+        {itemData === null ? (
+          <p className={styles.quiet}>{t.workflows.reading}</p>
+        ) : (
+          <DeclaredDataList data={itemData} />
+        )}
       </section>
 
       <section className={styles.section} aria-labelledby={`${titleId}-activity`}>

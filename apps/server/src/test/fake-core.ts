@@ -14,7 +14,10 @@ export interface FakeCoreState {
     sheet_valid: boolean;
     gestures?: { name: string; kind: 'comment' | 'issue'; repo?: string }[];
   }[];
-  /** The sheet of each workflow, as the core serves it; absent: 503 sheet_unavailable. */
+  /**
+   * The sheet of each workflow, as the core serves it; absent: 503 sheet_unavailable; an `{ invalid }`:
+   * the core refuses it (422 invalid_sheet, `invalid` its reason).
+   */
   sheets: Record<string, unknown>;
   items: Record<string, unknown[]>;
   /** The cursor the read routes carry; `null`: none (the stream does not run). */
@@ -210,10 +213,14 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
         ? json(response, 200, { schema_version: 1, workflow: key, ...(usage(days) as object) })
         : json(response, 404, { error: 'not_found', detail: 'no usage' });
     }
-    if (route[2] === 'sheet')
+    if (route[2] === 'sheet') {
+      const sheet = state.sheets[key] as { invalid?: string } | undefined;
+      if (sheet?.invalid !== undefined)
+        return json(response, 422, { error: 'invalid_sheet', detail: sheet.invalid });
       return key in state.sheets
         ? json(response, 200, { schema_version: 1, workflow: key, sheet: state.sheets[key] })
         : json(response, 503, { error: 'sheet_unavailable', detail: 'no sheet' });
+    }
     return json(
       response,
       200,

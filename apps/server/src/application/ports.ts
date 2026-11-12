@@ -6,9 +6,11 @@ import type {
   AcceptanceTwins,
   ActivityEvent,
   ConfigDrift,
+  DeclaredData,
+  GenericWorkflowView,
   IssueLabel,
-  PullRequestView,
   ProfileLimit,
+  PullRequestView,
   PushPayload,
   StudioItem,
   Text,
@@ -201,6 +203,20 @@ export interface RunTranscripts {
 export interface DeclaredPair {
   twins: AcceptanceTwins;
   mirror: number;
+}
+
+/**
+ * The generic workflows workflow-core declares besides the code line and the studio (#65): their sheet,
+ * their items with cards and runs, and the data they declare for an item or a run, as the core serves it.
+ */
+export interface GenericWorkflowsPort {
+  genericWorkflows(): GenericWorkflowView[];
+  /** The data the workflow declares for this subject; `null` when it is not a generic workflow. */
+  genericData(
+    workflow: string,
+    subject: 'card' | 'run',
+    id: string,
+  ): Promise<DeclaredData[] | null>;
 }
 
 export interface DeclaredViewsPort {

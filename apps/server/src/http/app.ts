@@ -44,7 +44,11 @@ import type { HistoryStore } from '../adapters/store/history.ts';
 import { toHookEvent } from '../ingest/hermes.ts';
 import { ReplayGuard, verifySignature } from '../ingest/signature.ts';
 import type { Hub } from '../application/hub.ts';
-import type { DeclaredViewsPort, WorkflowView } from '../application/ports.ts';
+import type {
+  DeclaredViewsPort,
+  GenericWorkflowsPort,
+  WorkflowView,
+} from '../application/ports.ts';
 import {
   historyStats,
   acceptanceSubject,
@@ -82,6 +86,8 @@ export interface AppDeps {
   declared?: DeclaredViewsPort;
   /** The other workflows workflow-core declares (#57), listed with their sheet; their screen is #65. */
   coreWorkflows?: () => readonly WorkflowView[];
+  /** The generic workflows workflow-core declares, for their screen (#65); absent: none. */
+  generic?: GenericWorkflowsPort;
   /** The code line's sheet as the factory publishes it, or why the embedded copy is drawn (#31). */
   codeSheet?: () => PublishedSheet;
   /** Someone looks at a workflow: it is read more often for a while. */
@@ -952,6 +958,32 @@ export function createApp(deps: AppDeps) {
       },
       200,
     );
+  });
+
+  // --- Generic workflows (#65): those workflow-core declares besides the code line and the studio --
+
+  app.get('/api/core-workflows', (c) => {
+    c.header('Cache-Control', 'no-store');
+    return c.json({ workflows: deps.generic?.genericWorkflows() ?? [] }, 200);
+  });
+
+  app.get('/api/core-workflows/:wf/data', async (c) => {
+    const subject = c.req.query('subject');
+    const id = c.req.query('id');
+    if ((subject !== 'card' && subject !== 'run') || !id)
+      return c.json(
+        {
+          error: 'Sujet attendu : card ou run, avec un identifiant',
+          code: 'invalid_request' as const,
+        },
+        400,
+      );
+    const data = deps.generic
+      ? await deps.generic.genericData(c.req.param('wf'), subject, id)
+      : null;
+    if (data === null) return unknownWorkflow(c);
+    c.header('Cache-Control', 'no-store');
+    return c.json({ data }, 200);
   });
 
   app.get('/api/workflows/:wf', (c) => {

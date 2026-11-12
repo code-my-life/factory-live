@@ -25,18 +25,6 @@
   font: var(--text-body-shorthand-medium);
 }
 
-/* The mockup's states, offered by the demo only. */
-.preview {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--base-size-8);
-  min-width: 0;
-  padding: var(--base-size-8) var(--base-size-12);
-  border: var(--borderWidth-thin) dashed var(--borderColor-default);
-  border-radius: var(--borderRadius-medium);
-}
-
 /* The items, when the sheet is refused: one row each, its title cut on one line. */
 .itemList {
   display: flex;

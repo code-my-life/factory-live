@@ -1,4 +1,4 @@
-import { Banner, FormControl, Heading, Select } from '@primer/react';
+import { Banner, Heading } from '@primer/react';
 import { useMemo } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
@@ -7,13 +7,10 @@ import { useNow } from '../../ui/useNow.ts';
 import { WorkStateLabel, issueWorkState } from '../../ui/work/workState.tsx';
 import { SheetGraph } from '../line/graph/FactoryGraph.tsx';
 import { ItemDetail } from './ItemDetail.tsx';
-import { itemIssue } from './model.ts';
+import { itemIssue, placed } from './model.ts';
 import type { GenericItem } from './model.ts';
 import { useWorkflows } from './WorkflowsProvider.tsx';
-import type { Preview } from './WorkflowsProvider.tsx';
 import styles from './workflows.module.css';
-
-const PREVIEWS: readonly Preview[] = ['normal', 'empty', 'loading', 'unreachable', 'refused'];
 
 /** The items as a plain list, when the sheet is refused: the page keeps its items under the banner. */
 function ItemList({
@@ -39,7 +36,7 @@ function ItemList({
           >
             <span className={styles.itemTitle}>{item.title}</span>
             <span className={styles.itemMeta}>
-              <span className="fl-mono">{item.station}</span>
+              {item.station ? <span className="fl-mono">{item.station}</span> : null}
               <WorkStateLabel state={issueWorkState(item, null, t)} />
             </span>
           </button>
@@ -56,7 +53,7 @@ function ItemList({
  */
 export function WorkflowPage() {
   const { t, fmt } = useI18n();
-  const { ready, workflows, previewable, preview, setPreview } = useWorkflows();
+  const { ready, workflows } = useWorkflows();
   const now = useNow();
   const navigate = useNavigate();
   const { workflow: key, item: selected = null } = useParams();
@@ -64,9 +61,15 @@ export function WorkflowPage() {
   const sheet = workflow?.sheet.ok ? workflow.sheet.sheet : null;
   const rows = useMemo(
     () =>
-      workflow && sheet ? workflow.items.map((item) => itemIssue(item, sheet, workflow.key)) : [],
+      workflow && sheet
+        ? workflow.items
+            .filter((item) => placed(item, sheet))
+            .map((item) => itemIssue(item, sheet, workflow.key))
+        : [],
     [workflow, sheet],
   );
+  // The items the core places at no station of the sheet: listed under the graph, never lost.
+  const unplaced = workflow && sheet ? workflow.items.filter((item) => !placed(item, sheet)) : [];
   const open = (id: string) =>
     void navigate(id === selected ? `/workflows/${key}` : `/workflows/${key}/${id}`);
   const item = workflow?.items.find((each) => each.id === selected) ?? null;
@@ -85,21 +88,6 @@ export function WorkflowPage() {
         </div>
         <MotionToggle />
       </header>
-
-      {previewable ? (
-        <div className={styles.preview}>
-          <FormControl>
-            <FormControl.Label>{t.workflows.preview.label}</FormControl.Label>
-            <Select value={preview} onChange={(event) => setPreview(event.target.value as Preview)}>
-              {PREVIEWS.map((each) => (
-                <Select.Option key={each} value={each}>
-                  {t.workflows.preview[each]}
-                </Select.Option>
-              ))}
-            </Select>
-          </FormControl>
-        </div>
-      ) : null}
 
       {!ready ? (
         <p className={styles.quiet}>{t.workflows.loading}</p>
@@ -127,21 +115,31 @@ export function WorkflowPage() {
               ) : null}
             </>
           ) : (
-            <SheetGraph
-              parsed={workflow.sheet}
-              items={rows}
-              providers={[]}
-              selectedKey={selected}
-              onSelect={open}
-              now={now}
-              maxInProgress={1}
-            />
+            <>
+              <SheetGraph
+                parsed={workflow.sheet}
+                items={rows}
+                providers={[]}
+                selectedKey={selected}
+                onSelect={open}
+                now={now}
+                maxInProgress={1}
+              />
+              {unplaced.length > 0 ? (
+                <section className={styles.section} aria-labelledby="workflow-unplaced">
+                  <Heading as="h2" variant="small" id="workflow-unplaced">
+                    {t.workflows.unplaced}
+                  </Heading>
+                  <ItemList items={unplaced} selected={selected} onSelect={open} />
+                </section>
+              ) : null}
+            </>
           )}
 
           {workflow.items.length === 0 ? (
             <p className={styles.quiet}>{t.workflows.empty}</p>
           ) : item ? (
-            <ItemDetail key={item.id} item={item} sheet={sheet} now={now} />
+            <ItemDetail key={item.id} workflow={workflow.key} item={item} sheet={sheet} now={now} />
           ) : selected ? (
             <p className={styles.quiet}>{t.workflows.unknownItem}</p>
           ) : (
