@@ -109,12 +109,12 @@ describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => 
       side.hub.flush();
       received.length = 0;
 
-      // A kind of event the copy of the schema does not know yet (the core's machine, #35) is skipped.
+      // A kind of event the copy of the schema does not know yet is skipped.
       core.send({
         cursor: '1762900000:6',
         workflow: null,
         item: null,
-        kind: 'machine',
+        kind: 'future',
         at: '2026-11-12T10:00:00.500Z',
         state: [{ id: 'gateway', status: 'ok' }],
       });
@@ -226,7 +226,12 @@ describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => 
     expect(side.sheet()).toEqual({ source: 'published', sheet: SHEET });
     const after = line(side.hub.snapshot());
     expect(after.issues.length).toBeGreaterThan(0);
-    expect(after).toEqual(before);
+    // The only change is the intervention that says the core is down (#62).
+    expect(after.interventions.filter((item) => item.kind === 'service_down')).toHaveLength(1);
+    expect({
+      ...after,
+      interventions: after.interventions.filter((item) => item.kind !== 'service_down'),
+    }).toEqual(before);
     expect(side.hub.boardData.tasks).toHaveLength(3);
   });
 
@@ -348,13 +353,55 @@ describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => 
     };
     side = coreSide(dir, core);
     side.reader.start();
-    await until(() => side!.boards.length > 0);
+    const streams = () => core!.requests.filter((request) => request.path === '/api/events').length;
+    // The window starts at the first opening of the stream, after the full read.
+    await until(() => streams() > 0);
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // retryMs is 50 ms in these tests: about ten reopenings in 500 ms, not hundreds.
-    const opened = core.requests.filter((request) => request.path === '/api/events').length;
+    const opened = streams();
     expect(opened).toBeGreaterThan(1);
     expect(opened).toBeLessThanOrEqual(12);
+  });
+
+  it('l’état de la machine du socle et ses événements machine arrivent au hub', async () => {
+    dir = tempDir();
+    const gateway = {
+      id: 'gateway',
+      label: 'Gateway',
+      group: 'hermes',
+      status: 'down',
+      detail: 'Dernier battement il y a 240 s',
+      metrics: { pid: '4242' },
+      checked_at: '2026-11-12T09:59:55Z',
+    };
+    core = await fakeCore(SECRET, {
+      ...coreState(),
+      machine: {
+        runtime_version: '0.22.2',
+        contract: { ok: true, checked_at: '2026-11-12T09:59:00Z', problems: [] },
+        mode: 'normal',
+        boards: { factory: { last_read_at: '2026-11-12T09:59:50Z' } },
+        checks: [gateway],
+      },
+    });
+    side = coreSide(dir, core);
+    side.reader.start();
+    const tile = (id: string) => side!.hub.snapshot().health.find((item) => item.id === id);
+    await until(() => tile('gateway')?.status === 'down' && core!.openStreams() === 1);
+    expect(tile('core')?.status).toBe('ok');
+
+    core.send({
+      cursor: '1762900000:9',
+      workflow: null,
+      item: null,
+      kind: 'machine',
+      at: '2026-11-12T10:00:05Z',
+      state: [{ ...gateway, status: 'ok', detail: 'Battement il y a 4 s' }],
+    });
+    await until(() => tile('gateway')?.status === 'ok', 2_000);
+    expect(tile('gateway')?.detail).toBe('Battement il y a 4 s');
+    expect(side.failures).toEqual([]);
   });
 
   it('un workflow générique du socle est listé avec sa fiche', async () => {

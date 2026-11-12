@@ -1,6 +1,6 @@
 {
   "repository": "code-my-life/workflow-core",
-  "commit": "17edca059bdd8728937674f81f75e2de601278c1",
+  "commit": "73ee66ed64dce4536623e466e578f5b4be68c916",
   "schemas": [
     "workflows",
     "sheet-response",

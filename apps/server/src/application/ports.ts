@@ -381,6 +381,26 @@ export interface CoreAgentState {
   lastHeartbeatAt: number | null;
 }
 
+/** One check of the machine, as workflow-core publishes it (#62); `checkedAt` in ms epoch. */
+export interface CoreCheckState {
+  id: string;
+  label: string;
+  group: string;
+  status: 'ok' | 'degraded' | 'down' | 'unknown';
+  detail: string;
+  metrics: Record<string, string>;
+  checkedAt: number | null;
+}
+
+/** The state of the machine as workflow-core publishes it (#62), times in ms epoch. */
+export interface CoreMachineState {
+  runtimeVersion: string | null;
+  contract: { ok: boolean; problems: string[] } | null;
+  mode: 'normal' | 'observer';
+  boards: { board: string; lastReadAt: number | null }[];
+  checks: CoreCheckState[];
+}
+
 /** One recent fact of the board's activity, as workflow-core serves it (#66); `at` in ms epoch. */
 export interface CoreActivityFact {
   id: string;

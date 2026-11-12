@@ -254,6 +254,21 @@ export const machineSchema: unknown = {
       title: 'ContractVerdict',
       type: 'object',
     },
+    MachineCheck: {
+      description: "One tile of the machine's state.",
+      properties: {
+        id: { title: 'Id', type: 'string' },
+        label: { title: 'Label', type: 'string' },
+        group: { title: 'Group', type: 'string' },
+        status: { enum: ['ok', 'degraded', 'down', 'unknown'], title: 'Status', type: 'string' },
+        detail: { title: 'Detail', type: 'string' },
+        metrics: { additionalProperties: { type: 'string' }, title: 'Metrics', type: 'object' },
+        checked_at: { title: 'Checked At', type: 'string' },
+      },
+      required: ['id', 'label', 'group', 'status', 'detail', 'checked_at'],
+      title: 'MachineCheck',
+      type: 'object',
+    },
   },
   description: 'GET /api/machine: what the core holds about itself.',
   properties: {
@@ -266,6 +281,12 @@ export const machineSchema: unknown = {
       additionalProperties: { $ref: '#/$defs/BoardRead' },
       title: 'Boards',
       type: 'object',
+    },
+    checks: {
+      default: [],
+      items: { $ref: '#/$defs/MachineCheck' },
+      title: 'Checks',
+      type: 'array',
     },
   },
   required: ['schema_version', 'runtime_version', 'contract', 'mode', 'boards'],
@@ -423,6 +444,21 @@ export const eventSchema: unknown = {
       title: 'LiveModel',
       type: 'object',
     },
+    MachineCheck: {
+      description: "One tile of the machine's state.",
+      properties: {
+        id: { title: 'Id', type: 'string' },
+        label: { title: 'Label', type: 'string' },
+        group: { title: 'Group', type: 'string' },
+        status: { enum: ['ok', 'degraded', 'down', 'unknown'], title: 'Status', type: 'string' },
+        detail: { title: 'Detail', type: 'string' },
+        metrics: { additionalProperties: { type: 'string' }, title: 'Metrics', type: 'object' },
+        checked_at: { title: 'Checked At', type: 'string' },
+      },
+      required: ['id', 'label', 'group', 'status', 'detail', 'checked_at'],
+      title: 'MachineCheck',
+      type: 'object',
+    },
     Run: {
       description: 'One run of a card: who worked on it, how it ended. Dates are Unix seconds.',
       properties: {
@@ -450,18 +486,23 @@ export const eventSchema: unknown = {
     },
   },
   description:
-    'One event of GET /api/events. `reset` opens an epoch: the client reads the full state again; it names no\nworkflow, no item and carries no state. `changed` carries the full state of the item, `live` the live state of an\nagent (its item: the card it holds), `activity` one new fact of the board.',
+    "One event of GET /api/events. `reset` opens an epoch: the client reads the full state again; it names no\nworkflow, no item and carries no state. `changed` carries the full state of the item, `live` the live state of an\nagent (its item: the card it holds), `activity` one new fact of the board, `machine` the full list of the machine's\nchecks when a status changed (no workflow, no item).",
   properties: {
     cursor: { title: 'Cursor', type: 'string' },
     workflow: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Workflow' },
     item: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Item' },
-    kind: { enum: ['changed', 'reset', 'live', 'activity'], title: 'Kind', type: 'string' },
+    kind: {
+      enum: ['changed', 'reset', 'live', 'activity', 'machine'],
+      title: 'Kind',
+      type: 'string',
+    },
     at: { title: 'At', type: 'string' },
     state: {
       anyOf: [
         { $ref: '#/$defs/Item' },
         { $ref: '#/$defs/AgentLive' },
         { $ref: '#/$defs/ActivityFact' },
+        { items: { $ref: '#/$defs/MachineCheck' }, type: 'array' },
         { type: 'null' },
       ],
       title: 'State',

@@ -27,6 +27,7 @@ import { createApp } from './http/app.ts';
 import { StreamBuffer } from './http/stream.ts';
 import { DiagnosisService } from './application/diagnosis.ts';
 import { Hub } from './application/hub.ts';
+import { CoreWatch } from './application/core-watch.ts';
 import { KanbanWatch } from './application/kanban-watch.ts';
 import { createLogger } from './logger.ts';
 import { factoryBadge, notifyOpened } from './application/notify.ts';
@@ -197,7 +198,13 @@ const pollKanban = () => {
 };
 pollKanban();
 
-// The core's side: the full state, then its stream; without an answer, the last state stays (#57).
+// The core's side: the full state, then its stream; without an answer, the last state stays (#57). Its
+// reachability drives /healthz there (#62); it never stops the process.
+const coreWatch = new CoreWatch({
+  now,
+  log: log.child({ component: 'workflow-core' }),
+  requestExit: (code) => shutdown('workflow-core', code),
+});
 const core = onCore
   ? new WorkflowCoreReader({
       url: config.WORKFLOW_CORE_URL ?? '',
@@ -217,8 +224,17 @@ const core = onCore
         workflows: (views) => {
           coreWorkflows = views;
         },
-        // The health of the core on the screen comes with #62; the last state stays meanwhile.
-        failed: (error) => hub.kanbanFailed(error),
+        // The core does not answer: the screen and /healthz say so, the last state stays (#62).
+        failed: (error, at) => {
+          coreWatch.failed(error, at);
+          hub.coreFailed(error, at);
+        },
+        answered: (at) => {
+          coreWatch.answered(at);
+          hub.coreAnswered();
+        },
+        machine: (machine) => hub.applyCoreMachine(machine),
+        checks: (checks) => hub.applyCoreChecks(checks),
         live: (agents) => hub.replaceCoreAgents(agents),
         activity: (facts) => hub.addCoreActivity(facts),
         usage: (rows) => store.setUsage(rows),
@@ -303,6 +319,8 @@ const timers = [
   setInterval(() => store.purgeActivity(now() - 30 * 86_400_000), 6 * 3600_000),
   // On the core's side, today's and yesterday's usage are read again every minute (#66).
   setInterval(() => void core?.refreshUsage(2), 60_000),
+  // On the core's side, the state of the machine is read again every 30 seconds (#62).
+  setInterval(() => void core?.refreshMachine(), 30_000),
 ];
 void refreshGitHub();
 void refreshWorkflows();
@@ -342,7 +360,7 @@ const app = createApp({
   workflowWatched: () => {
     workflowWatchedAt = now();
   },
-  kanbanHealthy: () => kanbanWatch.healthy(),
+  kanbanHealthy: () => (onCore ? coreWatch.healthy() : kanbanWatch.healthy()),
   hookSecret: config.secrets.hookSecret,
   origins: config.PUBLIC_ORIGINS,
   allowedHosts: config.allowedHosts,
