@@ -226,6 +226,31 @@ export const CORE_ITEMS = [
   }),
 ];
 
+/**
+ * The intervention the core publishes for the blocked card of cv-site#49 (workflow-core#37): the agent's
+ * question quoted, the gesture `unblock` and, for `needs_input`, the command that shows the card.
+ */
+export const CORE_INTERVENTION = {
+  id: 'needs_input:t_1a9f0049:1',
+  kind: 'needs_input',
+  item: 't_1a9f0049',
+  event: 1,
+  opened_at: new Date((NOW_S - 600) * 1000).toISOString(),
+  agent: 'coder',
+  severity: 'critical',
+  push: true,
+  title: { quote: 'Quelle base de données ?' },
+  question: { quote: 'Quelle base de données ?' },
+  actions: [
+    { kind: 'gesture', gesture: 'unblock' },
+    {
+      kind: 'copy',
+      label: { code: 'intervention.action.showCard', params: {} },
+      command: 'hermes kanban --board factory show t_1a9f0049',
+    },
+  ],
+};
+
 export const coreState = (): FakeCoreState => ({
   workflows: [
     { key: 'factory', board: 'factory', sheet_valid: true },
@@ -233,6 +258,7 @@ export const coreState = (): FakeCoreState => ({
   ],
   sheets: { factory: structuredClone(SHEET), studio: structuredClone(SHEET) },
   items: { factory: structuredClone(CORE_ITEMS), studio: [] },
+  interventions: { factory: [structuredClone(CORE_INTERVENTION)] },
   cursor: '1762900000:5',
 });
 
@@ -307,6 +333,11 @@ export function coreSide(dir: TempDir, core: FakeCore): Side {
       live: (agents) => hub.replaceCoreAgents(agents),
       activity: (facts) => hub.addCoreActivity(facts),
       usage: () => undefined,
+      interventions: (list) => hub.replaceCoreInterventions(list),
+      interventionOpened: (item) => hub.openCoreIntervention(item),
+      interventionClosed: (id) => hub.closeCoreIntervention(id),
+      diagnoses: (entries) => hub.applyCoreDiagnoses(entries),
+      verdicts: (cardId, verdicts) => hub.applyCoreVerdicts(cardId, verdicts),
     },
   });
   return { hub, reader, sheet: () => sheet, generic: () => generic, boards, failures };

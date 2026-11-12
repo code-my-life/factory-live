@@ -5,6 +5,10 @@ export type Cursor = string | null;
 export type Key = string;
 export type Board = string;
 export type SheetValid = boolean;
+export type Name = string;
+export type Kind = 'comment' | 'issue';
+export type Repo = string | null;
+export type Gestures = ListedGesture[];
 export type Workflows = ListedWorkflow[];
 
 /**
@@ -20,5 +24,16 @@ export interface ListedWorkflow {
   key: Key;
   board: Board;
   sheet_valid: SheetValid;
+  gestures?: Gestures;
+  [k: string]: unknown;
+}
+/**
+ * A gesture the workflow declares: `comment` posts `/<key> <name> [note]` on an item's issue, `issue` opens an
+ * issue in `repo` (given for that kind only).
+ */
+export interface ListedGesture {
+  name: Name;
+  kind: Kind;
+  repo?: Repo;
   [k: string]: unknown;
 }

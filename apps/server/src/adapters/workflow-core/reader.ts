@@ -1,9 +1,12 @@
-import type { WorkflowSheet } from '@factory-live/contracts';
+import type { Diagnosis, RunVerdict, WorkflowSheet } from '@factory-live/contracts';
 import {
   coreActivity,
+  coreDiagnosis,
+  coreInterventions,
   coreItems,
   coreLive,
   coreMachine,
+  coreRunVerdicts,
   coreSheetResponse,
   coreUsage,
   coreWorkflows,
@@ -11,6 +14,7 @@ import {
 import type {
   CoreAgent,
   CoreFact,
+  CoreIntervention,
   CoreItem,
   CoreMachineCheck,
   CoreSheet,
@@ -19,6 +23,7 @@ import type {
   CoreActivityFact,
   CoreAgentState,
   CoreCheckState,
+  CoreInterventionState,
   CoreMachineState,
   KanbanDelta,
   LoggerPort,
@@ -28,6 +33,7 @@ import type {
 } from '../../application/ports.ts';
 import { boardOf } from './cards.ts';
 import { WorkflowCoreClient } from './client.ts';
+import { coreInterventionState } from './interventions.ts';
 import { coreActivityFact, coreAgentState } from './live.ts';
 
 /** Where the reader sends what it reads: main.ts wires it to the hub, the code line's sheet and the list. */
@@ -46,6 +52,15 @@ export interface CoreSink {
   activity(facts: CoreActivityFact[]): void;
   /** The code line's usage, one row per day, model, provider and agent (#66). */
   usage(rows: UsageRow[]): void;
+  /** Every open intervention of the code line, from a full read (#59). */
+  interventions(items: CoreInterventionState[]): void;
+  /** An intervention the core announces as opened, then as closed (#59). */
+  interventionOpened(item: CoreInterventionState): void;
+  interventionClosed(id: string): void;
+  /** The diagnoses of the interventions, by id; `null` for one of a refused form (#59). */
+  diagnoses(entries: [string, Diagnosis | null][]): void;
+  /** The verdicts of a card's failed runs (#59). */
+  verdicts(cardId: string, verdicts: RunVerdict[]): void;
   /** The core answered: a read succeeded, or its stream is open or sent an event (#62). */
   answered(at: number): void;
   /** The state of the machine the core publishes, read in full (#62). */
@@ -70,6 +85,13 @@ export interface WorkflowCoreReaderOptions {
 }
 
 const RETRY_MS = 2_000;
+/** The reads of run verdicts at once (#59): enough to fill a board at start, without flooding the core. */
+const VERDICT_READS = 4;
+
+/** A card with a run that ended otherwise than completed: the core gives its runs' verdicts (#59). */
+function hasFailedRun(item: CoreItem): boolean {
+  return item.runs.some((run) => run.ended_at !== null && run.outcome !== 'completed');
+}
 
 /** Whether cursor `a` (`<epoch>:<n>`) comes before cursor `b`. */
 function older(a: string, b: string): boolean {
@@ -107,6 +129,15 @@ export class WorkflowCoreReader {
   private items = new Map<string, Map<string, CoreItem>>();
   private readonly sheets = new Map<string, CoreSheet>();
   private readonly readAt = new Map<string, number>();
+  /** The code line's open interventions, by id, with their card (#59). */
+  private openCards = new Map<string, string>();
+  /** The reads of diagnoses and verdicts, done beside the stream (#59). */
+  private diagnosesBusy = false;
+  private diagnosesAgain = false;
+  private readonly verdictsQueue: string[] = [];
+  private readonly verdictsQueued = new Set<string>();
+  private readonly verdictsReading = new Set<string>();
+  private readonly verdictsAgain = new Set<string>();
   /** The code line's agents the core follows, by agent. */
   private agents = new Map<string, CoreAgent>();
   private cursor: string | null = null;
@@ -229,7 +260,12 @@ export class WorkflowCoreReader {
     this.emitAll();
     this.options.sink.live(this.liveAgents());
     this.options.sink.activity(facts.map(coreActivityFact));
-    if (items.has(code)) await this.refreshUsage(USAGE_DAYS);
+    if (items.has(code)) {
+      await this.refreshUsage(USAGE_DAYS);
+      await this.readInterventions();
+      for (const item of this.items.get(code)?.values() ?? [])
+        if (hasFailedRun(item)) this.scheduleVerdicts(item.id);
+    }
     await this.refreshMachine();
   }
 
@@ -291,6 +327,10 @@ export class WorkflowCoreReader {
         if (event.workflow === this.options.code) this.live(event.kind, event.state);
         continue;
       }
+      if (event.kind === 'intervention_opened' || event.kind === 'intervention_closed') {
+        if (event.workflow === this.options.code) this.intervention(event.kind, event.state);
+        continue;
+      }
       if (event.item === null) continue;
       const held = this.items.get(event.workflow);
       // A workflow declared since the last full read: read it all.
@@ -302,8 +342,135 @@ export class WorkflowCoreReader {
         this.dropAgentsOf(event.item);
       this.readAt.set(event.workflow, this.options.now());
       this.emit(event.workflow);
+      if (event.workflow === this.options.code) {
+        // A card with an open intervention: its diagnosis may have changed; a failed run: its verdict.
+        if ([...this.openCards.values()].includes(event.item)) this.scheduleDiagnoses();
+        if (hasFailedRun(item)) this.scheduleVerdicts(event.item);
+      }
     }
     return false;
+  }
+
+  /** The code line's open interventions (#59), then their diagnoses. */
+  private async readInterventions(): Promise<void> {
+    const path = `/api/workflows/${encodeURIComponent(this.options.code)}/interventions`;
+    const answer = await this.client.get(path, coreInterventions, this.abort.signal);
+    this.openCards = new Map(answer.interventions.map((item) => [item.id, item.item]));
+    this.options.sink.interventions(answer.interventions.map(coreInterventionState));
+    this.scheduleDiagnoses();
+  }
+
+  private intervention(kind: 'intervention_opened' | 'intervention_closed', state: unknown): void {
+    if (kind === 'intervention_closed') {
+      const id = (state as { id: string }).id;
+      this.openCards.delete(id);
+      this.options.sink.interventionClosed(id);
+      return;
+    }
+    const item = state as CoreIntervention;
+    this.openCards.set(item.id, item.item);
+    this.options.sink.interventionOpened(coreInterventionState(item));
+    this.scheduleDiagnoses();
+  }
+
+  /**
+   * Reads the diagnoses again without holding the stream: a read already running is followed by one more,
+   * never by several (#59).
+   */
+  private scheduleDiagnoses(): void {
+    if (this.diagnosesBusy) {
+      this.diagnosesAgain = true;
+      return;
+    }
+    this.diagnosesBusy = true;
+    void this.refreshDiagnoses().finally(() => {
+      this.diagnosesBusy = false;
+      if (!this.diagnosesAgain || !this.running) return;
+      this.diagnosesAgain = false;
+      this.scheduleDiagnoses();
+    });
+  }
+
+  /**
+   * Reads a card's verdicts without holding the stream, `VERDICT_READS` at a time (#59). A card is read
+   * once at a time: asked again during its read, it is read once more after it, so an older answer never
+   * replaces a newer one.
+   */
+  private scheduleVerdicts(cardId: string): void {
+    if (this.verdictsReading.has(cardId)) {
+      this.verdictsAgain.add(cardId);
+      return;
+    }
+    if (this.verdictsQueued.has(cardId)) return;
+    this.verdictsQueued.add(cardId);
+    this.verdictsQueue.push(cardId);
+    this.pumpVerdicts();
+  }
+
+  private pumpVerdicts(): void {
+    while (
+      this.running &&
+      this.verdictsReading.size < VERDICT_READS &&
+      this.verdictsQueue.length > 0
+    ) {
+      const cardId = this.verdictsQueue.shift()!;
+      this.verdictsQueued.delete(cardId);
+      this.verdictsReading.add(cardId);
+      void this.refreshVerdicts(cardId).finally(() => {
+        this.verdictsReading.delete(cardId);
+        if (this.verdictsAgain.delete(cardId)) this.scheduleVerdicts(cardId);
+        this.pumpVerdicts();
+      });
+    }
+  }
+
+  /**
+   * The diagnoses of the code line's interventions, as the core computes them (#59). Each one is checked by
+   * the schema drawn from the core's JSON Schema of a diagnosis; one of another form is left out, and its
+   * intervention is shown without it. A failure keeps the diagnoses held.
+   */
+  async refreshDiagnoses(): Promise<void> {
+    const path = `/api/workflows/${encodeURIComponent(this.options.code)}/diagnoses`;
+    try {
+      const answer = await this.client.get(path, null, this.abort.signal);
+      const listed = (answer as { diagnoses?: unknown } | null)?.diagnoses;
+      const entries: [string, Diagnosis | null][] = [];
+      for (const entry of Array.isArray(listed) ? listed : []) {
+        const id = (entry as { trigger?: { id?: unknown } } | null)?.trigger?.id;
+        if (typeof id !== 'string') continue;
+        const diagnosis = (entry as { diagnosis?: unknown }).diagnosis;
+        const checked = coreDiagnosis.safeParse(diagnosis);
+        if (!checked.success)
+          this.options.log.warn(
+            { interventionId: id, error: checked.error.message },
+            'diagnostic du socle hors schéma : intervention montrée sans lui',
+          );
+        // The diagnosis as the core sent it, which is factory-live's contract (the check adds defaults).
+        entries.push([id, checked.success ? (diagnosis as Diagnosis) : null]);
+      }
+      this.options.sink.diagnoses(entries);
+    } catch (error) {
+      if (this.abort.signal.aborted) return;
+      this.options.log.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        'diagnostics du socle illisibles : les derniers restent',
+      );
+    }
+  }
+
+  /** The verdicts of a card's failed runs, as the core computes them (#59); a failure keeps those held. */
+  async refreshVerdicts(cardId: string): Promise<void> {
+    const path = `/api/workflows/${encodeURIComponent(this.options.code)}/items/${encodeURIComponent(cardId)}/run-verdicts`;
+    try {
+      const answer = await this.client.get(path, coreRunVerdicts, this.abort.signal);
+      this.options.sink.verdicts(cardId, answer.verdicts as RunVerdict[]);
+    } catch (error) {
+      if (this.abort.signal.aborted) return;
+      this.options.log.warn(
+        { cardId, error: error instanceof Error ? error.message : String(error) },
+        'verdicts des runs du socle illisibles : les derniers restent',
+      );
+    }
   }
 
   /**
@@ -369,8 +536,10 @@ export class WorkflowCoreReader {
       this.emit(code);
       return;
     }
-    // The code line is no longer declared by the core: its cards go too.
+    // The code line is no longer declared by the core: its cards and its interventions go too.
     this.options.sink.board(boardOf([]), this.options.now());
+    this.openCards = new Map();
+    this.options.sink.interventions([]);
     this.options.sink.workflows(this.views());
   }
 

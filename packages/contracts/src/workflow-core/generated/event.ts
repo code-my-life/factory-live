@@ -3,9 +3,17 @@
 export type Cursor = string;
 export type Workflow = string | null;
 export type Item = string | null;
-export type Kind = 'changed' | 'reset' | 'live' | 'activity' | 'machine';
+export type Kind =
+  | 'changed'
+  | 'reset'
+  | 'live'
+  | 'activity'
+  | 'machine'
+  | 'intervention_opened'
+  | 'intervention_closed';
 export type At = string;
-export type State = Item1 | AgentLive | ActivityFact | MachineCheck[] | null;
+export type State =
+  Item1 | AgentLive | ActivityFact | MachineCheck[] | Intervention | InterventionClosed | null;
 export type Id = string;
 export type Title = string;
 export type Body = string | null;
@@ -68,12 +76,34 @@ export type Group = string;
 export type Status3 = 'ok' | 'degraded' | 'down' | 'unknown';
 export type Detail1 = string;
 export type CheckedAt = string;
+export type Id6 = string;
+export type Kind4 =
+  'needs_input' | 'capability' | 'transient' | 'gave_up' | 'triage_loop' | 'held_active_pr';
+export type Item4 = string;
+export type Event = number | null;
+export type OpenedAt = string;
+export type Agent2 = string | null;
+export type Severity = 'critical' | 'warning' | 'info';
+export type Push = boolean;
+export type Title1 = CodedText | QuotedText;
+export type Code = string;
+export type Quote = string;
+export type Question = CodedText | QuotedText;
+export type Kind5 = 'gesture';
+export type Gesture = string;
+export type Kind6 = 'copy';
+export type Command = string;
+export type Kind7 = 'link';
+export type Url = string;
+export type Actions = (GestureAction | CopyAction | LinkAction)[];
+export type Id7 = string;
 
 /**
  * One event of GET /api/events. `reset` opens an epoch: the client reads the full state again; it names no
  * workflow, no item and carries no state. `changed` carries the full state of the item, `live` the live state of an
  * agent (its item: the card it holds), `activity` one new fact of the board, `machine` the full list of the machine's
- * checks when a status changed (no workflow, no item).
+ * checks when a status changed (no workflow, no item), `intervention_opened` an intervention that opened (its item:
+ * the card), `intervention_closed` the id of one that closed.
  */
 export interface StreamEvent {
   cursor: Cursor;
@@ -214,4 +244,69 @@ export interface MachineCheck {
 }
 export interface Metrics {
   [k: string]: string;
+}
+/**
+ * A point where the workflow waits for its owner.
+ */
+export interface Intervention {
+  id: Id6;
+  kind: Kind4;
+  item: Item4;
+  event: Event;
+  opened_at: OpenedAt;
+  agent: Agent2;
+  severity: Severity;
+  push: Push;
+  title: Title1;
+  question: Question;
+  actions: Actions;
+  [k: string]: unknown;
+}
+/**
+ * A text of factory-live's catalogue: its code and its parameters.
+ */
+export interface CodedText {
+  code: Code;
+  params?: Params;
+  [k: string]: unknown;
+}
+export interface Params {
+  [k: string]: string | number | boolean | null;
+}
+/**
+ * The agent's own words, as written.
+ */
+export interface QuotedText {
+  quote: Quote;
+  [k: string]: unknown;
+}
+/**
+ * A gesture the workflow declares, that applies to the card (`unblock`): the client posts it.
+ */
+export interface GestureAction {
+  kind?: Kind5;
+  gesture: Gesture;
+  [k: string]: unknown;
+}
+/**
+ * A command to copy, written by the runtime's adapter, and its label.
+ */
+export interface CopyAction {
+  kind?: Kind6;
+  label: CodedText;
+  command: Command;
+  [k: string]: unknown;
+}
+export interface LinkAction {
+  kind?: Kind7;
+  label: CodedText;
+  url: Url;
+  [k: string]: unknown;
+}
+/**
+ * The state of an `intervention_closed` event: the intervention gone.
+ */
+export interface InterventionClosed {
+  id: Id7;
+  [k: string]: unknown;
 }

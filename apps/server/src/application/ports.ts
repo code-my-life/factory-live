@@ -401,6 +401,29 @@ export interface CoreMachineState {
   checks: CoreCheckState[];
 }
 
+/**
+ * An intervention as workflow-core announces it (#59), in factory-live's units: opening time in seconds epoch,
+ * as the kanban's; titles, questions and labels as factory-live's texts (a code of its catalogue, or a quote);
+ * the core's gesture `unblock` as the action Débloquer. The links to an issue or a dashboard are factory-live's.
+ */
+export interface CoreInterventionState {
+  id: string;
+  kind: 'needs_input' | 'capability' | 'transient' | 'gave_up' | 'triage_loop' | 'held_active_pr';
+  cardId: string;
+  eventId: number | null;
+  openedAt: number;
+  profile: string | null;
+  severity: 'critical' | 'warning' | 'info';
+  push: boolean;
+  title: Text;
+  question: Text;
+  actions: (
+    | { kind: 'unblock' }
+    | { kind: 'copy'; label: Text; command: string }
+    | { kind: 'link'; label: Text; url: string }
+  )[];
+}
+
 /** One recent fact of the board's activity, as workflow-core serves it (#66); `at` in ms epoch. */
 export interface CoreActivityFact {
   id: string;
