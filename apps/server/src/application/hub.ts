@@ -26,6 +26,7 @@ import { buildHealth } from './health.ts';
 import type { HealthSignals } from './health.ts';
 import {
   coreActivityEvent,
+  coreIntervention,
   foundInterventions,
   issueOfCards,
   projectAgents,
@@ -39,6 +40,7 @@ import {
 import type { ProjectionInput, ResolvedIntervention } from './projection.ts';
 import type {
   CoreActivityFact,
+  CoreInterventionState,
   CoreAgentState,
   CoreCheckState,
   CoreMachineState,
@@ -140,6 +142,10 @@ export class Hub {
   private coreError: string | null = null;
   private coreMachine: CoreMachineState | null = null;
   private coreChecks: CoreCheckState[] = [];
+  /** On workflow-core's side (#59): its open interventions, their diagnoses, the verdicts of the runs. */
+  private coreInterventions = new Map<string, CoreInterventionState>();
+  private coreDiagnoses = new Map<string, Diagnosis>();
+  private readonly coreVerdicts = new Map<string, ReadonlyMap<number, RunVerdict>>();
   /** Les interventions du kanban au dernier passage, et celles fermées depuis moins de 30 min. */
   private found: FoundIntervention[] = [];
   private readonly resolved = new Map<
@@ -172,7 +178,7 @@ export class Hub {
     this.root = deps.profiles.root();
     this.factoryProfiles = this.loadProfiles();
     // Le miroir du kanban suffit pour montrer les interventions avant la première lecture.
-    this.found = foundInterventions(this.projectionInput());
+    this.found = this.foundNow();
   }
 
   private loadProfiles(): string[] {
@@ -276,7 +282,7 @@ export class Hub {
    */
   private trackInterventions(): void {
     const now = this.deps.now();
-    const found = foundInterventions(this.projectionInput());
+    const found = this.foundNow();
     const ids = new Set(found.map((item) => item.id));
     const tasks = new Map(this.board.tasks.map((task) => [task.id, task]));
     for (const previous of this.found) {
@@ -325,8 +331,8 @@ export class Hub {
     const next = this.found.find(
       (item) => item.cardId === intervention.cardId && DIAGNOSED.has(item.kind),
     );
-    const before = this.deps.diagnoses?.primaryOf(intervention.id) ?? null;
-    const after = next ? (this.deps.diagnoses?.primaryOf(next.id) ?? null) : null;
+    const before = this.primaryOf(intervention.id);
+    const after = next ? this.primaryOf(next.id) : null;
     return {
       runId: run.id,
       outcome: run.outcome,
@@ -368,11 +374,92 @@ export class Hub {
   }
 
   diagnosisOf(interventionId: string): Diagnosis | null {
+    if (this.deps.source === 'workflow-core') return this.coreDiagnoses.get(interventionId) ?? null;
     return this.deps.diagnoses?.of(interventionId) ?? null;
+  }
+
+  /**
+   * The interventions of the moment. On workflow-core's side (#59), those the core publishes, with
+   * factory-live's links, and the two kinds factory-live still computes from the cards the core serves:
+   * a pull request to approve and a red main.
+   */
+  private foundNow(): FoundIntervention[] {
+    const input = this.projectionInput();
+    if (this.deps.source !== 'workflow-core') return foundInterventions(input);
+    const own = foundInterventions(input).filter(
+      (item) => item.kind === 'pr_approval' || item.kind === 'main_red',
+    );
+    const fromCore = [...this.coreInterventions.values()].map((item) =>
+      coreIntervention(item, this.issueOfCard.get(item.cardId) ?? null, {
+        owner: this.options.owner,
+        dashboardUrl: this.options.dashboardUrl,
+      }),
+    );
+    return [...fromCore, ...own].sort((left, right) => left.openedAt - right.openedAt);
+  }
+
+  /** Every open intervention of the core, from a full read (#59): they replace those held. */
+  replaceCoreInterventions(items: readonly CoreInterventionState[]): void {
+    this.coreInterventions = new Map(items.map((item) => [item.id, item]));
+    this.trackInterventions();
+    this.dirty.add('board');
+  }
+
+  /** An intervention the core announces as opened (#59). */
+  openCoreIntervention(item: CoreInterventionState): void {
+    this.coreInterventions.set(item.id, item);
+    this.trackInterventions();
+    this.dirty.add('board');
+  }
+
+  /** An intervention the core announces as closed (#59): it stays 30 min if its card started again. */
+  closeCoreIntervention(id: string): void {
+    if (!this.coreInterventions.delete(id)) return;
+    this.trackInterventions();
+    this.dirty.add('board');
+  }
+
+  /**
+   * The core's diagnoses, by intervention; `null` for one whose form the core's schema refused (#59). The
+   * core lists the open interventions only: the diagnosis of one resolved in the last 30 minutes is kept,
+   * so its follow-up can still say whether the card blocked again for the same cause.
+   */
+  applyCoreDiagnoses(entries: readonly (readonly [string, Diagnosis | null])[]): void {
+    const next = new Map(
+      entries.flatMap(([id, diagnosis]) => (diagnosis ? [[id, diagnosis] as const] : [])),
+    );
+    for (const id of this.resolved.keys()) {
+      const kept = this.coreDiagnoses.get(id);
+      if (kept && !next.has(id)) next.set(id, kept);
+    }
+    this.coreDiagnoses = next;
+    this.dirty.add('board');
+  }
+
+  /**
+   * The verdicts of a card's failed runs, as the core computes them (#59). New verdicts send the board
+   * again even when it did not change: the app reads an issue's details again on a board event.
+   */
+  applyCoreVerdicts(cardId: string, verdicts: readonly RunVerdict[]): void {
+    const next = new Map(verdicts.map((verdict) => [verdict.runId, verdict]));
+    const held = this.coreVerdicts.get(cardId);
+    const same = held !== undefined && JSON.stringify([...held]) === JSON.stringify([...next]);
+    this.coreVerdicts.set(cardId, next);
+    if (same) return;
+    this.lastSent.delete('board');
+    this.dirty.add('board');
+  }
+
+  /** The cause a diagnosis names first, from the core on its side, else from the diagnosis service. */
+  private primaryOf(interventionId: string): string | null {
+    if (this.deps.source === 'workflow-core')
+      return this.coreDiagnoses.get(interventionId)?.primary.code ?? null;
+    return this.deps.diagnoses?.primaryOf(interventionId) ?? null;
   }
 
   /** Le verdict des runs en échec d'une carte (page d'une issue), calculé à la demande et gardé. */
   verdictsOf(task: Task): ReadonlyMap<number, RunVerdict> {
+    if (this.deps.source === 'workflow-core') return this.coreVerdicts.get(task.id) ?? new Map();
     return this.deps.diagnoses?.verdictsOf(this.board, task, this.deps.now()) ?? new Map();
   }
 

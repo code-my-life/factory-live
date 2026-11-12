@@ -27,6 +27,12 @@ export interface FakeCoreState {
    * core declares nothing for it (an empty list); `invalid_id`: the core refuses the id (422).
    */
   data?: Record<string, Record<string, unknown[] | 'invalid_id'>>;
+  /** The open interventions of each workflow, by opening time (#59); absent: none. */
+  interventions?: Record<string, unknown[]>;
+  /** The diagnoses of each workflow, `{item, trigger, diagnosis}` (#59); absent: none. */
+  diagnoses?: Record<string, unknown[]>;
+  /** The run verdicts of each card, by card id (#59); absent: none. */
+  verdicts?: Record<string, unknown[]>;
 }
 
 export interface FakeCoreRequest {
@@ -43,6 +49,8 @@ export interface FakeCore {
   backlog: (lastEventId: string | null) => object[];
   /** Sends one event to every open stream; returns the number of streams it reached. */
   send(event: { cursor: string; kind: string } & Record<string, unknown>): number;
+  /** How long the core waits before answering a path (#59: a slow route); none by default. */
+  delay: (path: string) => number;
   /** Cuts every open stream, as a restart of the core would. */
   cut(): void;
   /** Ends every open stream normally, as a proxy that closes long requests would. */
@@ -63,6 +71,7 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
     state,
     requests,
     backlog: () => [],
+    delay: () => 0,
     send(event) {
       for (const stream of streams) stream.write(frame(event));
       return streams.size;
@@ -127,10 +136,31 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
         response.write(frame(event as { cursor: string; kind: string }));
       return;
     }
-    const route = /^\/api\/workflows\/([\w-]+)\/(sheet|items|live|activity|usage|data)$/.exec(path);
+    const verdicts = /^\/api\/workflows\/([\w-]+)\/items\/([\w-]+)\/run-verdicts$/.exec(path);
+    if (verdicts)
+      return json(response, 200, {
+        schema_version: 1,
+        verdicts: state.verdicts?.[verdicts[2] ?? ''] ?? [],
+      });
+    const route =
+      /^\/api\/workflows\/([\w-]+)\/(sheet|items|live|activity|usage|interventions|diagnoses|data)$/.exec(
+        path,
+      );
     const key = route?.[1];
     if (!route || !key || !state.workflows.some((workflow) => workflow.key === key))
       return json(response, 404, { error: 'unknown_workflow', detail: `workflow "${key}"` });
+    if (route[2] === 'interventions')
+      return json(response, 200, {
+        schema_version: 1,
+        workflow: key,
+        interventions: state.interventions?.[key] ?? [],
+      });
+    if (route[2] === 'diagnoses')
+      return json(response, 200, {
+        schema_version: 1,
+        workflow: key,
+        diagnoses: state.diagnoses?.[key] ?? [],
+      });
     if (route[2] === 'live')
       return json(response, 200, {
         schema_version: 1,
@@ -170,7 +200,12 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
     );
   };
 
-  const server: Server = createServer(handle);
+  const server: Server = createServer((request, response) => {
+    const path = new URL(request.url ?? '/', 'http://core').pathname;
+    const wait = core.delay(path);
+    if (wait > 0) setTimeout(() => handle(request, response), wait);
+    else handle(request, response);
+  });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   core.url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   return core;

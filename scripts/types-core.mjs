@@ -31,6 +31,9 @@ export const SCHEMAS = [
   'live',
   'activity',
   'usage',
+  'interventions',
+  'diagnosis',
+  'run-verdicts',
   'declared-data',
 ];
 const BANNER = (name) =>

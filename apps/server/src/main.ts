@@ -239,6 +239,11 @@ const core = onCore
         live: (agents) => hub.replaceCoreAgents(agents),
         activity: (facts) => hub.addCoreActivity(facts),
         usage: (rows) => store.setUsage(rows),
+        interventions: (items) => hub.replaceCoreInterventions(items),
+        interventionOpened: (item) => hub.openCoreIntervention(item),
+        interventionClosed: (id) => hub.closeCoreIntervention(id),
+        diagnoses: (entries) => hub.applyCoreDiagnoses(entries),
+        verdicts: (cardId, verdicts) => hub.applyCoreVerdicts(cardId, verdicts),
       },
     })
   : null;

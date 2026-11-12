@@ -3,6 +3,7 @@ import type * as NodeFs from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type * as NodeSqlite from 'node:sqlite';
+import { msg } from '@factory-live/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PublishedSheet } from '../../application/ports.ts';
 import { HistoryStore } from '../store/history.ts';
@@ -90,7 +91,23 @@ describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => 
     const fromHermes = line(hermes.snapshot());
     expect(fromHermes.issues.length).toBeGreaterThan(0);
     expect(fromHermes.interventions.length).toBeGreaterThan(0);
-    expect(line(side.hub.snapshot())).toEqual(fromHermes);
+    // Since workflow-core#37 (its C2, decided by the owner), a `needs_input` of the core also offers the
+    // command that shows the card, after Débloquer: the one difference with Hermes' side, written here.
+    const showCard = {
+      kind: 'copy' as const,
+      label: msg('intervention.action.showCard'),
+      command: 'hermes kanban --board factory show t_1a9f0049',
+    };
+    const expected = {
+      ...fromHermes,
+      interventions: fromHermes.interventions.map((item) =>
+        item.kind === 'needs_input'
+          ? { ...item, actions: [item.actions[0]!, showCard, ...item.actions.slice(1)] }
+          : item,
+      ),
+    };
+    await until(() => side!.hub.snapshot().interventions.length > 0);
+    expect(line(side.hub.snapshot())).toEqual(expected);
     expect(side.sheet()).toEqual({ source: 'published', sheet: SHEET });
     expect(core.requests.every((request) => request.auth === `Bearer ${SECRET}`)).toBe(true);
   });

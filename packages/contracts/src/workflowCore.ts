@@ -1,22 +1,31 @@
 import { z } from 'zod';
 import type { ActivityFact, ActivityResponse } from './workflow-core/generated/activity.ts';
 import type { DeclaredDataResponse } from './workflow-core/generated/declared-data.ts';
+import type { Diagnosis } from './workflow-core/generated/diagnosis.ts';
 import type { ErrorResponse } from './workflow-core/generated/error.ts';
+import type {
+  Intervention,
+  InterventionsResponse,
+} from './workflow-core/generated/interventions.ts';
 import type { StreamEvent } from './workflow-core/generated/event.ts';
 import type { ItemsResponse } from './workflow-core/generated/items.ts';
 import type { AgentLive, LiveResponse } from './workflow-core/generated/live.ts';
 import type { MachineCheck, MachineResponse } from './workflow-core/generated/machine.ts';
+import type { RunVerdicts } from './workflow-core/generated/run-verdicts.ts';
 import type { SheetResponse } from './workflow-core/generated/sheet-response.ts';
 import type { UsageResponse } from './workflow-core/generated/usage.ts';
 import type { WorkflowsResponse } from './workflow-core/generated/workflows.ts';
 import {
   activitySchema,
   declaredDataSchema,
+  diagnosisSchema,
   errorSchema,
   eventSchema,
+  interventionsSchema,
   itemsSchema,
   liveSchema,
   machineSchema,
+  runVerdictsSchema,
   sheetResponseSchema,
   usageSchema,
   workflowsSchema,
@@ -33,11 +42,15 @@ export type {
   ActivityResponse,
   AgentLive as CoreAgent,
   DeclaredDataResponse,
+  Diagnosis as CoreDiagnosis,
   ErrorResponse,
+  Intervention as CoreIntervention,
+  InterventionsResponse,
   ItemsResponse,
   LiveResponse,
   MachineCheck as CoreMachineCheck,
   MachineResponse,
+  RunVerdicts as RunVerdictsResponse,
   SheetResponse,
   StreamEvent as CoreEvent,
   UsageResponse,
@@ -76,3 +89,6 @@ export const coreUsage = check<UsageResponse>(usageSchema);
 export const coreDeclaredData = check<DeclaredDataResponse>(declaredDataSchema);
 export type CoreDeclaredData = DeclaredDataResponse['data'][number];
 export type CoreValue = CoreDeclaredData['values'][number];
+export const coreInterventions = check<InterventionsResponse>(interventionsSchema);
+export const coreDiagnosis = check<Diagnosis>(diagnosisSchema);
+export const coreRunVerdicts = check<RunVerdicts>(runVerdictsSchema);

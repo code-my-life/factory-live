@@ -1,9 +1,18 @@
 import { msg } from '@factory-live/contracts';
 import type { Diagnosis, FindingCode, Intervention } from '@factory-live/contracts';
 import { describe, expect, it, vi } from 'vitest';
+import { Hub } from './hub.ts';
 import { notifyOpened } from './notify.ts';
 import type { NotifyDeps } from './notify.ts';
-import type { PushMessage } from './ports.ts';
+import type {
+  CoreInterventionState,
+  HistoryPort,
+  LoggerPort,
+  ProfilesPort,
+  PushMessage,
+  PushPort,
+} from './ports.ts';
+import { KEEP_FINISHED_MS } from './projection.ts';
 
 const NOW = Date.parse('2026-10-28T18:00:00Z');
 
@@ -142,5 +151,142 @@ describe('notifyOpened', () => {
       [hook.diagnosis?.primary.summary, hook.diagnosis?.primary.why, 2],
       ['Quelle base de données ?', 'Quelle base de données ? PostgreSQL ou SQLite ?', 2],
     ]);
+  });
+});
+
+// --- Interventions announced by workflow-core (#59) -------------------------------------------------------
+
+/** A store that keeps the notifications claimed, shared between two hubs as one base across a restart. */
+function coreStore(claimed: Set<string>): HistoryPort {
+  const store: Partial<HistoryPort> = {
+    board: () => ({ tasks: [], runs: [], links: [], events: [], comments: [] }),
+    stations: () => new Map(),
+    recentActivity: () => [],
+    saveStation: () => {},
+    appendActivity: () => {},
+    openUnblocks: () => [],
+    unblock: () => null,
+    claimNotification: (id: string) => (claimed.has(id) ? false : (claimed.add(id), true)),
+  };
+  return store as HistoryPort;
+}
+
+/** A hub on workflow-core's side whose openings go to `notifyOpened`, as main.ts wires it. */
+function coreHub(claimed: Set<string>, sent: PushMessage[]): Hub {
+  const silent: LoggerPort = { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} };
+  const store = coreStore(claimed);
+  const profiles: ProfilesPort = {
+    profiles: () => [],
+    live: () => null,
+    repo: () => null,
+    manifest: () => ({ owner: null, projects: {}, profiles: {} }),
+    root: () => ({ maxInProgress: 0, maxInProgressPerProfile: 0 }),
+    facts: () => null,
+    factsStamp: () => '',
+  };
+  const hub = new Hub(
+    {
+      owner: 'code-my-life',
+      boardName: 'factory',
+      dashboardUrl: null,
+      addresses: { local: 'http://localhost:8446', tailnet: null },
+      heldAfterSeconds: 1_800,
+      keepFinishedMs: KEEP_FINISHED_MS,
+    },
+    {
+      store,
+      profiles,
+      github: null,
+      diagnoses: null,
+      log: silent,
+      now: () => NOW,
+      source: 'workflow-core',
+    },
+  );
+  const notifier: PushPort = {
+    notify: (message) => {
+      sent.push(message);
+      return Promise.resolve({ sent: 1, removed: 0, failed: 0 });
+    },
+  };
+  hub.interventionListeners.add((opened, all) => {
+    void notifyOpened({ store, notifier, log: silent, now: () => NOW }, opened, all);
+  });
+  return hub;
+}
+
+/** An intervention as the adapter of the core hands it to the hub (seconds epoch, factory-live texts). */
+function announced(patch: Partial<CoreInterventionState> = {}): CoreInterventionState {
+  return {
+    id: 'needs_input:t_1:10',
+    kind: 'needs_input',
+    cardId: 't_1',
+    eventId: 10,
+    openedAt: Math.floor((NOW - 60_000) / 1000),
+    profile: 'coder',
+    severity: 'critical',
+    push: true,
+    title: 'Quelle base de données ?',
+    question: 'Quelle base de données ?\nPostgreSQL ou SQLite ?',
+    actions: [{ kind: 'unblock' }],
+    ...patch,
+  };
+}
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+describe('notifications des interventions annoncées par le socle (#59)', () => {
+  it('une ouverture annoncée par le socle envoie une seule notification', async () => {
+    const sent: PushMessage[] = [];
+    const hub = coreHub(new Set(), sent);
+    hub.flush();
+
+    hub.openCoreIntervention(announced());
+    hub.flush();
+    await settle();
+    // Announced again (a full read after a reset), it is not sent twice.
+    hub.replaceCoreInterventions([announced()]);
+    hub.flush();
+    await settle();
+
+    expect(sent).toEqual([
+      {
+        where: 't_1',
+        title: 'Quelle base de données ?',
+        body: 'Quelle base de données ? PostgreSQL ou SQLite ?',
+        url: '/interventions/needs_input%3At_1%3A10',
+        tag: 'needs_input:t_1:10',
+        badge: 1,
+      },
+    ]);
+  });
+
+  it('après un redémarrage, rien n’est renvoyé et une ouverture manquée est notifiée une fois', async () => {
+    const claimed = new Set<string>();
+    const before: PushMessage[] = [];
+    const first = coreHub(claimed, before);
+    first.openCoreIntervention(announced());
+    first.flush();
+    await settle();
+    expect(before).toHaveLength(1);
+
+    // factory-live restarts on the same base; while it was down, three interventions opened.
+    const missed = announced({ id: 'capability:t_2:11', cardId: 't_2', kind: 'capability' });
+    const old = announced({
+      id: 'capability:t_3:12',
+      cardId: 't_3',
+      kind: 'capability',
+      openedAt: Math.floor((NOW - 7 * 3600_000) / 1000),
+    });
+    const silentOne = announced({ id: 'needs_input:t_4:13', cardId: 't_4', push: false });
+    const after: PushMessage[] = [];
+    const second = coreHub(claimed, after);
+    second.replaceCoreInterventions([announced(), missed, old, silentOne]);
+    second.flush();
+    await settle();
+    second.flush();
+    await settle();
+
+    expect(after.map((message) => message.tag)).toEqual(['capability:t_2:11']);
   });
 });

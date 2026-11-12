@@ -865,6 +865,603 @@ export const usageSchema: unknown = {
   title: 'UsageResponse',
   type: 'object',
 };
+export const interventionsSchema: unknown = {
+  $defs: {
+    CodedText: {
+      description: "A text of factory-live's catalogue: its code and its parameters.",
+      properties: {
+        code: { title: 'Code', type: 'string' },
+        params: {
+          additionalProperties: {
+            anyOf: [
+              { type: 'string' },
+              { type: 'integer' },
+              { type: 'number' },
+              { type: 'boolean' },
+              { type: 'null' },
+            ],
+          },
+          title: 'Params',
+          type: 'object',
+        },
+      },
+      required: ['code'],
+      title: 'CodedText',
+      type: 'object',
+    },
+    CopyAction: {
+      description: "A command to copy, written by the runtime's adapter, and its label.",
+      properties: {
+        kind: { const: 'copy', default: 'copy', title: 'Kind', type: 'string' },
+        label: { $ref: '#/$defs/CodedText' },
+        command: { title: 'Command', type: 'string' },
+      },
+      required: ['label', 'command'],
+      title: 'CopyAction',
+      type: 'object',
+    },
+    GestureAction: {
+      description:
+        'A gesture the workflow declares, that applies to the card (`unblock`): the client posts it.',
+      properties: {
+        kind: { const: 'gesture', default: 'gesture', title: 'Kind', type: 'string' },
+        gesture: { title: 'Gesture', type: 'string' },
+      },
+      required: ['gesture'],
+      title: 'GestureAction',
+      type: 'object',
+    },
+    Intervention: {
+      description: 'A point where the workflow waits for its owner.',
+      properties: {
+        id: { title: 'Id', type: 'string' },
+        kind: {
+          enum: [
+            'needs_input',
+            'capability',
+            'transient',
+            'gave_up',
+            'triage_loop',
+            'held_active_pr',
+          ],
+          title: 'Kind',
+          type: 'string',
+        },
+        item: { title: 'Item', type: 'string' },
+        event: { anyOf: [{ type: 'integer' }, { type: 'null' }], title: 'Event' },
+        opened_at: { title: 'Opened At', type: 'string' },
+        agent: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Agent' },
+        severity: { enum: ['critical', 'warning', 'info'], title: 'Severity', type: 'string' },
+        push: { title: 'Push', type: 'boolean' },
+        title: {
+          anyOf: [{ $ref: '#/$defs/CodedText' }, { $ref: '#/$defs/QuotedText' }],
+          title: 'Title',
+        },
+        question: {
+          anyOf: [{ $ref: '#/$defs/CodedText' }, { $ref: '#/$defs/QuotedText' }],
+          title: 'Question',
+        },
+        actions: {
+          items: {
+            discriminator: {
+              mapping: {
+                copy: '#/$defs/CopyAction',
+                gesture: '#/$defs/GestureAction',
+                link: '#/$defs/LinkAction',
+              },
+              propertyName: 'kind',
+            },
+            oneOf: [
+              { $ref: '#/$defs/GestureAction' },
+              { $ref: '#/$defs/CopyAction' },
+              { $ref: '#/$defs/LinkAction' },
+            ],
+          },
+          title: 'Actions',
+          type: 'array',
+        },
+      },
+      required: [
+        'id',
+        'kind',
+        'item',
+        'event',
+        'opened_at',
+        'agent',
+        'severity',
+        'push',
+        'title',
+        'question',
+        'actions',
+      ],
+      title: 'Intervention',
+      type: 'object',
+    },
+    LinkAction: {
+      properties: {
+        kind: { const: 'link', default: 'link', title: 'Kind', type: 'string' },
+        label: { $ref: '#/$defs/CodedText' },
+        url: { title: 'Url', type: 'string' },
+      },
+      required: ['label', 'url'],
+      title: 'LinkAction',
+      type: 'object',
+    },
+    QuotedText: {
+      description: "The agent's own words, as written.",
+      properties: { quote: { title: 'Quote', type: 'string' } },
+      required: ['quote'],
+      title: 'QuotedText',
+      type: 'object',
+    },
+  },
+  description:
+    "GET /api/workflows/<key>/interventions: the open interventions of the workflow's board, by opening time.",
+  properties: {
+    schema_version: { const: 1, title: 'Schema Version', type: 'integer' },
+    workflow: { title: 'Workflow', type: 'string' },
+    interventions: {
+      items: { $ref: '#/$defs/Intervention' },
+      title: 'Interventions',
+      type: 'array',
+    },
+  },
+  required: ['schema_version', 'workflow', 'interventions'],
+  title: 'InterventionsResponse',
+  type: 'object',
+};
+export const diagnosisSchema: unknown = {
+  $defs: {
+    Actor: {
+      description:
+        'Who must act: the owner on the workflow side (setting, plugin), the owner by an answer, the agent, or nobody.',
+      enum: ['you_factory', 'you_answer', 'agent', 'wait'],
+      title: 'Actor',
+      type: 'string',
+    },
+    CauseFixed: {
+      properties: {
+        state: { const: 'fixed', title: 'State', type: 'string' },
+        at: {
+          pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$',
+          title: 'At',
+          type: 'string',
+        },
+        verified: { title: 'Verified', type: 'boolean' },
+        durable: { anyOf: [{ type: 'boolean' }, { type: 'null' }], title: 'Durable' },
+      },
+      required: ['state', 'at', 'verified', 'durable'],
+      title: 'CauseFixed',
+      type: 'object',
+    },
+    CauseNone: {
+      properties: { state: { const: 'none', title: 'State', type: 'string' } },
+      required: ['state'],
+      title: 'CauseNone',
+      type: 'object',
+    },
+    CausePresent: {
+      properties: { state: { const: 'present', title: 'State', type: 'string' } },
+      required: ['state'],
+      title: 'CausePresent',
+      type: 'object',
+    },
+    CauseUnknown: {
+      properties: { state: { const: 'unknown', title: 'State', type: 'string' } },
+      required: ['state'],
+      title: 'CauseUnknown',
+      type: 'object',
+    },
+    Episode: {
+      description:
+        'The runs examined: since the last unblocking, the creation, or a manual reclaim.',
+      properties: {
+        from: {
+          pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$',
+          title: 'From',
+          type: 'string',
+        },
+        runIds: { items: { exclusiveMinimum: 0, type: 'integer' }, title: 'Runids', type: 'array' },
+      },
+      required: ['from', 'runIds'],
+      title: 'Episode',
+      type: 'object',
+    },
+    Evidence: {
+      description:
+        'A fact the diagnosis rests on: what the core says of it, and the exact quote of the source.',
+      properties: {
+        source: { $ref: '#/$defs/EvidenceSource' },
+        at: {
+          anyOf: [
+            { pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$', type: 'string' },
+            { type: 'null' },
+          ],
+          title: 'At',
+        },
+        until: {
+          anyOf: [
+            { pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$', type: 'string' },
+            { type: 'null' },
+          ],
+          title: 'Until',
+        },
+        runId: {
+          anyOf: [{ exclusiveMinimum: 0, type: 'integer' }, { type: 'null' }],
+          title: 'Runid',
+        },
+        fact: { anyOf: [{ $ref: '#/$defs/Message' }, { type: 'string' }], title: 'Fact' },
+        quote: { anyOf: [{ maxLength: 400, type: 'string' }, { type: 'null' }], title: 'Quote' },
+        count: {
+          anyOf: [{ exclusiveMinimum: 0, type: 'integer' }, { type: 'null' }],
+          title: 'Count',
+        },
+      },
+      required: ['source', 'at', 'until', 'runId', 'fact', 'quote', 'count'],
+      title: 'Evidence',
+      type: 'object',
+    },
+    EvidenceFile: {
+      properties: {
+        name: { title: 'Name', type: 'string' },
+        bytes: { minimum: 0, title: 'Bytes', type: 'integer' },
+        at: {
+          pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$',
+          title: 'At',
+          type: 'string',
+        },
+      },
+      required: ['name', 'bytes', 'at'],
+      title: 'EvidenceFile',
+      type: 'object',
+    },
+    EvidenceSource: {
+      enum: ['kanban', 'transcript', 'webhook', 'agent_log', 'config', 'plugin', 'workspace'],
+      title: 'EvidenceSource',
+      type: 'string',
+    },
+    Finding: {
+      properties: {
+        code: { $ref: '#/$defs/FindingCode' },
+        confidence: { enum: ['certain', 'likely'], title: 'Confidence', type: 'string' },
+        actor: { $ref: '#/$defs/Actor' },
+        cause: {
+          discriminator: {
+            mapping: {
+              fixed: '#/$defs/CauseFixed',
+              none: '#/$defs/CauseNone',
+              present: '#/$defs/CausePresent',
+              unknown: '#/$defs/CauseUnknown',
+            },
+            propertyName: 'state',
+          },
+          oneOf: [
+            { $ref: '#/$defs/CausePresent' },
+            { $ref: '#/$defs/CauseFixed' },
+            { $ref: '#/$defs/CauseUnknown' },
+            { $ref: '#/$defs/CauseNone' },
+          ],
+          title: 'Cause',
+        },
+        summary: { anyOf: [{ $ref: '#/$defs/Message' }, { type: 'string' }], title: 'Summary' },
+        why: { anyOf: [{ $ref: '#/$defs/Message' }, { type: 'string' }], title: 'Why' },
+        subject: { $ref: '#/$defs/Subject' },
+        setting: { anyOf: [{ $ref: '#/$defs/Setting' }, { type: 'null' }] },
+        evidence: {
+          items: { $ref: '#/$defs/Evidence' },
+          maxItems: 8,
+          title: 'Evidence',
+          type: 'array',
+        },
+        steps: { items: { $ref: '#/$defs/Step' }, maxItems: 6, title: 'Steps', type: 'array' },
+        runIds: { items: { exclusiveMinimum: 0, type: 'integer' }, title: 'Runids', type: 'array' },
+      },
+      required: [
+        'code',
+        'confidence',
+        'actor',
+        'cause',
+        'summary',
+        'why',
+        'subject',
+        'setting',
+        'evidence',
+        'steps',
+        'runIds',
+      ],
+      title: 'Finding',
+      type: 'object',
+    },
+    FindingCode: {
+      description: 'The causes the diagnosis recognises; `unexplained` when no rule applies.',
+      enum: [
+        'guard_hook_timeout',
+        'guard_hook_hung',
+        'guard_hook_raised',
+        'plugin_load_failed',
+        'stopped_after_refusals',
+        'stopped_without_kanban_call',
+        'protocol_breaker',
+        'iteration_budget',
+        'runtime_limit',
+        'tool_deadline',
+        'command_timeout',
+        'guard_refusal',
+        'refusal_loop',
+        'provider_quota',
+        'provider_terminal',
+        'provider_unavailable',
+        'pr_acceptance_infra',
+        'pr_acceptance_missing',
+        'spawn_failed',
+        'held_active_pr',
+        'triage_loop',
+        'question',
+        'unexplained',
+      ],
+      title: 'FindingCode',
+      type: 'string',
+    },
+    Message: {
+      description:
+        "A text the core makes itself: a code of factory-live's catalogue and its parameters.",
+      properties: {
+        code: { pattern: '^diagnosis\\.[A-Za-z]+(\\.[A-Za-z]+)+$', title: 'Code', type: 'string' },
+        params: {
+          additionalProperties: {
+            anyOf: [
+              { type: 'string' },
+              { type: 'integer' },
+              { type: 'number' },
+              { type: 'boolean' },
+              { type: 'null' },
+            ],
+          },
+          title: 'Params',
+          type: 'object',
+        },
+      },
+      required: ['code', 'params'],
+      title: 'Message',
+      type: 'object',
+    },
+    RunVerdict: {
+      properties: {
+        runId: { exclusiveMinimum: 0, title: 'Runid', type: 'integer' },
+        finding: { anyOf: [{ $ref: '#/$defs/FindingCode' }, { type: 'null' }] },
+        role: {
+          anyOf: [{ enum: ['cause', 'consequence'], type: 'string' }, { type: 'null' }],
+          title: 'Role',
+        },
+        text: { anyOf: [{ $ref: '#/$defs/Message' }, { type: 'string' }], title: 'Text' },
+        sessionId: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Sessionid' },
+      },
+      required: ['runId', 'finding', 'role', 'text', 'sessionId'],
+      title: 'RunVerdict',
+      type: 'object',
+    },
+    Setting: {
+      description:
+        "The setting at fault: the limit observed at the incident, the value in service, the repository's.",
+      properties: {
+        profile: { title: 'Profile', type: 'string' },
+        key: { title: 'Key', type: 'string' },
+        unit: { enum: ['seconds', 'turns'], title: 'Unit', type: 'string' },
+        observed: {
+          anyOf: [{ anyOf: [{ type: 'number' }, { type: 'integer' }], ge: 0 }, { type: 'null' }],
+          title: 'Observed',
+        },
+        current: {
+          anyOf: [{ anyOf: [{ type: 'number' }, { type: 'integer' }], ge: 0 }, { type: 'null' }],
+          title: 'Current',
+        },
+        defaultValue: {
+          anyOf: [{ anyOf: [{ type: 'number' }, { type: 'integer' }], ge: 0 }, { type: 'null' }],
+          title: 'Defaultvalue',
+        },
+        effective: {
+          anyOf: [{ anyOf: [{ type: 'number' }, { type: 'integer' }], ge: 0 }, { type: 'null' }],
+          title: 'Effective',
+        },
+        repo: {
+          anyOf: [{ anyOf: [{ type: 'number' }, { type: 'integer' }], ge: 0 }, { type: 'null' }],
+          title: 'Repo',
+        },
+      },
+      required: [
+        'profile',
+        'key',
+        'unit',
+        'observed',
+        'current',
+        'defaultValue',
+        'effective',
+        'repo',
+      ],
+      title: 'Setting',
+      type: 'object',
+    },
+    Sources: {
+      description: 'The sources read: a missing one leaves some conclusions only likely.',
+      properties: {
+        transcript: { title: 'Transcript', type: 'boolean' },
+        agentLog: { title: 'Agentlog', type: 'boolean' },
+        config: { title: 'Config', type: 'boolean' },
+        workspace: { title: 'Workspace', type: 'boolean' },
+      },
+      required: ['transcript', 'agentLog', 'config', 'workspace'],
+      title: 'Sources',
+      type: 'object',
+    },
+    Step: {
+      properties: {
+        text: { anyOf: [{ $ref: '#/$defs/Message' }, { type: 'string' }], title: 'Text' },
+        command: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Command' },
+        done: { title: 'Done', type: 'boolean' },
+      },
+      required: ['text', 'command', 'done'],
+      title: 'Step',
+      type: 'object',
+    },
+    Subject: {
+      properties: {
+        profile: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Profile' },
+        plugin: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Plugin' },
+        tool: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Tool' },
+      },
+      required: ['profile', 'plugin', 'tool'],
+      title: 'Subject',
+      type: 'object',
+    },
+    UnblockAdvice: {
+      properties: {
+        when: {
+          enum: ['now', 'after_fix', 'answer', 'wait', 'not_unblockable'],
+          title: 'When',
+          type: 'string',
+        },
+        template: {
+          anyOf: [{ $ref: '#/$defs/Message' }, { type: 'string' }, { type: 'null' }],
+          title: 'Template',
+        },
+        nextBlock: {
+          anyOf: [{ enum: ['blocked', 'triage'], type: 'string' }, { type: 'null' }],
+          title: 'Nextblock',
+        },
+      },
+      required: ['when', 'template', 'nextBlock'],
+      title: 'UnblockAdvice',
+      type: 'object',
+    },
+    WorkState: {
+      properties: {
+        branch: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Branch' },
+        commits: { enum: ['none', 'some', 'unknown'], title: 'Commits', type: 'string' },
+        commitsRefused: { minimum: 0, title: 'Commitsrefused', type: 'integer' },
+        pushed: { enum: ['yes', 'no', 'unknown'], title: 'Pushed', type: 'string' },
+        prUrl: { title: 'Prurl', type: 'null' },
+        editedFiles: { minimum: 0, title: 'Editedfiles', type: 'integer' },
+        evidence: {
+          items: { $ref: '#/$defs/EvidenceFile' },
+          maxItems: 50,
+          title: 'Evidence',
+          type: 'array',
+        },
+      },
+      required: [
+        'branch',
+        'commits',
+        'commitsRefused',
+        'pushed',
+        'prUrl',
+        'editedFiles',
+        'evidence',
+      ],
+      title: 'WorkState',
+      type: 'object',
+    },
+  },
+  properties: {
+    computedAt: {
+      pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$',
+      title: 'Computedat',
+      type: 'string',
+    },
+    episode: { $ref: '#/$defs/Episode' },
+    primary: { $ref: '#/$defs/Finding' },
+    others: { items: { $ref: '#/$defs/Finding' }, maxItems: 4, title: 'Others', type: 'array' },
+    unblock: { $ref: '#/$defs/UnblockAdvice' },
+    runs: { items: { $ref: '#/$defs/RunVerdict' }, title: 'Runs', type: 'array' },
+    work: { anyOf: [{ $ref: '#/$defs/WorkState' }, { type: 'null' }] },
+    sources: { $ref: '#/$defs/Sources' },
+  },
+  required: ['computedAt', 'episode', 'primary', 'others', 'unblock', 'runs', 'work', 'sources'],
+  title: 'Diagnosis',
+  type: 'object',
+  'x-diagnosis-version': 1,
+};
+export const runVerdictsSchema: unknown = {
+  $defs: {
+    FindingCode: {
+      description: 'The causes the diagnosis recognises; `unexplained` when no rule applies.',
+      enum: [
+        'guard_hook_timeout',
+        'guard_hook_hung',
+        'guard_hook_raised',
+        'plugin_load_failed',
+        'stopped_after_refusals',
+        'stopped_without_kanban_call',
+        'protocol_breaker',
+        'iteration_budget',
+        'runtime_limit',
+        'tool_deadline',
+        'command_timeout',
+        'guard_refusal',
+        'refusal_loop',
+        'provider_quota',
+        'provider_terminal',
+        'provider_unavailable',
+        'pr_acceptance_infra',
+        'pr_acceptance_missing',
+        'spawn_failed',
+        'held_active_pr',
+        'triage_loop',
+        'question',
+        'unexplained',
+      ],
+      title: 'FindingCode',
+      type: 'string',
+    },
+    Message: {
+      description:
+        "A text the core makes itself: a code of factory-live's catalogue and its parameters.",
+      properties: {
+        code: { pattern: '^diagnosis\\.[A-Za-z]+(\\.[A-Za-z]+)+$', title: 'Code', type: 'string' },
+        params: {
+          additionalProperties: {
+            anyOf: [
+              { type: 'string' },
+              { type: 'integer' },
+              { type: 'number' },
+              { type: 'boolean' },
+              { type: 'null' },
+            ],
+          },
+          title: 'Params',
+          type: 'object',
+        },
+      },
+      required: ['code', 'params'],
+      title: 'Message',
+      type: 'object',
+    },
+    RunVerdict: {
+      properties: {
+        runId: { exclusiveMinimum: 0, title: 'Runid', type: 'integer' },
+        finding: { anyOf: [{ $ref: '#/$defs/FindingCode' }, { type: 'null' }] },
+        role: {
+          anyOf: [{ enum: ['cause', 'consequence'], type: 'string' }, { type: 'null' }],
+          title: 'Role',
+        },
+        text: { anyOf: [{ $ref: '#/$defs/Message' }, { type: 'string' }], title: 'Text' },
+        sessionId: { anyOf: [{ type: 'string' }, { type: 'null' }], title: 'Sessionid' },
+      },
+      required: ['runId', 'finding', 'role', 'text', 'sessionId'],
+      title: 'RunVerdict',
+      type: 'object',
+    },
+  },
+  description:
+    'The answer of the run verdicts of a card: the verdict of each failed run, newest run first.',
+  properties: {
+    schema_version: { const: 1, title: 'Schema Version', type: 'integer' },
+    verdicts: { items: { $ref: '#/$defs/RunVerdict' }, title: 'Verdicts', type: 'array' },
+  },
+  required: ['schema_version', 'verdicts'],
+  title: 'RunVerdicts',
+  type: 'object',
+  'x-diagnosis-version': 1,
+};
 export const declaredDataSchema: unknown = {
   $defs: {
     DeclaredData: {
