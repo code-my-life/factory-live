@@ -38,8 +38,11 @@ import { coreActivityFact, coreAgentState } from './live.ts';
 
 /** Where the reader sends what it reads: main.ts wires it to the hub, the code line's sheet and the list. */
 export interface CoreSink {
-  /** The whole board of the code line, replacing the one held. */
-  board(delta: KanbanDelta, readAt: number): void;
+  /**
+   * The whole board of the code line, replacing the one held. `declared`: false once the core no longer
+   * declares the code line, whose board is then empty, without the history of its past cards (#63).
+   */
+  board(delta: KanbanDelta, readAt: number, declared: boolean): void;
   /** The code line's sheet, as the core judged it. */
   sheet(sheet: PublishedSheet): void;
   /** The other workflows the core declares, besides the code line and those read by their own adapter. */
@@ -544,7 +547,7 @@ export class WorkflowCoreReader {
       return;
     }
     // The code line is no longer declared by the core: its cards and its interventions go too.
-    this.options.sink.board(boardOf([]), this.options.now());
+    this.options.sink.board(boardOf([]), this.options.now(), false);
     this.openCards = new Map();
     this.options.sink.interventions([]);
     this.options.sink.workflows(this.views());
@@ -561,6 +564,7 @@ export class WorkflowCoreReader {
     this.options.sink.board(
       boardOf([...(this.items.get(key)?.values() ?? [])]),
       this.options.now(),
+      true,
     );
     this.options.sink.workflows(this.views());
   }

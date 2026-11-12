@@ -1837,7 +1837,8 @@ describe('historique lu par le socle (#63)', () => {
       now: () => core.clock.now,
       log: createLogger('silent'),
       sink: {
-        board: (delta, readAt) => core.hub.replaceBoard(history.withGone('factory', delta), readAt),
+        board: (delta, readAt, declared) =>
+          core.hub.replaceBoard(declared ? history.withGone('factory', delta) : delta, readAt),
         history: (workflow, read, complete) => history.record(workflow, read, complete),
         sheet: () => undefined,
         workflows: () => undefined,

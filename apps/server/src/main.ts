@@ -220,8 +220,8 @@ const core = onCore
       now,
       log: log.child({ component: 'workflow-core' }),
       sink: {
-        board: (board, readAt) =>
-          hub.replaceBoard(coreHistory.withGone(CODE_WORKFLOW, board), readAt),
+        board: (board, readAt, declared) =>
+          hub.replaceBoard(declared ? coreHistory.withGone(CODE_WORKFLOW, board) : board, readAt),
         history: (workflow, items, complete) => coreHistory.record(workflow, items, complete),
         sheet: (next) => {
           if (JSON.stringify(next) === JSON.stringify(codeSheet)) return;

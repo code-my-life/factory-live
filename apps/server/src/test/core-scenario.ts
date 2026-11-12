@@ -320,9 +320,9 @@ export function coreSide(dir: TempDir, core: FakeCore): Side {
     now: () => NOW,
     log,
     sink: {
-      board: (delta, readAt) => {
+      board: (delta, readAt, declared) => {
         boards.push(delta);
-        hub.replaceBoard(history.withGone('factory', delta), readAt);
+        hub.replaceBoard(declared ? history.withGone('factory', delta) : delta, readAt);
       },
       history: (workflow, items, complete) => history.record(workflow, items, complete),
       sheet: (next) => {

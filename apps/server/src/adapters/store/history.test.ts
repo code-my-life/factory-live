@@ -115,6 +115,7 @@ let side: Side | null = null;
 
 afterEach(async () => {
   await side?.reader.stop();
+  side?.store.close();
   await core?.close();
   side = null;
   core = null;
@@ -152,6 +153,25 @@ describe('historique de factory-live par le socle (#63)', () => {
     expect(after?.cards.map((item) => item.id)).toEqual(before?.cards.map((item) => item.id));
   });
 
+  it('un workflow de la ligne du code retiré du socle ne garde pas ses cartes purgées', async () => {
+    dir = tempDir();
+    const { hub, store } = await start();
+    // A finished card purged first: it stays, from the history.
+    core!.state.items['factory'] = structuredClone(CORE_ITEMS).filter(
+      (item) => item['id'] !== 't_b1ef0049',
+    );
+    await until(() => core!.openStreams() === 1);
+    reset(core!, 1);
+    await until(() => store.historyItems('factory').some((row) => row.goneAt !== null), 2_000);
+    expect(hub.boardData.tasks.map((task) => task.id)).toContain('t_b1ef0049');
+
+    // Then the core no longer declares the code line: its board is empty, purged cards included.
+    core!.state.workflows = core!.state.workflows.filter((workflow) => workflow.key !== 'factory');
+    await until(() => core!.openStreams() === 1);
+    reset(core!, 2);
+    await until(() => hub.boardData.tasks.length === 0, 2_000);
+  });
+
   it('un reset du socle ne crée aucun doublon', async () => {
     dir = tempDir();
     await start();
@@ -173,8 +193,8 @@ describe('historique de factory-live par le socle (#63)', () => {
     // A base written on Hermes' side: its mirror holds cv-site#40, delivered 45 days ago and purged since.
     const seeded = new HistoryStore(join(dir.path, 'core-data'));
     seeded.mirror(MIRROR);
+    const fromHermes = historyStats(views(newHub(dir, 'core-data', 'hermes', seeded), seeded), 60);
     seeded.close();
-    const fromHermes = historyStats(views(newHub(dir, 'core-data'), seeded), 60);
     expect(fromHermes.issuesDone).toBe(1);
     const mirrorRows = ['tasks', 'runs', 'links', 'events', 'comments'].map((table) =>
       rows(dir, table),
@@ -203,7 +223,10 @@ describe('historique de factory-live par le socle (#63)', () => {
 
     // A second start does not pour it again.
     await side!.reader.stop();
+    side!.store.close();
     side = null;
+    await core!.close();
+    core = null;
     await start();
     expect(rows(dir, 'item_history')).toBe(historyRows);
   });

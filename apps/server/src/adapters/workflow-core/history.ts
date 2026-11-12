@@ -15,6 +15,11 @@ const FINISHED = new Set(['done', 'archived']);
 export class CoreHistory {
   private readonly store: HistoryPort;
   private readonly now: () => number;
+  /**
+   * By workflow, the finished cards the core no longer serves, read once from the history and kept until it
+   * changes them: a card that changes does not reload every stored state (the history outlives Hermes' purge).
+   */
+  private readonly gone = new Map<string, Map<string, CoreItem>>();
 
   constructor(store: HistoryPort, now: () => number) {
     this.store = store;
@@ -29,6 +34,10 @@ export class CoreHistory {
 
   /** Items read from the core; `complete` for a full read, where the others are gone. */
   record(workflow: string, items: readonly CoreItem[], complete: boolean): void {
+    const gone = this.gone.get(workflow);
+    // A full read may mark items gone: read the gone cards again. A single item seen again is no longer gone.
+    if (complete) this.gone.delete(workflow);
+    else if (gone) for (const item of items) gone.delete(item.id);
     this.store.recordItems(
       workflow,
       items.map((item) => ({ id: item.id, state: item })),
@@ -40,13 +49,7 @@ export class CoreHistory {
   /** The board of the core's current items, then the items gone from the core, from the history. */
   withGone(workflow: string, board: KanbanDelta): KanbanDelta {
     const current = new Set(board.tasks.map((task) => task.id));
-    // Only a finished card is kept: Hermes purges finished cards; a card gone unfinished (deleted, or a
-    // journal rebuilt without it) leaves the line, as a full read of the core says (#57).
-    const gone = this.store
-      .historyItems(workflow)
-      .filter((item) => item.goneAt !== null && !current.has(item.id))
-      .map((item) => item.state as CoreItem)
-      .filter((item) => FINISHED.has(item.status));
+    const gone = [...this.goneOf(workflow).values()].filter((item) => !current.has(item.id));
     if (gone.length === 0) return board;
     const past = boardOf(gone);
     return {
@@ -59,5 +62,23 @@ export class CoreHistory {
       events: [...board.events, ...past.events].sort((left, right) => left.id - right.id),
       comments: [...board.comments, ...past.comments].sort((left, right) => left.id - right.id),
     };
+  }
+
+  private goneOf(workflow: string): Map<string, CoreItem> {
+    let gone = this.gone.get(workflow);
+    if (!gone) {
+      // Only a finished card is kept: Hermes purges finished cards; a card gone unfinished (deleted, or a
+      // journal rebuilt without it) leaves the line, as a full read of the core says (#57).
+      gone = new Map(
+        this.store
+          .historyItems(workflow)
+          .filter((item) => item.goneAt !== null)
+          .map((item) => item.state as CoreItem)
+          .filter((item) => FINISHED.has(item.status))
+          .map((item) => [item.id, item]),
+      );
+      this.gone.set(workflow, gone);
+    }
+    return gone;
   }
 }
