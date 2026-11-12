@@ -18,6 +18,7 @@ import type {
 } from '@factory-live/contracts';
 import type {
   Board,
+  GuardRisk,
   Comment,
   EvidenceFile,
   Link,
@@ -99,6 +100,11 @@ export interface ProfilesPort {
    * #93); absent: the agents' screen counts them in the agent's journal.
    */
   hookTimeouts?(profile: string): ReadonlyMap<string, number> | null;
+  /**
+   * The guards at risk as the source computes them itself, with the time it was read (workflow-core, #96);
+   * absent: the hub finds them with the rule on each agent's facts. `null`: nothing read yet.
+   */
+  guardRisks?(): { risks: GuardRisk[]; checkedAt: number } | null;
   /**
    * The agent's limits with their defaults, when the source publishes them (workflow-core, #93); absent:
    * the agents' screen takes them from `facts` and Hermes' defaults.
