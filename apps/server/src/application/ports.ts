@@ -330,6 +330,11 @@ export interface HistoryPort {
   // Most recent lines of these kinds, across all cards (guard refusals).
   activityOfKinds(kinds: readonly string[], limit: number): ActivityEvent[];
   addUsage(delta: UsageDelta): void;
+  /**
+   * Usage rows as workflow-core serves them (#66): each one sets its day, model, provider and agent, so a
+   * day served again is not counted twice, and a day the core no longer serves stays.
+   */
+  setUsage(rows: readonly UsageRow[]): void;
   usageSince(day: string): UsageRow[];
   claimNotification(interventionId: string, now: number): boolean;
   unblock(interventionId: string): UnblockRecord | null;

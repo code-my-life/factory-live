@@ -2,6 +2,7 @@ import {
   AcceptanceLayoutPreference,
   ApiError,
   GitHubAccess,
+  HermesHookBody,
   IssueDetail,
   PushPayload,
   Snapshot,
@@ -14,6 +15,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { HOOK_TIMEOUT_MESSAGE } from '@factory-live/domain';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackUnblockReactions } from '../application/unblock.ts';
+import { toHookEvent } from '../ingest/hermes.ts';
 import { sign } from '../ingest/signature.ts';
 import { NOW, NOW_S, ORIGINS, SECRET, harness } from '../test/harness.ts';
 import type { Harness } from '../test/harness.ts';
@@ -23,6 +25,10 @@ import { TwinBench } from '../adapters/twins/bench.ts';
 import { WorkflowApi } from '../adapters/workflows/api.ts';
 import { FakeWorkflow, MASTER, waitingVideo } from '../test/workflow-fixtures.ts';
 import { contentSecurityPolicy } from './app.ts';
+import { WorkflowCoreReader } from '../adapters/workflow-core/reader.ts';
+import { createLogger } from '../logger.ts';
+import { fakeCore } from '../test/fake-core.ts';
+import { coreState } from '../test/core-scenario.ts';
 
 let h: Harness;
 
@@ -1616,3 +1622,121 @@ describe('workflows suivis par leur API (#31)', () => {
     expect(fake.calls).toHaveLength(calls);
   });
 });
+
+describe('coûts lus par le socle (#66)', () => {
+  it('côté socle, les coûts viennent du socle et les jours passés restent', async () => {
+    const day = (offset: number) => new Date(NOW - offset * 86_400_000).toISOString();
+    // Hermes' side: three days of calls, received as webhooks, one of them refused for quota. They are
+    // applied as the ingestion route applies them: the route itself refuses a two-day-old timestamp.
+    const receive = (body: unknown) => h.hub.applyHook(toHookEvent(HermesHookBody.parse(body)));
+    const calls = [
+      { at: day(2), profile: 'coder', model: 'agnes-2.5-flash', input: 1_000, output: 200 },
+      { at: day(1), profile: 'coder', model: 'agnes-2.5-flash', input: 2_000, output: 300 },
+      { at: day(1), profile: 'gate', model: 'qwen-3.6', input: 500, output: 50 },
+      { at: day(0), profile: 'gate', model: 'qwen-3.6', input: 700, output: 70 },
+    ];
+    for (const call of calls)
+      receive(
+        hook('post_api_request', {
+          profile: call.profile,
+          timestamp: call.at,
+          extra: {
+            provider: 'freellmapi',
+            response_model: call.model,
+            usage: { input_tokens: call.input, output_tokens: call.output },
+          },
+        }),
+      );
+    receive(
+      hook('api_request_error', {
+        profile: 'gate',
+        timestamp: day(0),
+        extra: { model: 'qwen-3.6', provider: 'freellmapi', status_code: 429 },
+      }),
+    );
+    const fromHermes = await (
+      await h.app.request('/api/usage?days=7', { headers: THIS_PC })
+    ).json();
+
+    // The core's side: the same consumption, as workflow-core serves it, one row per day, model and agent.
+    // The refusal for quota counts on the row of its day, model and agent, as the core counts it.
+    const rows = calls.map((call, index) => ({
+      day: call.at.slice(0, 10),
+      agent: call.profile,
+      model: call.model,
+      provider: 'freellmapi',
+      calls: 1,
+      input_tokens: call.input,
+      output_tokens: call.output,
+      cost_usd: null,
+      rate_limited: index === calls.length - 1 ? 1 : 0,
+      errors: 0,
+    }));
+    const served = { rows };
+    const core = harness();
+    const fake = await fakeCore(CORE_SECRET, {
+      ...coreState(),
+      usage: {
+        factory: (days: number) => ({
+          days,
+          models: [],
+          agents: [],
+          daily: [],
+          rows: served.rows.filter((row) => row.day >= day(days - 1).slice(0, 10)),
+        }),
+      },
+    });
+    const reader = new WorkflowCoreReader({
+      url: fake.url,
+      secret: CORE_SECRET,
+      code: 'factory',
+      own: ['studio'],
+      retryMs: 50,
+      now: () => NOW,
+      log: createLogger('silent'),
+      sink: {
+        board: () => undefined,
+        sheet: () => undefined,
+        workflows: () => undefined,
+        failed: () => undefined,
+        live: () => undefined,
+        activity: () => undefined,
+        usage: (usage) => core.store.setUsage(usage),
+      },
+    });
+    try {
+      reader.start();
+      await until(() => fake.requests.some((request) => request.path.endsWith('/usage')));
+      await until(async () => (await usagePage(core)).models.length > 0);
+      expect(await usagePage(core)).toEqual(fromHermes);
+
+      // The core no longer serves the oldest day: it stays in factory-live's own table.
+      served.rows = served.rows.filter((row) => row.day !== day(2).slice(0, 10));
+      await reader.refreshUsage(7);
+      expect(await usagePage(core)).toEqual(fromHermes);
+      expect(core.store.usageSince(day(2).slice(0, 10)).map((row) => row.day)).toContain(
+        day(2).slice(0, 10),
+      );
+    } finally {
+      await reader.stop();
+      await fake.close();
+      core.close();
+    }
+  });
+});
+
+const CORE_SECRET = 'secret-du-socle-de-test';
+
+async function usagePage(on: Harness) {
+  return (await (await on.app.request('/api/usage?days=7', { headers: THIS_PC })).json()) as {
+    models: unknown[];
+  };
+}
+
+async function until(condition: () => boolean | Promise<boolean>, timeoutMs = 3_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await condition())) {
+    if (Date.now() > deadline) throw new Error('condition not met in time');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}

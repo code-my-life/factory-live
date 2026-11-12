@@ -245,6 +245,35 @@ export class HistoryStore implements HistoryPort, GitHubAuthStore {
       );
   }
 
+  setUsage(rows: readonly UsageRow[]): void {
+    const statement = this.db.prepare(
+      `INSERT INTO usage_daily (day, model, provider, profile, calls, input, output, rate_limited, errors)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(day, model, provider, profile) DO UPDATE SET
+         calls = excluded.calls, input = excluded.input, output = excluded.output,
+         rate_limited = excluded.rate_limited, errors = excluded.errors`,
+    );
+    this.db.exec('BEGIN');
+    try {
+      for (const row of rows)
+        statement.run(
+          row.day,
+          row.model,
+          row.provider,
+          row.profile,
+          row.calls,
+          row.input,
+          row.output,
+          row.rateLimited,
+          row.errors,
+        );
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
   usageSince(day: string): UsageRow[] {
     return this.db
       .prepare('SELECT * FROM usage_daily WHERE day >= ? ORDER BY day')

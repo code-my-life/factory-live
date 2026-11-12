@@ -23,7 +23,12 @@
           "title": "Run"
         },
         "state": {
-          "enum": ["thinking", "tool", "cli", "blocked"],
+          "enum": [
+            "thinking",
+            "tool",
+            "cli",
+            "blocked"
+          ],
           "title": "State",
           "type": "string"
         },
@@ -87,7 +92,11 @@
       "description": "What the agent is doing: a tool call (`tool`), a delegated command line (`cli`, its label the command's name),\nor waiting for the model (`llm`). `detail`: the command, the path or the name given to the tool, secrets masked,\n2 000 characters at most; for `llm`, the model.",
       "properties": {
         "kind": {
-          "enum": ["llm", "tool", "cli"],
+          "enum": [
+            "llm",
+            "tool",
+            "cli"
+          ],
           "title": "Kind",
           "type": "string"
         },
@@ -111,7 +120,12 @@
           "type": "string"
         }
       },
-      "required": ["kind", "label", "detail", "started_at"],
+      "required": [
+        "kind",
+        "label",
+        "detail",
+        "started_at"
+      ],
       "title": "LiveAction",
       "type": "object"
     },
@@ -134,12 +148,19 @@
           "title": "Provider"
         },
         "source": {
-          "enum": ["live", "session"],
+          "enum": [
+            "live",
+            "session"
+          ],
           "title": "Source",
           "type": "string"
         }
       },
-      "required": ["name", "provider", "source"],
+      "required": [
+        "name",
+        "provider",
+        "source"
+      ],
       "title": "LiveModel",
       "type": "object"
     }
@@ -163,7 +184,11 @@
       "type": "array"
     }
   },
-  "required": ["schema_version", "workflow", "agents"],
+  "required": [
+    "schema_version",
+    "workflow",
+    "agents"
+  ],
   "title": "LiveResponse",
   "type": "object"
 }

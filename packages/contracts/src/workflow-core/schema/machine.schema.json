@@ -14,7 +14,9 @@
           "title": "Last Read At"
         }
       },
-      "required": ["last_read_at"],
+      "required": [
+        "last_read_at"
+      ],
       "title": "BoardRead",
       "type": "object"
     },
@@ -36,7 +38,11 @@
           "type": "array"
         }
       },
-      "required": ["ok", "checked_at", "problems"],
+      "required": [
+        "ok",
+        "checked_at",
+        "problems"
+      ],
       "title": "ContractVerdict",
       "type": "object"
     }
@@ -82,7 +88,10 @@
       ]
     },
     "mode": {
-      "enum": ["observer", "normal"],
+      "enum": [
+        "observer",
+        "normal"
+      ],
       "title": "Mode",
       "type": "string"
     },
@@ -94,7 +103,13 @@
       "type": "object"
     }
   },
-  "required": ["schema_version", "runtime_version", "contract", "mode", "boards"],
+  "required": [
+    "schema_version",
+    "runtime_version",
+    "contract",
+    "mode",
+    "boards"
+  ],
   "title": "MachineResponse",
   "type": "object"
 }

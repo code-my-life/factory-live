@@ -13,7 +13,12 @@
           "type": "string"
         },
         "kind": {
-          "enum": ["line", "return", "branch", "fan"],
+          "enum": [
+            "line",
+            "return",
+            "branch",
+            "fan"
+          ],
           "title": "Kind",
           "type": "string"
         },
@@ -43,7 +48,11 @@
           "title": "Label"
         }
       },
-      "required": ["from", "to", "kind"],
+      "required": [
+        "from",
+        "to",
+        "kind"
+      ],
       "title": "SheetEdge",
       "type": "object"
     },
@@ -63,7 +72,11 @@
           "type": "string"
         }
       },
-      "required": ["key", "label", "icon"],
+      "required": [
+        "key",
+        "label",
+        "icon"
+      ],
       "title": "SheetGroup",
       "type": "object"
     },
@@ -79,7 +92,10 @@
           "type": "string"
         }
       },
-      "required": ["type", "label"],
+      "required": [
+        "type",
+        "label"
+      ],
       "title": "SheetItem",
       "type": "object"
     },
@@ -99,7 +115,13 @@
           "type": "string"
         },
         "kind": {
-          "enum": ["ai", "script", "github", "owner", "end"],
+          "enum": [
+            "ai",
+            "script",
+            "github",
+            "owner",
+            "end"
+          ],
           "title": "Kind",
           "type": "string"
         },
@@ -142,7 +164,14 @@
           "title": "Types"
         }
       },
-      "required": ["key", "label", "icon", "kind", "col", "row"],
+      "required": [
+        "key",
+        "label",
+        "icon",
+        "kind",
+        "col",
+        "row"
+      ],
       "title": "SheetStation",
       "type": "object"
     },
@@ -189,7 +218,12 @@
           "type": "array"
         }
       },
-      "required": ["item", "stations", "edges", "models"],
+      "required": [
+        "item",
+        "stations",
+        "edges",
+        "models"
+      ],
       "title": "WorkflowSheet",
       "type": "object"
     }
@@ -209,7 +243,11 @@
       "$ref": "#/$defs/WorkflowSheet"
     }
   },
-  "required": ["schema_version", "workflow", "sheet"],
+  "required": [
+    "schema_version",
+    "workflow",
+    "sheet"
+  ],
   "title": "SheetResponse",
   "type": "object"
 }

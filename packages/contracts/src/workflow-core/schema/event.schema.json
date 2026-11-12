@@ -12,7 +12,13 @@
           "type": "string"
         },
         "kind": {
-          "enum": ["tool", "llm", "kanban", "guard", "system"],
+          "enum": [
+            "tool",
+            "llm",
+            "kanban",
+            "guard",
+            "system"
+          ],
           "title": "Kind",
           "type": "string"
         },
@@ -45,7 +51,12 @@
         "status": {
           "anyOf": [
             {
-              "enum": ["ok", "running", "error", "blocked"],
+              "enum": [
+                "ok",
+                "running",
+                "error",
+                "blocked"
+              ],
               "type": "string"
             },
             {
@@ -55,7 +66,15 @@
           "title": "Status"
         }
       },
-      "required": ["id", "at", "kind", "agent", "item", "text", "status"],
+      "required": [
+        "id",
+        "at",
+        "kind",
+        "agent",
+        "item",
+        "text",
+        "status"
+      ],
       "title": "ActivityFact",
       "type": "object"
     },
@@ -82,7 +101,12 @@
           "title": "Run"
         },
         "state": {
-          "enum": ["thinking", "tool", "cli", "blocked"],
+          "enum": [
+            "thinking",
+            "tool",
+            "cli",
+            "blocked"
+          ],
           "title": "State",
           "type": "string"
         },
@@ -174,7 +198,13 @@
           "type": "integer"
         }
       },
-      "required": ["id", "run_id", "kind", "payload", "created_at"],
+      "required": [
+        "id",
+        "run_id",
+        "kind",
+        "payload",
+        "created_at"
+      ],
       "title": "CardEvent",
       "type": "object"
     },
@@ -197,7 +227,12 @@
           "type": "integer"
         }
       },
-      "required": ["id", "author", "body", "created_at"],
+      "required": [
+        "id",
+        "author",
+        "body",
+        "created_at"
+      ],
       "title": "Comment",
       "type": "object"
     },
@@ -414,7 +449,11 @@
       "description": "What the agent is doing: a tool call (`tool`), a delegated command line (`cli`, its label the command's name),\nor waiting for the model (`llm`). `detail`: the command, the path or the name given to the tool, secrets masked,\n2 000 characters at most; for `llm`, the model.",
       "properties": {
         "kind": {
-          "enum": ["llm", "tool", "cli"],
+          "enum": [
+            "llm",
+            "tool",
+            "cli"
+          ],
           "title": "Kind",
           "type": "string"
         },
@@ -438,7 +477,12 @@
           "type": "string"
         }
       },
-      "required": ["kind", "label", "detail", "started_at"],
+      "required": [
+        "kind",
+        "label",
+        "detail",
+        "started_at"
+      ],
       "title": "LiveAction",
       "type": "object"
     },
@@ -461,12 +505,19 @@
           "title": "Provider"
         },
         "source": {
-          "enum": ["live", "session"],
+          "enum": [
+            "live",
+            "session"
+          ],
           "title": "Source",
           "type": "string"
         }
       },
-      "required": ["name", "provider", "source"],
+      "required": [
+        "name",
+        "provider",
+        "source"
+      ],
       "title": "LiveModel",
       "type": "object"
     },
@@ -578,7 +629,12 @@
       "title": "Item"
     },
     "kind": {
-      "enum": ["changed", "reset", "live", "activity"],
+      "enum": [
+        "changed",
+        "reset",
+        "live",
+        "activity"
+      ],
       "title": "Kind",
       "type": "string"
     },
@@ -604,7 +660,14 @@
       "title": "State"
     }
   },
-  "required": ["cursor", "workflow", "item", "kind", "at", "state"],
+  "required": [
+    "cursor",
+    "workflow",
+    "item",
+    "kind",
+    "at",
+    "state"
+  ],
   "title": "StreamEvent",
   "type": "object"
 }

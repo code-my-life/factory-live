@@ -302,6 +302,7 @@ export function coreSide(dir: TempDir, core: FakeCore): Side {
       },
       live: (agents) => hub.replaceCoreAgents(agents),
       activity: (facts) => hub.addCoreActivity(facts),
+      usage: () => undefined,
     },
   });
   return { hub, reader, sheet: () => sheet, generic: () => generic, boards, failures };

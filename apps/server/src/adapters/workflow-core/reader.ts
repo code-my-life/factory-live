@@ -4,6 +4,7 @@ import {
   coreItems,
   coreLive,
   coreSheetResponse,
+  coreUsage,
   coreWorkflows,
 } from '@factory-live/contracts/workflow-core';
 import type {
@@ -18,6 +19,7 @@ import type {
   KanbanDelta,
   LoggerPort,
   PublishedSheet,
+  UsageRow,
   WorkflowView,
 } from '../../application/ports.ts';
 import { boardOf } from './cards.ts';
@@ -38,6 +40,8 @@ export interface CoreSink {
   live(agents: CoreAgentState[]): void;
   /** Facts of the code line's activity, oldest first; those already sent come again after a full read. */
   activity(facts: CoreActivityFact[]): void;
+  /** The code line's usage, one row per day, model, provider and agent (#66). */
+  usage(rows: UsageRow[]): void;
 }
 
 export interface WorkflowCoreReaderOptions {
@@ -58,6 +62,8 @@ export interface WorkflowCoreReaderOptions {
 const RETRY_MS = 2_000;
 /** The facts of activity read at a full read: as many as the screen keeps. */
 const ACTIVITY_LIMIT = 200;
+/** The days of usage read at a full read: as many as the core serves. */
+export const USAGE_DAYS = 90;
 
 /**
  * Reads the code line and every generic workflow from workflow-core (ADR 0015, #57): the full state at
@@ -190,6 +196,7 @@ export class WorkflowCoreReader {
     this.emitAll();
     this.options.sink.live(this.liveAgents());
     this.options.sink.activity(facts.map(coreActivityFact));
+    if (items.has(code)) await this.refreshUsage(USAGE_DAYS);
   }
 
   /** Follows the stream until it ends (false: resume from the cursor) or asks for a full read (true). */
@@ -216,6 +223,36 @@ export class WorkflowCoreReader {
       this.emit(event.workflow);
     }
     return false;
+  }
+
+  /**
+   * Reads the code line's usage over the last `days` days and sends its rows; a failure is logged and
+   * leaves the stored days as they are (main.ts asks again every minute).
+   */
+  async refreshUsage(days: number): Promise<void> {
+    const path = `/api/workflows/${encodeURIComponent(this.options.code)}/usage?days=${days}`;
+    try {
+      const usage = await this.client.get(path, coreUsage, this.abort.signal);
+      this.options.sink.usage(
+        usage.rows.map((row) => ({
+          day: row.day,
+          model: row.model,
+          provider: row.provider,
+          profile: row.agent,
+          calls: row.calls,
+          input: row.input_tokens,
+          output: row.output_tokens,
+          rateLimited: row.rate_limited,
+          errors: row.errors,
+        })),
+      );
+    } catch (error) {
+      if (this.abort.signal.aborted) return;
+      this.options.log.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        'usage du socle illisible : les jours gardés restent',
+      );
+    }
   }
 
   private live(kind: 'live' | 'activity', state: unknown): void {

@@ -17,6 +17,17 @@ export type Day = string;
 export type Tokens1 = number;
 export type RateLimited1 = number;
 export type Daily = DayUsage[];
+export type Day1 = string;
+export type Agent1 = string;
+export type Model1 = string;
+export type Provider1 = string;
+export type Calls1 = number;
+export type InputTokens1 = number;
+export type OutputTokens1 = number;
+export type CostUsd1 = number | null;
+export type RateLimited2 = number;
+export type Errors1 = number;
+export type Rows = UsageRow[];
 export type SchemaVersion = 1;
 export type Workflow = string;
 
@@ -28,6 +39,7 @@ export interface UsageResponse {
   models: Models;
   agents: Agents;
   daily: Daily;
+  rows: Rows;
   schema_version: SchemaVersion;
   workflow: Workflow;
   [k: string]: unknown;
@@ -52,5 +64,21 @@ export interface DayUsage {
   day: Day;
   tokens: Tokens1;
   rate_limited: RateLimited1;
+  [k: string]: unknown;
+}
+/**
+ * The usage of one model by one agent on one day: summed, the rows give `models`, `agents` and `daily`.
+ */
+export interface UsageRow {
+  day: Day1;
+  agent: Agent1;
+  model: Model1;
+  provider: Provider1;
+  calls: Calls1;
+  input_tokens: InputTokens1;
+  output_tokens: OutputTokens1;
+  cost_usd: CostUsd1;
+  rate_limited: RateLimited2;
+  errors: Errors1;
   [k: string]: unknown;
 }

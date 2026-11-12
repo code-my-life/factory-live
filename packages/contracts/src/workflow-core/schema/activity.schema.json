@@ -12,7 +12,13 @@
           "type": "string"
         },
         "kind": {
-          "enum": ["tool", "llm", "kanban", "guard", "system"],
+          "enum": [
+            "tool",
+            "llm",
+            "kanban",
+            "guard",
+            "system"
+          ],
           "title": "Kind",
           "type": "string"
         },
@@ -45,7 +51,12 @@
         "status": {
           "anyOf": [
             {
-              "enum": ["ok", "running", "error", "blocked"],
+              "enum": [
+                "ok",
+                "running",
+                "error",
+                "blocked"
+              ],
               "type": "string"
             },
             {
@@ -55,7 +66,15 @@
           "title": "Status"
         }
       },
-      "required": ["id", "at", "kind", "agent", "item", "text", "status"],
+      "required": [
+        "id",
+        "at",
+        "kind",
+        "agent",
+        "item",
+        "text",
+        "status"
+      ],
       "title": "ActivityFact",
       "type": "object"
     }
@@ -79,7 +98,11 @@
       "type": "array"
     }
   },
-  "required": ["schema_version", "workflow", "facts"],
+  "required": [
+    "schema_version",
+    "workflow",
+    "facts"
+  ],
   "title": "ActivityResponse",
   "type": "object"
 }
