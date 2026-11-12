@@ -52,6 +52,11 @@ export interface CoreSink {
   activity(facts: CoreActivityFact[]): void;
   /** The code line's usage, one row per day, model, provider and agent (#66). */
   usage(rows: UsageRow[]): void;
+  /**
+   * Items read from the core, for factory-live's own history (#63), before the board they make is sent.
+   * `complete`: all the items of the workflow (a full read).
+   */
+  history(workflow: string, items: CoreItem[], complete: boolean): void;
   /** Every open intervention of the code line, from a full read (#59). */
   interventions(items: CoreInterventionState[]): void;
   /** An intervention the core announces as opened, then as closed (#59). */
@@ -257,6 +262,7 @@ export class WorkflowCoreReader {
     this.cursor = cursor;
     this.answered();
     for (const key of keys) this.readAt.set(key, this.options.now());
+    for (const [key, held] of items) this.options.sink.history(key, [...held.values()], true);
     this.emitAll();
     this.options.sink.live(this.liveAgents());
     this.options.sink.activity(facts.map(coreActivityFact));
@@ -337,6 +343,7 @@ export class WorkflowCoreReader {
       if (!held) return true;
       const item = event.state as CoreItem;
       held.set(event.item, item);
+      this.options.sink.history(event.workflow, [item], false);
       // A card no longer in progress has no agent on it any more: the core sends no departure (#34).
       if (event.workflow === this.options.code && item.current_run_id === null)
         this.dropAgentsOf(event.item);

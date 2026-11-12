@@ -25,6 +25,7 @@ import { TwinBench } from '../adapters/twins/bench.ts';
 import { WorkflowApi } from '../adapters/workflows/api.ts';
 import { FakeWorkflow, MASTER, waitingVideo } from '../test/workflow-fixtures.ts';
 import { contentSecurityPolicy } from './app.ts';
+import { CoreHistory } from '../adapters/workflow-core/history.ts';
 import { WorkflowCoreReader } from '../adapters/workflow-core/reader.ts';
 import { createLogger } from '../logger.ts';
 import { fakeCore } from '../test/fake-core.ts';
@@ -1702,6 +1703,7 @@ describe('coûts lus par le socle (#66)', () => {
         live: () => undefined,
         activity: () => undefined,
         usage: (usage) => core.store.setUsage(usage),
+        history: () => undefined,
         interventions: () => undefined,
         interventionOpened: () => undefined,
         interventionClosed: () => undefined,
@@ -1748,3 +1750,119 @@ async function until(condition: () => boolean | Promise<boolean>, timeoutMs = 3_
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }
+
+describe('historique lu par le socle (#63)', () => {
+  it('côté socle, l’historique donne les mêmes statistiques que côté Hermès', async () => {
+    const stats = async (on: Harness) =>
+      (await (await on.app.request('/api/history?days=30', { headers: THIS_PC })).json()) as object;
+    const fromHermes = await stats(h);
+
+    // The same miniature factory as the harness's kanban (cv-site#49), as workflow-core serves it.
+    const item = (fields: Record<string, unknown>) => ({
+      body: null,
+      assignee: null,
+      started_at: null,
+      completed_at: null,
+      block_kind: null,
+      idempotency_key: null,
+      workspace_path: null,
+      current_run_id: null,
+      last_heartbeat_at: null,
+      model_override: null,
+      provider_override: null,
+      skills: [],
+      runs: [],
+      parents: [],
+      children: [],
+      comments: [],
+      events: [],
+      ...fields,
+    });
+    const run = (id: number, profile: string, outcome: string, start: number, end: number) => ({
+      id,
+      profile,
+      status: 'done',
+      outcome,
+      started_at: start,
+      ended_at: end,
+      summary: null,
+      metadata: {},
+    });
+    const items = [
+      item({
+        id: 't_b1ef0049',
+        title: 'brief cv-site#49 : Page Projets',
+        status: 'done',
+        assignee: 'coordinator',
+        created_at: NOW_S - 7_200,
+        runs: [run(1, 'coordinator', 'completed', NOW_S - 7_100, NOW_S - 6_100)],
+        children: ['t_1a9f0049'],
+      }),
+      item({
+        id: 't_1a9f0049',
+        title: 'impl cv-site#49 : Page Projets',
+        status: 'blocked',
+        assignee: 'coder',
+        block_kind: 'needs_input',
+        created_at: NOW_S - 6_000,
+        runs: [run(2, 'coder', 'blocked', NOW_S - 5_000, NOW_S - 600)],
+        parents: ['t_b1ef0049'],
+        events: [
+          {
+            id: 1,
+            run_id: 2,
+            kind: 'blocked',
+            payload: {
+              kind: 'needs_input',
+              reason: 'Quelle base de données ?\nPostgreSQL ou SQLite ?',
+            },
+            created_at: NOW_S - 600,
+          },
+        ],
+      }),
+    ];
+    const core = harness({ source: 'workflow-core' });
+    const fake = await fakeCore(CORE_SECRET, {
+      ...coreState(),
+      items: { factory: items, studio: [] },
+    });
+    const history = new CoreHistory(core.store, () => core.clock.now);
+    history.seed('factory', core.store.board());
+    const reader = new WorkflowCoreReader({
+      url: fake.url,
+      secret: CORE_SECRET,
+      code: 'factory',
+      own: ['studio'],
+      retryMs: 50,
+      now: () => core.clock.now,
+      log: createLogger('silent'),
+      sink: {
+        board: (delta, readAt) => core.hub.replaceBoard(history.withGone('factory', delta), readAt),
+        history: (workflow, read, complete) => history.record(workflow, read, complete),
+        sheet: () => undefined,
+        workflows: () => undefined,
+        failed: () => undefined,
+        answered: () => undefined,
+        machine: () => undefined,
+        checks: () => undefined,
+        live: () => undefined,
+        activity: () => undefined,
+        usage: () => undefined,
+        interventions: () => undefined,
+        interventionOpened: () => undefined,
+        interventionClosed: () => undefined,
+        diagnoses: () => undefined,
+        verdicts: () => undefined,
+      },
+    });
+    try {
+      reader.start();
+      await until(() => core.hub.boardData.tasks.length === 2);
+      expect(await stats(core)).toEqual(fromHermes);
+    } finally {
+      await reader.stop();
+      await fake.close();
+      core.close();
+    }
+  });
+});

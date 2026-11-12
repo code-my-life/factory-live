@@ -73,6 +73,11 @@ export function harness(
     twins?: TwinBench;
     /** The workflows followed by their generic API (#31). */
     workflows?: WorkflowApi[];
+    /**
+     * Where the hub reads the factory (#63): on workflow-core's side, the hub starts empty and the kanban of
+     * the harness is not read; the test feeds the hub from a fake core.
+     */
+    source?: 'hermes' | 'workflow-core';
   } = {},
 ): Harness {
   const dir = tempDir();
@@ -253,12 +258,14 @@ export function harness(
       }),
       log,
       now,
+      ...(options.source ? { source: options.source } : {}),
     },
   );
   const buffer = new StreamBuffer();
   hub.subscribe((event) => buffer.push(event));
   const kanban = new KanbanReader(join(boardDir, 'kanban.db'));
   const syncKanban = () => {
+    if (options.source === 'workflow-core') return;
     if (kanban.changed()) hub.applyKanban(kanban.read(), clock.now);
   };
   syncKanban();
