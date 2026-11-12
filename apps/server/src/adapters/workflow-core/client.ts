@@ -13,7 +13,15 @@ export class CoreError extends Error {}
 const READ_TIMEOUT_MS = 10_000;
 
 /** The kinds of event this copy of the core's schema knows: the others are skipped. */
-const KNOWN_KINDS = new Set(['changed', 'reset', 'live', 'activity', 'machine']);
+const KNOWN_KINDS = new Set([
+  'changed',
+  'reset',
+  'live',
+  'activity',
+  'machine',
+  'intervention_opened',
+  'intervention_closed',
+]);
 
 export class WorkflowCoreClient {
   private readonly url: string;
@@ -31,7 +39,13 @@ export class WorkflowCoreClient {
   }
 
   /** One read route, its answer checked by its schema. */
-  async get<T>(path: string, check: CoreCheck<T>, signal?: AbortSignal): Promise<T> {
+  /**
+   * One read route, its answer checked by its schema. A route without a published schema of its answer
+   * (`/diagnoses`) is read with `check` null: the caller checks each part it uses.
+   */
+  async get<T>(path: string, check: CoreCheck<T>, signal?: AbortSignal): Promise<T>;
+  async get(path: string, check: null, signal?: AbortSignal): Promise<unknown>;
+  async get<T>(path: string, check: CoreCheck<T> | null, signal?: AbortSignal): Promise<unknown> {
     // A read never waits more than READ_TIMEOUT_MS: a hung core is a failed read, not a silent one.
     const timeout = AbortSignal.timeout(READ_TIMEOUT_MS);
     const response = await this.fetchImpl(`${this.url}${path}`, {
@@ -47,11 +61,12 @@ export class WorkflowCoreClient {
           : `${path} : ${response.status}`,
       );
     }
+    if (check === null) return body;
     const parsed = check.safeParse(body);
     if (!parsed.success)
       throw new CoreError(`${path} : réponse hors schéma (${parsed.error.message})`);
     // The answer as the core sent it: the check would fill in the schema's defaults, which the core omits.
-    return body as T;
+    return body;
   }
 
   /**

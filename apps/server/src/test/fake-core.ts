@@ -22,6 +22,12 @@ export interface FakeCoreState {
   machine?: unknown;
   /** The usage of each workflow, by the `days` asked (#66); absent: 404. */
   usage?: Record<string, (days: number) => unknown>;
+  /** The open interventions of each workflow, by opening time (#59); absent: none. */
+  interventions?: Record<string, unknown[]>;
+  /** The diagnoses of each workflow, `{item, trigger, diagnosis}` (#59); absent: none. */
+  diagnoses?: Record<string, unknown[]>;
+  /** The run verdicts of each card, by card id (#59); absent: none. */
+  verdicts?: Record<string, unknown[]>;
 }
 
 export interface FakeCoreRequest {
@@ -122,10 +128,31 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
         response.write(frame(event as { cursor: string; kind: string }));
       return;
     }
-    const route = /^\/api\/workflows\/([\w-]+)\/(sheet|items|live|activity|usage)$/.exec(path);
+    const verdicts = /^\/api\/workflows\/([\w-]+)\/items\/([\w-]+)\/run-verdicts$/.exec(path);
+    if (verdicts)
+      return json(response, 200, {
+        schema_version: 1,
+        verdicts: state.verdicts?.[verdicts[2] ?? ''] ?? [],
+      });
+    const route =
+      /^\/api\/workflows\/([\w-]+)\/(sheet|items|live|activity|usage|interventions|diagnoses)$/.exec(
+        path,
+      );
     const key = route?.[1];
     if (!route || !key || !state.workflows.some((workflow) => workflow.key === key))
       return json(response, 404, { error: 'unknown_workflow', detail: `workflow "${key}"` });
+    if (route[2] === 'interventions')
+      return json(response, 200, {
+        schema_version: 1,
+        workflow: key,
+        interventions: state.interventions?.[key] ?? [],
+      });
+    if (route[2] === 'diagnoses')
+      return json(response, 200, {
+        schema_version: 1,
+        workflow: key,
+        diagnoses: state.diagnoses?.[key] ?? [],
+      });
     if (route[2] === 'live')
       return json(response, 200, {
         schema_version: 1,
