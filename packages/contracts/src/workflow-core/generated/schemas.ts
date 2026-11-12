@@ -1636,6 +1636,19 @@ export const agentsSchema: unknown = {
       title: 'AgentPlugin',
       type: 'object',
     },
+    GuardRisk: {
+      description:
+        "A guard whose code can wait at least the delay of its hook, on one or more agents (issue #137): a plugin\nplugged to a hook, whose longest command lasts at least the hook's effective delay.",
+      properties: {
+        plugin: { title: 'Plugin', type: 'string' },
+        agents: { items: { type: 'string' }, title: 'Agents', type: 'array' },
+        longest_seconds: { title: 'Longest Seconds', type: 'number' },
+        limit_seconds: { title: 'Limit Seconds', type: 'number' },
+      },
+      required: ['plugin', 'agents', 'longest_seconds', 'limit_seconds'],
+      title: 'GuardRisk',
+      type: 'object',
+    },
     KanbanSettings: {
       description: "The runtime's settings of the kanban that bound the cards in progress.",
       properties: {
@@ -1660,8 +1673,9 @@ export const agentsSchema: unknown = {
     workflow: { title: 'Workflow', type: 'string' },
     kanban: { anyOf: [{ $ref: '#/$defs/KanbanSettings' }, { type: 'null' }] },
     agents: { items: { $ref: '#/$defs/Agent' }, title: 'Agents', type: 'array' },
+    guard_risks: { items: { $ref: '#/$defs/GuardRisk' }, title: 'Guard Risks', type: 'array' },
   },
-  required: ['schema_version', 'workflow', 'kanban', 'agents'],
+  required: ['schema_version', 'workflow', 'kanban', 'agents', 'guard_risks'],
   title: 'AgentsResponse',
   type: 'object',
 };

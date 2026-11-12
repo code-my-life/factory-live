@@ -362,7 +362,7 @@ export function coreSide(dir: TempDir, core: FakeCore): Side {
       diagnoses: (entries) => hub.applyCoreDiagnoses(entries),
       verdicts: (cardId, verdicts) => hub.applyCoreVerdicts(cardId, verdicts),
       agents: (answer) => {
-        profiles.update(answer);
+        profiles.update(answer, NOW);
         hub.reloadConfig();
       },
       gestures: () => undefined,

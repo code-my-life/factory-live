@@ -248,7 +248,7 @@ const core = onCore
         activity: (facts) => hub.addCoreActivity(facts),
         usage: (rows) => store.setUsage(rows),
         agents: (answer) => {
-          coreProfiles?.update(answer);
+          coreProfiles?.update(answer, now());
           hub.reloadConfig();
         },
         interventions: (items) => hub.replaceCoreInterventions(items),
