@@ -396,6 +396,34 @@ export interface HistoryPort {
   audit(actor: string, action: string, detail: string | null, now: number): void;
   stations(): Map<string, StationRecord>;
   saveStation(issueKey: string, record: StationRecord): void;
+  /**
+   * factory-live's own history of a workflow's items, as workflow-core serves them (#63). Each item keeps its
+   * last full state, one row per item. `complete`: these are all the items of the workflow (a full read), so
+   * an item that is not among them is marked gone at `at`, its last state kept; an item seen again is no
+   * longer gone.
+   */
+  recordItems(
+    workflow: string,
+    items: readonly { id: string; state: unknown }[],
+    at: number,
+    complete: boolean,
+  ): void;
+  historyItems(workflow: string): HistoryItem[];
+  /** Pours these items into the history once per workflow (the mirror, at the first start on the core's side). */
+  seedHistory(
+    workflow: string,
+    items: readonly { id: string; state: unknown }[],
+    at: number,
+  ): boolean;
+}
+
+/** One item of factory-live's history (#63): its last state as the core served it; times in ms epoch. */
+export interface HistoryItem {
+  id: string;
+  state: unknown;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  goneAt: number | null;
 }
 
 // --- Notifications -------------------------------------------------------------------------------

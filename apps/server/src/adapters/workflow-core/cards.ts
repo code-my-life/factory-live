@@ -1,5 +1,5 @@
 import type { CoreItem } from '@factory-live/contracts/workflow-core';
-import type { BlockKind, KanbanStatus, Task } from '@factory-live/domain';
+import type { BlockKind, Board, Comment, KanbanStatus, Task } from '@factory-live/domain';
 import type { KanbanDelta } from '../../application/ports.ts';
 
 /**
@@ -93,4 +93,60 @@ export function boardOf(items: readonly CoreItem[]): KanbanDelta {
   delta.events.sort((left, right) => left.id - right.id);
   delta.comments.sort((left, right) => left.id - right.id);
   return delta;
+}
+
+/**
+ * The cards of a board as workflow-core's items (#63): the inverse of `boardOf`, for the kanban mirror poured
+ * into factory-live's history at the first start on the core's side. Heartbeats were never kept.
+ */
+export function itemsOfBoard(board: Board & { comments: Comment[] }): CoreItem[] {
+  return board.tasks.map((task) => ({
+    id: task.id,
+    title: task.title,
+    body: task.body === '' ? null : task.body,
+    status: task.status,
+    assignee: task.assignee,
+    created_at: task.createdAt,
+    started_at: task.startedAt,
+    completed_at: task.completedAt,
+    block_kind: task.blockKind,
+    idempotency_key: task.idempotencyKey,
+    workspace_path: task.workspacePath,
+    current_run_id: task.currentRunId,
+    last_heartbeat_at: task.lastHeartbeatAt,
+    model_override: task.modelOverride,
+    provider_override: task.providerOverride,
+    skills: [...task.skills],
+    runs: board.runs
+      .filter((run) => run.taskId === task.id)
+      .map((run) => ({
+        id: run.id,
+        profile: run.profile === '?' ? null : run.profile,
+        status: run.status,
+        outcome: run.outcome,
+        started_at: run.startedAt,
+        ended_at: run.endedAt,
+        summary: run.summary,
+        metadata: run.metadata,
+      })),
+    parents: board.links.filter((link) => link.childId === task.id).map((link) => link.parentId),
+    children: board.links.filter((link) => link.parentId === task.id).map((link) => link.childId),
+    comments: board.comments
+      .filter((comment) => comment.taskId === task.id)
+      .map((comment) => ({
+        id: comment.id,
+        author: comment.author,
+        body: comment.body,
+        created_at: comment.createdAt,
+      })),
+    events: board.events
+      .filter((event) => event.taskId === task.id)
+      .map((event) => ({
+        id: event.id,
+        run_id: event.runId,
+        kind: event.kind,
+        payload: event.payload,
+        created_at: event.createdAt,
+      })),
+  }));
 }

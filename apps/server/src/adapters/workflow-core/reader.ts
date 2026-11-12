@@ -15,6 +15,7 @@ import {
 import type {
   AgentsResponse,
   CoreAgent,
+  CoreEvent,
   CoreFact,
   CoreIntervention,
   CoreItem,
@@ -40,8 +41,11 @@ import { coreActivityFact, coreAgentState } from './live.ts';
 
 /** Where the reader sends what it reads: main.ts wires it to the hub, the code line's sheet and the list. */
 export interface CoreSink {
-  /** The whole board of the code line, replacing the one held. */
-  board(delta: KanbanDelta, readAt: number): void;
+  /**
+   * The whole board of the code line, replacing the one held. `declared`: false once the core no longer
+   * declares the code line, whose board is then empty, without the history of its past cards (#63).
+   */
+  board(delta: KanbanDelta, readAt: number, declared: boolean): void;
   /** The code line's sheet, as the core judged it. */
   sheet(sheet: PublishedSheet): void;
   /** The other workflows the core declares, besides the code line and those read by their own adapter. */
@@ -56,6 +60,11 @@ export interface CoreSink {
   usage(rows: UsageRow[]): void;
   /** The code line's agents and the kanban's settings (#93): they replace those held. */
   agents(answer: AgentsResponse): void;
+  /**
+   * Items read from the core, for factory-live's own history (#63), before the board they make is sent.
+   * `complete`: all the items of the workflow (a full read).
+   */
+  history(workflow: string, items: CoreItem[], complete: boolean): void;
   /** Every open intervention of the code line, from a full read (#59). */
   interventions(items: CoreInterventionState[]): void;
   /** An intervention the core announces as opened, then as closed (#59). */
@@ -266,6 +275,7 @@ export class WorkflowCoreReader {
     this.cursor = cursor;
     this.answered();
     for (const key of keys) this.readAt.set(key, this.options.now());
+    for (const [key, held] of items) this.options.sink.history(key, [...held.values()], true);
     this.emitAll();
     this.options.sink.live(this.liveAgents());
     this.options.sink.activity(facts.map(coreActivityFact));
@@ -321,42 +331,52 @@ export class WorkflowCoreReader {
   private async follow(): Promise<boolean> {
     const stream = this.client.events(this.cursor, this.abort.signal, () => this.answered());
     for await (const event of stream) {
-      this.cursor = event.cursor;
       this.answered();
-      if (event.kind === 'reset') return true;
-      if (event.kind === 'machine') {
-        this.checks = (event.state as CoreMachineCheck[]).map(checkState);
-        this.checksCursor = event.cursor;
-        this.options.sink.checks(this.checks);
-        continue;
-      }
-      if (event.workflow === null || event.state === null) continue;
-      if (this.options.own.includes(event.workflow)) continue;
-      // A fact of activity may name no card (a tick of the dispatcher): only a card's change needs one.
-      if (event.kind === 'live' || event.kind === 'activity') {
-        if (event.workflow === this.options.code) this.live(event.kind, event.state);
-        continue;
-      }
-      if (event.kind === 'intervention_opened' || event.kind === 'intervention_closed') {
-        if (event.workflow === this.options.code) this.intervention(event.kind, event.state);
-        continue;
-      }
-      if (event.item === null) continue;
-      const held = this.items.get(event.workflow);
-      // A workflow declared since the last full read: read it all.
-      if (!held) return true;
-      const item = event.state as CoreItem;
-      held.set(event.item, item);
-      // A card no longer in progress has no agent on it any more: the core sends no departure (#34).
-      if (event.workflow === this.options.code && item.current_run_id === null)
-        this.dropAgentsOf(event.item);
-      this.readAt.set(event.workflow, this.options.now());
-      this.emit(event.workflow);
-      if (event.workflow === this.options.code) {
-        // A card with an open intervention: its diagnosis may have changed; a failed run: its verdict.
-        if ([...this.openCards.values()].includes(event.item)) this.scheduleDiagnoses();
-        if (hasFailedRun(item)) this.scheduleVerdicts(event.item);
-      }
+      // The cursor moves only once the event is applied: an event whose handling fails (a write the base
+      // refuses) is asked for again when the stream resumes, instead of being skipped.
+      const fullRead = this.apply(event);
+      this.cursor = event.cursor;
+      if (fullRead) return true;
+    }
+    return false;
+  }
+
+  /** Applies one event of the stream; true when it asks for a full read. */
+  private apply(event: CoreEvent): boolean {
+    if (event.kind === 'reset') return true;
+    if (event.kind === 'machine') {
+      this.checks = (event.state as CoreMachineCheck[]).map(checkState);
+      this.checksCursor = event.cursor;
+      this.options.sink.checks(this.checks);
+      return false;
+    }
+    if (event.workflow === null || event.state === null) return false;
+    if (this.options.own.includes(event.workflow)) return false;
+    // A fact of activity may name no card (a tick of the dispatcher): only a card's change needs one.
+    if (event.kind === 'live' || event.kind === 'activity') {
+      if (event.workflow === this.options.code) this.live(event.kind, event.state);
+      return false;
+    }
+    if (event.kind === 'intervention_opened' || event.kind === 'intervention_closed') {
+      if (event.workflow === this.options.code) this.intervention(event.kind, event.state);
+      return false;
+    }
+    if (event.item === null) return false;
+    const held = this.items.get(event.workflow);
+    // A workflow declared since the last full read: read it all.
+    if (!held) return true;
+    const item = event.state as CoreItem;
+    held.set(event.item, item);
+    this.options.sink.history(event.workflow, [item], false);
+    // A card no longer in progress has no agent on it any more: the core sends no departure (#34).
+    if (event.workflow === this.options.code && item.current_run_id === null)
+      this.dropAgentsOf(event.item);
+    this.readAt.set(event.workflow, this.options.now());
+    this.emit(event.workflow);
+    if (event.workflow === this.options.code) {
+      // A card with an open intervention: its diagnosis may have changed; a failed run: its verdict.
+      if ([...this.openCards.values()].includes(event.item)) this.scheduleDiagnoses();
+      if (hasFailedRun(item)) this.scheduleVerdicts(event.item);
     }
     return false;
   }
@@ -569,7 +589,7 @@ export class WorkflowCoreReader {
       return;
     }
     // The code line is no longer declared by the core: its cards and its interventions go too.
-    this.options.sink.board(boardOf([]), this.options.now());
+    this.options.sink.board(boardOf([]), this.options.now(), false);
     this.openCards = new Map();
     this.options.sink.interventions([]);
     this.options.sink.workflows(this.views());
@@ -586,6 +606,7 @@ export class WorkflowCoreReader {
     this.options.sink.board(
       boardOf([...(this.items.get(key)?.values() ?? [])]),
       this.options.now(),
+      true,
     );
     this.options.sink.workflows(this.views());
   }
