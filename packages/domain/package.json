@@ -8,6 +8,11 @@
       "source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./diagnosis-references": {
+      "source": "./src/diagnosis/references.test-helpers.ts",
+      "types": "./dist/diagnosis/references.test-helpers.d.ts",
+      "default": "./dist/diagnosis/references.test-helpers.js"
     }
   },
   "scripts": {
