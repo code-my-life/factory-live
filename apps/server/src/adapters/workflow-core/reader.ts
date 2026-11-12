@@ -34,7 +34,7 @@ import type {
 } from '../../application/ports.ts';
 import { boardOf } from './cards.ts';
 import { WorkflowCoreClient } from './client.ts';
-import { coreInterventionState } from './interventions.ts';
+import { commentGestures, coreInterventionState } from './interventions.ts';
 import { coreActivityFact, coreAgentState } from './live.ts';
 
 /** Where the reader sends what it reads: main.ts wires it to the hub, the code line's sheet and the list. */
@@ -381,9 +381,9 @@ export class WorkflowCoreReader {
     this.scheduleDiagnoses();
   }
 
-  /** The gestures the code line declares: an intervention's gesture shows only if it is one of them. */
+  /** The comment gestures the code line declares: an intervention's gesture shows only if it is one of them. */
   private codeGestures(): ReadonlySet<string> {
-    return new Set((this.declared[this.options.code] ?? []).map((gesture) => gesture.name));
+    return commentGestures(this.declared[this.options.code] ?? []);
   }
 
   private intervention(kind: 'intervention_opened' | 'intervention_closed', state: unknown): void {

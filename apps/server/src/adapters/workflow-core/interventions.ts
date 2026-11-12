@@ -1,7 +1,7 @@
 import { Text } from '@factory-live/contracts';
 import type { Text as ScreenText } from '@factory-live/contracts';
 import type { CoreIntervention } from '@factory-live/contracts/workflow-core';
-import type { CoreInterventionState } from '../../application/ports.ts';
+import type { CoreInterventionState, DeclaredGesture } from '../../application/ports.ts';
 
 /**
  * An intervention of workflow-core (#37, #59) in factory-live's units: a coded text becomes a code of
@@ -19,6 +19,16 @@ function text(value: CoreText): ScreenText {
   const coded = Text.safeParse({ code, params: value.params ?? {} });
   // A code factory-live does not know is shown as itself rather than lost.
   return coded.success ? coded.data : code;
+}
+
+/**
+ * The names of a workflow's gestures that are comments: Débloquer posts a comment on the card's issue, so an
+ * `unblock` declared as another kind of gesture does not show its form (#61).
+ */
+export function commentGestures(gestures: readonly DeclaredGesture[]): ReadonlySet<string> {
+  return new Set(
+    gestures.filter((gesture) => gesture.kind === 'comment').map((gesture) => gesture.name),
+  );
 }
 
 export function coreInterventionState(
