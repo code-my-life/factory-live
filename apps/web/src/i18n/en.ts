@@ -606,6 +606,50 @@ export const en: Messages = {
     invalid: 'This workflow’s sheet is refused: the graph cannot be drawn',
   },
 
+  /** The screen of a workflow the core declares besides the code line and the studio (#65). */
+  workflows: {
+    nav: 'Workflows',
+    summary: (items: number, waiting: number) =>
+      `${items} ${f.plural(items, 'item', 'items')}${waiting > 0 ? ` · ${waiting} waiting for you` : ''}`,
+    loading: 'Reading the workflow…',
+    empty: 'No item in this workflow yet.',
+    selectHint: 'Tap an item in the graph to open its detail here.',
+    unknownTitle: 'Unknown workflow',
+    unknown: 'The core declares no such workflow.',
+    unknownItem: 'This item is not in this workflow.',
+    unreachableTitle: 'The core does not answer',
+    unreachable: (stay: string) =>
+      `Core unreachable for ${stay}: the last sheet and items received stay shown.`,
+    items: 'Items',
+    unplaced: 'Items at no known station',
+    noStation: 'unknown station',
+    reading: 'Reading…',
+    marks: {
+      label: 'Landmarks',
+      station: 'Station',
+      since: (stay: string) => `for ${stay}`,
+      state: 'State',
+      item: 'Item',
+    },
+    cards: (count: number) => `${count} ${f.plural(count, 'card', 'cards')}`,
+    noCard: 'No card for this item.',
+    transcriptOf: (run: number) => `Transcript of run #${run}`,
+    data: 'Declared data',
+    noData: 'The workflow declares no data for this item.',
+    noValue: 'No value yet.',
+    activity: 'Activity',
+    activityOf: (title: string) => `Activity of ${title}`,
+    yes: 'yes',
+    no: 'no',
+    status: {
+      ok: 'OK',
+      running: 'running',
+      warning: 'to see',
+      error: 'failed',
+      unknown: 'unknown',
+    },
+  },
+
   studio: {
     title: 'Studio',
     waiting: (count: number) =>

@@ -64,14 +64,18 @@ export function transcriptRun(
   return card?.runs.at(-1)?.id ?? detail.cards.flatMap((each) => each.runs).at(-1)?.id ?? null;
 }
 
-function RunsTable({
+/**
+ * The runs of a card: one sheet per run on a phone, a table beyond. Without `onSelectRun`, no run opens a
+ * transcript (a generic workflow's screen, #65).
+ */
+export function RunsTable({
   card,
   selectedRunId,
   onSelectRun,
 }: {
-  card: CardView;
+  card: Pick<CardView, 'id' | 'runs'>;
   selectedRunId: number | null;
-  onSelectRun: (runId: number) => void;
+  onSelectRun?: (runId: number) => void;
 }) {
   const { t, fmt } = useI18n();
   if (card.runs.length === 0) {
@@ -109,15 +113,17 @@ function RunsTable({
             <p className={styles.runOutcome}>
               <RunOutcome run={run} />
             </p>
-            <Button size="small" onClick={() => onSelectRun(run.id)}>
-              {t.issue.runs.transcriptOf(run.id)}
-            </Button>
+            {onSelectRun ? (
+              <Button size="small" onClick={() => onSelectRun(run.id)}>
+                {t.issue.runs.transcriptOf(run.id)}
+              </Button>
+            ) : null}
           </li>
         ))}
       </ul>
       <div className={`${styles.tableBox} ${styles.runTable}`}>
         <Table
-          gridTemplateColumns="auto auto minmax(0, 2fr) minmax(0, 2fr) auto auto"
+          gridTemplateColumns={`auto auto minmax(0, 2fr) minmax(0, 2fr) auto${onSelectRun ? ' auto' : ''}`}
           cellPadding="condensed"
           aria-label={t.issue.runs.of(card.id)}
         >
@@ -128,9 +134,11 @@ function RunsTable({
               <Table.Header>{t.issue.runs.model}</Table.Header>
               <Table.Header>{t.issue.runs.outcome}</Table.Header>
               <Table.Header align="end">{t.issue.runs.duration}</Table.Header>
-              <Table.Header>
-                <span className="fl-visually-hidden">{t.issue.runs.transcript}</span>
-              </Table.Header>
+              {onSelectRun ? (
+                <Table.Header>
+                  <span className="fl-visually-hidden">{t.issue.runs.transcript}</span>
+                </Table.Header>
+              ) : null}
             </Table.Row>
           </Table.Head>
           <Table.Body>
@@ -158,11 +166,13 @@ function RunsTable({
                 <Table.Cell align="end" className="fl-tabular">
                   {duration(run)}
                 </Table.Cell>
-                <Table.Cell>
-                  <Button size="small" onClick={() => onSelectRun(run.id)}>
-                    {t.issue.runs.transcript}
-                  </Button>
-                </Table.Cell>
+                {onSelectRun ? (
+                  <Table.Cell>
+                    <Button size="small" onClick={() => onSelectRun(run.id)}>
+                      {t.issue.runs.transcript}
+                    </Button>
+                  </Table.Cell>
+                ) : null}
               </Table.Row>
             ))}
           </Table.Body>

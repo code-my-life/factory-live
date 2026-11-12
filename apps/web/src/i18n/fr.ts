@@ -658,6 +658,52 @@ export const fr = {
     invalid: 'La fiche de ce workflow est refusée : le graphe ne peut pas se dessiner',
   },
 
+  /** The screen of a workflow the core declares besides the code line and the studio (#65). */
+  workflows: {
+    nav: 'Workflows',
+    summary: (items: number, waiting: number) =>
+      `${items} ${f.plural(items, 'élément', 'éléments')}${
+        waiting > 0 ? ` · ${waiting} ${f.plural(waiting, 't’attend', 't’attendent')}` : ''
+      }`,
+    loading: 'Lecture du workflow…',
+    empty: 'Aucun élément dans ce workflow pour l’instant.',
+    selectHint: 'Touche un élément dans le graphe pour ouvrir son détail ici.',
+    unknownTitle: 'Workflow inconnu',
+    unknown: 'Le socle ne déclare pas ce workflow.',
+    unknownItem: 'Cet élément n’est pas dans ce workflow.',
+    unreachableTitle: 'Le socle ne répond pas',
+    unreachable: (stay: string) =>
+      `Socle injoignable depuis ${stay} : la dernière fiche et les derniers éléments reçus restent affichés.`,
+    items: 'Éléments',
+    unplaced: 'Éléments sans station connue',
+    noStation: 'station inconnue',
+    reading: 'Lecture…',
+    marks: {
+      label: 'Repères',
+      station: 'Station',
+      since: (stay: string) => `depuis ${stay}`,
+      state: 'État',
+      item: 'Élément',
+    },
+    cards: (count: number) => `${count} ${f.plural(count, 'carte', 'cartes')}`,
+    noCard: 'Aucune carte pour cet élément.',
+    transcriptOf: (run: number) => `Transcription du run #${run}`,
+    data: 'Données déclarées',
+    noData: 'Le workflow ne déclare aucune donnée pour cet élément.',
+    noValue: 'Aucune valeur pour l’instant.',
+    activity: 'Activité',
+    activityOf: (title: string) => `Activité de ${title}`,
+    yes: 'oui',
+    no: 'non',
+    status: {
+      ok: 'OK',
+      running: 'en cours',
+      warning: 'à voir',
+      error: 'en erreur',
+      unknown: 'inconnu',
+    },
+  },
+
   /** The video studio's page (`/studio`), its detail and the owner's gesture. */
   studio: {
     title: 'Studio',

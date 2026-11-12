@@ -1,0 +1,247 @@
+/* The screen of a generic workflow (#65): its head, the graph, then the open item's detail. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap-spacious);
+  min-width: 0;
+}
+
+.pageHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--stack-gap-condensed) var(--stack-gap-normal);
+}
+
+.pageTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.subtitle,
+.quiet {
+  margin: var(--base-size-4) 0 0;
+  color: var(--fgColor-muted);
+  font: var(--text-body-shorthand-medium);
+}
+
+/* The items, when the sheet is refused: one row each, its title cut on one line. */
+.itemList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.itemRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--base-size-8) var(--base-size-12);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  background: var(--bgColor-default);
+  color: var(--fgColor-default);
+  font: var(--text-body-shorthand-medium);
+  text-align: start;
+  cursor: pointer;
+}
+
+.itemRow[aria-current='true'] {
+  border-color: var(--borderColor-accent-emphasis);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .itemRow:hover {
+    background: var(--bgColor-muted);
+  }
+}
+
+.itemTitle {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8);
+  color: var(--fgColor-muted);
+  font: var(--text-body-shorthand-small);
+}
+
+/* The open item's detail. */
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap-normal);
+  min-width: 0;
+}
+
+.detailHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.detailTitle {
+  overflow-wrap: anywhere;
+}
+
+.marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8) var(--base-size-24);
+  margin: 0;
+  font: var(--text-body-shorthand-small);
+}
+
+.mark {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-2);
+  min-width: 0;
+}
+
+.markLabel {
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+}
+
+.markValue {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+  padding: var(--base-size-12);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+}
+
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8);
+  margin: 0;
+  min-width: 0;
+}
+
+.cardTitle {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font: var(--text-body-shorthand-medium);
+}
+
+.blockReason {
+  margin: 0;
+  padding-inline-start: var(--base-size-12);
+  border-inline-start: var(--borderWidth-thick) solid var(--borderColor-danger-emphasis);
+  color: var(--fgColor-default);
+  overflow-wrap: anywhere;
+  font: var(--text-body-shorthand-medium);
+}
+
+/* The declared data, by type. */
+.dataList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-16);
+  min-width: 0;
+}
+
+.data {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  min-width: 0;
+}
+
+.dataTitle {
+  margin: 0;
+  font: var(--text-body-shorthand-medium);
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.value {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4);
+  min-width: 0;
+  margin: 0;
+}
+
+.valueLabel {
+  margin: 0;
+  color: var(--fgColor-muted);
+  font: var(--text-caption-shorthand);
+}
+
+.text {
+  margin: 0;
+  padding: var(--base-size-8) var(--base-size-12);
+  overflow-x: auto;
+  border-radius: var(--borderRadius-medium);
+  background: var(--bgColor-muted);
+  font: var(--text-codeBlock-shorthand);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-4);
+  min-height: 44px;
+  overflow-wrap: anywhere;
+}
+
+.status {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8);
+  font: var(--text-body-shorthand-medium);
+}
+
+.statusText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tableBox {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
