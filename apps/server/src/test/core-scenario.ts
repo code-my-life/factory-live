@@ -6,6 +6,7 @@ import { KEEP_FINISHED_MS } from '../application/projection.ts';
 import { createLogger } from '../logger.ts';
 import { HistoryStore } from '../adapters/store/history.ts';
 import { noProfiles } from '../adapters/workflow-core/absent.ts';
+import { CoreHistory } from '../adapters/workflow-core/history.ts';
 import { WorkflowCoreReader } from '../adapters/workflow-core/reader.ts';
 import type { FakeCore, FakeCoreState } from './fake-core.ts';
 import { insertEvent, insertRun, insertTask, kanbanDb } from './hermes-fixtures.ts';
@@ -271,6 +272,7 @@ export function newHub(
   dir: TempDir,
   name: string,
   source: 'hermes' | 'workflow-core' = 'hermes',
+  store: HistoryStore = new HistoryStore(join(dir.path, name)),
 ): Hub {
   return new Hub(
     {
@@ -282,7 +284,7 @@ export function newHub(
       keepFinishedMs: KEEP_FINISHED_MS,
     },
     {
-      store: new HistoryStore(join(dir.path, name)),
+      store,
       profiles: noProfiles,
       github: null,
       diagnoses: null,
@@ -295,6 +297,7 @@ export function newHub(
 
 export interface Side {
   hub: Hub;
+  store: HistoryStore;
   reader: WorkflowCoreReader;
   sheet: () => PublishedSheet | null;
   generic: () => readonly WorkflowView[];
@@ -304,7 +307,11 @@ export interface Side {
 
 /** The core's side of the switch, as main.ts wires it: the reader feeds the hub, the sheet and the list. */
 export function coreSide(dir: TempDir, core: FakeCore): Side {
-  const hub = newHub(dir, 'core-data', 'workflow-core');
+  const store = new HistoryStore(join(dir.path, 'core-data'));
+  const hub = newHub(dir, 'core-data', 'workflow-core', store);
+  // factory-live's own history, as main.ts wires it (#63): the mirror poured once, then every item read.
+  const history = new CoreHistory(store, () => NOW);
+  history.seed('factory', store.board());
   let sheet: PublishedSheet | null = null;
   let generic: readonly WorkflowView[] = [];
   const boards: KanbanDelta[] = [];
@@ -318,10 +325,11 @@ export function coreSide(dir: TempDir, core: FakeCore): Side {
     now: () => NOW,
     log,
     sink: {
-      board: (delta, readAt) => {
+      board: (delta, readAt, declared) => {
         boards.push(delta);
-        hub.replaceBoard(delta, readAt);
+        hub.replaceBoard(declared ? history.withGone('factory', delta) : delta, readAt);
       },
+      history: (workflow, items, complete) => history.record(workflow, items, complete),
       sheet: (next) => {
         sheet = next;
       },
@@ -346,7 +354,7 @@ export function coreSide(dir: TempDir, core: FakeCore): Side {
       gestures: () => undefined,
     },
   });
-  return { hub, reader, sheet: () => sheet, generic: () => generic, boards, failures };
+  return { hub, store, reader, sheet: () => sheet, generic: () => generic, boards, failures };
 }
 
 /** What the PWA is sent of the line, without the times of computation. */
