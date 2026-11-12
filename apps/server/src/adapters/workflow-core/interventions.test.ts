@@ -16,7 +16,7 @@ import {
 import type { Side } from '../../test/core-scenario.ts';
 import { tempDir } from '../../test/hermes-fixtures.ts';
 import type { CoreIntervention } from '@factory-live/contracts/workflow-core';
-import { coreInterventionState } from './interventions.ts';
+import { commentGestures, coreInterventionState } from './interventions.ts';
 import type { TempDir } from '../../test/hermes-fixtures.ts';
 
 /** A real diagnosis, as factory-live computed it on an incident (a question of the agent). */
@@ -311,9 +311,33 @@ describe('interventions lues par le socle (workflow-core, #59)', () => {
     expect(side.hub.snapshot().interventions).toEqual([]);
   });
 
+  it('un geste unblock déclaré comme issue ne montre pas le formulaire Débloquer', () => {
+    // Débloquer posts a comment on the card's issue: a gesture of kind `issue` cannot answer it.
+    const asIssue = coreInterventionState(
+      NEEDS_INPUT as CoreIntervention,
+      commentGestures([{ name: 'unblock', kind: 'issue', repo: 'code-my-life/factory-live' }]),
+    );
+    expect(asIssue.actions.map((action) => action.kind)).not.toContain('unblock');
+    const asComment = coreInterventionState(
+      NEEDS_INPUT as CoreIntervention,
+      commentGestures([{ name: 'unblock', kind: 'comment', repo: null }]),
+    );
+    expect(asComment.actions.map((action) => action.kind)).toContain('unblock');
+  });
+
+  it('le geste unblock ne devient Débloquer que si le workflow le déclare (#61)', () => {
+    const declared = coreInterventionState(NEEDS_INPUT as CoreIntervention, new Set(['unblock']));
+    const undeclared = coreInterventionState(NEEDS_INPUT as CoreIntervention, new Set());
+    expect(declared.actions.map((action) => action.kind)).toContain('unblock');
+    expect(undeclared.actions.map((action) => action.kind)).not.toContain('unblock');
+  });
+
   it('un texte en code sans paramètres reste une phrase du catalogue', () => {
     const { params: _params, ...bare } = NEEDS_INPUT.title;
-    const state = coreInterventionState({ ...NEEDS_INPUT, title: bare } as CoreIntervention);
+    const state = coreInterventionState(
+      { ...NEEDS_INPUT, title: bare } as CoreIntervention,
+      new Set(['unblock']),
+    );
     expect(state.title).toEqual(msg('intervention.title.needsInput'));
   });
 

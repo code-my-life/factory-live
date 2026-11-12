@@ -254,8 +254,13 @@ export const CORE_INTERVENTION = {
 
 export const coreState = (): FakeCoreState => ({
   workflows: [
-    { key: 'factory', board: 'factory', sheet_valid: true },
-    { key: 'studio', board: 'studio', sheet_valid: true },
+    {
+      key: 'factory',
+      board: 'factory',
+      sheet_valid: true,
+      gestures: [{ name: 'unblock', kind: 'comment' }],
+    },
+    { key: 'studio', board: 'studio', sheet_valid: true, gestures: [] },
   ],
   sheets: { factory: structuredClone(SHEET), studio: structuredClone(SHEET) },
   items: { factory: structuredClone(CORE_ITEMS), studio: [] },
@@ -346,6 +351,7 @@ export function coreSide(dir: TempDir, core: FakeCore): Side {
       interventionClosed: (id) => hub.closeCoreIntervention(id),
       diagnoses: (entries) => hub.applyCoreDiagnoses(entries),
       verdicts: (cardId, verdicts) => hub.applyCoreVerdicts(cardId, verdicts),
+      gestures: () => undefined,
     },
   });
   return { hub, store, reader, sheet: () => sheet, generic: () => generic, boards, failures };

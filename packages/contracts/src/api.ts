@@ -62,6 +62,9 @@ export const ApiErrorCode = z.enum([
   'host_refused',
   'workflow_refused',
   'workflow_unreachable',
+  'unknown_workflow',
+  'gesture_not_declared',
+  'no_issue',
 ]);
 export type ApiErrorCode = z.infer<typeof ApiErrorCode>;
 

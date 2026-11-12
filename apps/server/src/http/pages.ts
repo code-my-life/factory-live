@@ -52,7 +52,7 @@ export const PAGE_TEXTS: Readonly<Record<PageLocale, PageTexts>> = {
   fr: {
     setupTitle: 'Créer l’App GitHub de factory-live',
     setupRights:
-      'GitHub va créer une App privée pour l’organisation, avec ces droits : issues en écriture (pour « /factory unblock »), PR, CI, contenu et webhooks des dépôts en lecture. Aucun webhook n’est activé.',
+      'GitHub va créer une App privée pour l’organisation, avec ces droits : issues en écriture (pour les gestes que tu postes, comme le déblocage), PR, CI, contenu et webhooks des dépôts en lecture. Aucun webhook n’est activé.',
     setupSteps:
       'Sur GitHub, garde le nom proposé ou change-le, puis clique « Create GitHub App ». Tu reviendras ici pour l’installer : choisis alors « All repositories ».',
     setupContinue: 'Continuer sur GitHub',
@@ -92,7 +92,7 @@ export const PAGE_TEXTS: Readonly<Record<PageLocale, PageTexts>> = {
   en: {
     setupTitle: 'Create the factory-live GitHub App',
     setupRights:
-      'GitHub will create a private App for the organization, with these permissions: issues write (for “/factory unblock”), and read access to PRs, CI, contents and repository webhooks. No webhook is enabled.',
+      'GitHub will create a private App for the organization, with these permissions: issues write (for the gestures you post, such as unblocking), and read access to PRs, CI, contents and repository webhooks. No webhook is enabled.',
     setupSteps:
       'On GitHub, keep the suggested name or change it, then click “Create GitHub App”. You’ll come back here to install it: then choose “All repositories”.',
     setupContinue: 'Continue on GitHub',

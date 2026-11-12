@@ -1663,6 +1663,9 @@ export const fr = {
       host_refused: 'Adresse inconnue de factory-live : ouvre l’app par son adresse habituelle',
       workflow_refused: 'Le workflow a refusé ce geste',
       workflow_unreachable: 'Le workflow ne répond pas',
+      unknown_workflow: 'Workflow inconnu de factory-live',
+      gesture_not_declared: 'Ce workflow ne déclare pas ce geste',
+      no_issue: 'Cet élément n’a pas d’issue où poster le geste',
     } satisfies Record<ApiErrorCode, string>,
   },
 

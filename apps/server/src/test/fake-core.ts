@@ -8,7 +8,12 @@ import type { AddressInfo } from 'node:net';
  */
 
 export interface FakeCoreState {
-  workflows: { key: string; board: string; sheet_valid: boolean }[];
+  workflows: {
+    key: string;
+    board: string;
+    sheet_valid: boolean;
+    gestures?: { name: string; kind: 'comment' | 'issue'; repo?: string }[];
+  }[];
   /** The sheet of each workflow, as the core serves it; absent: 503 sheet_unavailable. */
   sheets: Record<string, unknown>;
   items: Record<string, unknown[]>;

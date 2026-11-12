@@ -15,6 +15,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { HOOK_TIMEOUT_MESSAGE } from '@factory-live/domain';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackUnblockReactions } from '../application/unblock.ts';
+import type { GesturesPort } from '../application/ports.ts';
 import { toHookEvent } from '../ingest/hermes.ts';
 import { sign } from '../ingest/signature.ts';
 import { NOW, NOW_S, ORIGINS, SECRET, harness } from '../test/harness.ts';
@@ -95,6 +96,10 @@ const TAILNET = {
   'x-factory-live': '1',
   'content-type': 'application/json',
 };
+
+async function snapshotOf(on: Harness) {
+  return Snapshot.parse(await (await on.app.request('/api/snapshot', { headers: THIS_PC })).json());
+}
 
 async function snapshot() {
   return Snapshot.parse(await (await h.app.request('/api/snapshot', { headers: THIS_PC })).json());
@@ -459,6 +464,127 @@ describe('déblocage depuis l’app', () => {
         }),
       ),
     ).toEqual([404, 'intervention_unknown']);
+  });
+});
+
+describe('gestes déclarés (#61)', () => {
+  const unblockOnly: GesturesPort = {
+    declared: (workflow) =>
+      workflow === 'factory' ? [{ name: 'unblock', kind: 'comment', repo: null }] : null,
+  };
+  const posts = (on: Harness) => on.github.calls.filter((call) => call.method === 'POST');
+  const gesture = (on: Harness, body: unknown, headers: Record<string, string> = LOCAL) =>
+    on.app.request('/api/gestures', { method: 'POST', headers, body: JSON.stringify(body) });
+
+  it('côté socle, le déblocage passe par le geste déclaré et poste le même commentaire', async () => {
+    // The gestures the core declares for the factory: the unblocking only.
+    const core = harness({ gestures: unblockOnly });
+    try {
+      const id = (await snapshotOf(core)).interventions[0]?.id as string;
+      const unblocked = await core.app.request(
+        `/api/interventions/${encodeURIComponent(id)}/unblock`,
+        { method: 'POST', headers: LOCAL, body: JSON.stringify({ text: 'Prends PostgreSQL' }) },
+      );
+      expect(unblocked.status).toBe(200);
+      expect(posts(core)).toEqual([
+        {
+          method: 'POST',
+          url: 'https://api.github.com/repos/code-my-life/cv-site/issues/49/comments',
+          body: { body: '/factory unblock Prends PostgreSQL' },
+          auth: 'Bearer jeton',
+        },
+      ]);
+
+      // The same gesture through the generic route posts the same comment.
+      const sent = await gesture(core, {
+        workflow: 'factory',
+        gesture: 'unblock',
+        item: 't_1a9f0049',
+        note: 'Prends PostgreSQL',
+      });
+      expect(sent.status).toBe(202);
+      expect(await sent.json()).toMatchObject({ kind: 'comment', state: 'sent' });
+      expect(posts(core)[1]?.body).toEqual({ body: '/factory unblock Prends PostgreSQL' });
+      expect(
+        await refusal(
+          await gesture(core, {
+            workflow: 'factory',
+            gesture: 'relancer',
+            item: 't_1a9f0049',
+            note: '',
+          }),
+        ),
+      ).toEqual([409, 'gesture_not_declared']);
+    } finally {
+      core.close();
+    }
+
+    // A core that declares no gesture for the factory: no unblocking is posted.
+    const none = harness({
+      gestures: { declared: (workflow) => (workflow === 'factory' ? [] : null) },
+    });
+    try {
+      const id = (await snapshotOf(none)).interventions[0]?.id as string;
+      const refused = await none.app.request(
+        `/api/interventions/${encodeURIComponent(id)}/unblock`,
+        { method: 'POST', headers: LOCAL, body: JSON.stringify({ text: 'ok' }) },
+      );
+      expect(await refusal(refused)).toEqual([409, 'unblock_not_available']);
+      expect(posts(none)).toEqual([]);
+    } finally {
+      none.close();
+    }
+  });
+
+  it('un nom hérité ou un workflow retiré du socle n’est ni une erreur interne ni un refus de GitHub', async () => {
+    expect(
+      await refusal(
+        await gesture(h, {
+          workflow: 'toString',
+          gesture: 'unblock',
+          item: 't_1a9f0049',
+          note: '',
+        }),
+      ),
+    ).toEqual([404, 'unknown_workflow']);
+
+    // The core no longer declares the factory: the unblocking posts nothing, and blames no one on GitHub.
+    const gone = harness({ gestures: { declared: () => null } });
+    try {
+      const id = (await snapshotOf(gone)).interventions[0]?.id as string;
+      const refused = await gone.app.request(
+        `/api/interventions/${encodeURIComponent(id)}/unblock`,
+        { method: 'POST', headers: LOCAL, body: JSON.stringify({ text: 'ok' }) },
+      );
+      expect(await refusal(refused)).toEqual([409, 'unblock_not_available']);
+      expect(posts(gone)).toEqual([]);
+    } finally {
+      gone.close();
+    }
+  });
+
+  it('la route des gestes est gardée comme le déblocage', async () => {
+    const body = { workflow: 'factory', gesture: 'unblock', item: 't_1a9f0049', note: 'ok' };
+    expect(await refusal(await gesture(h, body, { ...LOCAL, 'x-factory-live': '' }))).toEqual([
+      403,
+      'csrf_missing',
+    ]);
+    expect(
+      await refusal(await gesture(h, body, { ...LOCAL, origin: 'https://evil.example' })),
+    ).toEqual([403, 'origin_refused']);
+    expect(await refusal(await gesture(h, body, TAILNET))).toEqual([403, 'write_local_only']);
+    expect(
+      await refusal(
+        await gesture(h, body, { ...TAILNET, 'tailscale-user-login': 'intrus@github' }),
+      ),
+    ).toEqual([403, 'write_login_refused']);
+    expect(posts(h)).toHaveLength(0);
+
+    // 30 writes a minute, as the unblocking.
+    const statuses: number[] = [];
+    for (let i = 0; i < 31; i++) statuses.push((await gesture(h, body)).status);
+    expect(statuses.slice(0, 30).every((status) => status === 202)).toBe(true);
+    expect(statuses[30]).toBe(429);
   });
 });
 
@@ -1699,6 +1825,7 @@ describe('coûts lus par le socle (#66)', () => {
         board: () => undefined,
         sheet: () => undefined,
         workflows: () => undefined,
+        gestures: () => undefined,
         failed: () => undefined,
         live: () => undefined,
         activity: () => undefined,
@@ -1854,6 +1981,7 @@ describe('historique lu par le socle (#63)', () => {
         interventionClosed: () => undefined,
         diagnoses: () => undefined,
         verdicts: () => undefined,
+        gestures: () => undefined,
       },
     });
     try {
