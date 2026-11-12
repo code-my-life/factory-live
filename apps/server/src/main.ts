@@ -20,6 +20,7 @@ import {
   noProfiles,
   noSessions,
 } from './adapters/workflow-core/absent.ts';
+import { FactoryViews } from './adapters/workflow-core/factoryViews.ts';
 import { WorkflowCoreReader } from './adapters/workflow-core/reader.ts';
 import { HistoryStore } from './adapters/store/history.ts';
 import { loadConfig } from './config.ts';
@@ -347,9 +348,20 @@ void refreshGitHub();
 void refreshWorkflows();
 
 // The factory's twin bench (#23, ADR 0013): the pair's state on the board, its ports on this PC.
+// On the core's side, the factory's declared data (#60): the twins' state and their mirror's port, the gate's
+// proofs, the transcripts and the drift come from the core; a twin's session comes from the bench's mirror.
+const factoryViews = onCore
+  ? new FactoryViews({
+      url: config.WORKFLOW_CORE_URL ?? '',
+      secret: config.secrets.workflowCoreSecret ?? '',
+      workflow: CODE_WORKFLOW,
+      log: log.child({ component: 'workflow-core' }),
+    })
+  : null;
 const twins = new TwinBench({
-  // On the core's side, the twins come from the core's declared data (#60): none is read on the board.
-  file: (repo, pr) => (onCore ? null : paths.twins(repo, pr)),
+  ...(factoryViews
+    ? { declared: (repo: string, pr: number) => factoryViews.pair(repo, pr) }
+    : { file: (repo: string, pr: number) => paths.twins(repo, pr) }),
   host: config.TWINS_HOST,
 });
 const app = createApp({
@@ -377,6 +389,7 @@ const app = createApp({
   twins,
   workflows,
   coreWorkflows: () => coreWorkflows,
+  ...(factoryViews ? { declared: factoryViews } : {}),
   codeSheet: () => codeSheet,
   workflowWatched: () => {
     workflowWatchedAt = now();

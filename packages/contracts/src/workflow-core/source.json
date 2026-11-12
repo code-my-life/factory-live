@@ -1,6 +1,6 @@
 {
   "repository": "code-my-life/workflow-core",
-  "commit": "6247bf03add4c1da0369c3a717e675ded0f16931",
+  "commit": "b0fde75bd7b36c9c9b4e3cf4da84e9431fc9c5ab",
   "schemas": [
     "workflows",
     "sheet-response",
@@ -13,6 +13,7 @@
     "usage",
     "interventions",
     "diagnosis",
-    "run-verdicts"
+    "run-verdicts",
+    "declared-data"
   ]
 }

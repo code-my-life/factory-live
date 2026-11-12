@@ -357,3 +357,8 @@ export const line = (snapshot: Snapshot) => ({
   interventions: snapshot.interventions,
   agents: snapshot.agents,
 });
+
+/** The Hermes side's readers of the bench and the gate, for the tests of the core's side that compare with it. */
+export { CardFiles } from '../adapters/hermes/files.ts';
+export { HermesPaths } from '../adapters/hermes/paths.ts';
+export { TwinBench } from '../adapters/twins/bench.ts';
