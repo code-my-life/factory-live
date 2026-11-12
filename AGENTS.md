@@ -17,7 +17,7 @@ factory-live montre en temps réel la factory Hermès (dépôt `code-my-life/her
 | Serveur (dev)        | `npm run dev:server` : lit `~/.hermes` en lecture seule, port 8446                                                                               |
 | Conteneur            | `docker compose -f docker/compose.yaml up -d --build` (voir RUNBOOK)                                                                             |
 | Tests seuls          | `npm test` ; couverture : `npm run test:coverage`                                                                                                |
-| Bout en bout         | `npm run e2e` (Chromium : démo, app « live » sur un faux serveur d'API)                                                                          |
+| Bout en bout         | `npm run e2e` (Chromium : démo, app « live » : vrai serveur sur un faux socle)                                                                   |
 | Bout en bout, WebKit | dans l'image de Playwright : voir RUNBOOK, « Tests de bout en bout »                                                                             |
 | Formater             | `npm run format`                                                                                                                                 |
 | Types du socle       | `npm run types:core` (après une copie : `npm run types:core -- --from ../workflow-core --ref <commit>`) ; `npm run check:core-types` les vérifie |
