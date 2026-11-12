@@ -1,5 +1,6 @@
 import type { WorkflowSheet } from '@factory-live/contracts';
 import { Heading } from '@primer/react';
+import { useState } from 'react';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { AgentBadge } from '../../ui/badge/AgentBadge.tsx';
 import { CardBadge } from '../../ui/badge/CardBadge.tsx';
@@ -28,6 +29,9 @@ export function ItemDetail({
   const { t, fmt } = i18n;
   const station = sheet?.stations.find((each) => each.key === item.station)?.label ?? item.station;
   const titleId = `item-${item.id}`;
+  // The run whose transcript is open: the last run of the item, until another is picked.
+  const lastRun = item.cards.flatMap((card) => card.runs).at(-1)?.id ?? null;
+  const [runId, setRunId] = useState<number | null>(lastRun);
   return (
     <article className={styles.detail} aria-labelledby={titleId}>
       <header className={styles.detailHead}>
@@ -73,12 +77,21 @@ export function ItemDetail({
                 {card.blockReason ? (
                   <blockquote className={styles.blockReason}>{card.blockReason}</blockquote>
                 ) : null}
-                <RunsTable card={card} selectedRunId={null} />
+                <RunsTable card={card} selectedRunId={runId} onSelectRun={setRunId} />
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      {runId !== null ? (
+        <section className={styles.section} aria-labelledby={`${titleId}-transcript`}>
+          <Heading as="h3" variant="small" id={`${titleId}-transcript`}>
+            {t.workflows.transcriptOf(runId)}
+          </Heading>
+          <DeclaredDataList data={item.runData[runId] ?? []} idPrefix={`run-${runId}`} />
+        </section>
+      ) : null}
 
       <section className={styles.section} aria-labelledby={`${titleId}-data`}>
         <Heading as="h3" variant="small" id={`${titleId}-data`}>

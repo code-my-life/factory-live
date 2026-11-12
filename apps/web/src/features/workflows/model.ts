@@ -51,6 +51,8 @@ export interface GenericItem {
   cards: CardView[];
   timeline: TimelineEntry[];
   data: DeclaredData[];
+  /** The data the workflow declares for each run of the item (subject `run`): its transcript. */
+  runData: Record<number, DeclaredData[]>;
 }
 
 /** A generic workflow, as its screen shows it. */

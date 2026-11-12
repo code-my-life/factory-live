@@ -71,7 +71,7 @@ function Value({ value }: { value: DeclaredValue }) {
                         className={typeof cell === 'number' ? 'fl-tabular' : undefined}
                       >
                         {cell === null
-                          ? t.common.unknown
+                          ? ''
                           : typeof cell === 'boolean'
                             ? cell
                               ? t.workflows.yes
@@ -90,14 +90,30 @@ function Value({ value }: { value: DeclaredValue }) {
 }
 
 /** The data a workflow declares for an item, each under its label, in the order the core gives. */
-export function DeclaredDataList({ data }: { data: readonly Data[] }) {
+export function DeclaredDataList({
+  data,
+  idPrefix = 'data',
+}: {
+  data: readonly Data[];
+  /** Keeps the headings' ids apart when two lists share a page. */
+  idPrefix?: string;
+}) {
   const { t } = useI18n();
   if (data.length === 0) return <p className={styles.quiet}>{t.workflows.noData}</p>;
   return (
     <div className={styles.dataList}>
       {data.map((each) => (
-        <section key={each.name} className={styles.data} aria-labelledby={`data-${each.name}`}>
-          <Heading as="h4" variant="small" id={`data-${each.name}`} className={styles.dataTitle}>
+        <section
+          key={each.name}
+          className={styles.data}
+          aria-labelledby={`${idPrefix}-${each.name}`}
+        >
+          <Heading
+            as="h4"
+            variant="small"
+            id={`${idPrefix}-${each.name}`}
+            className={styles.dataTitle}
+          >
             {each.label}
           </Heading>
           {each.values.length === 0 ? (
