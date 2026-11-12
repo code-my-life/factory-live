@@ -1,6 +1,13 @@
 import type { ApiErrorCode } from '@factory-live/contracts';
 import type { Hub } from './hub.ts';
-import type { GitHubWritePort, HistoryPort, LoggerPort, UnblockRecord } from './ports.ts';
+import { GestureError, hermesSideGestures, postGesture } from './gestures.ts';
+import type {
+  GesturesPort,
+  GitHubWritePort,
+  HistoryPort,
+  LoggerPort,
+  UnblockRecord,
+} from './ports.ts';
 
 export class UnblockError extends Error {
   readonly status: 404 | 409 | 502 | 503;
@@ -28,14 +35,21 @@ export interface UnblockDeps {
   factoryBot: string;
   log: LoggerPort;
   now: () => number;
+  /**
+   * The gestures each workflow declares (#61): the core's on its side, the default list on Hermes' side.
+   * Absent: the default list.
+   */
+  gestures?: GesturesPort;
+  /** The workflow of the code line's interventions (`factory`). */
+  workflow?: string;
 }
 
 /**
- * Répond à une intervention depuis l'app : commentaire `/factory unblock <réponse>` posté sur l'issue au
- * nom de Clément (son jeton). C'est le chemin existant de la factory, relais `active_pr` compris ; le bot
- * accuse réception par une réaction, puis la carte repart. Une deuxième demande ne reposte rien, sauf
- * après un refus du bot. Tant que le diagnostic voit la cause encore présente côté factory, il faut
- * `acknowledgeCause` : la carte retomberait dans le même échec, et le 2e blocage l'envoie en triage.
+ * Answers an intervention from the app: the workflow's `unblock` gesture, posted on the issue in the owner's
+ * name (their token). It is the factory's existing path, `active_pr` relay included; the bot acknowledges
+ * with a reaction, then the card restarts. A second request posts nothing again, unless the bot refused the
+ * first. While the diagnosis sees the cause still present on the factory's side, `acknowledgeCause` is
+ * needed: the card would fall into the same failure, and the second block sends it to triage.
  */
 export async function unblockIntervention(
   deps: UnblockDeps,
@@ -96,9 +110,27 @@ export async function unblockIntervention(
   const cause = primary
     ? ` [cause ${primary.code} : ${causePresent ? 'présente, déblocage voulu' : primary.cause.state}]`
     : '';
-  const [repo = '', number = '0'] = intervention.issueKey.split('#');
+  const issueKey = intervention.issueKey;
   try {
-    const comment = await deps.github.comment(repo, Number(number), `/factory unblock ${text}`);
+    // The unblocking is the gesture `unblock` of the intervention's workflow (#61): posted only if declared.
+    const sent = await postGesture(
+      {
+        gestures: deps.gestures ?? hermesSideGestures,
+        github: deps.github,
+        issueOf: () => issueKey,
+        store: deps.store,
+        log: deps.log,
+        now: deps.now,
+      },
+      {
+        workflow: deps.workflow ?? 'factory',
+        gesture: 'unblock',
+        item: intervention.cardId ?? '',
+        note: text,
+      },
+      actor,
+    );
+    const comment = { id: sent.commentId ?? 0, url: sent.url };
     deps.store.updateUnblock(
       interventionId,
       { state: 'sent', commentId: comment.id, commentUrl: comment.url },
@@ -116,6 +148,14 @@ export async function unblockIntervention(
     );
   } catch (error) {
     deps.store.forgetUnblock(interventionId);
+    // A gesture not declared, an item without an issue, or a workflow the core no longer declares: nothing was
+    // posted, GitHub is not to blame.
+    if (error instanceof GestureError && (error.status === 409 || error.status === 404))
+      throw new UnblockError(
+        409,
+        'unblock_not_available',
+        'Cette intervention ne se débloque pas depuis l’app : utilise les commandes proposées',
+      );
     deps.store.audit(
       actor,
       'unblock-failed',

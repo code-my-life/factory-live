@@ -24,6 +24,7 @@ import type {
 } from '@factory-live/contracts/workflow-core';
 import type {
   CoreActivityFact,
+  DeclaredGesture,
   CoreAgentState,
   CoreCheckState,
   CoreInterventionState,
@@ -36,7 +37,7 @@ import type {
 } from '../../application/ports.ts';
 import { boardOf } from './cards.ts';
 import { WorkflowCoreClient } from './client.ts';
-import { coreInterventionState } from './interventions.ts';
+import { commentGestures, coreInterventionState } from './interventions.ts';
 import { coreActivityFact, coreAgentState } from './live.ts';
 
 /** Where the reader sends what it reads: main.ts wires it to the hub, the code line's sheet and the list. */
@@ -68,6 +69,11 @@ export interface CoreSink {
   /** Every open intervention of the code line, from a full read (#59). */
   interventions(items: CoreInterventionState[]): void;
   /** An intervention the core announces as opened, then as closed (#59). */
+  /**
+   * The gestures each workflow declares (#61), by workflow, the ones read by their own adapter included: the
+   * owner may post them from the screen. A workflow that declares none has an empty list.
+   */
+  gestures(declared: Record<string, DeclaredGesture[]>): void;
   interventionOpened(item: CoreInterventionState): void;
   interventionClosed(id: string): void;
   /** The diagnoses of the interventions, by id; `null` for one of a refused form (#59). */
@@ -159,6 +165,8 @@ export class WorkflowCoreReader {
   /** The number of the last read of the agents started, and of the last one sent (#93). */
   private agentsRead = 0;
   private agentsApplied = 0;
+  /** The gestures each workflow declares, from the last full read (#61). */
+  private declared: Record<string, DeclaredGesture[]> = {};
   /** The machine's last checks, and the cursor of the event or read they come from (#62). */
   private checks: CoreCheckState[] = [];
   private checksCursor: string | null = null;
@@ -240,6 +248,17 @@ export class WorkflowCoreReader {
     const listed = await this.client.get('/api/workflows', coreWorkflows, signal);
     // The cursor is taken before the items: an event that falls between comes again, harmless.
     const cursor = listed.cursor ?? null;
+    this.declared = Object.fromEntries(
+      listed.workflows.map((workflow) => [
+        workflow.key,
+        (workflow.gestures ?? []).map((gesture) => ({
+          name: gesture.name,
+          kind: gesture.kind,
+          repo: gesture.repo ?? null,
+        })),
+      ]),
+    );
+    this.options.sink.gestures(this.declared);
     const keys = listed.workflows
       .map((workflow) => workflow.key)
       .filter((key) => !this.options.own.includes(key));
@@ -386,8 +405,15 @@ export class WorkflowCoreReader {
     const path = `/api/workflows/${encodeURIComponent(this.options.code)}/interventions`;
     const answer = await this.client.get(path, coreInterventions, this.abort.signal);
     this.openCards = new Map(answer.interventions.map((item) => [item.id, item.item]));
-    this.options.sink.interventions(answer.interventions.map(coreInterventionState));
+    this.options.sink.interventions(
+      answer.interventions.map((item) => coreInterventionState(item, this.codeGestures())),
+    );
     this.scheduleDiagnoses();
+  }
+
+  /** The comment gestures the code line declares: an intervention's gesture shows only if it is one of them. */
+  private codeGestures(): ReadonlySet<string> {
+    return commentGestures(this.declared[this.options.code] ?? []);
   }
 
   private intervention(kind: 'intervention_opened' | 'intervention_closed', state: unknown): void {
@@ -399,7 +425,7 @@ export class WorkflowCoreReader {
     }
     const item = state as CoreIntervention;
     this.openCards.set(item.id, item.item);
-    this.options.sink.interventionOpened(coreInterventionState(item));
+    this.options.sink.interventionOpened(coreInterventionState(item, this.codeGestures()));
     this.scheduleDiagnoses();
   }
 

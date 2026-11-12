@@ -275,6 +275,16 @@ export class GitHubClient implements GitHubWritePort {
     return { id: Number(data['id']), url: str(data['html_url']) };
   }
 
+  /** Opens an issue in a repository of the owner (#61): `repo` is its name. */
+  async openIssue(
+    repo: string,
+    title: string,
+    body: string,
+  ): Promise<{ number: number; url: string }> {
+    const data = (await this.request('POST', this.path(repo, '/issues'), { title, body })) as Json;
+    return { number: Number(data['number']), url: str(data['html_url']) };
+  }
+
   async reactions(repo: string, commentId: number): Promise<Reaction[]> {
     const data = (await this.request(
       'GET',

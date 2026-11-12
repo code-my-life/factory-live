@@ -1,14 +1,14 @@
 import { createHash, createSign, randomBytes } from 'node:crypto';
 
 /**
- * Intégration GitHub de factory-live par une GitHub App dédiée (choix de Clément, 2026-10-28) :
- * - création en un clic par manifeste depuis factory-live ;
- * - lectures de fond (issues, PR, CI) avec le jeton d'installation de l'App : quota propre, API Checks ;
- * - écriture du seul commentaire `/factory unblock` avec le jeton utilisateur de Clément (connexion
- *   GitHub), pour que le commentaire lui soit attribué, ce qu'exige le bot de la factory.
- * Le jeton fine-grained de `~/.config/factory-live/github-token` reste un repli tant que l'App n'existe pas.
- * Références : docs.github.com, « Registering a GitHub App from a manifest », « Generating a user access
- * token for a GitHub App », « Refreshing user access tokens », « Generating a JSON Web Token ».
+ * factory-live's GitHub integration through a dedicated GitHub App (owner's choice, 2026-10-28):
+ * - created in one click from factory-live, by a manifest;
+ * - background reads (issues, PRs, CI) with the App's installation token: its own quota, the Checks API;
+ * - the owner's gestures, the only writes (the gestures each workflow declares, ADR 0016), with the owner's
+ *   user token (GitHub login), so that they are attributed to the owner, as the factory's bot requires.
+ * The fine-grained token of `~/.config/factory-live/github-token` stays a fallback while the App does not exist.
+ * References: docs.github.com, "Registering a GitHub App from a manifest", "Generating a user access token for
+ * a GitHub App", "Refreshing user access tokens", "Generating a JSON Web Token".
  */
 
 export interface AppCredentials {
@@ -182,7 +182,7 @@ export class GitHubAppAuth implements TokenSource {
         name: `factory-live-${this.options.owner}`.slice(0, 34),
         url: repoUrl,
         description:
-          'factory-live : la factory Hermès en temps réel. Lit issues, PR et CI ; poste « /factory unblock » au nom de Clément.',
+          'factory-live : la factory Hermès en temps réel. Lit issues, PR et CI ; poste les gestes du propriétaire en son nom.',
         hook_attributes: { url: repoUrl, active: false },
         redirect_url: `${origin}/api/github/manifest/callback`,
         callback_urls: this.options.origins.map((item) => `${item}/api/github/oauth/callback`),

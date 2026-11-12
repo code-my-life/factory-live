@@ -1542,6 +1542,9 @@ export const en: Messages = {
       host_refused: 'Unknown address for factory-live: open the app at its usual address',
       workflow_refused: 'The workflow refused this gesture',
       workflow_unreachable: 'The workflow isn’t answering',
+      unknown_workflow: 'Workflow unknown to factory-live',
+      gesture_not_declared: 'This workflow doesn’t declare this gesture',
+      no_issue: 'This item has no issue to post the gesture on',
     },
   },
 

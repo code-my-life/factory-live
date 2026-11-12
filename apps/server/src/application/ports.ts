@@ -320,10 +320,30 @@ export interface GitHubReadPort {
 // Direct writes and reads needed for unblocking.
 export interface GitHubWritePort {
   comment(repo: string, number: number, body: string): Promise<{ id: number; url: string }>;
+  /** Opens an issue in `repo` (a repository of the owner), in the name of the connected account (#61). */
+  openIssue(repo: string, title: string, body: string): Promise<{ number: number; url: string }>;
   reactions(repo: string, commentId: number): Promise<{ content: string; user: string }[]>;
 }
 
 // --- Stockage propre à factory-live --------------------------------------------------------------
+
+// --- Gestes déclarés (#61, ADR 0016) -------------------------------------------------------------
+
+/**
+ * A gesture a workflow declares: a comment `/<workflow> <name> <note>` on the issue of an item, or an issue
+ * opened in `repo`. factory-live posts only these.
+ */
+export interface DeclaredGesture {
+  name: string;
+  kind: 'comment' | 'issue';
+  /** The repository an `issue` gesture opens its issue in; `null` for a comment. */
+  repo: string | null;
+}
+
+export interface GesturesPort {
+  /** The gestures a workflow declares; `null` when the workflow is unknown. */
+  declared(workflow: string): readonly DeclaredGesture[] | null;
+}
 
 export interface UsageDelta {
   day: string;

@@ -21,6 +21,7 @@ import { DiagnosisService } from '../application/diagnosis.ts';
 import { Hub } from '../application/hub.ts';
 import { KanbanWatch } from '../application/kanban-watch.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
+import type { GesturesPort } from '../application/ports.ts';
 import { createLogger } from '../logger.ts';
 import { allowedHosts, appAddresses } from '../config.ts';
 import { appPem } from './github-fixtures.ts';
@@ -73,6 +74,8 @@ export function harness(
     twins?: TwinBench;
     /** The workflows followed by their generic API (#31). */
     workflows?: WorkflowApi[];
+    /** The gestures each workflow declares (#61); absent: Hermes' side default list. */
+    gestures?: GesturesPort;
     /**
      * Where the hub reads the factory (#63): on workflow-core's side, the hub starts empty and the kanban of
      * the harness is not read; the test feeds the hub from a fake core.
@@ -289,6 +292,7 @@ export function harness(
     factoryBot: 'code-my-life-factory[bot]',
     log,
     now,
+    ...(options.gestures ? { gestures: options.gestures } : {}),
   };
   const app = createApp({
     hub,
