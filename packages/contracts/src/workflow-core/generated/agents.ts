@@ -22,6 +22,11 @@ export type Default = number | null;
 export type Unit = 'seconds' | 'turns';
 export type Limits = AgentLimit[];
 export type Agents = Agent[];
+export type Plugin = string;
+export type Agents1 = string[];
+export type LongestSeconds1 = number;
+export type LimitSeconds = number;
+export type GuardRisks = GuardRisk[];
 
 /**
  * GET /api/workflows/<key>/agents?days=<n>: the workflow's agents and their configuration in service, without a
@@ -32,6 +37,7 @@ export interface AgentsResponse {
   workflow: Workflow;
   kanban: KanbanSettings | null;
   agents: Agents;
+  guard_risks: GuardRisks;
   [k: string]: unknown;
 }
 /**
@@ -70,5 +76,16 @@ export interface AgentLimit {
   value: Value;
   default: Default;
   unit: Unit;
+  [k: string]: unknown;
+}
+/**
+ * A guard whose code can wait at least the delay of its hook, on one or more agents (issue #137): a plugin
+ * plugged to a hook, whose longest command lasts at least the hook's effective delay.
+ */
+export interface GuardRisk {
+  plugin: Plugin;
+  agents: Agents1;
+  longest_seconds: LongestSeconds1;
+  limit_seconds: LimitSeconds;
   [k: string]: unknown;
 }

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type * as NodeFs from 'node:fs';
 import type * as NodeSqlite from 'node:sqlite';
-import { ProfileView } from '@factory-live/contracts';
+import { ProfileView, msg } from '@factory-live/contracts';
 import { coreAgents } from '@factory-live/contracts/workflow-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { profileViews } from '../../application/views.ts';
@@ -77,6 +77,7 @@ const agent = (name: string, skill: string, patch: Record<string, unknown> = {})
 /** The harness' factory (four agents, the kanban at 2 and 1), as the core serves it, by name. */
 const AGENTS = {
   kanban: { max_in_progress: 2, max_in_progress_per_profile: 1 },
+  guard_risks: [] as unknown[],
   agents: [
     agent('coder', 'factory-author-proof'),
     agent('coordinator', 'factory-brief'),
@@ -258,7 +259,7 @@ describe('écran Agents lu par le socle (#93)', () => {
 
 describe('écran Agents lu par le socle, revue (#93)', () => {
   it('la réponse réelle des agents du socle remplit l’écran Agents', () => {
-    // Captured from workflow-core 0.4.0 (#129) on the factory's machine, read-only: no secret in it.
+    // Captured from workflow-core 0.4.0 (#129, #137) on the factory's machine, read-only: no secret in it.
     const real = coreAgents.parse(
       JSON.parse(
         readFileSync(
@@ -325,5 +326,77 @@ describe('écran Agents lu par le socle, revue (#93)', () => {
     await first;
 
     expect(hub.settings).toEqual({ maxInProgress: 5, maxInProgressPerProfile: 3 });
+  });
+
+  it('côté socle, les gardes à risque viennent du socle', async () => {
+    const { hub } = await start({
+      agents: {
+        factory: {
+          ...AGENTS,
+          guard_risks: [
+            {
+              plugin: 'coder-guard',
+              agents: ['coder', 'coder-claude', 'coder-opencode', 'scribe'],
+              longest_seconds: 900,
+              limit_seconds: 420,
+            },
+            { plugin: 'merge-guard', agents: ['release'], longest_seconds: 30, limit_seconds: 30 },
+          ],
+        },
+      },
+    });
+    hub.refreshDiagnoses();
+    const guards = hub.snapshot().health.find((item) => item.id === 'guards');
+
+    // The tile `health.test.ts` expects for these two risks, field by field (but its time of reading).
+    expect(guards).toMatchObject({
+      id: 'guards',
+      label: msg('health.guards'),
+      group: 'hermes',
+      status: 'degraded',
+      detail: msg('health.guards.risk', { count: 2 }),
+      metrics: [
+        {
+          label: msg('health.guards.riskItem', {
+            profile: 'coder, coder-claude, coder-opencode, scribe',
+            plugin: 'coder-guard',
+          }),
+          value: msg('health.guards.limits', { longest: 900, limit: 420 }),
+        },
+        {
+          label: msg('health.guards.riskItem', { profile: 'release', plugin: 'merge-guard' }),
+          value: msg('health.guards.limits', { longest: 30, limit: 30 }),
+        },
+      ],
+    });
+    expect(guards?.checkedAt).toEqual(expect.any(String));
+  });
+
+  it('côté socle, aucune garde publiée donne la tuile sans risque', async () => {
+    const { hub } = await start({ agents: { factory: { ...AGENTS, guard_risks: [] } } });
+    hub.refreshDiagnoses();
+    expect(hub.snapshot().health.find((item) => item.id === 'guards')).toMatchObject({
+      status: 'ok',
+      detail: msg('health.guards.ok'),
+      metrics: [],
+    });
+  });
+
+  it('côté socle, la règle des gardes n’est pas appliquée', async () => {
+    // A plugin whose longest command reaches the agent's hook delay: the rule would find a risk in these facts.
+    const risky = agent('coder', 'factory-author-proof', {
+      plugins: [{ name: 'coder-guard', longest_seconds: 900, hook_timeouts: 0 }],
+      limits: LIMITS.map((entry) =>
+        entry.key === 'hook_callback_timeout' ? { ...entry, value: 30 } : entry,
+      ),
+    });
+    const { hub } = await start({
+      agents: { factory: { ...AGENTS, agents: [risky], guard_risks: [] } },
+    });
+    hub.refreshDiagnoses();
+    expect(hub.snapshot().health.find((item) => item.id === 'guards')).toMatchObject({
+      status: 'ok',
+      metrics: [],
+    });
   });
 });

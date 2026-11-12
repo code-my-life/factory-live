@@ -1,7 +1,7 @@
 import { LimitKey } from '@factory-live/contracts';
 import type { ProfileLimit } from '@factory-live/contracts';
 import type { AgentsResponse } from '@factory-live/contracts/workflow-core';
-import type { ProfileFacts } from '@factory-live/domain';
+import type { GuardRisk, ProfileFacts } from '@factory-live/domain';
 import type {
   FactoryManifest,
   ProfileConfig,
@@ -29,10 +29,26 @@ const limit = (agent: Agent, key: string): number | null =>
 
 export class CoreProfiles implements ProfilesPort {
   private answer: AgentsResponse | null = null;
+  private readAt = 0;
 
-  /** The core's latest answer: it replaces the one held. */
-  update(answer: AgentsResponse): void {
+  /** The core's latest answer, read at `at` (ms epoch): it replaces the one held. */
+  update(answer: AgentsResponse, at: number = Date.now()): void {
     this.answer = answer;
+    this.readAt = at;
+  }
+
+  /** The guards at risk the core computed (#96), as they are: no rule applies them here. */
+  guardRisks(): { risks: GuardRisk[]; checkedAt: number } | null {
+    if (!this.answer) return null;
+    return {
+      risks: this.answer.guard_risks.map((risk) => ({
+        plugin: risk.plugin,
+        profiles: [...risk.agents],
+        longest: risk.longest_seconds,
+        limit: risk.limit_seconds,
+      })),
+      checkedAt: this.readAt,
+    };
   }
 
   private agent(name: string): Agent | undefined {

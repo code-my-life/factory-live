@@ -194,6 +194,7 @@ export class Hub {
   reloadConfig(): void {
     this.root = this.deps.profiles.root();
     this.factoryProfiles = this.loadProfiles();
+    this.refreshGuards();
     this.dirty.add('agents').add('board').add('health');
   }
 
@@ -355,6 +356,14 @@ export class Hub {
 
   /** Les gardes dont le code peut attendre au moins le délai de leur hook, agent par agent. */
   private refreshGuards(): void {
+    // A source that computes the guards itself (workflow-core, #96): its list as it is, without the rule.
+    const published = this.deps.profiles.guardRisks?.();
+    if (published !== undefined) {
+      if (JSON.stringify(published?.risks) !== JSON.stringify(this.guards?.risks))
+        this.dirty.add('health');
+      this.guards = published;
+      return;
+    }
     const stamp = () =>
       this.factoryProfiles.map((profile) => this.deps.profiles.factsStamp(profile)).join('#');
     if (this.guardsStamp !== null && stamp() === this.guardsStamp) return;
