@@ -186,6 +186,35 @@ describe('InterventionsPage', () => {
  * The studio's states, read through its page and its gesture (the studio's own tests are written by
  * the factory and stay as they are; these complete them).
  */
+describe('gestes déclarés (#61)', () => {
+  it('un workflow sans geste déclaré n’affiche aucun bouton de geste', async () => {
+    // The server gives an intervention a gesture action only for a gesture its workflow declares: a workflow
+    // that declares none has interventions without one.
+    const factory = new DemoSource();
+    const blocked = factory
+      .getSnapshot()
+      .interventions.find((item) => item.actions.some((action) => action.kind === 'unblock'));
+    expect(blocked).toBeDefined();
+    const undeclared = {
+      ...blocked!,
+      actions: blocked!.actions.filter((action) => action.kind !== 'unblock'),
+    };
+    // With the gesture declared, the same screen shows the button: the test sees it when it is there.
+    const declared = renderApp(`/interventions/${encodeURIComponent(blocked!.id)}`, factory);
+    expect((await screen.findAllByRole('button', { name: /Débloquer/ })).length).toBeGreaterThan(0);
+    declared.unmount();
+
+    const snapshot = { ...factory.getSnapshot(), interventions: [undeclared] };
+    vi.spyOn(factory, 'getSnapshot').mockReturnValue(snapshot);
+
+    renderApp(`/interventions/${encodeURIComponent(undeclared.id)}`, factory);
+
+    expect(await screen.findByRole('heading', { level: 2 })).toBeInTheDocument();
+    expect(screen.queryAllByRole('button', { name: /Débloquer/ })).toEqual([]);
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+});
+
 describe('le Studio, ses états et sa source', () => {
   const renderStudio = (route: string, studio: StudioSource = createDemoStudioSource()) =>
     renderApp(route, new DemoSource(), studio);

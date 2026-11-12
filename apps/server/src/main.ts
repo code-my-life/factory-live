@@ -34,8 +34,10 @@ import { factoryBadge, notifyOpened } from './application/notify.ts';
 import { notifyArrivals, waitingForOwner } from './application/notifications.ts';
 import { KEEP_FINISHED_MS } from './application/projection.ts';
 import { trackUnblockReactions } from './application/unblock.ts';
+import { hermesSideGestures } from './application/gestures.ts';
 import type {
   AgentLogPort,
+  DeclaredGesture,
   CardFilesPort,
   ProfilesPort,
   PublishedSheet,
@@ -139,6 +141,8 @@ let codeSheet: PublishedSheet = onCore
   : publishedSheet(paths.factorySheet());
 /** The workflows workflow-core declares besides the code line and the studio (#57); their screen is #65. */
 let coreWorkflows: readonly WorkflowView[] = [];
+/** The gestures each workflow declares to workflow-core (#61); before the first read, none. */
+let coreGestures: Record<string, DeclaredGesture[]> = {};
 /** The workflows' items that wait for the owner: the app's badge counts them with the factory's. */
 const workflowsWaiting = () =>
   workflows.reduce((count, workflow) => count + waitingForOwner(workflow.view()).length, 0);
@@ -243,6 +247,9 @@ const core = onCore
         interventionClosed: (id) => hub.closeCoreIntervention(id),
         diagnoses: (entries) => hub.applyCoreDiagnoses(entries),
         verdicts: (cardId, verdicts) => hub.applyCoreVerdicts(cardId, verdicts),
+        gestures: (declared) => {
+          coreGestures = declared;
+        },
       },
     })
   : null;
@@ -256,6 +263,12 @@ const unblockDeps = {
   factoryBot: config.FACTORY_BOT_LOGIN,
   log,
   now,
+  // The gestures factory-live may post (#61): those each workflow declares to the core, on its side; the
+  // code line's default list on Hermes' side.
+  gestures: onCore
+    ? { declared: (workflow: string) => coreGestures[workflow] ?? null }
+    : hermesSideGestures,
+  workflow: CODE_WORKFLOW,
 };
 let githubBusy = false;
 let lastDeliveries = 0;

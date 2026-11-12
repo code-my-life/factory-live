@@ -6,7 +6,8 @@ import type { CoreInterventionState } from '../../application/ports.ts';
 /**
  * An intervention of workflow-core (#37, #59) in factory-live's units: a coded text becomes a code of
  * factory-live's catalogue (checked by its schema), a quote stays as written, the gesture `unblock` becomes
- * the action Débloquer. Another gesture is not shown here: gestures are generic with #61.
+ * the action Débloquer, only when the workflow declares it (#61): a workflow that declares no gesture shows no
+ * gesture button. Another gesture has no button of its own on this screen yet.
  */
 
 type CoreText = CoreIntervention['title'];
@@ -20,11 +21,15 @@ function text(value: CoreText): ScreenText {
   return coded.success ? coded.data : code;
 }
 
-export function coreInterventionState(item: CoreIntervention): CoreInterventionState {
+export function coreInterventionState(
+  item: CoreIntervention,
+  declared: ReadonlySet<string>,
+): CoreInterventionState {
   const actions: CoreInterventionState['actions'] = [];
   for (const action of item.actions) {
     if (action.kind === 'gesture') {
-      if (action.gesture === 'unblock') actions.push({ kind: 'unblock' });
+      if (action.gesture === 'unblock' && declared.has('unblock'))
+        actions.push({ kind: 'unblock' });
       continue;
     }
     const { label, command, url } = action as { label: CoreText; command?: string; url?: string };

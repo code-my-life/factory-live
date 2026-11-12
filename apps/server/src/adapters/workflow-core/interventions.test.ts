@@ -311,9 +311,19 @@ describe('interventions lues par le socle (workflow-core, #59)', () => {
     expect(side.hub.snapshot().interventions).toEqual([]);
   });
 
+  it('le geste unblock ne devient Débloquer que si le workflow le déclare (#61)', () => {
+    const declared = coreInterventionState(NEEDS_INPUT as CoreIntervention, new Set(['unblock']));
+    const undeclared = coreInterventionState(NEEDS_INPUT as CoreIntervention, new Set());
+    expect(declared.actions.map((action) => action.kind)).toContain('unblock');
+    expect(undeclared.actions.map((action) => action.kind)).not.toContain('unblock');
+  });
+
   it('un texte en code sans paramètres reste une phrase du catalogue', () => {
     const { params: _params, ...bare } = NEEDS_INPUT.title;
-    const state = coreInterventionState({ ...NEEDS_INPUT, title: bare } as CoreIntervention);
+    const state = coreInterventionState(
+      { ...NEEDS_INPUT, title: bare } as CoreIntervention,
+      new Set(['unblock']),
+    );
     expect(state.title).toEqual(msg('intervention.title.needsInput'));
   });
 

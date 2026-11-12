@@ -24,6 +24,8 @@ import {
   TwinSide,
   UnblockProgress,
   UnblockRequest,
+  GestureRequest,
+  GestureSent,
   UsageReport,
   msg,
 } from '@factory-live/contracts';
@@ -52,6 +54,7 @@ import {
 } from '../application/views.ts';
 import type { ViewDeps } from '../application/views.ts';
 import type { Logger } from '../logger.ts';
+import { GestureError, hermesSideGestures, postGesture } from '../application/gestures.ts';
 import { UnblockError, unblockIntervention } from '../application/unblock.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
 import { hostGuard, navigationGuard, requestOrigin, writeGuard } from './guard.ts';
@@ -391,6 +394,51 @@ export function createApp(deps: AppDeps) {
   app.use('/api/push/subscribe', guard);
   app.use('/api/push/unsubscribe', guard);
   app.use('/api/push/test', guard);
+
+  // The owner's gestures, generic (#61): only those the workflow declares, guarded as the unblocking.
+  app.use('/api/gestures', guard);
+  app.openapi(
+    createRoute({
+      method: 'post',
+      path: '/api/gestures',
+      request: { body: { content: { 'application/json': { schema: GestureRequest } } } },
+      responses: {
+        202: json(GestureSent, 'Geste posté sur GitHub'),
+        ...errors,
+        404: json(ApiError, 'Workflow inconnu'),
+        409: json(ApiError, 'Geste non déclaré, ou élément sans issue'),
+        502: json(ApiError, 'GitHub a refusé'),
+        503: json(ApiError, 'Jeton absent'),
+      },
+    }),
+    async (c) => {
+      const code = deps.unblock.workflow ?? 'factory';
+      try {
+        const sent = await postGesture(
+          {
+            gestures: deps.unblock.gestures ?? hermesSideGestures,
+            github: deps.unblock.github,
+            ...(deps.unblock.canWrite ? { canWrite: deps.unblock.canWrite } : {}),
+            // Only the code line's items have an issue known here; another workflow's item gets none.
+            issueOf: (workflow, item) => (workflow === code ? deps.hub.issueKeyOfCard(item) : null),
+            store: deps.store,
+            log: deps.log,
+            now: deps.now,
+          },
+          c.req.valid('json'),
+          c.get('actor'),
+        );
+        return c.json(
+          { kind: sent.kind, state: sent.state, url: sent.url, issueKey: sent.issueKey },
+          202,
+        );
+      } catch (error) {
+        if (error instanceof GestureError)
+          return c.json({ error: error.message, code: error.code }, error.status);
+        throw error;
+      }
+    },
+  );
 
   app.openapi(
     createRoute({

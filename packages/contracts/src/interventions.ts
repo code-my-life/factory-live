@@ -73,3 +73,32 @@ export const UnblockRequest = z.object({
   acknowledgeCause: z.boolean().default(false),
 });
 export type UnblockRequest = z.infer<typeof UnblockRequest>;
+
+/**
+ * A gesture the owner posts for a workflow (#61, ADR 0016): a comment `/<workflow> <gesture> <note>` on the
+ * issue of an item, or an issue opened in the repository the workflow declares.
+ */
+export const GestureRequest = z.union([
+  z.object({
+    workflow: z.string().min(1).max(100),
+    gesture: z.string().min(1).max(100),
+    item: z.string().min(1).max(200),
+    note: z.string().max(4000).default(''),
+  }),
+  z.object({
+    workflow: z.string().min(1).max(100),
+    gesture: z.string().min(1).max(100),
+    title: z.string().trim().min(1).max(256),
+    body: z.string().max(60_000).default(''),
+  }),
+]);
+export type GestureRequest = z.infer<typeof GestureRequest>;
+
+/** A gesture posted: the comment or the issue, on GitHub. */
+export const GestureSent = z.object({
+  kind: z.enum(['comment', 'issue']),
+  state: z.literal('sent'),
+  url: z.string(),
+  issueKey: z.string(),
+});
+export type GestureSent = z.infer<typeof GestureSent>;
