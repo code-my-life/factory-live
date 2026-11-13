@@ -12,6 +12,11 @@ import { readFileSync } from 'node:fs';
 const root = new URL('../', import.meta.url);
 const read = (path) => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
 
+/** The secret of the fake core: the fake core checks it, factory-live's server sends it (live-server.mjs). */
+export const SECRET = process.env.FAKE_CORE_SECRET ?? 'secret-du-socle-des-e2e';
+/** The card of cv-site#49, blocked: its intervention and its diagnosis exist while the board holds it. */
+export const BLOCKED_CARD = 't_1a9f0049';
+
 /** The PR of cv-site#52 and the commit of its head, as the fake GitHub serves them. */
 // factory-live#24, whose real answers of GitHub are kept in fixtures/github-acceptance/.
 export const PR = {
@@ -25,7 +30,7 @@ export const PR_URL = `https://github.com/code-my-life/${PR.repo}/pull/${PR.numb
  * The intervention of cv-site#49: its id names the event of its block, `generation`, a new one at each
  * reset of the fake core, so that a test that unblocks it finds it open again (one post per intervention).
  */
-export const interventionId = (generation) => `needs_input:t_1a9f0049:${generation}`;
+export const interventionId = (generation) => `needs_input:${BLOCKED_CARD}:${generation}`;
 export const QUESTION = 'Quelle base de données ?\nPostgreSQL ou SQLite ?';
 
 /** A card of the core with every field, the empty ones by default. */
@@ -112,7 +117,7 @@ export function factoryItems(now, after = false, generation = 1) {
   if (!after)
     items.push(
       card({
-        id: 't_1a9f0049',
+        id: BLOCKED_CARD,
         title: 'impl cv-site#49 : Page Projets',
         status: 'blocked',
         assignee: 'coder',
@@ -209,7 +214,7 @@ export function interventions(now, generation = 1) {
     {
       id: interventionId(generation),
       kind: 'needs_input',
-      item: 't_1a9f0049',
+      item: BLOCKED_CARD,
       event: generation,
       opened_at: new Date((now - 600) * 1000).toISOString(),
       agent: 'coder',
@@ -222,7 +227,7 @@ export function interventions(now, generation = 1) {
         {
           kind: 'copy',
           label: { code: 'intervention.action.showCard', params: {} },
-          command: 'hermes kanban --board factory show t_1a9f0049',
+          command: `hermes kanban --board factory show ${BLOCKED_CARD}`,
         },
       ],
     },
@@ -233,7 +238,7 @@ export function interventions(now, generation = 1) {
 export function diagnoses(now, generation = 1) {
   return [
     {
-      item: 't_1a9f0049',
+      item: BLOCKED_CARD,
       trigger: {
         id: interventionId(generation),
         kind: 'needs_input',
