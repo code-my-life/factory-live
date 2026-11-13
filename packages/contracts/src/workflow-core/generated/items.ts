@@ -39,6 +39,7 @@ export type RunId = number | null;
 export type Kind = string;
 export type CreatedAt2 = number;
 export type Events = CardEvent[];
+export type Station = string | null;
 export type Items = Item[];
 
 /**
@@ -76,6 +77,7 @@ export interface Item {
   children: Children;
   comments: Comments;
   events: Events;
+  station?: Station;
   [k: string]: unknown;
 }
 /**

@@ -160,7 +160,6 @@ export function stationViews(profiles: readonly string[]): StationView[] {
   }));
 }
 
-/** Ce qui attend Clément d'après le kanban, tel que le domaine le trouve (secondes epoch). */
 /** The kinds whose card's issue gets its link among the actions, as factory-live gives it (`interventionsOf`). */
 const ISSUE_LINKED = new Set<string>(['needs_input', 'capability', 'gave_up']);
 
@@ -213,6 +212,7 @@ export function coreIntervention(
   };
 }
 
+/** What waits for the owner according to the kanban, as the domain finds it (epoch seconds). */
 export function foundInterventions(input: ProjectionInput): FoundIntervention[] {
   return interventionsOf(input.board, {
     now: Math.floor(input.now / 1000),

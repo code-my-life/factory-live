@@ -70,13 +70,6 @@ interface ReportedCheck {
   metrics: Record<string, string>;
 }
 
-const fromCore = (check: CoreCheckState): ReportedCheck => ({
-  status: check.status,
-  label: check.label,
-  detail: check.detail,
-  metrics: check.metrics,
-});
-
 const PROBE_SILENT_MS = 90_000;
 const DISPATCHER_SILENT_MS = 3 * 60_000;
 
@@ -111,8 +104,8 @@ export function buildHealth(signals: HealthSignals): {
   const coreChecks = new Map(
     (core?.checks ?? core?.machine?.checks ?? []).map((check) => [check.id, check]),
   );
-  const checks: Map<string, ReportedCheck> = core
-    ? new Map([...coreChecks].map(([id, check]) => [id, fromCore(check)]))
+  const checks: ReadonlyMap<string, ReportedCheck> = core
+    ? coreChecks
     : new Map((probe?.report.checks ?? []).map((check) => [check.id, check]));
   const reported = core !== undefined || probeFresh;
   const checkedAtOf = (id: string): string | null => {

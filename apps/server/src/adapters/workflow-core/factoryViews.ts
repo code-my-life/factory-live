@@ -10,7 +10,7 @@ import type {
   RunTranscripts,
   TranscriptLine,
 } from '../../application/ports.ts';
-import { WorkflowCoreClient } from './client.ts';
+import { WorkflowCoreClient, errorText, workflowPath } from './client.ts';
 
 /**
  * The factory's declared data, as factory-live's views show them (#60, decision of 2026-11-12). This module
@@ -184,11 +184,7 @@ export class FactoryViews implements DeclaredViewsPort {
 
   constructor(options: FactoryViewsOptions) {
     this.options = options;
-    this.client = new WorkflowCoreClient({
-      url: options.url,
-      secret: options.secret,
-      ...(options.fetch ? { fetch: options.fetch } : {}),
-    });
+    this.client = new WorkflowCoreClient(options);
   }
 
   private async read(
@@ -199,7 +195,7 @@ export class FactoryViews implements DeclaredViewsPort {
     const query = `subject=${subject}&id=${encodeURIComponent(id)}`;
     try {
       const answer = await this.client.get(
-        `/api/workflows/${encodeURIComponent(this.options.workflow)}/data?${query}`,
+        workflowPath(this.options.workflow, `/data?${query}`),
         coreDeclaredData,
       );
       // The most recent last: past KEPT_SUBJECTS, the subject read longest ago is dropped.
@@ -212,7 +208,7 @@ export class FactoryViews implements DeclaredViewsPort {
       return answer.data;
     } catch (error) {
       this.options.log.warn(
-        { subject, id, error: error instanceof Error ? error.message : String(error) },
+        { subject, id, error: errorText(error) },
         'données déclarées du socle illisibles : dernière réponse gardée',
       );
       return this.last.get(key) ?? [];

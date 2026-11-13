@@ -1,6 +1,6 @@
 import type { ApiErrorCode } from '@factory-live/contracts';
 import type { Hub } from './hub.ts';
-import { GestureError, hermesSideGestures, postGesture } from './gestures.ts';
+import { CODE_WORKFLOW, GestureError, hermesSideGestures, postGesture } from './gestures.ts';
 import type {
   GesturesPort,
   GitHubWritePort,
@@ -123,7 +123,7 @@ export async function unblockIntervention(
         now: deps.now,
       },
       {
-        workflow: deps.workflow ?? 'factory',
+        workflow: deps.workflow ?? CODE_WORKFLOW,
         gesture: 'unblock',
         item: intervention.cardId ?? '',
         note: text,

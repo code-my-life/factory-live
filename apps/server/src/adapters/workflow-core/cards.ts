@@ -1,25 +1,25 @@
 import type { CoreItem } from '@factory-live/contracts/workflow-core';
-import type { BlockKind, Board, Comment, KanbanStatus, Task } from '@factory-live/domain';
+import { BlockKind, KanbanStatus } from '@factory-live/contracts';
+import type { Board, Comment, Task } from '@factory-live/domain';
 import type { KanbanDelta } from '../../application/ports.ts';
 
 /**
  * workflow-core's items, as the code line's projection reads cards (#57): the same `Task`, `Run`, links,
  * events and comments the Hermes reader gave. What the core does not serve (the diagnosis' own fields)
- * stays empty: the diagnosis comes from the core in a later story.
+ * stays empty: the core computes the diagnoses and serves them apart (#59).
  */
 
-const STATUSES = new Set<string>([
-  'triage',
-  'todo',
-  'scheduled',
-  'ready',
-  'running',
-  'blocked',
-  'review',
-  'done',
-  'archived',
-]);
-const BLOCK_KINDS = new Set<string>(['dependency', 'needs_input', 'capability', 'transient']);
+/** A card's status as the core names it; one the contracts do not know reads as `todo`. */
+export function cardStatus(status: string): KanbanStatus {
+  const known = KanbanStatus.safeParse(status);
+  return known.success ? known.data : 'todo';
+}
+
+/** A card's kind of block as the core names it; none, or one the contracts do not know, reads as `null`. */
+export function blockKindOf(kind: string | null): BlockKind | null {
+  const known = BlockKind.safeParse(kind);
+  return known.success ? known.data : null;
+}
 
 function toTask(item: CoreItem): Task {
   return {
@@ -27,15 +27,12 @@ function toTask(item: CoreItem): Task {
     title: item.title,
     body: item.body ?? '',
     assignee: item.assignee,
-    status: (STATUSES.has(item.status) ? item.status : 'todo') as KanbanStatus,
+    status: cardStatus(item.status),
     createdAt: item.created_at,
     startedAt: item.started_at,
     completedAt: item.completed_at,
     idempotencyKey: item.idempotency_key,
-    blockKind:
-      item.block_kind !== null && BLOCK_KINDS.has(item.block_kind)
-        ? (item.block_kind as BlockKind)
-        : null,
+    blockKind: blockKindOf(item.block_kind),
     currentRunId: item.current_run_id,
     workspacePath: item.workspace_path,
     skills: item.skills,

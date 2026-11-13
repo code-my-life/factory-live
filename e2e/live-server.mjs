@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { SECRET } from './fake-core-scenario.mjs';
 
 const port = process.env.PORT ?? '4183';
 const core = process.env.FAKE_CORE_URL ?? 'http://127.0.0.1:4182';
@@ -15,10 +16,7 @@ const dir = (name) => {
   return path;
 };
 const secrets = dir('secrets');
-writeFileSync(
-  join(secrets, 'workflow-core-secret'),
-  process.env.FAKE_CORE_SECRET ?? 'secret-du-socle-des-e2e',
-);
+writeFileSync(join(secrets, 'workflow-core-secret'), SECRET);
 // The fallback token of ADR 0003: the comment of a gesture goes to the fake GitHub with it.
 writeFileSync(join(secrets, 'github-token'), 'jeton-des-e2e');
 

@@ -189,4 +189,21 @@ describe('workflows génériques du socle (#65)', () => {
     expect((await get('/api/core-workflows/factory/data?subject=card&id=x')).status).toBe(404);
     expect((await get('/api/core-workflows/trial/data?subject=pr&id=x')).status).toBe(400);
   });
+
+  it('un élément que le socle publie avec sa station est lu à cette station (workflow-core#140)', async () => {
+    const state = trialState();
+    state.items['trial'] = [{ ...BLOCKED, station: 'write' }];
+    const { reader } = await start(state);
+    h = harness({ generic: reader });
+
+    const [item] = reader.genericWorkflows()[0]?.items ?? [];
+    expect(item?.station).toBe('write');
+    expect(item?.cards.map((each) => each.station)).toEqual(['write']);
+    // The screen reads it the same way, through the server's route.
+    const listed = await h.app.request('/api/core-workflows', {
+      headers: { host: 'localhost:8446' },
+    });
+    const [trial] = GenericWorkflows.parse(await listed.json()).workflows;
+    expect(trial?.items[0]?.station).toBe('write');
+  });
 });

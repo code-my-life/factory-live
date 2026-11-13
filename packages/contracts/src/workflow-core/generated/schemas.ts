@@ -95,6 +95,11 @@ export const sheetResponseSchema: unknown = {
           default: null,
           title: 'Types',
         },
+        agents: {
+          anyOf: [{ items: { minLength: 1, type: 'string' }, type: 'array' }, { type: 'null' }],
+          default: null,
+          title: 'Agents',
+        },
       },
       required: ['key', 'label', 'icon', 'kind', 'col', 'row'],
       title: 'SheetStation',
@@ -188,6 +193,7 @@ export const itemsSchema: unknown = {
         children: { items: { type: 'string' }, title: 'Children', type: 'array' },
         comments: { items: { $ref: '#/$defs/Comment' }, title: 'Comments', type: 'array' },
         events: { items: { $ref: '#/$defs/CardEvent' }, title: 'Events', type: 'array' },
+        station: { anyOf: [{ type: 'string' }, { type: 'null' }], default: null, title: 'Station' },
       },
       required: [
         'id',
@@ -527,6 +533,7 @@ export const eventSchema: unknown = {
         children: { items: { type: 'string' }, title: 'Children', type: 'array' },
         comments: { items: { $ref: '#/$defs/Comment' }, title: 'Comments', type: 'array' },
         events: { items: { $ref: '#/$defs/CardEvent' }, title: 'Events', type: 'array' },
+        station: { anyOf: [{ type: 'string' }, { type: 'null' }], default: null, title: 'Station' },
       },
       required: [
         'id',

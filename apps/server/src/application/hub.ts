@@ -164,14 +164,16 @@ export class Hub {
 
   private readonly options: HubOptions;
   private readonly deps: HubDeps;
+  /** Whether the factory is read from workflow-core (`source`), set once at start. */
+  private readonly onCore: boolean;
 
   constructor(options: HubOptions, deps: HubDeps) {
     this.options = options;
     this.deps = deps;
-    this.board =
-      deps.source === 'workflow-core'
-        ? { tasks: [], runs: [], links: [], events: [], comments: [] }
-        : deps.store.board();
+    this.onCore = deps.source === 'workflow-core';
+    this.board = this.onCore
+      ? { tasks: [], runs: [], links: [], events: [], comments: [] }
+      : deps.store.board();
     this.issueOfCard = issueOfCards(this.board);
     this.stations = deps.store.stations();
     this.activity = deps.store.recentActivity(ACTIVITY_KEPT);
@@ -383,7 +385,7 @@ export class Hub {
   }
 
   diagnosisOf(interventionId: string): Diagnosis | null {
-    if (this.deps.source === 'workflow-core') return this.coreDiagnoses.get(interventionId) ?? null;
+    if (this.onCore) return this.coreDiagnoses.get(interventionId) ?? null;
     return this.deps.diagnoses?.of(interventionId) ?? null;
   }
 
@@ -394,7 +396,7 @@ export class Hub {
    */
   private foundNow(): FoundIntervention[] {
     const input = this.projectionInput();
-    if (this.deps.source !== 'workflow-core') return foundInterventions(input);
+    if (!this.onCore) return foundInterventions(input);
     const own = foundInterventions(input).filter(
       (item) => item.kind === 'pr_approval' || item.kind === 'main_red',
     );
@@ -461,14 +463,13 @@ export class Hub {
 
   /** The cause a diagnosis names first, from the core on its side, else from the diagnosis service. */
   private primaryOf(interventionId: string): string | null {
-    if (this.deps.source === 'workflow-core')
-      return this.coreDiagnoses.get(interventionId)?.primary.code ?? null;
+    if (this.onCore) return this.coreDiagnoses.get(interventionId)?.primary.code ?? null;
     return this.deps.diagnoses?.primaryOf(interventionId) ?? null;
   }
 
   /** Le verdict des runs en échec d'une carte (page d'une issue), calculé à la demande et gardé. */
   verdictsOf(task: Task): ReadonlyMap<number, RunVerdict> {
-    if (this.deps.source === 'workflow-core') return this.coreVerdicts.get(task.id) ?? new Map();
+    if (this.onCore) return this.coreVerdicts.get(task.id) ?? new Map();
     return this.deps.diagnoses?.verdictsOf(this.board, task, this.deps.now()) ?? new Map();
   }
 
@@ -544,7 +545,7 @@ export class Hub {
 
   applyHook(event: HookEvent): void {
     // On workflow-core's side, the live state comes from the core: a webhook still received changes nothing.
-    if (this.deps.source === 'workflow-core') return;
+    if (this.onCore) return;
     const now = this.deps.now();
     this.lastHookAt = now;
     this.hookTimes.push(now);
@@ -753,7 +754,7 @@ export class Hub {
       maxInProgressPerProfile: this.root.maxInProgressPerProfile,
       ...(this.deps.workflows ? { workflows: this.deps.workflows() } : {}),
       ...(this.deps.codeSheet ? { codeSheet: this.deps.codeSheet() } : {}),
-      ...(this.deps.source === 'workflow-core'
+      ...(this.onCore
         ? {
             core: {
               unreachableSince: this.coreUnreachableSince,
@@ -769,7 +770,7 @@ export class Hub {
   private boardSlice() {
     const input = this.projectionInput();
     const interventions = projectInterventions(input, this.found);
-    if (this.deps.source === 'workflow-core' && this.coreUnreachableSince !== null)
+    if (this.onCore && this.coreUnreachableSince !== null)
       interventions.unshift(this.coreDown(this.coreUnreachableSince));
     const issues = projectIssues(input, interventions);
     const now = this.deps.now();
@@ -837,7 +838,7 @@ export class Hub {
   }
 
   private agentsSlice() {
-    if (this.deps.source === 'workflow-core') {
+    if (this.onCore) {
       // One line per profile the core publishes (#103), at rest or with its card from the board, as on
       // Hermes' side; an agent of the core's live state replaces its profile's line, or joins the list.
       const live = projectCoreAgents(this.coreAgents, this.board.runs, this.issueOfCard);

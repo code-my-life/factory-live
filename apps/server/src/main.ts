@@ -32,7 +32,7 @@ import { factoryBadge, notifyOpened } from './application/notify.ts';
 import { notifyArrivals, waitingForOwner } from './application/notifications.ts';
 import { KEEP_FINISHED_MS } from './application/projection.ts';
 import { trackUnblockReactions } from './application/unblock.ts';
-import { hermesSideGestures } from './application/gestures.ts';
+import { CODE_WORKFLOW, declaredIn, hermesSideGestures } from './application/gestures.ts';
 import type {
   AgentLogPort,
   DeclaredGesture,
@@ -57,8 +57,6 @@ const now = () => Date.now();
  * workflow-core, and nothing is opened under Hermes' home nor in the factory's repository.
  */
 const onCore = config.LIVE_SOURCE === 'workflow-core';
-/** The code line's workflow, as workflow-core declares it. */
-const CODE_WORKFLOW = 'factory';
 
 const store = (() => {
   try {
@@ -118,7 +116,7 @@ const github = new GitHubCache(
   },
 );
 
-// On the core's side, the diagnosis comes from workflow-core in a later story (#59): none is computed here.
+// On the core's side, the diagnoses come from workflow-core (#59): none is computed here.
 const diagnoses = onCore
   ? null
   : new DiagnosisService({
@@ -138,7 +136,7 @@ const workflows = config.WORKFLOWS.map(
 let codeSheet: PublishedSheet = onCore
   ? { source: 'embedded', reason: 'fiche du socle pas encore reçue' }
   : publishedSheet(paths.factorySheet());
-/** The workflows workflow-core declares besides the code line and the studio (#57); their screen is #65. */
+/** The workflows workflow-core declares besides the code line and the studio (#57), listed with their sheet. */
 let coreWorkflows: readonly WorkflowView[] = [];
 /** The gestures each workflow declares to workflow-core (#61); before the first read, none. */
 let coreGestures: Record<string, DeclaredGesture[]> = {};
@@ -206,7 +204,6 @@ pollKanban();
 const coreWatch = new CoreWatch({
   now,
   log: log.child({ component: 'workflow-core' }),
-  requestExit: (code) => shutdown('workflow-core', code),
 });
 // factory-live's own history on the core's side (#63): the kanban mirror poured once at the first start,
 // then every item read from the core; the code line keeps the items Hermes purged.
@@ -276,8 +273,7 @@ const unblockDeps = {
   // code line's default list on Hermes' side.
   gestures: onCore
     ? {
-        declared: (workflow: string) =>
-          Object.hasOwn(coreGestures, workflow) ? (coreGestures[workflow] ?? null) : null,
+        declared: (workflow: string) => declaredIn(coreGestures, workflow),
       }
     : hermesSideGestures,
   workflow: CODE_WORKFLOW,
