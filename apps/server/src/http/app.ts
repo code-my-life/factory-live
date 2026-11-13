@@ -84,7 +84,7 @@ export interface AppDeps {
    * screen read before showing; absent on Hermes' side.
    */
   declared?: DeclaredViewsPort;
-  /** The other workflows workflow-core declares (#57), listed with their sheet; their screen is #65. */
+  /** The other workflows workflow-core declares (#57), listed with their sheet; their screen reads `generic`. */
   coreWorkflows?: () => readonly WorkflowView[];
   /** The generic workflows workflow-core declares, for their screen (#65); absent: none. */
   generic?: GenericWorkflowsPort;

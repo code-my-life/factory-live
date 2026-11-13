@@ -118,7 +118,7 @@ const github = new GitHubCache(
   },
 );
 
-// On the core's side, the diagnosis comes from workflow-core in a later story (#59): none is computed here.
+// On the core's side, the diagnoses come from workflow-core (#59): none is computed here.
 const diagnoses = onCore
   ? null
   : new DiagnosisService({
@@ -138,7 +138,7 @@ const workflows = config.WORKFLOWS.map(
 let codeSheet: PublishedSheet = onCore
   ? { source: 'embedded', reason: 'fiche du socle pas encore reçue' }
   : publishedSheet(paths.factorySheet());
-/** The workflows workflow-core declares besides the code line and the studio (#57); their screen is #65. */
+/** The workflows workflow-core declares besides the code line and the studio (#57), listed with their sheet. */
 let coreWorkflows: readonly WorkflowView[] = [];
 /** The gestures each workflow declares to workflow-core (#61); before the first read, none. */
 let coreGestures: Record<string, DeclaredGesture[]> = {};

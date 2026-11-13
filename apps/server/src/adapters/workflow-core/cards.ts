@@ -5,7 +5,7 @@ import type { KanbanDelta } from '../../application/ports.ts';
 /**
  * workflow-core's items, as the code line's projection reads cards (#57): the same `Task`, `Run`, links,
  * events and comments the Hermes reader gave. What the core does not serve (the diagnosis' own fields)
- * stays empty: the diagnosis comes from the core in a later story.
+ * stays empty: the core computes the diagnoses and serves them apart (#59).
  */
 
 const STATUSES = new Set<string>([

@@ -7,9 +7,9 @@ import type {
 
 /**
  * On the core's side of the switch (#57), the server opens nothing under Hermes' home nor in the
- * factory's repository (ADR 0015). What workflow-core does not serve yet (agents' configurations,
- * sessions, card files, journals) is absent until the stories that bring it through the core: these
- * ports answer « nothing », the way the Hermes readers answer for a missing file.
+ * factory's repository (ADR 0015). What workflow-core does not serve (sessions, card files, journals) is
+ * absent: these ports answer « nothing », the way the Hermes readers answer for a missing file. The
+ * agents' configurations come from the core (`CoreProfiles`, #93); `noProfiles` serves the tests.
  */
 
 export const noProfiles: ProfilesPort = {
