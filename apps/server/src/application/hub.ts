@@ -837,8 +837,17 @@ export class Hub {
   }
 
   private agentsSlice() {
-    if (this.deps.source === 'workflow-core')
-      return projectCoreAgents(this.coreAgents, this.board.runs, this.issueOfCard);
+    if (this.deps.source === 'workflow-core') {
+      // One line per profile the core publishes (#103), at rest or with its card from the board, as on
+      // Hermes' side; an agent of the core's live state replaces its profile's line, or joins the list.
+      const live = projectCoreAgents(this.coreAgents, this.board.runs, this.issueOfCard);
+      const byProfile = new Map(live.map((agent) => [agent.profile, agent]));
+      const lines = projectAgents(this.projectionInput(), this.issueOfCard).map(
+        (agent) => byProfile.get(agent.profile) ?? agent,
+      );
+      const known = new Set(lines.map((agent) => agent.profile));
+      return [...lines, ...live.filter((agent) => !known.has(agent.profile))];
+    }
     const now = this.deps.now();
     const running = new Set(
       this.board.tasks.filter((task) => task.status === 'running').map((task) => task.id),
