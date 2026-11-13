@@ -36,10 +36,9 @@ const TONE: Record<string, TimelineEntry['tone']> = {
   done: 'done',
 };
 
-/** The station the core names for the item, when it names one (it does not yet: `null`). */
+/** The station the core names for the item (workflow-core#140); `null` when it names none. */
 function stationOf(item: CoreItem): string | null {
-  const station = (item as { station?: unknown }).station;
-  return typeof station === 'string' && station ? station : null;
+  return item.station || null;
 }
 
 export function genericItem(item: CoreItem): GenericItemView {
