@@ -204,7 +204,6 @@ pollKanban();
 const coreWatch = new CoreWatch({
   now,
   log: log.child({ component: 'workflow-core' }),
-  requestExit: (code) => shutdown('workflow-core', code),
 });
 // factory-live's own history on the core's side (#63): the kanban mirror poured once at the first start,
 // then every item read from the core; the code line keeps the items Hermes purged.

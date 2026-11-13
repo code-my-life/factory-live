@@ -7,10 +7,10 @@ export interface CoreWatchDeps {
   now: () => number;
   log: LoggerPort;
   /**
-   * The composition root's way to stop the process, as for the kanban watch. The core's watch never calls
-   * it: restarting factory-live would not bring the core back, and would lose the last state kept.
+   * Accepted for the shape of the kanban watch's deps, never called: restarting factory-live would not bring
+   * the core back, and would lose the last state kept. The composition root passes none.
    */
-  requestExit: (code: number) => void;
+  requestExit?: (code: number) => void;
 }
 
 /**
