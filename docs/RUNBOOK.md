@@ -25,13 +25,15 @@ Exposition tailnet : `tailscale serve --bg --https=8446 http://127.0.0.1:8446` (
 
 Le nom tailnet de ce PC, le login Tailscale autorisé à écrire et l'adresse du dashboard d'Hermès n'entrent jamais dans le dépôt, qui est public : leurs vraies valeurs sont dans `docker/.env`, ignoré par git, que compose lit à chaque `up`. Modèle commenté : `docker/.env.example`. Sans `docker/.env`, factory-live ne répond qu'à ce PC (`http://localhost:8446`) et n'accepte d'écriture que de lui.
 
-| Variable           | Rôle                                                                                                               | Forme                                                           |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| `PUBLIC_ORIGINS`   | adresses de la PWA : ce PC, puis l'adresse tailnet (Réglages, « Installer l'app », retours de GitHub, hôtes admis) | `http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446` |
-| `TAILSCALE_LOGINS` | logins Tailscale autorisés à écrire depuis les autres appareils                                                    | `<login>@github`                                                |
-| `DASHBOARD_URL`    | dashboard d'Hermès, lien des interventions ; vide : pas de lien                                                    | `https://<machine>.<tailnet>.ts.net:<port>`                     |
-| `ALLOWED_HOSTS`    | hôtes acceptés en plus (`nom:port`), par exemple si le port publié change                                          | vide                                                            |
-| `HERMES_TZ`        | fuseau de ce PC (IANA) : le journal d'Hermès note l'heure locale sans fuseau, le conteneur est en UTC              | `Europe/Paris` (défaut)                                         |
+| Variable            | Rôle                                                                                                               | Forme                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `PUBLIC_ORIGINS`    | adresses de la PWA : ce PC, puis l'adresse tailnet (Réglages, « Installer l'app », retours de GitHub, hôtes admis) | `http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446` |
+| `TAILSCALE_LOGINS`  | logins Tailscale autorisés à écrire depuis les autres appareils                                                    | `<login>@github`                                                |
+| `DASHBOARD_URL`     | dashboard d'Hermès, lien des interventions ; vide : pas de lien                                                    | `https://<machine>.<tailnet>.ts.net:<port>`                     |
+| `ALLOWED_HOSTS`     | hôtes acceptés en plus (`nom:port`), par exemple si le port publié change                                          | vide                                                            |
+| `HERMES_TZ`         | fuseau de ce PC (IANA) : le journal d'Hermès note l'heure locale sans fuseau, le conteneur est en UTC              | `Europe/Paris` (défaut)                                         |
+| `LIVE_SOURCE`       | source de la lecture (ADR 0015) : `workflow-core`, le socle, par défaut (#68) ; `hermes`, le retour arrière        | vide (défaut `workflow-core`)                                   |
+| `WORKFLOW_CORE_URL` | adresse du socle vue du conteneur                                                                                  | `http://host.docker.internal:8447` (défaut)                     |
 
 Après un changement : `docker compose -f docker/compose.yaml up -d`. Le fichier ne s'affiche pas en entier (`grep -c` ou `cut -d= -f1` pour vérifier ses clés). `npm run check:text` refuse tout nom tailnet ou login Tailscale réel dans le dépôt : doc, tests et démo n'emploient que le gabarit ci-dessus, l'exemple fictif `machine.tailnet.ts.net` et `alice@github`.
 
@@ -47,7 +49,7 @@ L'en-tête dit l'état du lien : « En direct », « Connexion… », « Hors li
 
 ## Tests de bout en bout
 
-`npm run e2e` lance Playwright sous Chromium : la démo (bureau et iPhone), et l'app « live » branchée sur un faux serveur d'API (`e2e/fake-api.mjs`) que les tests coupent et rétablissent. WebKit (Safari, iPhone) et les captures de référence tournent dans l'image officielle de Playwright, comme en CI (il manque à WSL des bibliothèques pour WebKit) :
+`npm run e2e` lance Playwright sous Chromium : la démo (bureau et iPhone), et l'app « live », servie par le vrai serveur de factory-live côté socle (`LIVE_SOURCE=workflow-core`, lancé par `e2e/live-server.mjs` avec une base et des secrets temporaires) et branchée sur un faux workflow-core (`e2e/fake-api.mjs`, scénario dans `e2e/fake-core-scenario.mjs`). Le faux socle vérifie chacune de ses réponses avec les JSON Schema copiés du socle, répond aussi aux appels à GitHub, et se pilote par ses routes `/__control/…` : couper et rétablir le socle, annoncer un changement de carte, ouvrir une nouvelle époque par un `reset`, lire les commentaires postés. Les quatre projets `live-*` partagent ce montage et passent l'un après l'autre. WebKit (Safari, iPhone) et les captures de référence tournent dans l'image officielle de Playwright, comme en CI (il manque à WSL des bibliothèques pour WebKit) :
 
 ```sh
 docker run --rm --ipc=host --user "$(id -u):$(id -g)" -e HOME=/tmp -e E2E_WEBKIT=1 \
@@ -151,6 +153,20 @@ Le studio de video-factory est suivi par son API (ADR 0014), servie sur ce PC pa
 
 Le studio est « injoignable » dans la Santé : le service tourne-t-il (`systemctl --user status video-factory-studio`) ? La page Studio garde le dernier état reçu en attendant.
 
+## Source de la lecture : le socle ou Hermès
+
+Depuis #68, factory-live lit par défaut le socle (`workflow-core`, port 8447 de ce PC) : son API et son flux, derrière le secret `workflow-core-secret`. Il exige au démarrage `WORKFLOW_CORE_URL` et ce secret, et s'arrête en nommant ce qui manque. Les montages d'Hermès, du dépôt de la factory et des transcriptions restent dans `docker/compose.yaml` pour le retour arrière.
+
+- **Retour arrière** : `LIVE_SOURCE=hermes` dans `docker/.env`, puis `docker compose -f docker/compose.yaml up -d` : factory-live relit Hermès, entier, comme avant l'epic.
+- **Retour au socle** : retirer la ligne `LIVE_SOURCE` (ou la mettre à `workflow-core`), puis `docker compose -f docker/compose.yaml up -d`.
+- **Contrôle** : `curl -s http://127.0.0.1:8446/healthz` répond `"ok": true` ; côté socle, il passe en échec après 60 secondes sans le socle (#62), et la page Santé montre la tuile « Socle ».
+
+Ordre de la mise en production de cette release (une fois) :
+
+1. **Avant** que `release/0.12.0` arrive dans `main` (le déploiement redémarre alors le conteneur sur le nouveau défaut) : poser `LIVE_SOURCE=hermes` dans `docker/.env`. La production reste sur Hermès.
+2. La release dans `main`, le conteneur redémarré : faire l'essai de la tâche code-my-life/factory-live#58 (le socle joignable depuis le conteneur, l'interrupteur essayé puis rebasculé sur Hermès).
+3. La bascule, tâche code-my-life/factory-live#69 : retirer la ligne `LIVE_SOURCE=hermes` de `docker/.env`, relancer, observer une journée, essayer le retour arrière.
+
 ## Secrets
 
 - `~/.config/factory-live/hook-secret` : secret HMAC partagé avec Hermès (`FACTORY_LIVE_HOOK_SECRET` de `~/.hermes/.env`), créé une fois par `install.sh` de la factory (étape 5b), jamais affiché. Absent : l'ingestion répond 503.
@@ -161,6 +177,7 @@ Le studio est « injoignable » dans la Santé : le service tourne-t-il (`system
      État : `curl -s localhost:8446/api/github/status`. Déconnexion : Réglages, ou `POST /api/github/logout`. Révocation complète : supprimer l'App dans les réglages de l'organisation sur GitHub.
 - `~/.config/factory-live/github-token` : facultatif, jeton fine-grained de `cddev` servant de repli tant que l'App n'est pas en place (propriétaire `code-my-life` ; Metadata, Issues lecture et écriture, Pull requests, Actions, Contents et Webhooks en lecture), `chmod 600`. Après l'avoir déposé : `docker restart factory-live`.
 - Clés VAPID (push) : générées au premier démarrage dans la base du volume.
+- `~/.config/factory-live/workflow-core-secret` : le secret partagé du socle (`WORKFLOW_CORE_SECRET` de `~/.config/workflow-core/.env`), copié sans retour à la ligne, mode 600, jamais affiché (tâche code-my-life/factory-live#58). Absent avec la source `workflow-core` : le démarrage s'arrête en le nommant.
 
 ## Pannes
 

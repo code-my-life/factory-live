@@ -14,6 +14,7 @@ import type {
   UnblockState,
   UsageDelta,
   UsageRow,
+  HistoryItem,
 } from '../../application/ports.ts';
 
 export type { StationRecord, UnblockRecord, UnblockState, UsageDelta, UsageRow };
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS unblocks (
   state TEXT NOT NULL, comment_id INTEGER, comment_url TEXT, at INTEGER NOT NULL, updated_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS audit (seq INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL, detail TEXT);
+CREATE TABLE IF NOT EXISTS item_history (workflow TEXT NOT NULL, item TEXT NOT NULL, state TEXT NOT NULL, first_seen_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL, gone_at INTEGER, PRIMARY KEY (workflow, item));
 CREATE TABLE IF NOT EXISTS issue_stations (issue_key TEXT PRIMARY KEY, station TEXT NOT NULL, previous TEXT, changed_at INTEGER NOT NULL);
 `;
 
@@ -245,6 +247,35 @@ export class HistoryStore implements HistoryPort, GitHubAuthStore {
       );
   }
 
+  setUsage(rows: readonly UsageRow[]): void {
+    const statement = this.db.prepare(
+      `INSERT INTO usage_daily (day, model, provider, profile, calls, input, output, rate_limited, errors)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(day, model, provider, profile) DO UPDATE SET
+         calls = excluded.calls, input = excluded.input, output = excluded.output,
+         rate_limited = excluded.rate_limited, errors = excluded.errors`,
+    );
+    this.db.exec('BEGIN');
+    try {
+      for (const row of rows)
+        statement.run(
+          row.day,
+          row.model,
+          row.provider,
+          row.profile,
+          row.calls,
+          row.input,
+          row.output,
+          row.rateLimited,
+          row.errors,
+        );
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
   usageSince(day: string): UsageRow[] {
     return this.db
       .prepare('SELECT * FROM usage_daily WHERE day >= ? ORDER BY day')
@@ -418,6 +449,69 @@ export class HistoryStore implements HistoryPort, GitHubAuthStore {
 
   clearGitHubUser(): void {
     this.db.prepare("DELETE FROM meta WHERE key = 'github:user'").run();
+  }
+
+  recordItems(
+    workflow: string,
+    items: readonly { id: string; state: unknown }[],
+    at: number,
+    complete: boolean,
+  ): void {
+    this.transaction(() => {
+      const upsert = this.db.prepare(
+        `INSERT INTO item_history (workflow, item, state, first_seen_at, last_seen_at, gone_at)
+         VALUES (?, ?, ?, ?, ?, NULL)
+         ON CONFLICT(workflow, item) DO UPDATE SET
+           state = excluded.state, last_seen_at = excluded.last_seen_at, gone_at = NULL`,
+      );
+      for (const item of items) upsert.run(workflow, item.id, JSON.stringify(item.state), at, at);
+      if (!complete) return;
+      const seen = new Set(items.map((item) => item.id));
+      const gone = this.db.prepare(
+        'UPDATE item_history SET gone_at = ? WHERE workflow = ? AND item = ? AND gone_at IS NULL',
+      );
+      for (const row of this.db
+        .prepare('SELECT item FROM item_history WHERE workflow = ? AND gone_at IS NULL')
+        .all(workflow)) {
+        const id = String(row['item']);
+        if (!seen.has(id)) gone.run(at, workflow, id);
+      }
+    });
+  }
+
+  historyItems(workflow: string): HistoryItem[] {
+    return this.db
+      .prepare(
+        'SELECT item, state, first_seen_at, last_seen_at, gone_at FROM item_history WHERE workflow = ? ORDER BY first_seen_at, item',
+      )
+      .all(workflow)
+      .map((row) => ({
+        id: String(row['item']),
+        state: parse<unknown>(row['state']),
+        firstSeenAt: Number(row['first_seen_at']),
+        lastSeenAt: Number(row['last_seen_at']),
+        goneAt: row['gone_at'] === null ? null : Number(row['gone_at']),
+      }));
+  }
+
+  seedHistory(
+    workflow: string,
+    items: readonly { id: string; state: unknown }[],
+    at: number,
+  ): boolean {
+    const key = `history:seeded:${workflow}`;
+    if (this.meta(key) !== null) return false;
+    this.transaction(() => {
+      const insert = this.db.prepare(
+        `INSERT OR IGNORE INTO item_history (workflow, item, state, first_seen_at, last_seen_at, gone_at)
+         VALUES (?, ?, ?, ?, ?, NULL)`,
+      );
+      for (const item of items) insert.run(workflow, item.id, JSON.stringify(item.state), at, at);
+      this.db
+        .prepare('INSERT INTO meta (key, value) VALUES (?, ?)')
+        .run(key, new Date(at).toISOString());
+    });
+    return true;
   }
 
   close(): void {

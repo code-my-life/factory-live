@@ -1,6 +1,6 @@
 # ADR 0007 : serveur, réception des webhooks et données lues
 
-Date : 2026-10-28. Statut : accepté.
+Date : 2026-10-28. Statut : accepté, amendée par l'ADR 0019.
 
 ## Contexte
 

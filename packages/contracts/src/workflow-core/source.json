@@ -1,0 +1,20 @@
+{
+  "repository": "code-my-life/workflow-core",
+  "commit": "791e03601cddb7202c1aab55b4838f0ea582c37f",
+  "schemas": [
+    "workflows",
+    "sheet-response",
+    "items",
+    "machine",
+    "event",
+    "error",
+    "live",
+    "activity",
+    "usage",
+    "interventions",
+    "diagnosis",
+    "run-verdicts",
+    "declared-data",
+    "agents"
+  ]
+}

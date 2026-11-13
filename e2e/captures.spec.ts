@@ -15,6 +15,9 @@ const VIEWS = [
   ['reglages', '/settings'],
   // The studio, open on the real video's master to review: the player and the aligned words in view.
   ['studio', '/studio/vitrine-factory-live'],
+  // The screen of a generic workflow (#65), and the detail of its blocked item.
+  ['workflow', '/workflows/essai'],
+  ['workflow-detail', '/workflows/essai/e_0002'],
 ] as const;
 
 for (const [name, route] of VIEWS) {

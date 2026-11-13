@@ -505,6 +505,18 @@ const server: ServerMessages = {
   'health.codeSheet': () => 'Fiche de la ligne du code',
   'health.codeSheet.published': () => 'Publiée par la factory (config/workflow.json)',
   'health.codeSheet.embedded': ({ reason }) => `Copie embarquée : ${reason}`,
+  'health.core': () => 'Socle (workflow-core)',
+  'health.core.ok': () => 'Répond',
+  'health.core.unreachable': ({ seconds }) =>
+    `Socle injoignable depuis ${secs(seconds)}, dernier état gardé`,
+  'health.core.unreachableTitle': () => 'Socle injoignable',
+  'health.core.observer': ({ problem }) => `En mode observateur${problem ? ` : ${problem}` : ''}`,
+  'health.core.contract.ok': () => 'Tenu',
+  'health.core.contract.broken': ({ problem }) => `Rompu${problem ? ` : ${problem}` : ''}`,
+  'health.metric.coreVersion': () => 'Version d’Hermès',
+  'health.metric.contract': () => 'Contrat',
+  'health.metric.mode': () => 'Mode',
+  'health.metric.boardRead': ({ board }) => `Lecture du tableau ${board}`,
 };
 
 export const fr = {
@@ -644,6 +656,52 @@ export const fr = {
   workflow: {
     /** Over the reason a workflow's sheet is refused, given as is. */
     invalid: 'La fiche de ce workflow est refusée : le graphe ne peut pas se dessiner',
+  },
+
+  /** The screen of a workflow the core declares besides the code line and the studio (#65). */
+  workflows: {
+    nav: 'Workflows',
+    summary: (items: number, waiting: number) =>
+      `${items} ${f.plural(items, 'élément', 'éléments')}${
+        waiting > 0 ? ` · ${waiting} ${f.plural(waiting, 't’attend', 't’attendent')}` : ''
+      }`,
+    loading: 'Lecture du workflow…',
+    empty: 'Aucun élément dans ce workflow pour l’instant.',
+    selectHint: 'Touche un élément dans le graphe pour ouvrir son détail ici.',
+    unknownTitle: 'Workflow inconnu',
+    unknown: 'Le socle ne déclare pas ce workflow.',
+    unknownItem: 'Cet élément n’est pas dans ce workflow.',
+    unreachableTitle: 'Le socle ne répond pas',
+    unreachable: (stay: string) =>
+      `Socle injoignable depuis ${stay} : la dernière fiche et les derniers éléments reçus restent affichés.`,
+    items: 'Éléments',
+    unplaced: 'Éléments sans station connue',
+    noStation: 'station inconnue',
+    reading: 'Lecture…',
+    marks: {
+      label: 'Repères',
+      station: 'Station',
+      since: (stay: string) => `depuis ${stay}`,
+      state: 'État',
+      item: 'Élément',
+    },
+    cards: (count: number) => `${count} ${f.plural(count, 'carte', 'cartes')}`,
+    noCard: 'Aucune carte pour cet élément.',
+    transcriptOf: (run: number) => `Transcription du run #${run}`,
+    data: 'Données déclarées',
+    noData: 'Le workflow ne déclare aucune donnée pour cet élément.',
+    noValue: 'Aucune valeur pour l’instant.',
+    activity: 'Activité',
+    activityOf: (title: string) => `Activité de ${title}`,
+    yes: 'oui',
+    no: 'non',
+    status: {
+      ok: 'OK',
+      running: 'en cours',
+      warning: 'à voir',
+      error: 'en erreur',
+      unknown: 'inconnu',
+    },
   },
 
   /** The video studio's page (`/studio`), its detail and the owner's gesture. */
@@ -1651,6 +1709,9 @@ export const fr = {
       host_refused: 'Adresse inconnue de factory-live : ouvre l’app par son adresse habituelle',
       workflow_refused: 'Le workflow a refusé ce geste',
       workflow_unreachable: 'Le workflow ne répond pas',
+      unknown_workflow: 'Workflow inconnu de factory-live',
+      gesture_not_declared: 'Ce workflow ne déclare pas ce geste',
+      no_issue: 'Cet élément n’a pas d’issue où poster le geste',
     } satisfies Record<ApiErrorCode, string>,
   },
 

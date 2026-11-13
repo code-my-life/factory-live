@@ -429,6 +429,18 @@ const server: ServerMessages = {
   'health.codeSheet': () => 'Sheet of the code line',
   'health.codeSheet.published': () => 'Published by the factory (config/workflow.json)',
   'health.codeSheet.embedded': ({ reason }) => `Embedded copy: ${reason}`,
+  'health.core': () => 'Core (workflow-core)',
+  'health.core.ok': () => 'Answering',
+  'health.core.unreachable': ({ seconds }) =>
+    `Core unreachable for ${secs(seconds)}, last state kept`,
+  'health.core.unreachableTitle': () => 'Core unreachable',
+  'health.core.observer': ({ problem }) => `In observer mode${problem ? `: ${problem}` : ''}`,
+  'health.core.contract.ok': () => 'Holds',
+  'health.core.contract.broken': ({ problem }) => `Broken${problem ? `: ${problem}` : ''}`,
+  'health.metric.coreVersion': () => 'Hermes version',
+  'health.metric.contract': () => 'Contract',
+  'health.metric.mode': () => 'Mode',
+  'health.metric.boardRead': ({ board }) => `Read of board ${board}`,
 };
 
 export const en: Messages = {
@@ -592,6 +604,50 @@ export const en: Messages = {
 
   workflow: {
     invalid: 'This workflow’s sheet is refused: the graph cannot be drawn',
+  },
+
+  /** The screen of a workflow the core declares besides the code line and the studio (#65). */
+  workflows: {
+    nav: 'Workflows',
+    summary: (items: number, waiting: number) =>
+      `${items} ${f.plural(items, 'item', 'items')}${waiting > 0 ? ` · ${waiting} waiting for you` : ''}`,
+    loading: 'Reading the workflow…',
+    empty: 'No item in this workflow yet.',
+    selectHint: 'Tap an item in the graph to open its detail here.',
+    unknownTitle: 'Unknown workflow',
+    unknown: 'The core declares no such workflow.',
+    unknownItem: 'This item is not in this workflow.',
+    unreachableTitle: 'The core does not answer',
+    unreachable: (stay: string) =>
+      `Core unreachable for ${stay}: the last sheet and items received stay shown.`,
+    items: 'Items',
+    unplaced: 'Items at no known station',
+    noStation: 'unknown station',
+    reading: 'Reading…',
+    marks: {
+      label: 'Landmarks',
+      station: 'Station',
+      since: (stay: string) => `for ${stay}`,
+      state: 'State',
+      item: 'Item',
+    },
+    cards: (count: number) => `${count} ${f.plural(count, 'card', 'cards')}`,
+    noCard: 'No card for this item.',
+    transcriptOf: (run: number) => `Transcript of run #${run}`,
+    data: 'Declared data',
+    noData: 'The workflow declares no data for this item.',
+    noValue: 'No value yet.',
+    activity: 'Activity',
+    activityOf: (title: string) => `Activity of ${title}`,
+    yes: 'yes',
+    no: 'no',
+    status: {
+      ok: 'OK',
+      running: 'running',
+      warning: 'to see',
+      error: 'failed',
+      unknown: 'unknown',
+    },
   },
 
   studio: {
@@ -1530,6 +1586,9 @@ export const en: Messages = {
       host_refused: 'Unknown address for factory-live: open the app at its usual address',
       workflow_refused: 'The workflow refused this gesture',
       workflow_unreachable: 'The workflow isn’t answering',
+      unknown_workflow: 'Workflow unknown to factory-live',
+      gesture_not_declared: 'This workflow doesn’t declare this gesture',
+      no_issue: 'This item has no issue to post the gesture on',
     },
   },
 

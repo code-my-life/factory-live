@@ -25,9 +25,12 @@ import type { DiagnosisService } from './diagnosis.ts';
 import { buildHealth } from './health.ts';
 import type { HealthSignals } from './health.ts';
 import {
+  coreActivityEvent,
+  coreIntervention,
   foundInterventions,
   issueOfCards,
   projectAgents,
+  projectCoreAgents,
   projectInterventions,
   projectIssues,
   projectSideCards,
@@ -36,6 +39,11 @@ import {
 } from './projection.ts';
 import type { ProjectionInput, ResolvedIntervention } from './projection.ts';
 import type {
+  CoreActivityFact,
+  CoreInterventionState,
+  CoreAgentState,
+  CoreCheckState,
+  CoreMachineState,
   GitHubReadPort,
   HistoryPort,
   KanbanDelta,
@@ -71,6 +79,12 @@ export interface HubDeps {
   workflows?: () => readonly WorkflowView[];
   /** Where the code line's sheet comes from (#31). */
   codeSheet?: () => PublishedSheet;
+  /**
+   * Where the factory is read (#57, ADR 0015); `hermes` by default. On workflow-core's side, the board
+   * starts empty (the kanban mirror holds Hermes' cards, not the core's), the agents and the activity come
+   * from the core (#66), and Hermes' webhooks no longer change anything.
+   */
+  source?: 'hermes' | 'workflow-core';
 }
 
 type Slice = 'board' | 'agents' | 'health';
@@ -121,6 +135,17 @@ export class Hub {
   private readonly lastSent = new Map<Slice, string>();
   private readonly dirty = new Set<Slice>(['board', 'agents', 'health']);
   private interventions: Intervention[] = [];
+  /** On workflow-core's side (#66): the agents it announces. */
+  private coreAgents: CoreAgentState[] = [];
+  /** On workflow-core's side (#62): since when it does not answer, why, and the machine it last published. */
+  private coreUnreachableSince: number | null = null;
+  private coreError: string | null = null;
+  private coreMachine: CoreMachineState | null = null;
+  private coreChecks: CoreCheckState[] = [];
+  /** On workflow-core's side (#59): its open interventions, their diagnoses, the verdicts of the runs. */
+  private coreInterventions = new Map<string, CoreInterventionState>();
+  private coreDiagnoses = new Map<string, Diagnosis>();
+  private readonly coreVerdicts = new Map<string, ReadonlyMap<number, RunVerdict>>();
   /** Les interventions du kanban au dernier passage, et celles fermées depuis moins de 30 min. */
   private found: FoundIntervention[] = [];
   private readonly resolved = new Map<
@@ -143,14 +168,17 @@ export class Hub {
   constructor(options: HubOptions, deps: HubDeps) {
     this.options = options;
     this.deps = deps;
-    this.board = deps.store.board();
+    this.board =
+      deps.source === 'workflow-core'
+        ? { tasks: [], runs: [], links: [], events: [], comments: [] }
+        : deps.store.board();
     this.issueOfCard = issueOfCards(this.board);
     this.stations = deps.store.stations();
     this.activity = deps.store.recentActivity(ACTIVITY_KEPT);
     this.root = deps.profiles.root();
     this.factoryProfiles = this.loadProfiles();
     // Le miroir du kanban suffit pour montrer les interventions avant la première lecture.
-    this.found = foundInterventions(this.projectionInput());
+    this.found = this.foundNow();
   }
 
   private loadProfiles(): string[] {
@@ -166,6 +194,7 @@ export class Hub {
   reloadConfig(): void {
     this.root = this.deps.profiles.root();
     this.factoryProfiles = this.loadProfiles();
+    this.refreshGuards();
     this.dirty.add('agents').add('board').add('health');
   }
 
@@ -225,13 +254,36 @@ export class Hub {
   }
 
   /**
+   * The whole board, read from workflow-core (#57): it replaces the one held, so a card gone from the
+   * core is gone here too. Nothing is written in the kanban mirror (ADR 0019): the core holds the state.
+   */
+  replaceBoard(board: KanbanDelta, readAt: number): void {
+    const seenEvents = new Set(this.board.events.map((event) => event.id));
+    this.board = {
+      tasks: [...board.tasks],
+      runs: [...board.runs].sort((left, right) => left.id - right.id),
+      links: [...board.links],
+      events: [...board.events],
+      comments: [...board.comments],
+    };
+    this.issueOfCard = issueOfCards(this.board);
+    this.kanbanStatus = { state: 'read', cards: this.board.tasks.length, error: null, readAt };
+    this.trackUnblocks(
+      { ...board, events: board.events.filter((event) => !seenEvents.has(event.id)) },
+      readAt,
+    );
+    this.trackInterventions();
+    this.dirty.add('board').add('agents').add('health');
+  }
+
+  /**
    * Suit les interventions d'un passage à l'autre : celle dont la carte est repartie (un run lancé
    * après elle, ou un statut de reprise) passe dans les « récemment débloquées » pendant 30 min.
    * Puis recalcule les diagnostics dont les faits ont changé.
    */
   private trackInterventions(): void {
     const now = this.deps.now();
-    const found = foundInterventions(this.projectionInput());
+    const found = this.foundNow();
     const ids = new Set(found.map((item) => item.id));
     const tasks = new Map(this.board.tasks.map((task) => [task.id, task]));
     for (const previous of this.found) {
@@ -280,8 +332,8 @@ export class Hub {
     const next = this.found.find(
       (item) => item.cardId === intervention.cardId && DIAGNOSED.has(item.kind),
     );
-    const before = this.deps.diagnoses?.primaryOf(intervention.id) ?? null;
-    const after = next ? (this.deps.diagnoses?.primaryOf(next.id) ?? null) : null;
+    const before = this.primaryOf(intervention.id);
+    const after = next ? this.primaryOf(next.id) : null;
     return {
       runId: run.id,
       outcome: run.outcome,
@@ -304,6 +356,14 @@ export class Hub {
 
   /** Les gardes dont le code peut attendre au moins le délai de leur hook, agent par agent. */
   private refreshGuards(): void {
+    // A source that computes the guards itself (workflow-core, #96): its list as it is, without the rule.
+    const published = this.deps.profiles.guardRisks?.();
+    if (published !== undefined) {
+      if (JSON.stringify(published?.risks) !== JSON.stringify(this.guards?.risks))
+        this.dirty.add('health');
+      this.guards = published;
+      return;
+    }
     const stamp = () =>
       this.factoryProfiles.map((profile) => this.deps.profiles.factsStamp(profile)).join('#');
     if (this.guardsStamp !== null && stamp() === this.guardsStamp) return;
@@ -323,11 +383,92 @@ export class Hub {
   }
 
   diagnosisOf(interventionId: string): Diagnosis | null {
+    if (this.deps.source === 'workflow-core') return this.coreDiagnoses.get(interventionId) ?? null;
     return this.deps.diagnoses?.of(interventionId) ?? null;
+  }
+
+  /**
+   * The interventions of the moment. On workflow-core's side (#59), those the core publishes, with
+   * factory-live's links, and the two kinds factory-live still computes from the cards the core serves:
+   * a pull request to approve and a red main.
+   */
+  private foundNow(): FoundIntervention[] {
+    const input = this.projectionInput();
+    if (this.deps.source !== 'workflow-core') return foundInterventions(input);
+    const own = foundInterventions(input).filter(
+      (item) => item.kind === 'pr_approval' || item.kind === 'main_red',
+    );
+    const fromCore = [...this.coreInterventions.values()].map((item) =>
+      coreIntervention(item, this.issueOfCard.get(item.cardId) ?? null, {
+        owner: this.options.owner,
+        dashboardUrl: this.options.dashboardUrl,
+      }),
+    );
+    return [...fromCore, ...own].sort((left, right) => left.openedAt - right.openedAt);
+  }
+
+  /** Every open intervention of the core, from a full read (#59): they replace those held. */
+  replaceCoreInterventions(items: readonly CoreInterventionState[]): void {
+    this.coreInterventions = new Map(items.map((item) => [item.id, item]));
+    this.trackInterventions();
+    this.dirty.add('board');
+  }
+
+  /** An intervention the core announces as opened (#59). */
+  openCoreIntervention(item: CoreInterventionState): void {
+    this.coreInterventions.set(item.id, item);
+    this.trackInterventions();
+    this.dirty.add('board');
+  }
+
+  /** An intervention the core announces as closed (#59): it stays 30 min if its card started again. */
+  closeCoreIntervention(id: string): void {
+    if (!this.coreInterventions.delete(id)) return;
+    this.trackInterventions();
+    this.dirty.add('board');
+  }
+
+  /**
+   * The core's diagnoses, by intervention; `null` for one whose form the core's schema refused (#59). The
+   * core lists the open interventions only: the diagnosis of one resolved in the last 30 minutes is kept,
+   * so its follow-up can still say whether the card blocked again for the same cause.
+   */
+  applyCoreDiagnoses(entries: readonly (readonly [string, Diagnosis | null])[]): void {
+    const next = new Map(
+      entries.flatMap(([id, diagnosis]) => (diagnosis ? [[id, diagnosis] as const] : [])),
+    );
+    for (const id of this.resolved.keys()) {
+      const kept = this.coreDiagnoses.get(id);
+      if (kept && !next.has(id)) next.set(id, kept);
+    }
+    this.coreDiagnoses = next;
+    this.dirty.add('board');
+  }
+
+  /**
+   * The verdicts of a card's failed runs, as the core computes them (#59). New verdicts send the board
+   * again even when it did not change: the app reads an issue's details again on a board event.
+   */
+  applyCoreVerdicts(cardId: string, verdicts: readonly RunVerdict[]): void {
+    const next = new Map(verdicts.map((verdict) => [verdict.runId, verdict]));
+    const held = this.coreVerdicts.get(cardId);
+    const same = held !== undefined && JSON.stringify([...held]) === JSON.stringify([...next]);
+    this.coreVerdicts.set(cardId, next);
+    if (same) return;
+    this.lastSent.delete('board');
+    this.dirty.add('board');
+  }
+
+  /** The cause a diagnosis names first, from the core on its side, else from the diagnosis service. */
+  private primaryOf(interventionId: string): string | null {
+    if (this.deps.source === 'workflow-core')
+      return this.coreDiagnoses.get(interventionId)?.primary.code ?? null;
+    return this.deps.diagnoses?.primaryOf(interventionId) ?? null;
   }
 
   /** Le verdict des runs en échec d'une carte (page d'une issue), calculé à la demande et gardé. */
   verdictsOf(task: Task): ReadonlyMap<number, RunVerdict> {
+    if (this.deps.source === 'workflow-core') return this.coreVerdicts.get(task.id) ?? new Map();
     return this.deps.diagnoses?.verdictsOf(this.board, task, this.deps.now()) ?? new Map();
   }
 
@@ -342,7 +483,68 @@ export class Hub {
     this.dirty.add('health');
   }
 
+  /** workflow-core answered (#62): a read or an event of its stream. */
+  coreAnswered(): void {
+    if (this.coreUnreachableSince === null) return;
+    this.coreUnreachableSince = null;
+    this.coreError = null;
+    this.dirty.add('health').add('board');
+  }
+
+  /** A read or a reconnection to workflow-core failed (#62): the last state stays. */
+  coreFailed(error: string, at: number): void {
+    const first = this.coreUnreachableSince === null;
+    this.coreUnreachableSince ??= at;
+    this.coreError = error;
+    this.dirty.add('health');
+    if (first) this.dirty.add('board');
+  }
+
+  /** The state of the machine workflow-core publishes (#62), read in full. */
+  applyCoreMachine(machine: CoreMachineState): void {
+    this.coreMachine = machine;
+    this.coreChecks = [...machine.checks];
+    this.dirty.add('health');
+  }
+
+  /**
+   * The machine's checks, from an event of the core's stream (#62): they replace those held, even before
+   * the machine's first read has succeeded.
+   */
+  applyCoreChecks(checks: readonly CoreCheckState[]): void {
+    this.coreChecks = [...checks];
+    this.dirty.add('health');
+  }
+
+  /** The agents workflow-core announces, all of them: they replace those held (#66). */
+  replaceCoreAgents(agents: readonly CoreAgentState[]): void {
+    this.coreAgents = [...agents];
+    this.dirty.add('agents');
+  }
+
+  /**
+   * Facts of workflow-core's activity (#66): those not yet in the feed join it, in their order. The feed
+   * itself (200 lines, restored from the base at start) says which are already there: the core serves its
+   * last 200 facts at most, so nothing it sends again falls out of it, and nothing grows without bound.
+   */
+  addCoreActivity(facts: readonly CoreActivityFact[]): void {
+    const known = new Set(this.activity.map((line) => line.id));
+    const lines: ActivityEvent[] = [];
+    for (const fact of facts) {
+      const line = coreActivityEvent(fact, this.issueOfCard);
+      if (known.has(line.id)) continue;
+      known.add(line.id);
+      lines.push(line);
+    }
+    if (lines.length === 0) return;
+    this.activity = [...this.activity, ...lines].slice(-ACTIVITY_KEPT);
+    this.pendingActivity.push(...lines);
+    this.deps.store.appendActivity(lines);
+  }
+
   applyHook(event: HookEvent): void {
+    // On workflow-core's side, the live state comes from the core: a webhook still received changes nothing.
+    if (this.deps.source === 'workflow-core') return;
     const now = this.deps.now();
     this.lastHookAt = now;
     this.hookTimes.push(now);
@@ -551,12 +753,24 @@ export class Hub {
       maxInProgressPerProfile: this.root.maxInProgressPerProfile,
       ...(this.deps.workflows ? { workflows: this.deps.workflows() } : {}),
       ...(this.deps.codeSheet ? { codeSheet: this.deps.codeSheet() } : {}),
+      ...(this.deps.source === 'workflow-core'
+        ? {
+            core: {
+              unreachableSince: this.coreUnreachableSince,
+              error: this.coreError,
+              machine: this.coreMachine,
+              checks: this.coreChecks,
+            },
+          }
+        : {}),
     });
   }
 
   private boardSlice() {
     const input = this.projectionInput();
     const interventions = projectInterventions(input, this.found);
+    if (this.deps.source === 'workflow-core' && this.coreUnreachableSince !== null)
+      interventions.unshift(this.coreDown(this.coreUnreachableSince));
     const issues = projectIssues(input, interventions);
     const now = this.deps.now();
     for (const issue of issues) {
@@ -581,6 +795,28 @@ export class Hub {
     };
   }
 
+  /** workflow-core does not answer (#62): the intervention of a service down, with the tile's text. */
+  private coreDown(since: number): Intervention {
+    const seconds = Math.max(0, Math.round((this.deps.now() - since) / 1000));
+    return {
+      id: 'service_down:workflow-core',
+      kind: 'service_down',
+      severity: 'critical',
+      title: msg('health.core.unreachableTitle'),
+      issueKey: null,
+      cardId: null,
+      profile: null,
+      question: msg('health.core.unreachable', { seconds }),
+      openedAt: new Date(since).toISOString(),
+      push: false,
+      actions: [],
+      unblock: null,
+      diagnosis: null,
+      resolvedAt: null,
+      followUp: null,
+    };
+  }
+
   private noticeInterventions(interventions: Intervention[]): void {
     // Une intervention débloquée n'est plus ouverte : ni notifiée, ni comptée.
     const open = interventions.filter((item) => !item.resolvedAt);
@@ -601,6 +837,8 @@ export class Hub {
   }
 
   private agentsSlice() {
+    if (this.deps.source === 'workflow-core')
+      return projectCoreAgents(this.coreAgents, this.board.runs, this.issueOfCard);
     const now = this.deps.now();
     const running = new Set(
       this.board.tasks.filter((task) => task.status === 'running').map((task) => task.id),

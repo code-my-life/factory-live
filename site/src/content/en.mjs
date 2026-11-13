@@ -361,22 +361,19 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
   },
   security: {
     title: 'Read-only by design',
-    text: 'factory-live watches the factory and never drives it. Its one write is the comment you ask for.',
+    text: 'factory-live writes only what you ask for, in your name: a gesture such as <code>/factory unblock</code>, or an issue it opens for you.',
     groups: [
       {
         title: 'Reads',
         rows: [
-          ['<code>kanban.db</code>, agent sessions, card logs', 'read-only'],
-          ['Claude Code transcripts', 'read-only mount'],
+          ['workflow-core API', 'shared secret'],
+          ['GitHub', 'GitHub App token'],
           ['OpenCode database and its tokens', 'never opened'],
         ],
       },
       {
         title: 'Receives',
-        rows: [
-          ['Hermes webhooks', 'HMAC-SHA256, replay window'],
-          ['Health probe', 'HMAC-SHA256'],
-        ],
+        rows: [['workflow-core change stream', 'shared secret, cursor']],
       },
       {
         title: 'Writes',

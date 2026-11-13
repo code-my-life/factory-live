@@ -6,6 +6,7 @@ import { RouterProvider } from 'react-router/dom';
 import { FactoryProvider } from '../data/FactoryProvider.tsx';
 import { createDataSource } from '../data/createDataSource.ts';
 import { StudioProvider } from '../features/studio/StudioProvider.tsx';
+import { WorkflowsProvider } from '../features/workflows/WorkflowsProvider.tsx';
 import { I18nProvider } from '../i18n/I18nProvider.tsx';
 import { MotionProvider } from '../ui/motion.tsx';
 import { ColorModeProvider, primerColorMode, useColorMode } from './colorMode.tsx';
@@ -35,7 +36,9 @@ export function App() {
           <MotionProvider>
             <FactoryProvider source={source}>
               <StudioProvider>
-                <RouterProvider router={router} />
+                <WorkflowsProvider>
+                  <RouterProvider router={router} />
+                </WorkflowsProvider>
               </StudioProvider>
             </FactoryProvider>
           </MotionProvider>

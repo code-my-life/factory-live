@@ -2,6 +2,7 @@ import {
   AcceptanceLayoutPreference,
   ApiError,
   GitHubAccess,
+  HermesHookBody,
   IssueDetail,
   PushPayload,
   Snapshot,
@@ -14,6 +15,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { HOOK_TIMEOUT_MESSAGE } from '@factory-live/domain';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackUnblockReactions } from '../application/unblock.ts';
+import type { GesturesPort } from '../application/ports.ts';
+import { toHookEvent } from '../ingest/hermes.ts';
 import { sign } from '../ingest/signature.ts';
 import { NOW, NOW_S, ORIGINS, SECRET, harness } from '../test/harness.ts';
 import type { Harness } from '../test/harness.ts';
@@ -23,6 +26,11 @@ import { TwinBench } from '../adapters/twins/bench.ts';
 import { WorkflowApi } from '../adapters/workflows/api.ts';
 import { FakeWorkflow, MASTER, waitingVideo } from '../test/workflow-fixtures.ts';
 import { contentSecurityPolicy } from './app.ts';
+import { CoreHistory } from '../adapters/workflow-core/history.ts';
+import { WorkflowCoreReader } from '../adapters/workflow-core/reader.ts';
+import { createLogger } from '../logger.ts';
+import { fakeCore } from '../test/fake-core.ts';
+import { coreState } from '../test/core-scenario.ts';
 
 let h: Harness;
 
@@ -88,6 +96,10 @@ const TAILNET = {
   'x-factory-live': '1',
   'content-type': 'application/json',
 };
+
+async function snapshotOf(on: Harness) {
+  return Snapshot.parse(await (await on.app.request('/api/snapshot', { headers: THIS_PC })).json());
+}
 
 async function snapshot() {
   return Snapshot.parse(await (await h.app.request('/api/snapshot', { headers: THIS_PC })).json());
@@ -452,6 +464,127 @@ describe('déblocage depuis l’app', () => {
         }),
       ),
     ).toEqual([404, 'intervention_unknown']);
+  });
+});
+
+describe('gestes déclarés (#61)', () => {
+  const unblockOnly: GesturesPort = {
+    declared: (workflow) =>
+      workflow === 'factory' ? [{ name: 'unblock', kind: 'comment', repo: null }] : null,
+  };
+  const posts = (on: Harness) => on.github.calls.filter((call) => call.method === 'POST');
+  const gesture = (on: Harness, body: unknown, headers: Record<string, string> = LOCAL) =>
+    on.app.request('/api/gestures', { method: 'POST', headers, body: JSON.stringify(body) });
+
+  it('côté socle, le déblocage passe par le geste déclaré et poste le même commentaire', async () => {
+    // The gestures the core declares for the factory: the unblocking only.
+    const core = harness({ gestures: unblockOnly });
+    try {
+      const id = (await snapshotOf(core)).interventions[0]?.id as string;
+      const unblocked = await core.app.request(
+        `/api/interventions/${encodeURIComponent(id)}/unblock`,
+        { method: 'POST', headers: LOCAL, body: JSON.stringify({ text: 'Prends PostgreSQL' }) },
+      );
+      expect(unblocked.status).toBe(200);
+      expect(posts(core)).toEqual([
+        {
+          method: 'POST',
+          url: 'https://api.github.com/repos/code-my-life/cv-site/issues/49/comments',
+          body: { body: '/factory unblock Prends PostgreSQL' },
+          auth: 'Bearer jeton',
+        },
+      ]);
+
+      // The same gesture through the generic route posts the same comment.
+      const sent = await gesture(core, {
+        workflow: 'factory',
+        gesture: 'unblock',
+        item: 't_1a9f0049',
+        note: 'Prends PostgreSQL',
+      });
+      expect(sent.status).toBe(202);
+      expect(await sent.json()).toMatchObject({ kind: 'comment', state: 'sent' });
+      expect(posts(core)[1]?.body).toEqual({ body: '/factory unblock Prends PostgreSQL' });
+      expect(
+        await refusal(
+          await gesture(core, {
+            workflow: 'factory',
+            gesture: 'relancer',
+            item: 't_1a9f0049',
+            note: '',
+          }),
+        ),
+      ).toEqual([409, 'gesture_not_declared']);
+    } finally {
+      core.close();
+    }
+
+    // A core that declares no gesture for the factory: no unblocking is posted.
+    const none = harness({
+      gestures: { declared: (workflow) => (workflow === 'factory' ? [] : null) },
+    });
+    try {
+      const id = (await snapshotOf(none)).interventions[0]?.id as string;
+      const refused = await none.app.request(
+        `/api/interventions/${encodeURIComponent(id)}/unblock`,
+        { method: 'POST', headers: LOCAL, body: JSON.stringify({ text: 'ok' }) },
+      );
+      expect(await refusal(refused)).toEqual([409, 'unblock_not_available']);
+      expect(posts(none)).toEqual([]);
+    } finally {
+      none.close();
+    }
+  });
+
+  it('un nom hérité ou un workflow retiré du socle n’est ni une erreur interne ni un refus de GitHub', async () => {
+    expect(
+      await refusal(
+        await gesture(h, {
+          workflow: 'toString',
+          gesture: 'unblock',
+          item: 't_1a9f0049',
+          note: '',
+        }),
+      ),
+    ).toEqual([404, 'unknown_workflow']);
+
+    // The core no longer declares the factory: the unblocking posts nothing, and blames no one on GitHub.
+    const gone = harness({ gestures: { declared: () => null } });
+    try {
+      const id = (await snapshotOf(gone)).interventions[0]?.id as string;
+      const refused = await gone.app.request(
+        `/api/interventions/${encodeURIComponent(id)}/unblock`,
+        { method: 'POST', headers: LOCAL, body: JSON.stringify({ text: 'ok' }) },
+      );
+      expect(await refusal(refused)).toEqual([409, 'unblock_not_available']);
+      expect(posts(gone)).toEqual([]);
+    } finally {
+      gone.close();
+    }
+  });
+
+  it('la route des gestes est gardée comme le déblocage', async () => {
+    const body = { workflow: 'factory', gesture: 'unblock', item: 't_1a9f0049', note: 'ok' };
+    expect(await refusal(await gesture(h, body, { ...LOCAL, 'x-factory-live': '' }))).toEqual([
+      403,
+      'csrf_missing',
+    ]);
+    expect(
+      await refusal(await gesture(h, body, { ...LOCAL, origin: 'https://evil.example' })),
+    ).toEqual([403, 'origin_refused']);
+    expect(await refusal(await gesture(h, body, TAILNET))).toEqual([403, 'write_local_only']);
+    expect(
+      await refusal(
+        await gesture(h, body, { ...TAILNET, 'tailscale-user-login': 'intrus@github' }),
+      ),
+    ).toEqual([403, 'write_login_refused']);
+    expect(posts(h)).toHaveLength(0);
+
+    // 30 writes a minute, as the unblocking.
+    const statuses: number[] = [];
+    for (let i = 0; i < 31; i++) statuses.push((await gesture(h, body)).status);
+    expect(statuses.slice(0, 30).every((status) => status === 202)).toBe(true);
+    expect(statuses[30]).toBe(429);
   });
 });
 
@@ -1614,5 +1747,253 @@ describe('workflows suivis par leur API (#31)', () => {
         (await h.app.request(`/api/workflows/studio/items/${path}`, { headers: THIS_PC })).status,
       ).toBe(404);
     expect(fake.calls).toHaveLength(calls);
+  });
+});
+
+describe('coûts lus par le socle (#66)', () => {
+  it('côté socle, les coûts viennent du socle et les jours passés restent', async () => {
+    const day = (offset: number) => new Date(NOW - offset * 86_400_000).toISOString();
+    // Hermes' side: three days of calls, received as webhooks, one of them refused for quota. They are
+    // applied as the ingestion route applies them: the route itself refuses a two-day-old timestamp.
+    const receive = (body: unknown) => h.hub.applyHook(toHookEvent(HermesHookBody.parse(body)));
+    const calls = [
+      { at: day(2), profile: 'coder', model: 'agnes-2.5-flash', input: 1_000, output: 200 },
+      { at: day(1), profile: 'coder', model: 'agnes-2.5-flash', input: 2_000, output: 300 },
+      { at: day(1), profile: 'gate', model: 'qwen-3.6', input: 500, output: 50 },
+      { at: day(0), profile: 'gate', model: 'qwen-3.6', input: 700, output: 70 },
+    ];
+    for (const call of calls)
+      receive(
+        hook('post_api_request', {
+          profile: call.profile,
+          timestamp: call.at,
+          extra: {
+            provider: 'freellmapi',
+            response_model: call.model,
+            usage: { input_tokens: call.input, output_tokens: call.output },
+          },
+        }),
+      );
+    receive(
+      hook('api_request_error', {
+        profile: 'gate',
+        timestamp: day(0),
+        extra: { model: 'qwen-3.6', provider: 'freellmapi', status_code: 429 },
+      }),
+    );
+    const fromHermes = await (
+      await h.app.request('/api/usage?days=7', { headers: THIS_PC })
+    ).json();
+
+    // The core's side: the same consumption, as workflow-core serves it, one row per day, model and agent.
+    // The refusal for quota counts on the row of its day, model and agent, as the core counts it.
+    const rows = calls.map((call, index) => ({
+      day: call.at.slice(0, 10),
+      agent: call.profile,
+      model: call.model,
+      provider: 'freellmapi',
+      calls: 1,
+      input_tokens: call.input,
+      output_tokens: call.output,
+      cost_usd: null,
+      rate_limited: index === calls.length - 1 ? 1 : 0,
+      errors: 0,
+    }));
+    const served = { rows };
+    const core = harness();
+    const fake = await fakeCore(CORE_SECRET, {
+      ...coreState(),
+      usage: {
+        factory: (days: number) => ({
+          days,
+          models: [],
+          agents: [],
+          daily: [],
+          rows: served.rows.filter((row) => row.day >= day(days - 1).slice(0, 10)),
+        }),
+      },
+    });
+    const reader = new WorkflowCoreReader({
+      url: fake.url,
+      secret: CORE_SECRET,
+      code: 'factory',
+      own: ['studio'],
+      retryMs: 50,
+      now: () => NOW,
+      log: createLogger('silent'),
+      sink: {
+        board: () => undefined,
+        sheet: () => undefined,
+        workflows: () => undefined,
+        gestures: () => undefined,
+        failed: () => undefined,
+        live: () => undefined,
+        activity: () => undefined,
+        agents: () => undefined,
+        usage: (usage) => core.store.setUsage(usage),
+        history: () => undefined,
+        interventions: () => undefined,
+        interventionOpened: () => undefined,
+        interventionClosed: () => undefined,
+        diagnoses: () => undefined,
+        verdicts: () => undefined,
+        answered: () => undefined,
+        machine: () => undefined,
+        checks: () => undefined,
+      },
+    });
+    try {
+      reader.start();
+      await until(() => fake.requests.some((request) => request.path.endsWith('/usage')));
+      await until(async () => (await usagePage(core)).models.length > 0);
+      expect(await usagePage(core)).toEqual(fromHermes);
+
+      // The core no longer serves the oldest day: it stays in factory-live's own table.
+      served.rows = served.rows.filter((row) => row.day !== day(2).slice(0, 10));
+      await reader.refreshUsage(7);
+      expect(await usagePage(core)).toEqual(fromHermes);
+      expect(core.store.usageSince(day(2).slice(0, 10)).map((row) => row.day)).toContain(
+        day(2).slice(0, 10),
+      );
+    } finally {
+      await reader.stop();
+      await fake.close();
+      core.close();
+    }
+  });
+});
+
+const CORE_SECRET = 'secret-du-socle-de-test';
+
+async function usagePage(on: Harness) {
+  return (await (await on.app.request('/api/usage?days=7', { headers: THIS_PC })).json()) as {
+    models: unknown[];
+  };
+}
+
+async function until(condition: () => boolean | Promise<boolean>, timeoutMs = 3_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await condition())) {
+    if (Date.now() > deadline) throw new Error('condition not met in time');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+describe('historique lu par le socle (#63)', () => {
+  it('côté socle, l’historique donne les mêmes statistiques que côté Hermès', async () => {
+    const stats = async (on: Harness) =>
+      (await (await on.app.request('/api/history?days=30', { headers: THIS_PC })).json()) as object;
+    const fromHermes = await stats(h);
+
+    // The same miniature factory as the harness's kanban (cv-site#49), as workflow-core serves it.
+    const item = (fields: Record<string, unknown>) => ({
+      body: null,
+      assignee: null,
+      started_at: null,
+      completed_at: null,
+      block_kind: null,
+      idempotency_key: null,
+      workspace_path: null,
+      current_run_id: null,
+      last_heartbeat_at: null,
+      model_override: null,
+      provider_override: null,
+      skills: [],
+      runs: [],
+      parents: [],
+      children: [],
+      comments: [],
+      events: [],
+      ...fields,
+    });
+    const run = (id: number, profile: string, outcome: string, start: number, end: number) => ({
+      id,
+      profile,
+      status: 'done',
+      outcome,
+      started_at: start,
+      ended_at: end,
+      summary: null,
+      metadata: {},
+    });
+    const items = [
+      item({
+        id: 't_b1ef0049',
+        title: 'brief cv-site#49 : Page Projets',
+        status: 'done',
+        assignee: 'coordinator',
+        created_at: NOW_S - 7_200,
+        runs: [run(1, 'coordinator', 'completed', NOW_S - 7_100, NOW_S - 6_100)],
+        children: ['t_1a9f0049'],
+      }),
+      item({
+        id: 't_1a9f0049',
+        title: 'impl cv-site#49 : Page Projets',
+        status: 'blocked',
+        assignee: 'coder',
+        block_kind: 'needs_input',
+        created_at: NOW_S - 6_000,
+        runs: [run(2, 'coder', 'blocked', NOW_S - 5_000, NOW_S - 600)],
+        parents: ['t_b1ef0049'],
+        events: [
+          {
+            id: 1,
+            run_id: 2,
+            kind: 'blocked',
+            payload: {
+              kind: 'needs_input',
+              reason: 'Quelle base de données ?\nPostgreSQL ou SQLite ?',
+            },
+            created_at: NOW_S - 600,
+          },
+        ],
+      }),
+    ];
+    const core = harness({ source: 'workflow-core' });
+    const fake = await fakeCore(CORE_SECRET, {
+      ...coreState(),
+      items: { factory: items, studio: [] },
+    });
+    const history = new CoreHistory(core.store, () => core.clock.now);
+    history.seed('factory', core.store.board());
+    const reader = new WorkflowCoreReader({
+      url: fake.url,
+      secret: CORE_SECRET,
+      code: 'factory',
+      own: ['studio'],
+      retryMs: 50,
+      now: () => core.clock.now,
+      log: createLogger('silent'),
+      sink: {
+        board: (delta, readAt, declared) =>
+          core.hub.replaceBoard(declared ? history.withGone('factory', delta) : delta, readAt),
+        history: (workflow, read, complete) => history.record(workflow, read, complete),
+        sheet: () => undefined,
+        workflows: () => undefined,
+        failed: () => undefined,
+        answered: () => undefined,
+        machine: () => undefined,
+        checks: () => undefined,
+        live: () => undefined,
+        activity: () => undefined,
+        usage: () => undefined,
+        interventions: () => undefined,
+        interventionOpened: () => undefined,
+        interventionClosed: () => undefined,
+        diagnoses: () => undefined,
+        verdicts: () => undefined,
+        agents: () => undefined,
+        gestures: () => undefined,
+      },
+    });
+    try {
+      reader.start();
+      await until(() => core.hub.boardData.tasks.length === 2);
+      expect(await stats(core)).toEqual(fromHermes);
+    } finally {
+      await reader.stop();
+      await fake.close();
+      core.close();
+    }
   });
 });

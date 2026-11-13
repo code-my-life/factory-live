@@ -7,6 +7,7 @@ import {
   type TwinsBenchState,
 } from '@factory-live/contracts';
 import { z } from 'zod';
+import type { DeclaredPair } from '../../application/ports.ts';
 
 /**
  * The factory's twin bench (hermes-software-factory#26), as factory-live sees it (#23, ADR 0013): the
@@ -40,8 +41,19 @@ interface Session {
 export interface TwinPair {
   twins: AcceptanceTwins;
   mirror: number;
-  sessions: Record<TwinSide, Session | undefined>;
+  /**
+   * How to open each twin's session: with its password read in the bench's file, or, on workflow-core's
+   * side (#60), through the mirror (`POST /viewer/<twin>`), the password never leaving the bench.
+   */
+  sessions: Record<TwinSide, Session | 'mirror' | undefined>;
 }
+
+export type { DeclaredPair };
+
+const ViewerSession = z.object({
+  port: z.number().int().min(1).max(65_535),
+  token: z.string().min(1),
+});
 
 function sessionOf(stream: string | null): Session | undefined {
   if (!stream) return undefined;
@@ -58,8 +70,10 @@ function sessionOf(stream: string | null): Session | undefined {
 }
 
 export interface TwinBenchOptions {
-  /** The state file of a PR's pair (`HermesPaths.twins`). */
-  file: (repo: string, pr: number) => string | null;
+  /** The state file of a PR's pair (`HermesPaths.twins`), on Hermes' side. */
+  file?: (repo: string, pr: number) => string | null;
+  /** The pair as workflow-core last published it, on the core's side (#60): no file is read. */
+  declared?: (repo: string, pr: number) => DeclaredPair | null;
   /** Where the bench's ports answer this server: this PC, or `host.docker.internal`. */
   host: string;
   fetchImpl?: Fetch;
@@ -79,7 +93,13 @@ export class TwinBench {
 
   /** The pair of a PR, as the factory last wrote it; `null` without a pair or with an unreadable file. */
   pair(repo: string, pr: number): TwinPair | null {
-    const path = this.options.file(repo, pr);
+    if (this.options.declared) {
+      const declared = this.options.declared(repo, pr);
+      if (!declared) return null;
+      const ready = declared.twins.state === 'ready' ? 'mirror' : undefined;
+      return { ...declared, sessions: { base: ready, head: ready } };
+    }
+    const path = this.options.file?.(repo, pr) ?? null;
     if (!path) return null;
     try {
       if (statSync(path).size > MAX_FILE_BYTES) return null;
@@ -107,22 +127,21 @@ export class TwinBench {
     // The sessions are those of one surface (the app): no other surface may show or drive them.
     const served = (pair.twins.surfaces.find((each) => each.id === 'app') ??
       pair.twins.surfaces[0])!.id;
-    const stream = (id: string, side: TwinSide, value: string | null) =>
-      id === served && value && pair.sessions[side]
-        ? `/api/twins/${repo}/${pr}/session/${side}`
-        : null;
+    // A session exists only for a twin whose stream the bench announced (a password, or the mirror).
+    const stream = (id: string, side: TwinSide) =>
+      id === served && pair.sessions[side] ? `/api/twins/${repo}/${pr}/session/${side}` : null;
     return {
       ...pair.twins,
       surfaces: pair.twins.surfaces.map((surface) => ({
         ...surface,
         base: {
           ...surface.base,
-          stream: stream(surface.id, 'base', surface.base.stream),
+          stream: stream(surface.id, 'base'),
           poster: null,
         },
         head: {
           ...surface.head,
-          stream: stream(surface.id, 'head', surface.head.stream),
+          stream: stream(surface.id, 'head'),
           poster: null,
         },
       })),
@@ -157,15 +176,24 @@ export class TwinBench {
     side: TwinSide,
     viewer: string,
   ): Promise<TwinSession | null> {
-    const session = this.pair(repo, pr)?.sessions[side];
-    if (!session) return null;
+    const pair = this.pair(repo, pr);
+    const session = pair?.sessions[side];
+    if (!pair || !session) return null;
     const origin = new URL(viewer);
     const scheme = origin.protocol === 'https:' ? 'wss' : 'ws';
+    const opened = session === 'mirror' ? await this.viewer(pair.mirror, side) : null;
     return {
-      ws: `${scheme}://${origin.hostname}:${session.port}/api/ws`,
-      token: await this.token(session),
+      ws: `${scheme}://${origin.hostname}:${opened?.port ?? (session as Session).port}/api/ws`,
+      token: opened?.token ?? (await this.token(session as Session)),
       candidateHost: LOOPBACK.has(origin.hostname) ? '127.0.0.1' : null,
     };
+  }
+
+  /** A viewer's session opened by the mirror (hermes-software-factory#116): its port and its token. */
+  private async viewer(mirror: number, side: TwinSide): Promise<z.infer<typeof ViewerSession>> {
+    const response = await this.call(mirror, `/viewer/${side}`, { method: 'POST' });
+    if (!response.ok) throw new Error(`le miroir n'a pas ouvert la session (${response.status})`);
+    return ViewerSession.parse(await response.json());
   }
 
   /** The last image of a twin's screen, JPEG: Neko serves it to an admin only, so the mirror asks it. */

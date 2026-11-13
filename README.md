@@ -63,7 +63,7 @@ English | [Français](README.fr.md)
 
 factory-live is the window on an autonomous software factory built on [Hermes Agent](https://github.com/NousResearch/hermes-agent). Hermes agents take GitHub issues labelled `factory` and move them card by card along a factory line: brief, implementation, gate, release. factory-live shows that line live: which issue is at which station, which agent holds it, which model really answered, what it is doing this second, and what waits for your decision. When an agent is stuck, you answer from the app, on your computer or your smartphone, and the card restarts.
 
-It runs next to the factory, in one Docker container on the same machine, and reaches your other devices through your tailnet. Everything it shows comes from Hermes itself: its native signed webhooks for the live part, its own databases, read-only, for the rest. Nothing is written for it.
+It runs next to the factory, in one Docker container on the same machine, and reaches your other devices through your tailnet. Everything it shows comes from the API of [workflow-core](https://github.com/code-my-life/workflow-core), the shared core of the workflows, which reads the Hermes boards read-only and pushes each change over a stream, and from GitHub. Nothing is written for it.
 
 factory-live is a **Progressive Web App**: it installs from the browser, with no store, on a computer (Chrome, Edge), on Android (Chrome: Install app) and on iPhone or iPad (Safari: Share, Add to Home Screen). Installed, it has its icon on the home screen, opens full screen, sends push notifications for the blockers that wait for you, and opens offline on the last state it received. On iPhone and iPad, push notifications only work once the app is installed (iOS 16.4 or later); on Android, in the browser too.
 
@@ -71,7 +71,7 @@ The interface is in French; the code is in English. The design follows [Primer](
 
 ## What it is, and who it is for
 
-factory-live is made for a developer who runs a factory of AI agents and does not want to follow it through a terminal, a dashboard, a chat bot and ten GitHub tabs. It answers three questions at a glance: where is each issue, is anything stuck, and what does it cost. It watches the factory and never drives it: its one write is the comment you ask for.
+factory-live is made for a developer who runs a factory of AI agents and does not want to follow it through a terminal, a dashboard, a chat bot and ten GitHub tabs. It answers three questions at a glance: where is each issue, is anything stuck, and what does it cost. It writes only what you ask for, in your name: a gesture such as `/factory unblock`, or an issue it opens for you.
 
 It was built for the factory of Code My Life, which develops its own tools, factory-live included. If you run Hermes Agent with a kanban board fed by GitHub issues, it should fit your factory with a few settings (see [Configuration](#configuration)).
 
@@ -130,7 +130,7 @@ flowchart LR
 
 - **Native outbound webhooks, signed.** The `hooks.outbound` setting of Hermes Agent posts each event (tool calls, model replies, kanban events, sessions, skills, subagents) to `/api/ingest/hermes`, signed with HMAC-SHA256 and a shared secret. Hermes sends them from a bounded queue in a daemon thread: an agent is never slowed down, and nothing is written to disk for factory-live. The hooks that carry whole conversations are not subscribed.
 - **A health probe.** The `factory-live-probe` plugin runs in the gateway, checks the services every 30 seconds and posts a signed report to `/api/ingest/health`. After 90 seconds without a report, the probe is marked silent.
-- **The kanban and the sessions, read-only.** `kanban.db` (watched with `PRAGMA data_version` every 300 ms), the `state.db` of each agent, the card logs and the Claude Code transcripts are opened read-only, with short queries; a lint rule forbids any write in the Hermes adapters. After a restart, factory-live catches up from them. The database of OpenCode holds OAuth tokens: it is never mounted.
+- **The cards, through workflow-core.** The boards, their cards and runs, the diagnosis of a blocker and the state of the machine come from the HTTP API of workflow-core and its Server-Sent Events stream, behind a shared secret. Each event carries the full state of the card and a cursor; after a restart, factory-live catches up from the cursor, and a `reset` makes it read the whole state again. workflow-core opens the Hermes databases read-only; factory-live opens none. The database of OpenCode holds OAuth tokens: it is never mounted.
 - **One stream for every screen.** The server keeps the live state and sends each change over Server-Sent Events. A `ping` after 15 seconds of silence keeps the link honest; a stream silent for 45 seconds is restarted, and the app says when it is offline.
 - **A Progressive Web App.** Installed from the browser, with no store, on a computer, Android, iPhone or iPad; a service worker keeps the shell available offline, and the app opens on the last state received, kept on the device. The API never goes through the cache.
 - **Push.** Web Push with VAPID keys generated on first start, only for the blockers that wait for you. The contact sent to push services is the repository address, never an e-mail.

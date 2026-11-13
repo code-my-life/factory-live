@@ -21,6 +21,7 @@ import { DiagnosisService } from '../application/diagnosis.ts';
 import { Hub } from '../application/hub.ts';
 import { KanbanWatch } from '../application/kanban-watch.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
+import type { GesturesPort, GenericWorkflowsPort } from '../application/ports.ts';
 import { createLogger } from '../logger.ts';
 import { allowedHosts, appAddresses } from '../config.ts';
 import { appPem } from './github-fixtures.ts';
@@ -73,6 +74,15 @@ export function harness(
     twins?: TwinBench;
     /** The workflows followed by their generic API (#31). */
     workflows?: WorkflowApi[];
+    /** The generic workflows workflow-core declares (#65), for their screen. */
+    generic?: GenericWorkflowsPort;
+    /** The gestures each workflow declares (#61); absent: Hermes' side default list. */
+    gestures?: GesturesPort;
+    /**
+     * Where the hub reads the factory (#63): on workflow-core's side, the hub starts empty and the kanban of
+     * the harness is not read; the test feeds the hub from a fake core.
+     */
+    source?: 'hermes' | 'workflow-core';
   } = {},
 ): Harness {
   const dir = tempDir();
@@ -253,12 +263,14 @@ export function harness(
       }),
       log,
       now,
+      ...(options.source ? { source: options.source } : {}),
     },
   );
   const buffer = new StreamBuffer();
   hub.subscribe((event) => buffer.push(event));
   const kanban = new KanbanReader(join(boardDir, 'kanban.db'));
   const syncKanban = () => {
+    if (options.source === 'workflow-core') return;
     if (kanban.changed()) hub.applyKanban(kanban.read(), clock.now);
   };
   syncKanban();
@@ -282,6 +294,7 @@ export function harness(
     factoryBot: 'code-my-life-factory[bot]',
     log,
     now,
+    ...(options.gestures ? { gestures: options.gestures } : {}),
   };
   const app = createApp({
     hub,
@@ -306,6 +319,7 @@ export function harness(
     githubAuth,
     ...(options.twins ? { twins: options.twins } : {}),
     ...(options.workflows ? { workflows: options.workflows } : {}),
+    ...(options.generic ? { generic: options.generic } : {}),
     kanbanHealthy: () => kanbanWatch.healthy(),
     hookSecret: SECRET,
     origins: ORIGINS,

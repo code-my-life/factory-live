@@ -1,6 +1,6 @@
 # ADR 0014 : les workflows suivis par leur API, et la fiche publiée de la ligne du code
 
-Date : 2026-11-05. Statut : accepté (issue #31, décisions du propriétaire : le studio de video-factory est le premier workflow suivi ; la ligne du code se dessine depuis la fiche que publie la factory).
+Date : 2026-11-05. Statut : accepté (issue #31, décisions du propriétaire : le studio de video-factory est le premier workflow suivi ; la ligne du code se dessine depuis la fiche que publie la factory), remplacée par l'ADR 0018.
 
 ## Contexte
 

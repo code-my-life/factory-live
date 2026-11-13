@@ -20,6 +20,7 @@ import {
   issueStatusOf,
   issueTypeOf,
   journeyOf,
+  message,
   lineStationOf,
   profileStation,
   pullRequestUrl,
@@ -35,7 +36,12 @@ import type {
   Run,
   Task,
 } from '@factory-live/domain';
-import type { UnblockRecord } from './ports.ts';
+import type {
+  CoreActivityFact,
+  CoreAgentState,
+  CoreInterventionState,
+  UnblockRecord,
+} from './ports.ts';
 
 export interface IssueInfoView {
   title: string;
@@ -155,6 +161,58 @@ export function stationViews(profiles: readonly string[]): StationView[] {
 }
 
 /** Ce qui attend Clément d'après le kanban, tel que le domaine le trouve (secondes epoch). */
+/** The kinds whose card's issue gets its link among the actions, as factory-live gives it (`interventionsOf`). */
+const ISSUE_LINKED = new Set<string>(['needs_input', 'capability', 'gave_up']);
+
+/**
+ * An intervention of workflow-core (#59) as factory-live shows it: the core's texts and actions, the action
+ * Débloquer only for a card with an issue (the gesture is posted on it), and factory-live's own links: the
+ * card's issue, and the dashboard of a triage loop when one is configured.
+ */
+export function coreIntervention(
+  item: CoreInterventionState,
+  issueKey: string | null,
+  links: { owner: string; dashboardUrl: string | null },
+): FoundIntervention {
+  const [repo, number] = issueKey ? issueKey.split('#') : [];
+  const issueLink: FoundIntervention['actions'] =
+    issueKey && ISSUE_LINKED.has(item.kind)
+      ? [
+          {
+            kind: 'link',
+            label: message('intervention.action.openIssue', { issueKey }),
+            url: `https://github.com/${links.owner}/${repo}/issues/${number}`,
+          },
+        ]
+      : [];
+  const dashboard: FoundIntervention['actions'] =
+    item.kind === 'triage_loop' && links.dashboardUrl
+      ? [
+          {
+            kind: 'link',
+            label: message('intervention.action.dashboard'),
+            url: links.dashboardUrl,
+          },
+        ]
+      : [];
+  const actions = item.actions.filter((action) => action.kind !== 'unblock' || issueKey !== null);
+  return {
+    id: item.id,
+    kind: item.kind,
+    severity: item.severity,
+    // The core's texts are factory-live's (codes of its catalogue, checked by the adapter, or quotes).
+    title: item.title as FoundIntervention['title'],
+    issueKey,
+    cardId: item.cardId,
+    profile: item.profile,
+    question: item.question as FoundIntervention['question'],
+    openedAt: item.openedAt,
+    eventId: item.eventId,
+    push: item.push,
+    actions: [...dashboard, ...(actions as FoundIntervention['actions']), ...issueLink],
+  };
+}
+
 export function foundInterventions(input: ProjectionInput): FoundIntervention[] {
   return interventionsOf(input.board, {
     now: Math.floor(input.now / 1000),
@@ -358,6 +416,53 @@ export function projectAgents(
       lastHeartbeatAt: running?.lastHeartbeatAt ? isoSeconds(running.lastHeartbeatAt) : null,
     };
   });
+}
+
+/**
+ * The agents workflow-core announces (#66), as the PWA shows them: one line per agent holding a card, its
+ * model with the source the core gives (`live`, or `session` when the served model is not on disk).
+ */
+export function projectCoreAgents(
+  agents: readonly CoreAgentState[],
+  runs: readonly Run[],
+  issueOfCard: ReadonlyMap<string, string>,
+): AgentActivity[] {
+  const runById = new Map(runs.map((run) => [run.id, run]));
+  return agents.map((agent) => {
+    const run = agent.runId === null ? undefined : runById.get(agent.runId);
+    return {
+      profile: agent.profile,
+      station: profileStation(agent.profile),
+      state: agent.state,
+      cardId: agent.cardId,
+      issueKey: issueOfCard.get(agent.cardId) ?? null,
+      model: agent.model,
+      laneModel: liveModel(agent.laneModel, 'live'),
+      action: agent.action ? { ...agent.action, startedAt: iso(agent.action.startedAt) } : null,
+      runStartedAt: run ? isoSeconds(run.startedAt) : null,
+      lastHeartbeatAt: agent.lastHeartbeatAt === null ? null : iso(agent.lastHeartbeatAt),
+    };
+  });
+}
+
+/** A fact of workflow-core's activity (#66) as a line of the feed, its issue found from its card. */
+export function coreActivityEvent(
+  fact: CoreActivityFact,
+  issueOfCard: ReadonlyMap<string, string>,
+): ActivityEvent {
+  return {
+    id: `core-${fact.id}`,
+    at: iso(fact.at),
+    kind: fact.kind,
+    profile: fact.profile,
+    issueKey: fact.cardId ? (issueOfCard.get(fact.cardId) ?? null) : null,
+    cardId: fact.cardId,
+    label: fact.text,
+    detail: null,
+    status: fact.status,
+    durationMs: null,
+    model: null,
+  };
 }
 
 /** Ligne du domaine vers l'événement du fil : identifiant de séquence, issue retrouvée par la carte. */

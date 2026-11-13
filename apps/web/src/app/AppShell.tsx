@@ -7,6 +7,7 @@ import {
   KebabHorizontalIcon,
   ProjectIcon,
   PulseIcon,
+  StackIcon,
   UndoIcon,
   VideoIcon,
   WorkflowIcon,
@@ -39,6 +40,7 @@ import {
   useSnapshot,
 } from '../data/FactoryProvider.tsx';
 import { useStudio } from '../features/studio/StudioProvider.tsx';
+import { useWorkflows } from '../features/workflows/WorkflowsProvider.tsx';
 import { useI18n } from '../i18n/I18nProvider.tsx';
 import type { Messages } from '../i18n/fr.ts';
 import { setAppBadge } from '../pwa/badge.ts';
@@ -95,6 +97,26 @@ function SideNavItem({
   );
 }
 
+/** A workflow the core declares besides the code line and the studio (#65): one entry each, by its key. */
+function WorkflowNavItem({ workflow, waiting }: { workflow: string; waiting: number }) {
+  const to = `/workflows/${workflow}`;
+  const resolved = useResolvedPath(to);
+  const current = useMatch({ path: resolved.pathname, end: false }) !== null;
+  return (
+    <NavList.Item as={Link} to={to} aria-current={current ? 'page' : undefined}>
+      <NavList.LeadingVisual>
+        <StackIcon />
+      </NavList.LeadingVisual>
+      {workflow}
+      {waiting > 0 ? (
+        <NavList.TrailingVisual>
+          <CounterLabel variant="primary">{waiting}</CounterLabel>
+        </NavList.TrailingVisual>
+      ) : null}
+    </NavList.Item>
+  );
+}
+
 function FactoryLogo() {
   return (
     <svg className={styles.logo} viewBox="0 0 24 24" aria-hidden="true">
@@ -126,6 +148,12 @@ export function AppShell() {
   // The videos of the studio that wait for the owner join the interventions: the bell counts both.
   const studio = useStudio();
   const studioWaiting = studio.waiting.length;
+  // The other workflows the core declares: an entry each, none when it declares none (#65).
+  const { workflows } = useWorkflows();
+  const waitingIn = (key: string) =>
+    workflows
+      .find((each) => each.key === key)
+      ?.items.filter((item) => item.status === 'waiting_human').length ?? 0;
   // A server that follows no studio shows no tab for it.
   const tabs = studio.configured
     ? PRIMARY
@@ -140,9 +168,9 @@ export function AppShell() {
     if (source.kind === 'live' && connection === 'open') setAppBadge(waiting);
   }, [source.kind, connection, waiting]);
   const unhealthy = snapshot.health.filter((service) => needsWatch(service.status)).length;
-  const secondaryCurrent = SECONDARY.some((destination) =>
-    location.pathname.startsWith(destination.to),
-  );
+  const secondaryCurrent =
+    SECONDARY.some((destination) => location.pathname.startsWith(destination.to)) ||
+    location.pathname.startsWith('/workflows/');
 
   return (
     <div>
@@ -252,6 +280,13 @@ export function AppShell() {
                   }
                 />
               ) : null}
+              {workflows.map((workflow) => (
+                <WorkflowNavItem
+                  key={workflow.key}
+                  workflow={workflow.key}
+                  waiting={waitingIn(workflow.key)}
+                />
+              ))}
               <SideNavItem destination={PRIMARY[3] as Destination} />
               <NavList.Divider />
               <SideNavItem
@@ -331,6 +366,23 @@ export function AppShell() {
               le menu s'ouvrait hors de l'écran tant qu'on n'avait pas défilé jusqu'en bas. */}
           <ActionMenu.Overlay align="end" side="outside-top">
             <ActionList>
+              {workflows.length > 0 ? (
+                <ActionList.Group>
+                  <ActionList.GroupHeading>{t.workflows.nav}</ActionList.GroupHeading>
+                  {workflows.map((workflow) => (
+                    <ActionList.Item
+                      key={workflow.key}
+                      onSelect={() => void navigate(`/workflows/${workflow.key}`)}
+                    >
+                      <ActionList.LeadingVisual>
+                        <StackIcon />
+                      </ActionList.LeadingVisual>
+                      {workflow.key}
+                    </ActionList.Item>
+                  ))}
+                </ActionList.Group>
+              ) : null}
+              {workflows.length > 0 ? <ActionList.Divider /> : null}
               {SECONDARY.map((destination) => {
                 const IconComponent = destination.icon;
                 return (

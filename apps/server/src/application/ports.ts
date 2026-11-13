@@ -3,8 +3,13 @@ import type {
   AcceptanceGate,
   AcceptanceTestSuite,
   AcceptanceThread,
+  AcceptanceTwins,
   ActivityEvent,
+  ConfigDrift,
+  DeclaredData,
+  GenericWorkflowView,
   IssueLabel,
+  ProfileLimit,
   PullRequestView,
   PushPayload,
   StudioItem,
@@ -13,6 +18,7 @@ import type {
 } from '@factory-live/contracts';
 import type {
   Board,
+  GuardRisk,
   Comment,
   EvidenceFile,
   Link,
@@ -89,6 +95,21 @@ export interface ProfilesPort {
   facts(profile: string): ProfileFacts | null;
   // Fingerprint of files read by `facts` (modification times); it changes when any of them changes.
   factsStamp(profile: string): string;
+  /**
+   * How many times each plugin's hook ran past its delay, when the source counts them itself (workflow-core,
+   * #93); absent: the agents' screen counts them in the agent's journal.
+   */
+  hookTimeouts?(profile: string): ReadonlyMap<string, number> | null;
+  /**
+   * The guards at risk as the source computes them itself, with the time it was read (workflow-core, #96);
+   * absent: the hub finds them with the rule on each agent's facts. `null`: nothing read yet.
+   */
+  guardRisks?(): { risks: GuardRisk[]; checkedAt: number } | null;
+  /**
+   * The agent's limits with their defaults, when the source publishes them (workflow-core, #93); absent:
+   * the agents' screen takes them from `facts` and Hermes' defaults.
+   */
+  limits?(profile: string): ProfileLimit[] | null;
 }
 
 // --- Sessions des workers ------------------------------------------------------------------------
@@ -169,6 +190,54 @@ export interface LaneTranscript {
 }
 
 /** A proof of the gate for a head (#22): its rule, its place in the gate's order, its text (cut). */
+/**
+ * What a run's transcripts are made of, read from workflow-core's declared data (#60): the agent's session,
+ * each Claude Code session, the card's raw log. Times in ms epoch.
+ */
+export interface RunTranscripts {
+  hermes: TranscriptLine[];
+  lanes: { name: string | null; entries: TranscriptLine[] }[];
+  terminal: string[];
+}
+
+/**
+ * The factory's declared data, as the views of the core's side read them before showing (#60): only
+ * `adapters/workflow-core/factoryViews.ts` knows their names. A route asks for them, then gives them to its
+ * view; the twins it reads stay for the bench (`TwinBench`, ADR 0013).
+ */
+/** A PR's twin pair as workflow-core publishes it (#60): its state and its mirror's port, no session nor password. */
+export interface DeclaredPair {
+  twins: AcceptanceTwins;
+  mirror: number;
+}
+
+/**
+ * The generic workflows workflow-core declares besides the code line and the studio (#65): their sheet,
+ * their items with cards and runs, and the data they declare for an item or a run, as the core serves it.
+ */
+export interface GenericWorkflowsPort {
+  genericWorkflows(): GenericWorkflowView[];
+  /** The data the workflow declares for this subject; `null` when it is not a generic workflow. */
+  genericData(
+    workflow: string,
+    subject: 'card' | 'run',
+    id: string,
+  ): Promise<DeclaredData[] | null>;
+}
+
+export interface DeclaredViewsPort {
+  /** The gate's proofs of the PR's head for these cards, and the PR's twins read for the bench. */
+  acceptance(
+    repo: string,
+    pr: number,
+    cardIds: readonly string[],
+    head: string,
+  ): Promise<GateProof[]>;
+  transcripts(runId: number): Promise<RunTranscripts | null>;
+  /** The drift of each of these agents; an agent the core does not answer for has none. */
+  drift(agents: readonly string[]): Promise<ReadonlyMap<string, ConfigDrift[]>>;
+}
+
 export interface GateProof {
   order: number;
   rule: string;
@@ -273,10 +342,30 @@ export interface GitHubReadPort {
 // Direct writes and reads needed for unblocking.
 export interface GitHubWritePort {
   comment(repo: string, number: number, body: string): Promise<{ id: number; url: string }>;
+  /** Opens an issue in `repo` (a repository of the owner), in the name of the connected account (#61). */
+  openIssue(repo: string, title: string, body: string): Promise<{ number: number; url: string }>;
   reactions(repo: string, commentId: number): Promise<{ content: string; user: string }[]>;
 }
 
 // --- Stockage propre à factory-live --------------------------------------------------------------
+
+// --- Gestes déclarés (#61, ADR 0016) -------------------------------------------------------------
+
+/**
+ * A gesture a workflow declares: a comment `/<workflow> <name> <note>` on the issue of an item, or an issue
+ * opened in `repo`. factory-live posts only these.
+ */
+export interface DeclaredGesture {
+  name: string;
+  kind: 'comment' | 'issue';
+  /** The repository an `issue` gesture opens its issue in; `null` for a comment. */
+  repo: string | null;
+}
+
+export interface GesturesPort {
+  /** The gestures a workflow declares; `null` when the workflow is unknown. */
+  declared(workflow: string): readonly DeclaredGesture[] | null;
+}
 
 export interface UsageDelta {
   day: string;
@@ -330,6 +419,11 @@ export interface HistoryPort {
   // Most recent lines of these kinds, across all cards (guard refusals).
   activityOfKinds(kinds: readonly string[], limit: number): ActivityEvent[];
   addUsage(delta: UsageDelta): void;
+  /**
+   * Usage rows as workflow-core serves them (#66): each one sets its day, model, provider and agent, so a
+   * day served again is not counted twice, and a day the core no longer serves stays.
+   */
+  setUsage(rows: readonly UsageRow[]): void;
   usageSince(day: string): UsageRow[];
   claimNotification(interventionId: string, now: number): boolean;
   unblock(interventionId: string): UnblockRecord | null;
@@ -344,6 +438,34 @@ export interface HistoryPort {
   audit(actor: string, action: string, detail: string | null, now: number): void;
   stations(): Map<string, StationRecord>;
   saveStation(issueKey: string, record: StationRecord): void;
+  /**
+   * factory-live's own history of a workflow's items, as workflow-core serves them (#63). Each item keeps its
+   * last full state, one row per item. `complete`: these are all the items of the workflow (a full read), so
+   * an item that is not among them is marked gone at `at`, its last state kept; an item seen again is no
+   * longer gone.
+   */
+  recordItems(
+    workflow: string,
+    items: readonly { id: string; state: unknown }[],
+    at: number,
+    complete: boolean,
+  ): void;
+  historyItems(workflow: string): HistoryItem[];
+  /** Pours these items into the history once per workflow (the mirror, at the first start on the core's side). */
+  seedHistory(
+    workflow: string,
+    items: readonly { id: string; state: unknown }[],
+    at: number,
+  ): boolean;
+}
+
+/** One item of factory-live's history (#63): its last state as the core served it; times in ms epoch. */
+export interface HistoryItem {
+  id: string;
+  state: unknown;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  goneAt: number | null;
 }
 
 // --- Notifications -------------------------------------------------------------------------------
@@ -356,6 +478,80 @@ export interface PushPort {
 }
 
 /** A workflow followed by its generic API (#31), as last read (`adapters/workflows/api.ts`). */
+/**
+ * An agent's live state as workflow-core serves it (#66), in factory-live's units: times in ms epoch, a
+ * model's provider never null. `cardId` is the card its run is on.
+ */
+export interface CoreAgentState {
+  profile: string;
+  cardId: string;
+  runId: number | null;
+  state: 'thinking' | 'tool' | 'cli' | 'blocked';
+  action: {
+    kind: 'llm' | 'tool' | 'cli';
+    label: string;
+    detail: string | null;
+    startedAt: number;
+  } | null;
+  model: { model: string; provider: string; source: 'live' | 'session' } | null;
+  laneModel: { model: string; provider: string } | null;
+  lastHeartbeatAt: number | null;
+}
+
+/** One check of the machine, as workflow-core publishes it (#62); `checkedAt` in ms epoch. */
+export interface CoreCheckState {
+  id: string;
+  label: string;
+  group: string;
+  status: 'ok' | 'degraded' | 'down' | 'unknown';
+  detail: string;
+  metrics: Record<string, string>;
+  checkedAt: number | null;
+}
+
+/** The state of the machine as workflow-core publishes it (#62), times in ms epoch. */
+export interface CoreMachineState {
+  runtimeVersion: string | null;
+  contract: { ok: boolean; problems: string[] } | null;
+  mode: 'normal' | 'observer';
+  boards: { board: string; lastReadAt: number | null }[];
+  checks: CoreCheckState[];
+}
+
+/**
+ * An intervention as workflow-core announces it (#59), in factory-live's units: opening time in seconds epoch,
+ * as the kanban's; titles, questions and labels as factory-live's texts (a code of its catalogue, or a quote);
+ * the core's gesture `unblock` as the action Débloquer. The links to an issue or a dashboard are factory-live's.
+ */
+export interface CoreInterventionState {
+  id: string;
+  kind: 'needs_input' | 'capability' | 'transient' | 'gave_up' | 'triage_loop' | 'held_active_pr';
+  cardId: string;
+  eventId: number | null;
+  openedAt: number;
+  profile: string | null;
+  severity: 'critical' | 'warning' | 'info';
+  push: boolean;
+  title: Text;
+  question: Text;
+  actions: (
+    | { kind: 'unblock' }
+    | { kind: 'copy'; label: Text; command: string }
+    | { kind: 'link'; label: Text; url: string }
+  )[];
+}
+
+/** One recent fact of the board's activity, as workflow-core serves it (#66); `at` in ms epoch. */
+export interface CoreActivityFact {
+  id: string;
+  at: number;
+  kind: 'tool' | 'llm' | 'kanban' | 'guard' | 'system';
+  profile: string | null;
+  cardId: string | null;
+  text: string;
+  status: 'ok' | 'running' | 'error' | 'blocked' | null;
+}
+
 export interface WorkflowView {
   name: string;
   /** The sheet the workflow serves; `null` until read, or while it is invalid (`sheetError`). */

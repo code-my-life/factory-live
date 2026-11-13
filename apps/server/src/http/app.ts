@@ -24,6 +24,8 @@ import {
   TwinSide,
   UnblockProgress,
   UnblockRequest,
+  GestureRequest,
+  GestureSent,
   UsageReport,
   msg,
 } from '@factory-live/contracts';
@@ -42,8 +44,14 @@ import type { HistoryStore } from '../adapters/store/history.ts';
 import { toHookEvent } from '../ingest/hermes.ts';
 import { ReplayGuard, verifySignature } from '../ingest/signature.ts';
 import type { Hub } from '../application/hub.ts';
+import type {
+  DeclaredViewsPort,
+  GenericWorkflowsPort,
+  WorkflowView,
+} from '../application/ports.ts';
 import {
   historyStats,
+  acceptanceSubject,
   issueDetail,
   profileViews,
   transcripts,
@@ -51,6 +59,7 @@ import {
 } from '../application/views.ts';
 import type { ViewDeps } from '../application/views.ts';
 import type { Logger } from '../logger.ts';
+import { GestureError, hermesSideGestures, postGesture } from '../application/gestures.ts';
 import { UnblockError, unblockIntervention } from '../application/unblock.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
 import { hostGuard, navigationGuard, requestOrigin, writeGuard } from './guard.ts';
@@ -70,6 +79,15 @@ export interface AppDeps {
   twins?: TwinBench | null;
   /** The workflows followed by their generic API (#31): the studio's videos, today. */
   workflows?: readonly WorkflowApi[];
+  /**
+   * On workflow-core's side (#60): the factory's declared data the recette, the transcripts and the agents'
+   * screen read before showing; absent on Hermes' side.
+   */
+  declared?: DeclaredViewsPort;
+  /** The other workflows workflow-core declares (#57), listed with their sheet; their screen is #65. */
+  coreWorkflows?: () => readonly WorkflowView[];
+  /** The generic workflows workflow-core declares, for their screen (#65); absent: none. */
+  generic?: GenericWorkflowsPort;
   /** The code line's sheet as the factory publishes it, or why the embedded copy is drawn (#31). */
   codeSheet?: () => PublishedSheet;
   /** Someone looks at a workflow: it is read more often for a while. */
@@ -259,9 +277,19 @@ export function createApp(deps: AppDeps) {
       },
       responses: { 200: json(IssueDetail, 'Détail d’une issue'), ...errors },
     }),
-    (c) => {
+    async (c) => {
       const { repo, number } = c.req.valid('param');
-      const detail = issueDetail(deps.views, `${repo}#${number}`);
+      const key = `${repo}#${number}`;
+      const subject = deps.declared ? acceptanceSubject(deps.views, key) : null;
+      const proofs =
+        deps.declared && subject
+          ? await deps.declared.acceptance(subject.repo, subject.pr, subject.cardIds, subject.head)
+          : undefined;
+      const detail = issueDetail(
+        deps.views,
+        key,
+        proofs && subject ? { proofs, head: subject.head } : {},
+      );
       return detail
         ? c.json(detail, 200)
         : c.json({ error: 'Issue inconnue de la factory', code: 'not_found' as const }, 404);
@@ -275,8 +303,11 @@ export function createApp(deps: AppDeps) {
       request: { params: z.object({ id: z.coerce.number().int().positive() }) },
       responses: { 200: json(z.array(TranscriptView), 'Transcriptions du run'), ...errors },
     }),
-    (c) => {
-      const views = transcripts(deps.views, c.req.valid('param').id);
+    async (c) => {
+      const id = c.req.valid('param').id;
+      const views = deps.declared
+        ? transcripts(deps.views, id, await deps.declared.transcripts(id))
+        : transcripts(deps.views, id);
       return views
         ? c.json(views, 200)
         : c.json({ error: 'Run inconnu', code: 'not_found' as const }, 404);
@@ -289,7 +320,13 @@ export function createApp(deps: AppDeps) {
       path: '/api/profiles',
       responses: { 200: json(z.array(ProfileView), 'Profils de la factory') },
     }),
-    (c) => c.json(profileViews(deps.views), 200),
+    async (c) =>
+      c.json(
+        deps.declared
+          ? profileViews(deps.views, 30, await deps.declared.drift(deps.views.hub.profiles))
+          : profileViews(deps.views),
+        200,
+      ),
   );
 
   const period = z.object({
@@ -388,6 +425,59 @@ export function createApp(deps: AppDeps) {
   app.use('/api/push/subscribe', guard);
   app.use('/api/push/unsubscribe', guard);
   app.use('/api/push/test', guard);
+
+  // The owner's gestures, generic (#61): only those the workflow declares, guarded as the unblocking.
+  app.use('/api/gestures', guard);
+  app.openapi(
+    createRoute({
+      method: 'post',
+      path: '/api/gestures',
+      request: { body: { content: { 'application/json': { schema: GestureRequest } } } },
+      responses: {
+        202: json(GestureSent, 'Geste posté sur GitHub'),
+        ...errors,
+        404: json(ApiError, 'Workflow inconnu'),
+        409: json(ApiError, 'Geste non déclaré, ou élément sans issue'),
+        502: json(ApiError, 'GitHub a refusé'),
+        503: json(ApiError, 'Jeton absent'),
+      },
+    }),
+    async (c) => {
+      const code = deps.unblock.workflow ?? 'factory';
+      try {
+        const sent = await postGesture(
+          {
+            gestures: deps.unblock.gestures ?? hermesSideGestures,
+            github: deps.unblock.github,
+            ...(deps.unblock.canWrite ? { canWrite: deps.unblock.canWrite } : {}),
+            // Only the code line's items have an issue known here; another workflow's item gets none.
+            issueOf: (workflow, item) => (workflow === code ? deps.hub.issueKeyOfCard(item) : null),
+            // The same guard as the unblocking: a card whose open intervention still has its cause present.
+            causePresent: (workflow, item) =>
+              workflow === code &&
+              deps.hub.openInterventions.some(
+                (intervention) =>
+                  intervention.cardId === item &&
+                  intervention.diagnosis?.unblock.when === 'after_fix',
+              ),
+            store: deps.store,
+            log: deps.log,
+            now: deps.now,
+          },
+          c.req.valid('json'),
+          c.get('actor'),
+        );
+        return c.json(
+          { kind: sent.kind, state: sent.state, url: sent.url, issueKey: sent.issueKey },
+          202,
+        );
+      } catch (error) {
+        if (error instanceof GestureError)
+          return c.json({ error: error.message, code: error.code }, error.status);
+        throw error;
+      }
+    },
+  );
 
   app.openapi(
     createRoute({
@@ -860,11 +950,40 @@ export function createApp(deps: AppDeps) {
     c.header('Cache-Control', 'no-store');
     return c.json(
       {
-        workflows: (deps.workflows ?? []).map((workflow) => workflow.view()),
+        workflows: [
+          ...(deps.workflows ?? []).map((workflow) => workflow.view()),
+          ...(deps.coreWorkflows?.() ?? []),
+        ],
         code: deps.codeSheet?.() ?? null,
       },
       200,
     );
+  });
+
+  // --- Generic workflows (#65): those workflow-core declares besides the code line and the studio --
+
+  app.get('/api/core-workflows', (c) => {
+    c.header('Cache-Control', 'no-store');
+    return c.json({ workflows: deps.generic?.genericWorkflows() ?? [] }, 200);
+  });
+
+  app.get('/api/core-workflows/:wf/data', async (c) => {
+    const subject = c.req.query('subject');
+    const id = c.req.query('id');
+    if ((subject !== 'card' && subject !== 'run') || !id)
+      return c.json(
+        {
+          error: 'Sujet attendu : card ou run, avec un identifiant',
+          code: 'invalid_request' as const,
+        },
+        400,
+      );
+    const data = deps.generic
+      ? await deps.generic.genericData(c.req.param('wf'), subject, id)
+      : null;
+    if (data === null) return unknownWorkflow(c);
+    c.header('Cache-Control', 'no-store');
+    return c.json({ data }, 200);
   });
 
   app.get('/api/workflows/:wf', (c) => {

@@ -332,6 +332,17 @@ export const Message = z.discriminatedUnion('code', [
   message('health.codeSheet', none),
   message('health.codeSheet.published', none),
   message('health.codeSheet.embedded', { reason: z.string() }),
+  message('health.core', none),
+  message('health.core.ok', none),
+  message('health.core.unreachable', seconds),
+  message('health.core.unreachableTitle', none),
+  message('health.core.observer', { problem: z.string().nullable() }),
+  message('health.core.contract.ok', none),
+  message('health.core.contract.broken', { problem: z.string().nullable() }),
+  message('health.metric.coreVersion', none),
+  message('health.metric.contract', none),
+  message('health.metric.mode', none),
+  message('health.metric.boardRead', { board: z.string() }),
 ]);
 export type Message = z.infer<typeof Message>;
 export type MessageCode = Message['code'];
