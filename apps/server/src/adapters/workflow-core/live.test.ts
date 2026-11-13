@@ -11,6 +11,17 @@ import { tempDir } from '../../test/hermes-fixtures.ts';
 import type { TempDir } from '../../test/hermes-fixtures.ts';
 import { coreActivityFact } from './live.ts';
 
+/** The agents of the factory as workflow-core publishes them (#129), captured on the machine. */
+const AGENTS = JSON.parse(
+  readFileSync(
+    new URL('../../../../../fixtures/workflow-core/agents-factory.json', import.meta.url),
+    'utf8',
+  ),
+) as {
+  kanban: unknown;
+  agents: { name: string; model: { name: string; provider: string } | null }[];
+};
+
 /** The coder, on the card of cv-site#50, running `npm test`, as workflow-core announces it (#34). */
 const CODER = {
   agent: 'coder',
@@ -203,6 +214,57 @@ describe('direct de la ligne du code par le socle (workflow-core, #66)', () => {
     const again = newHub(dir, 'core-data', 'workflow-core');
     again.addCoreActivity([coreActivityFact(fact as Parameters<typeof coreActivityFact>[0])]);
     expect(again.snapshot().activity.map((line) => line.id)).toEqual(['core-f1']);
+  });
+
+  it('côté socle, les agents au repos restent sur la ligne', async () => {
+    const state = coreState();
+    state.agents = { factory: AGENTS };
+    const { hub } = await start(state);
+    await until(() => hub.snapshot().agents.length === AGENTS.agents.length, 2_000);
+
+    const agents = hub.snapshot().agents;
+    // One line per agent the core publishes, as the Hermes reading gives one per profile.
+    expect(agents.map((agent) => agent.profile).sort()).toEqual(
+      AGENTS.agents.map((agent) => agent.name).sort(),
+    );
+    for (const agent of agents) expect(agent.station).toBe(profileStation(agent.profile));
+    // At rest, an agent shows its configured model (a card in progress may override it, as on Hermes' side).
+    for (const agent of agents.filter((item) => item.cardId === null)) {
+      const published = AGENTS.agents.find((item) => item.name === agent.profile)!;
+      expect(agent.model).toEqual(
+        published.model
+          ? { model: published.model.name, provider: published.model.provider, source: 'config' }
+          : null,
+      );
+    }
+    // Without the live state, an agent is at rest unless the board gives it a card in progress.
+    const resting = agents.filter((agent) => agent.cardId === null);
+    expect(resting.length).toBeGreaterThan(0);
+    expect(resting.every((agent) => agent.state === 'idle')).toBe(true);
+  });
+
+  it('côté socle, un agent au travail remplace sa ligne au repos', async () => {
+    const state = coreState();
+    state.agents = { factory: AGENTS };
+    const { hub } = await start(state);
+    await until(() => hub.snapshot().agents.length === AGENTS.agents.length, 2_000);
+
+    core!.send(event(6, 'live', CODER));
+    await until(() => hub.snapshot().agents.some((agent) => agent.state === 'tool'), 2_000);
+
+    const agents = hub.snapshot().agents;
+    expect(agents).toHaveLength(AGENTS.agents.length);
+    const coders = agents.filter((agent) => agent.profile === 'coder');
+    expect(coders).toHaveLength(1);
+    expect(coders[0]).toMatchObject({
+      state: 'tool',
+      cardId: 't_c0de0050',
+      model: { model: 'agnes-2.5-flash', provider: 'freellmapi', source: 'live' },
+      action: { kind: 'tool', label: 'terminal', detail: 'npm test' },
+    });
+    expect(
+      agents.filter((agent) => agent.profile !== 'coder').every((agent) => agent.state !== 'tool'),
+    ).toBe(true);
   });
 
   it('côté socle, un webhook d’Hermès ne change pas l’instantané', async () => {
