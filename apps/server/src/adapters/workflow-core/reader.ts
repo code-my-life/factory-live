@@ -146,7 +146,7 @@ function checkState(check: CoreMachineCheck): CoreCheckState {
 /** The facts of activity read at a full read: as many as the screen keeps. */
 const ACTIVITY_LIMIT = 200;
 /** The days of usage read at a full read: as many as the core serves. */
-export const USAGE_DAYS = 90;
+const USAGE_DAYS = 90;
 
 /**
  * Reads the code line and every generic workflow from workflow-core (ADR 0015, #57): the full state at
@@ -456,7 +456,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
       return;
     }
     this.diagnosesBusy = true;
-    void this.refreshDiagnoses().finally(() => {
+    void this.readDiagnoses().finally(() => {
       this.diagnosesBusy = false;
       if (!this.diagnosesAgain || !this.running) return;
       this.diagnosesAgain = false;
@@ -489,7 +489,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
       const cardId = this.verdictsQueue.shift()!;
       this.verdictsQueued.delete(cardId);
       this.verdictsReading.add(cardId);
-      void this.refreshVerdicts(cardId).finally(() => {
+      void this.readVerdicts(cardId).finally(() => {
         this.verdictsReading.delete(cardId);
         if (this.verdictsAgain.delete(cardId)) this.scheduleVerdicts(cardId);
         this.pumpVerdicts();
@@ -502,7 +502,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
    * the schema drawn from the core's JSON Schema of a diagnosis; one of another form is left out, and its
    * intervention is shown without it. A failure keeps the diagnoses held.
    */
-  async refreshDiagnoses(): Promise<void> {
+  private async readDiagnoses(): Promise<void> {
     const path = workflowPath(this.options.code, '/diagnoses');
     try {
       const answer = await this.client.get(path, null, this.abort.signal);
@@ -532,7 +532,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
   }
 
   /** The verdicts of a card's failed runs, as the core computes them (#59); a failure keeps those held. */
-  async refreshVerdicts(cardId: string): Promise<void> {
+  private async readVerdicts(cardId: string): Promise<void> {
     const path = workflowPath(
       this.options.code,
       `/items/${encodeURIComponent(cardId)}/run-verdicts`,
