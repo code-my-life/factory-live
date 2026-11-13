@@ -44,7 +44,7 @@ import type {
   WorkflowView,
 } from '../../application/ports.ts';
 import { boardOf } from './cards.ts';
-import { CoreError, WorkflowCoreClient } from './client.ts';
+import { CoreError, WorkflowCoreClient, errorText, workflowPath } from './client.ts';
 import { genericItem } from './generic.ts';
 import { commentGestures, coreInterventionState } from './interventions.ts';
 import { coreActivityFact, coreAgentState } from './live.ts';
@@ -190,11 +190,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
 
   constructor(options: WorkflowCoreReaderOptions) {
     this.options = options;
-    this.client = new WorkflowCoreClient({
-      url: options.url,
-      secret: options.secret,
-      ...(options.fetch ? { fetch: options.fetch } : {}),
-    });
+    this.client = new WorkflowCoreClient(options);
   }
 
   start(): void {
@@ -232,7 +228,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
 
   private failed(error: unknown): void {
     const now = this.options.now();
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorText(error);
     this.unreachableSince ??= now;
     if (message !== this.lastError)
       this.options.log.warn({ error: message }, 'lecture du socle en échec : dernier état gardé');
@@ -276,9 +272,12 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
       .filter((key) => !this.options.own.includes(key));
     const items = new Map<string, Map<string, CoreItem>>();
     for (const key of keys) {
-      const path = `/api/workflows/${encodeURIComponent(key)}`;
       try {
-        const answer = await this.client.get(`${path}/sheet`, coreSheetResponse, signal);
+        const answer = await this.client.get(
+          workflowPath(key, '/sheet'),
+          coreSheetResponse,
+          signal,
+        );
         this.sheets.set(key, answer.sheet);
         this.sheetErrors.delete(key);
       } catch (error) {
@@ -287,21 +286,24 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
         if (error instanceof CoreError && error.code === 'invalid_sheet')
           this.sheetErrors.set(key, error.detail ?? error.message);
         this.options.log.warn(
-          { workflow: key, error: error instanceof Error ? error.message : String(error) },
+          { workflow: key, error: errorText(error) },
           'fiche du socle refusée : la dernière reçue reste',
         );
       }
-      const answer = await this.client.get(`${path}/items`, coreItems, signal);
+      const answer = await this.client.get(workflowPath(key, '/items'), coreItems, signal);
       items.set(key, new Map(answer.items.map((item) => [item.id, item])));
     }
     let agents: CoreAgent[] = [];
     let facts: CoreFact[] = [];
     const code = this.options.code;
     if (items.has(code)) {
-      const path = `/api/workflows/${encodeURIComponent(code)}`;
-      agents = (await this.client.get(`${path}/live`, coreLive, signal)).agents;
+      agents = (await this.client.get(workflowPath(code, '/live'), coreLive, signal)).agents;
       facts = (
-        await this.client.get(`${path}/activity?limit=${ACTIVITY_LIMIT}`, coreActivity, signal)
+        await this.client.get(
+          workflowPath(code, `/activity?limit=${ACTIVITY_LIMIT}`),
+          coreActivity,
+          signal,
+        )
       ).facts;
     }
     this.items = items;
@@ -355,7 +357,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
       // A read that fails, or hangs past its timeout, is a failed contact.
       this.failed(error);
       this.options.log.warn(
-        { error: error instanceof Error ? error.message : String(error) },
+        { error: errorText(error) },
         'état de la machine du socle illisible : le dernier reste',
       );
     }
@@ -417,7 +419,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
 
   /** The code line's open interventions (#59), then their diagnoses. */
   private async readInterventions(): Promise<void> {
-    const path = `/api/workflows/${encodeURIComponent(this.options.code)}/interventions`;
+    const path = workflowPath(this.options.code, '/interventions');
     const answer = await this.client.get(path, coreInterventions, this.abort.signal);
     this.openCards = new Map(answer.interventions.map((item) => [item.id, item.item]));
     this.options.sink.interventions(
@@ -501,7 +503,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
    * intervention is shown without it. A failure keeps the diagnoses held.
    */
   async refreshDiagnoses(): Promise<void> {
-    const path = `/api/workflows/${encodeURIComponent(this.options.code)}/diagnoses`;
+    const path = workflowPath(this.options.code, '/diagnoses');
     try {
       const answer = await this.client.get(path, null, this.abort.signal);
       const listed = (answer as { diagnoses?: unknown } | null)?.diagnoses;
@@ -523,7 +525,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
     } catch (error) {
       if (this.abort.signal.aborted) return;
       this.options.log.warn(
-        { error: error instanceof Error ? error.message : String(error) },
+        { error: errorText(error) },
         'diagnostics du socle illisibles : les derniers restent',
       );
     }
@@ -531,14 +533,17 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
 
   /** The verdicts of a card's failed runs, as the core computes them (#59); a failure keeps those held. */
   async refreshVerdicts(cardId: string): Promise<void> {
-    const path = `/api/workflows/${encodeURIComponent(this.options.code)}/items/${encodeURIComponent(cardId)}/run-verdicts`;
+    const path = workflowPath(
+      this.options.code,
+      `/items/${encodeURIComponent(cardId)}/run-verdicts`,
+    );
     try {
       const answer = await this.client.get(path, coreRunVerdicts, this.abort.signal);
       this.options.sink.verdicts(cardId, answer.verdicts as RunVerdict[]);
     } catch (error) {
       if (this.abort.signal.aborted) return;
       this.options.log.warn(
-        { cardId, error: error instanceof Error ? error.message : String(error) },
+        { cardId, error: errorText(error) },
         'verdicts des runs du socle illisibles : les derniers restent',
       );
     }
@@ -549,7 +554,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
    * ones received (main.ts asks again every 5 minutes).
    */
   async refreshAgents(): Promise<void> {
-    const path = `/api/workflows/${encodeURIComponent(this.options.code)}/agents?days=${AGENTS_DAYS}`;
+    const path = workflowPath(this.options.code, `/agents?days=${AGENTS_DAYS}`);
     // Reads may overlap (the timer and a full read after a reset): only the latest one started counts.
     const read = ++this.agentsRead;
     try {
@@ -560,7 +565,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
     } catch (error) {
       if (this.abort.signal.aborted) return;
       this.options.log.warn(
-        { error: error instanceof Error ? error.message : String(error) },
+        { error: errorText(error) },
         'agents du socle illisibles : les derniers reçus restent',
       );
     }
@@ -571,7 +576,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
    * leaves the stored days as they are (main.ts asks again every minute).
    */
   async refreshUsage(days: number): Promise<void> {
-    const path = `/api/workflows/${encodeURIComponent(this.options.code)}/usage?days=${days}`;
+    const path = workflowPath(this.options.code, `/usage?days=${days}`);
     try {
       const usage = await this.client.get(path, coreUsage, this.abort.signal);
       this.options.sink.usage(
@@ -590,7 +595,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
     } catch (error) {
       if (this.abort.signal.aborted) return;
       this.options.log.warn(
-        { error: error instanceof Error ? error.message : String(error) },
+        { error: errorText(error) },
         'usage du socle illisible : les jours gardés restent',
       );
     }
@@ -680,14 +685,14 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
     const query = `subject=${subject}&id=${encodeURIComponent(id)}`;
     try {
       const answer = await this.client.get(
-        `/api/workflows/${encodeURIComponent(workflow)}/data?${query}`,
+        workflowPath(workflow, `/data?${query}`),
         coreDeclaredData,
         this.abort.signal,
       );
       return answer.data;
     } catch (error) {
       this.options.log.warn(
-        { workflow, subject, id, error: error instanceof Error ? error.message : String(error) },
+        { workflow, subject, id, error: errorText(error) },
         'données déclarées du socle illisibles',
       );
       return [];
