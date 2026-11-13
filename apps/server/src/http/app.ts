@@ -59,7 +59,12 @@ import {
 } from '../application/views.ts';
 import type { ViewDeps } from '../application/views.ts';
 import type { Logger } from '../logger.ts';
-import { GestureError, hermesSideGestures, postGesture } from '../application/gestures.ts';
+import {
+  CODE_WORKFLOW,
+  GestureError,
+  hermesSideGestures,
+  postGesture,
+} from '../application/gestures.ts';
 import { UnblockError, unblockIntervention } from '../application/unblock.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
 import { hostGuard, navigationGuard, requestOrigin, writeGuard } from './guard.ts';
@@ -443,7 +448,7 @@ export function createApp(deps: AppDeps) {
       },
     }),
     async (c) => {
-      const code = deps.unblock.workflow ?? 'factory';
+      const code = deps.unblock.workflow ?? CODE_WORKFLOW;
       try {
         const sent = await postGesture(
           {

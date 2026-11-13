@@ -15,18 +15,30 @@ import type {
  * from the default list of main.ts.
  */
 
+/** The key of the code line's workflow, on the core as on Hermes' side. */
+export const CODE_WORKFLOW = 'factory';
+
+/**
+ * The gestures `workflow` declares in a list by workflow; `null` when the list does not name it. Own keys
+ * only: a name every object inherits (`toString`) is not a workflow.
+ */
+export function declaredIn(
+  declared: Readonly<Record<string, readonly DeclaredGesture[]>>,
+  workflow: string,
+): readonly DeclaredGesture[] | null {
+  return Object.hasOwn(declared, workflow) ? (declared[workflow] ?? null) : null;
+}
+
 /**
  * On Hermes' side of the switch, the code line declares what it always did: the unblocking, a comment on the
  * issue of a blocked card. On the core's side, the list comes from workflow-core (`gestures` of each workflow).
  */
 export const HERMES_SIDE_GESTURES: Readonly<Record<string, readonly DeclaredGesture[]>> = {
-  factory: [{ name: 'unblock', kind: 'comment', repo: null }],
+  [CODE_WORKFLOW]: [{ name: 'unblock', kind: 'comment', repo: null }],
 };
 
 export const hermesSideGestures: GesturesPort = {
-  // Own keys only: a name every object inherits (`toString`) is not a workflow.
-  declared: (workflow) =>
-    Object.hasOwn(HERMES_SIDE_GESTURES, workflow) ? (HERMES_SIDE_GESTURES[workflow] ?? null) : null,
+  declared: (workflow) => declaredIn(HERMES_SIDE_GESTURES, workflow),
 };
 
 export class GestureError extends Error {

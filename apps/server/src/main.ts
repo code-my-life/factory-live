@@ -32,7 +32,7 @@ import { factoryBadge, notifyOpened } from './application/notify.ts';
 import { notifyArrivals, waitingForOwner } from './application/notifications.ts';
 import { KEEP_FINISHED_MS } from './application/projection.ts';
 import { trackUnblockReactions } from './application/unblock.ts';
-import { hermesSideGestures } from './application/gestures.ts';
+import { CODE_WORKFLOW, declaredIn, hermesSideGestures } from './application/gestures.ts';
 import type {
   AgentLogPort,
   DeclaredGesture,
@@ -57,8 +57,6 @@ const now = () => Date.now();
  * workflow-core, and nothing is opened under Hermes' home nor in the factory's repository.
  */
 const onCore = config.LIVE_SOURCE === 'workflow-core';
-/** The code line's workflow, as workflow-core declares it. */
-const CODE_WORKFLOW = 'factory';
 
 const store = (() => {
   try {
@@ -276,8 +274,7 @@ const unblockDeps = {
   // code line's default list on Hermes' side.
   gestures: onCore
     ? {
-        declared: (workflow: string) =>
-          Object.hasOwn(coreGestures, workflow) ? (coreGestures[workflow] ?? null) : null,
+        declared: (workflow: string) => declaredIn(coreGestures, workflow),
       }
     : hermesSideGestures,
   workflow: CODE_WORKFLOW,
