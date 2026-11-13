@@ -19,6 +19,16 @@ export class CoreError extends Error {
   }
 }
 
+/** An error's text, for a log line or the reason of a failed read. */
+export function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** The path of a workflow's route on the core: `/api/workflows/<key>`, then `rest` (`/items`…). */
+export function workflowPath(key: string, rest = ''): string {
+  return `/api/workflows/${encodeURIComponent(key)}${rest}`;
+}
+
 /** The longest a read of the core's API may take. */
 const READ_TIMEOUT_MS = 10_000;
 
@@ -48,7 +58,6 @@ export class WorkflowCoreClient {
     return { Authorization: `Bearer ${this.secret}`, ...extra };
   }
 
-  /** One read route, its answer checked by its schema. */
   /**
    * One read route, its answer checked by its schema. A route without a published schema of its answer
    * (`/diagnoses`) is read with `check` null: the caller checks each part it uses.

@@ -167,4 +167,22 @@ describe('parseWorkflowSheet', () => {
       error: 'group key "models" is reserved for the model providers',
     });
   });
+
+  it('accepte une fiche dont une station déclare ses agents (workflow-core#140)', () => {
+    const sheet = {
+      ...CODE_LINE,
+      stations: CODE_LINE.stations.map((station) =>
+        station.key === 'implementation'
+          ? { ...station, agents: ['coder', 'reviewer'] }
+          : station.key === 'brief'
+            ? { ...station, agents: null }
+            : station,
+      ),
+    };
+    const result = parseWorkflowSheet(sheet);
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.sheet.stations.map((station) => station.key)).toEqual(
+      CODE_LINE.stations.map((station) => station.key),
+    );
+  });
 });

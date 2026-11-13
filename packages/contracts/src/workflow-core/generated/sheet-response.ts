@@ -16,6 +16,7 @@ export type Col = number;
 export type Row = number;
 export type Group = string | null;
 export type Types = string[] | null;
+export type Agents = string[] | null;
 export type Stations = SheetStation[];
 export type From = string;
 export type To = string;
@@ -62,6 +63,7 @@ export interface SheetStation {
   row: Row;
   group?: Group;
   types?: Types;
+  agents?: Agents;
   [k: string]: unknown;
 }
 export interface SheetEdge {

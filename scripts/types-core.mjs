@@ -21,7 +21,7 @@ import prettier from 'prettier';
 const ROOT = resolve(import.meta.dirname, '..');
 const DEFAULT_DIR = join(ROOT, 'packages', 'contracts', 'src', 'workflow-core');
 /** The responses of the core that factory-live reads, by the name of their file in the core's schema/. */
-export const SCHEMAS = [
+const SCHEMAS = [
   'workflows',
   'sheet-response',
   'items',
@@ -67,7 +67,7 @@ function copyFrom(clone, ref, dir) {
 const camel = (name) => name.replace(/-(\w)/g, (_, letter) => letter.toUpperCase());
 
 /** Every generated file of `dir`, by its path, as this script writes it. */
-export async function generate(dir) {
+async function generate(dir) {
   const options = {
     ...(await prettier.resolveConfig(join(DEFAULT_DIR, 'generated', 'x.ts'))),
     parser: 'typescript',

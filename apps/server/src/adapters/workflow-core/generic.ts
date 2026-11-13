@@ -6,25 +6,13 @@ import type {
   TimelineEntry,
 } from '@factory-live/contracts';
 import type { CoreItem } from '@factory-live/contracts/workflow-core';
+import { blockKindOf, cardStatus } from './cards.ts';
 
 /**
  * An item of a generic workflow (#65), as workflow-core serves it, for the generic screen: at this
  * stage each card of the core is its own item, so an item has one card, its runs, and its life. The
  * names of its events stay as the core publishes them (`claimed`, `blocked`…): no catalogue.
  */
-
-const STATUSES = new Set<string>([
-  'triage',
-  'todo',
-  'scheduled',
-  'ready',
-  'running',
-  'blocked',
-  'review',
-  'done',
-  'archived',
-]);
-const BLOCK_KINDS = new Set<string>(['dependency', 'needs_input', 'capability', 'transient']);
 
 /** Where an item stands, from its card's status, in the words of an issue's state. */
 const ITEM_STATUS: Record<KanbanStatus, IssueStatus> = {
@@ -48,14 +36,13 @@ const TONE: Record<string, TimelineEntry['tone']> = {
   done: 'done',
 };
 
-/** The station the core names for the item, when it names one (it does not yet: `null`). */
+/** The station the core names for the item (workflow-core#140); `null` when it names none. */
 function stationOf(item: CoreItem): string | null {
-  const station = (item as { station?: unknown }).station;
-  return typeof station === 'string' && station ? station : null;
+  return item.station || null;
 }
 
 export function genericItem(item: CoreItem): GenericItemView {
-  const status: KanbanStatus = STATUSES.has(item.status) ? (item.status as KanbanStatus) : 'todo';
+  const status = cardStatus(item.status);
   const lastBlock = [...item.events].reverse().find((event) => event.kind === 'blocked');
   const reason = lastBlock?.payload['reason'];
   const profileOfRun = new Map(item.runs.map((run) => [run.id, run.profile]));
@@ -67,10 +54,7 @@ export function genericItem(item: CoreItem): GenericItemView {
     status,
     assignee: item.assignee,
     station: stationOf(item) ?? '',
-    blockKind:
-      item.block_kind !== null && BLOCK_KINDS.has(item.block_kind)
-        ? (item.block_kind as GenericCardView['blockKind'])
-        : null,
+    blockKind: blockKindOf(item.block_kind),
     blockReason: status === 'blocked' && typeof reason === 'string' ? reason : null,
     parents: item.parents,
     skills: item.skills,

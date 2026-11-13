@@ -8,14 +8,15 @@
 // - POST /__control/down, /__control/up: the core stops answering (its streams cut, 502) or comes back;
 // - POST /__control/change {workflow?, id, patch}: a card changes, announced on the stream;
 // - POST /__control/reset {state: 'initial'|'after'}: a new epoch with that state, announced by `reset`;
-// - GET /__control/comments: the comments factory-live posted on GitHub.
+// - GET /__control/comments: the comments factory-live posted on GitHub;
+// - GET /__control/intervention: the id of cv-site#49's intervention in the current state;
+// - GET /__control/healthz: the fake core is up (Playwright waits for it), whether it answers or not.
 import { readFileSync, readdirSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { z } from 'zod';
 import * as scenario from './fake-core-scenario.mjs';
 
 const port = Number(process.env.PORT ?? 4182);
-const SECRET = process.env.FAKE_CORE_SECRET ?? 'secret-du-socle-des-e2e';
 
 // --- The core's JSON Schema, from the copies factory-live keeps --------------------------------------
 const SCHEMA_DIR = new URL('../packages/contracts/src/workflow-core/schema/', import.meta.url);
@@ -103,7 +104,7 @@ const SHEETS = { factory: scenario.CODE_SHEET, essai: scenario.ESSAI_SHEET };
 
 function core(request, response, url) {
   if (!up) return json(response, 502, { error: 'unavailable', detail: 'core stopped' });
-  if (request.headers.authorization !== `Bearer ${SECRET}`)
+  if (request.headers.authorization !== `Bearer ${scenario.SECRET}`)
     return json(response, 401, checked('error', { error: 'unauthorized', detail: 'wrong secret' }));
   const path = url.pathname;
   const params = url.searchParams;
@@ -232,13 +233,15 @@ function core(request, response, url) {
       checked('interventions', {
         schema_version: 1,
         workflow: key,
-        interventions: items.factory.has('t_1a9f0049')
+        interventions: items.factory.has(scenario.BLOCKED_CARD)
           ? scenario.interventions(at, generation)
           : [],
       }),
     );
   if (rest === 'diagnoses') {
-    const diagnoses = items.factory.has('t_1a9f0049') ? scenario.diagnoses(at, generation) : [];
+    const diagnoses = items.factory.has(scenario.BLOCKED_CARD)
+      ? scenario.diagnoses(at, generation)
+      : [];
     for (const each of diagnoses) checked('diagnosis', each.diagnosis);
     return json(response, 200, { schema_version: 1, workflow: key, diagnoses });
   }
