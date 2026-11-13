@@ -77,12 +77,12 @@ export interface CoreSink {
   history(workflow: string, items: CoreItem[], complete: boolean): void;
   /** Every open intervention of the code line, from a full read (#59). */
   interventions(items: CoreInterventionState[]): void;
-  /** An intervention the core announces as opened, then as closed (#59). */
   /**
    * The gestures each workflow declares (#61), by workflow, the ones read by their own adapter included: the
    * owner may post them from the screen. A workflow that declares none has an empty list.
    */
   gestures(declared: Record<string, DeclaredGesture[]>): void;
+  /** An intervention the core announces as opened, then as closed (#59). */
   interventionOpened(item: CoreInterventionState): void;
   interventionClosed(id: string): void;
   /** The diagnoses of the interventions, by id; `null` for one of a refused form (#59). */
@@ -129,6 +129,7 @@ function older(a: string, b: string): boolean {
   const [eb = 0, nb = 0] = b.split(':').map(Number);
   return ea < eb || (ea === eb && na < nb);
 }
+
 /** A check of the machine, in factory-live's units (#62). */
 function checkState(check: CoreMachineCheck): CoreCheckState {
   return {
@@ -544,10 +545,6 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
   }
 
   /**
-   * Reads the code line's usage over the last `days` days and sends its rows; a failure is logged and
-   * leaves the stored days as they are (main.ts asks again every minute).
-   */
-  /**
    * Reads the code line's agents and the kanban's settings (#93); a failure is logged and leaves the last
    * ones received (main.ts asks again every 5 minutes).
    */
@@ -569,6 +566,10 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
     }
   }
 
+  /**
+   * Reads the code line's usage over the last `days` days and sends its rows; a failure is logged and
+   * leaves the stored days as they are (main.ts asks again every minute).
+   */
   async refreshUsage(days: number): Promise<void> {
     const path = `/api/workflows/${encodeURIComponent(this.options.code)}/usage?days=${days}`;
     try {
@@ -651,7 +652,6 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
     this.options.sink.workflows(this.views());
   }
 
-  /** The generic workflows: their sheet and the state of their read; their screen comes later (#65). */
   /** The workflows the core declares besides the code line and those read by their own adapter (#65). */
   genericWorkflows(): GenericWorkflowView[] {
     const since =

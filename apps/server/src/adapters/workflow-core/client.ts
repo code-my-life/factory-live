@@ -48,7 +48,6 @@ export class WorkflowCoreClient {
     return { Authorization: `Bearer ${this.secret}`, ...extra };
   }
 
-  /** One read route, its answer checked by its schema. */
   /**
    * One read route, its answer checked by its schema. A route without a published schema of its answer
    * (`/diagnoses`) is read with `check` null: the caller checks each part it uses.
