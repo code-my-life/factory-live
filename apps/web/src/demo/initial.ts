@@ -837,7 +837,7 @@ export function createInitialState(now: number): DemoState {
         detail: 'Échec prouvé sur la base 3f9c2e1 : 2 tests rouges (npm test -- team)',
       }),
       timeline(ago(7 * min), 'claude -p', {
-        source: 'hermes',
+        source: 'runtime',
         profile: 'coder-claude',
         cardId: CARDS.teamImpl,
         detail: LANE_COMMAND,
@@ -941,7 +941,7 @@ export function createInitialState(now: number): DemoState {
           attempts: null,
         }),
         {
-          source: 'hermes',
+          source: 'runtime',
           profile: 'coder',
           cardId: CARDS.contactImpl,
           tone: 'danger',
@@ -1825,7 +1825,7 @@ export function createInitialState(now: number): DemoState {
     [RUNS.teamImpl]: [
       {
         runId: RUNS.teamImpl,
-        source: 'hermes',
+        source: 'runtime',
         title: msg('transcript.agent', { profile: 'coder-claude', session: null }),
         name: null,
         startedAt: now - 11 * min * 1000,
@@ -2042,7 +2042,7 @@ export function createInitialState(now: number): DemoState {
     [RUNS.contactGate]: [
       {
         runId: RUNS.contactGate,
-        source: 'hermes',
+        source: 'runtime',
         title: msg('transcript.agent', { profile: 'gate', session: null }),
         name: null,
         startedAt: now - 6 * min * 1000,
@@ -2079,7 +2079,7 @@ export function createInitialState(now: number): DemoState {
     [RUNS.teamBrief]: [
       {
         runId: RUNS.teamBrief,
-        source: 'hermes',
+        source: 'runtime',
         title: msg('transcript.agent', { profile: 'coordinator-claude', session: null }),
         name: null,
         startedAt: now - 38 * min * 1000,

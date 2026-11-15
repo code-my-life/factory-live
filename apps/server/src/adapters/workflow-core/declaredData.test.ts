@@ -380,6 +380,32 @@ describe('données déclarées de la factory lues par le socle (#60)', () => {
     ]);
   });
 
+  it('la session d’un agent a la source runtime', async () => {
+    h = harness();
+    const columns = ['Heure', 'Rôle', 'Texte', 'Outil', 'Modèle', 'Statut'];
+    const { views } = await coreSide({
+      'run:2': [
+        {
+          name: 'agent-session',
+          label: "Session de l'agent",
+          values: [
+            {
+              type: 'table',
+              label: "Session de l'agent",
+              columns,
+              rows: [[new Date(1_000_000).toISOString(), 'assistant', 'Fait', null, null, null]],
+            },
+          ],
+        },
+      ],
+    });
+
+    const shown = transcripts(coreViewDeps(h), 2, await views.transcripts(2));
+
+    expect(shown?.map((view) => view.source)).toEqual(['runtime']);
+    expect(shown?.[0]?.entries.map((entry) => entry.text)).toEqual(['Fait']);
+  });
+
   it('la dérive d’un agent lue par le socle est celle de la référence', async () => {
     h = harness();
     // The coder's drift the reading of its configurations gave before #72: its model in service (`auto`)

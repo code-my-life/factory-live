@@ -9,6 +9,7 @@ import type {
   IssueSummary,
   ProfileView,
   PullRequestView,
+  ServiceHealth,
   Snapshot,
   StreamEvent,
   TranscriptView,
@@ -16,6 +17,8 @@ import type {
 } from '@factory-live/contracts';
 import {
   AcceptanceLayoutPreference,
+  FACTORY_RUNTIME,
+  ServiceHealth as ServiceHealthSchema,
   STREAM_PING,
   STREAM_PING_EVERY_MS,
 } from '@factory-live/contracts';
@@ -70,8 +73,13 @@ type SavedPullRequest = Omit<PullRequestView, PullRequestAdded> &
   Partial<Pick<PullRequestView, PullRequestAdded>>;
 type SavedIssue = Omit<IssueSummary, IssueAdded | 'pr'> &
   Partial<Pick<IssueSummary, IssueAdded>> & { pr: SavedPullRequest | null };
+/** A tile as some version saved it: before #109, the runtime's tiles had a group named after the runtime. */
+type SavedHealth = Omit<ServiceHealth, 'group'> & { group: string };
 /** A snapshot as some version saved it on the device. */
-type SavedSnapshot = Omit<Snapshot, 'issues'> & { issues: SavedIssue[] };
+type SavedSnapshot = Omit<Snapshot, 'issues' | 'health'> & {
+  issues: SavedIssue[];
+  health: SavedHealth[];
+};
 
 function defaultStorage(): Pick<Storage, 'getItem' | 'setItem'> | null {
   try {
@@ -535,11 +543,13 @@ export class LiveSource implements FactoryDataSource {
 /**
  * A snapshot saved on the device by an earlier version lacks the fields added since: they get the
  * defaults the server's contracts give them (an issue without type, proof nor journey; a PR without
- * reviews nor delivery facts), so that no screen reads a missing field before the stream answers.
+ * reviews nor delivery facts), so that no screen reads a missing field before the stream answers. A tile
+ * whose group is no longer known (the runtime's former name, before #109) belongs to the runtime's group.
  */
 export function upgradeSaved(snapshot: SavedSnapshot): Snapshot {
   return {
     ...snapshot,
+    health: snapshot.health.map((service) => ({ ...service, group: knownGroup(service.group) })),
     issues: snapshot.issues.map(({ type = null, lane = null, journey = [], pr, ...issue }) => ({
       ...issue,
       type,
@@ -548,6 +558,12 @@ export function upgradeSaved(snapshot: SavedSnapshot): Snapshot {
       pr: pr ? upgradePullRequest(pr) : null,
     })),
   };
+}
+
+const GROUPS: readonly string[] = ServiceHealthSchema.shape.group.options;
+
+function knownGroup(group: string): ServiceHealth['group'] {
+  return GROUPS.includes(group) ? (group as ServiceHealth['group']) : FACTORY_RUNTIME;
 }
 
 function upgradePullRequest({

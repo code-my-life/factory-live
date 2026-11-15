@@ -56,6 +56,20 @@ describe('lignes de timeline', () => {
     });
   });
 
+  it('montrent une source inconnue, d’un serveur d’une autre version, comme celle du runtime', () => {
+    const unknown = { ...entry, source: 'renamed', tone: 'neutral' } as unknown as TimelineEntry;
+    const runtime = fromTimelineEntry(
+      { ...entry, source: 'runtime', tone: 'neutral' },
+      i18nOf('fr'),
+    );
+    const shown = fromTimelineEntry(unknown, i18nOf('fr'));
+    expect(shown).toMatchObject({
+      icon: runtime.icon,
+      iconLabel: runtime.iconLabel,
+      condensed: true,
+    });
+  });
+
   it('montrent tel quel ce qu’une ancienne ligne enregistrée en français portait', () => {
     expect(
       fromActivity({ ...event, label: 'Skill chargée', detail: null }, i18nOf('en')),

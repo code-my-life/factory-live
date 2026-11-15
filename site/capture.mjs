@@ -135,7 +135,7 @@ const SHOTS = [
     route: '/health',
     clip: (page) =>
       box(page, [
-        'section[aria-labelledby="groupe-hermes"]',
+        'section[aria-labelledby="groupe-runtime"]',
         'section[aria-labelledby="groupe-models"]',
       ]),
   },
