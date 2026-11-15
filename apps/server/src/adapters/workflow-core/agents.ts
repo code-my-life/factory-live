@@ -11,14 +11,14 @@ import type {
 
 /**
  * The agents of the code line as workflow-core serves them (#93, workflow-core#129), behind the profiles'
- * port on the core's side of the switch: the list, each agent's configuration in service, its skills and
- * the kanban's settings. Without an answer, the last one received stays. Nothing of Hermes is opened: the
- * configuration in the repository is not read here (the drift comes from the core, #60).
+ * port: the list, each agent's configuration in service, its skills and the kanban's settings. Without an
+ * answer, the last one received stays. Nothing of the factory is opened: the configuration in the repository
+ * is not read here (the drift comes from the core, #60).
  */
 
 type Agent = AgentsResponse['agents'][number];
 
-/** Hermes' settings when the core does not give them, as the Hermes reader takes them. */
+/** The factory's settings when the core does not give them. */
 const DEFAULT_ROOT: RootSettings = { maxInProgress: 2, maxInProgressPerProfile: 1 };
 
 const positive = (value: number | null | undefined, fallback: number): number =>
@@ -123,11 +123,6 @@ export class CoreProfiles implements ProfilesPort {
           }
         : {}),
     };
-  }
-
-  /** Changes when the core's answer for this agent changes: the hub reads its facts again then. */
-  factsStamp(name: string): string {
-    return JSON.stringify(this.agent(name) ?? null);
   }
 
   /** The agent's limits with the defaults the core publishes, in the core's order. */

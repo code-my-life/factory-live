@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { awaitingApproval, scriptedVerdicts } from './gateVerdicts.ts';
 import { aRun, aTask } from './fixtures.test-helpers.ts';
-import type { Board, Comment } from './hermes.ts';
+import type { Board, Comment } from './board.ts';
 
 /** Le début des commentaires que rend la gate scriptée de la factory (factory-gate.py) ; la suite n'est pas lue. */
 const GREEN =

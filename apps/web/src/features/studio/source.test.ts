@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEMO_STUDIO } from '../../demo/sheets.ts';
 import { createDemoStudioSource, createLiveStudioSource } from './source.ts';
 
 const VIDEO = {
@@ -13,6 +14,49 @@ const VIDEO = {
 };
 
 describe('createLiveStudioSource', () => {
+  it('la vue du studio dessine la fiche servie par le socle', async () => {
+    // What this server answers for the studio: the sheet workflow-core serves (#72), the videos its own
+    // adapter reads from the studio (WORKFLOWS).
+    let served: { sheet: unknown; sheetRefusal: string | null } = {
+      sheet: null,
+      sheetRefusal: null,
+    };
+    const asked: string[] = [];
+    const source = createLiveStudioSource((input) => {
+      asked.push(input instanceof Request ? input.url : input.toString());
+      return Promise.resolve(
+        Response.json({
+          name: 'studio',
+          ...served,
+          items: [VIDEO],
+          readAt: 0,
+          unreachableSince: null,
+          error: null,
+        }),
+      );
+    });
+
+    // Before the core's first sheet: the studio waits for it, its videos already there.
+    expect(await source.status()).toMatchObject({ sheetRead: false });
+    expect(await source.items()).toEqual([VIDEO]);
+
+    // The core's sheet: the studio's graph is drawn from it, as it is.
+    served = { sheet: DEMO_STUDIO, sheetRefusal: null };
+    expect(await source.status()).toMatchObject({
+      sheetRead: true,
+      sheet: { ok: true, sheet: DEMO_STUDIO },
+    });
+
+    // The core refuses the sheet: why, as it says it.
+    served = { sheet: null, sheetRefusal: 'duplicate station "revue"' };
+    expect((await source.status()).sheet).toEqual({
+      ok: false,
+      error: 'duplicate station "revue"',
+    });
+    // Everything is read through this server, nothing from the studio itself.
+    expect(asked.every((url) => url.startsWith('/api/workflows/studio'))).toBe(true);
+  });
+
   it('sans réponse, le geste est refusé et le détail garde la vidéo déjà lue', async () => {
     let online = true;
     const source = createLiveStudioSource((input) => {
@@ -22,7 +66,7 @@ describe('createLiveStudioSource', () => {
           ? Response.json({
               name: 'studio',
               sheet: null,
-              sheetError: null,
+              sheetRefusal: null,
               items: [VIDEO],
               readAt: 0,
               unreachableSince: null,

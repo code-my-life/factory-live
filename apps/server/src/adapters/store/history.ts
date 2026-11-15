@@ -3,34 +3,27 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { AcceptanceLayout } from '@factory-live/contracts';
 import type { AcceptanceDevice, ActivityEvent } from '@factory-live/contracts';
-import type { Board, Comment, Run, Task, TaskEvent } from '@factory-live/domain';
 import type { AppCredentials, GitHubAuthStore, UserTokens } from '../github/app.ts';
 import type {
   ActivityFilter,
   HistoryPort,
-  KanbanDelta,
   StationRecord,
   UnblockRecord,
   UnblockState,
-  UsageDelta,
   UsageRow,
   HistoryItem,
 } from '../../application/ports.ts';
 
-export type { StationRecord, UnblockRecord, UnblockState, UsageDelta, UsageRow };
+export type { StationRecord, UnblockRecord, UnblockState, UsageRow };
 
 /**
- * Base propre à factory-live, dans son volume Docker : miroir du kanban (le `gc` d'Hermès purge après
- * 30 jours), activité reçue, usage observé, abonnements push, déblocages et journal d'audit.
- * C'est la seule base que factory-live écrit.
+ * factory-live's own database, in its Docker volume: the history of the items the core served, the activity
+ * received, the usage observed, push subscriptions, unblockings and the audit log. It is the only database
+ * factory-live writes. The tables of the old kanban mirror (`tasks`, `runs`, `events`, `comments`, `links`)
+ * stay in an existing database: nothing reads or writes them any more (#72).
  */
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, data TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY, data TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, task_id TEXT NOT NULL, data TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY, task_id TEXT NOT NULL, data TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS links (parent_id TEXT NOT NULL, child_id TEXT NOT NULL, PRIMARY KEY (parent_id, child_id));
 CREATE TABLE IF NOT EXISTS activity (seq INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, data TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS activity_at ON activity(at);
 CREATE TABLE IF NOT EXISTS usage_daily (
@@ -123,57 +116,6 @@ export class HistoryStore implements HistoryPort, GitHubAuthStore {
       .run(key, value);
   }
 
-  /** Recopie ce que le kanban vient de rendre : cartes et runs remplacés, événements et commentaires ajoutés. */
-  mirror(delta: KanbanDelta): void {
-    this.transaction(() => {
-      const task = this.db.prepare(
-        'INSERT INTO tasks (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data',
-      );
-      for (const item of delta.tasks) task.run(item.id, JSON.stringify(item));
-      const run = this.db.prepare(
-        'INSERT INTO runs (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data',
-      );
-      for (const item of delta.runs) run.run(item.id, JSON.stringify(item));
-      const link = this.db.prepare(
-        'INSERT OR IGNORE INTO links (parent_id, child_id) VALUES (?, ?)',
-      );
-      for (const item of delta.links) link.run(item.parentId, item.childId);
-      const event = this.db.prepare(
-        'INSERT OR IGNORE INTO events (id, task_id, data) VALUES (?, ?, ?)',
-      );
-      for (const item of delta.events) event.run(item.id, item.taskId, JSON.stringify(item));
-      const comment = this.db.prepare(
-        'INSERT OR IGNORE INTO comments (id, task_id, data) VALUES (?, ?, ?)',
-      );
-      for (const item of delta.comments) comment.run(item.id, item.taskId, JSON.stringify(item));
-    });
-  }
-
-  board(): Board & { comments: Comment[] } {
-    return {
-      tasks: this.db
-        .prepare('SELECT data FROM tasks')
-        .all()
-        .map((row) => parse<Task>(row['data'])),
-      runs: this.db
-        .prepare('SELECT data FROM runs ORDER BY id')
-        .all()
-        .map((row) => parse<Run>(row['data'])),
-      events: this.db
-        .prepare('SELECT data FROM events ORDER BY id')
-        .all()
-        .map((row) => parse<TaskEvent>(row['data'])),
-      links: this.db
-        .prepare('SELECT parent_id, child_id FROM links')
-        .all()
-        .map((row) => ({ parentId: String(row['parent_id']), childId: String(row['child_id']) })),
-      comments: this.db
-        .prepare('SELECT data FROM comments ORDER BY id')
-        .all()
-        .map((row) => parse<Comment>(row['data'])),
-    };
-  }
-
   appendActivity(events: readonly ActivityEvent[]): void {
     if (events.length === 0) return;
     this.transaction(() => {
@@ -223,28 +165,6 @@ export class HistoryStore implements HistoryPort, GitHubAuthStore {
   /** Le détail des appels est purgé après 30 jours ; les agrégats d'usage restent. */
   purgeActivity(before: number): number {
     return Number(this.db.prepare('DELETE FROM activity WHERE at < ?').run(before).changes);
-  }
-
-  addUsage(delta: UsageDelta): void {
-    this.db
-      .prepare(
-        `INSERT INTO usage_daily (day, model, provider, profile, calls, input, output, rate_limited, errors)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(day, model, provider, profile) DO UPDATE SET
-           calls = calls + excluded.calls, input = input + excluded.input, output = output + excluded.output,
-           rate_limited = rate_limited + excluded.rate_limited, errors = errors + excluded.errors`,
-      )
-      .run(
-        delta.day,
-        delta.model,
-        delta.provider,
-        delta.profile,
-        delta.calls ?? 0,
-        delta.input ?? 0,
-        delta.output ?? 0,
-        delta.rateLimited ?? 0,
-        delta.errors ?? 0,
-      );
   }
 
   setUsage(rows: readonly UsageRow[]): void {
@@ -492,26 +412,6 @@ export class HistoryStore implements HistoryPort, GitHubAuthStore {
         lastSeenAt: Number(row['last_seen_at']),
         goneAt: row['gone_at'] === null ? null : Number(row['gone_at']),
       }));
-  }
-
-  seedHistory(
-    workflow: string,
-    items: readonly { id: string; state: unknown }[],
-    at: number,
-  ): boolean {
-    const key = `history:seeded:${workflow}`;
-    if (this.meta(key) !== null) return false;
-    this.transaction(() => {
-      const insert = this.db.prepare(
-        `INSERT OR IGNORE INTO item_history (workflow, item, state, first_seen_at, last_seen_at, gone_at)
-         VALUES (?, ?, ?, ?, ?, NULL)`,
-      );
-      for (const item of items) insert.run(workflow, item.id, JSON.stringify(item.state), at, at);
-      this.db
-        .prepare('INSERT INTO meta (key, value) VALUES (?, ?)')
-        .run(key, new Date(at).toISOString());
-    });
-    return true;
   }
 
   close(): void {

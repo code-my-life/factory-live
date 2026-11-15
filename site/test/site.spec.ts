@@ -248,12 +248,12 @@ for (const site of PAGES) {
     test('les étapes d’installation s’ouvrent une à une', async ({ page }) => {
       await page.goto(site.path);
       const tabs = page.locator('#start').getByRole('tab');
-      await expect(tabs).toHaveCount(5);
+      await expect(tabs).toHaveCount(4);
       await expect(page.locator('#step-tailnet')).toBeHidden();
-      await tabs.nth(2).click();
+      await tabs.nth(1).click();
       await expect(page.locator('#step-tailnet')).toBeVisible();
       await expect(page.locator('#step-tailnet code').first()).toContainText('tailscale serve');
-      await expect(page.locator('#step-hermes')).toBeHidden();
+      await expect(page.locator('#step-container')).toBeHidden();
     });
 
     test('le lien de langue mène à l’autre page', async ({ page }) => {

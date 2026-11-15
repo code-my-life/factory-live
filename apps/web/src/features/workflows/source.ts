@@ -1,6 +1,7 @@
-import { DeclaredDataList, GenericWorkflows, parseWorkflowSheet } from '@factory-live/contracts';
+import { DeclaredDataList, GenericWorkflows } from '@factory-live/contracts';
 import type { DeclaredData } from '@factory-live/contracts';
 import { demoWorkflows } from '../../demo/workflows.ts';
+import { sheetStateOf } from '../line/graph/sheetState.ts';
 import type { GenericWorkflow } from './model.ts';
 
 /** What a declared data is about: an item (a card of the core) or a run. */
@@ -17,7 +18,7 @@ export interface WorkflowsSource {
 
 /**
  * The live build's generic workflows, read through this server (`/api/core-workflows`), which reads
- * them from workflow-core. A server on Hermes' side declares none.
+ * them from workflow-core.
  */
 export function createLiveWorkflowsSource(
   fetchImpl: typeof fetch = (input, init) => fetch(input, init),
@@ -35,10 +36,7 @@ export function createLiveWorkflowsSource(
         if (!parsed.success) return null;
         return parsed.data.workflows.map((workflow) => ({
           key: workflow.name,
-          sheet:
-            workflow.sheetError !== null
-              ? { ok: false, error: workflow.sheetError }
-              : parseWorkflowSheet(workflow.sheet),
+          sheet: sheetStateOf(workflow.sheet, workflow.sheetRefusal),
           items: workflow.items,
           unreachableSince:
             workflow.unreachableSince === null ? null : Date.parse(workflow.unreachableSince),

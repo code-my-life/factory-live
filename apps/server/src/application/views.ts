@@ -1,4 +1,4 @@
-import { msg } from '@factory-live/contracts';
+import { FACTORY_RUNTIME, msg } from '@factory-live/contracts';
 import type {
   AcceptanceTwins,
   CardView,
@@ -20,7 +20,6 @@ import {
   TOOL_DEADLINE_DEFAULT,
   cardKindOf,
   finishedIssues,
-  hookTimeoutsByPlugin,
   gateVerdicts,
   groupByIssue,
   humanResponseMinutes,
@@ -35,15 +34,11 @@ import { acceptanceOf } from './acceptance.ts';
 import { configDrift } from './drift.ts';
 import type { Hub } from './hub.ts';
 import type {
-  AgentLogPort,
-  CardFilesPort,
   GateProof,
   GitHubReadPort,
   HistoryPort,
   ProfilesPort,
   RunTranscripts,
-  SessionInfo,
-  SessionsPort,
   TranscriptLine,
 } from './ports.ts';
 import { iso, projectInterventions, projectIssues } from './projection.ts';
@@ -51,14 +46,10 @@ import { iso, projectInterventions, projectIssues } from './projection.ts';
 export interface ViewDeps {
   hub: Hub;
   store: HistoryPort;
-  sessions: SessionsPort;
   profiles: ProfilesPort;
   github: GitHubReadPort | null;
-  files: CardFilesPort;
   /** The factory's twin bench (#23): a PR's pair, as the recette shows it; absent without a bench. */
   twins?: { view(repo: string, pr: number): AcceptanceTwins | null } | null;
-  /** Hermes agent log: hook timeouts, per guard. */
-  agentLog: AgentLogPort | null;
   owner: string;
   boardName: string;
   dashboardUrl: string | null;
@@ -72,28 +63,7 @@ function text(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function sessionOf(deps: ViewDeps, run: Run): SessionInfo | null {
-  try {
-    return deps.sessions.sessionOfRun(run.profile, {
-      startedAt: run.startedAt,
-      endedAt: run.endedAt,
-      workerSessionId: text(run.metadata['worker_session_id']),
-    });
-  } catch {
-    return null;
-  }
-}
-
-function runModel(
-  deps: ViewDeps,
-  run: Run,
-  task: Task,
-  session: SessionInfo | null,
-): ModelRef | null {
-  if (session) {
-    const usage = deps.sessions.modelUsage(run.profile, session.id).at(-1);
-    if (usage) return { model: usage.model, provider: usage.provider, source: 'session' };
-  }
+function runModel(deps: ViewDeps, run: Run, task: Task): ModelRef | null {
   if (task.modelOverride)
     return {
       model: task.modelOverride,
@@ -134,8 +104,8 @@ export function acceptanceSubject(
 }
 
 /**
- * The detail of an issue. On the core's side, the gate's proofs of the PR's head come read from the core
- * (`proofs`, #60, for the commit `head`) instead of the cards' evidence.
+ * The detail of an issue. The gate's proofs of the PR's head come read from the core (`proofs`, #60, for the
+ * commit `head`).
  */
 export function issueDetail(
   deps: ViewDeps,
@@ -166,8 +136,6 @@ export function issueDetail(
   const issue = projectIssues(input, projectInterventions(input)).find((item) => item.key === key);
   if (!issue) return null;
 
-  let tokens = 0;
-  let cost = 0;
   const parents = new Map<string, string[]>();
   for (const link of board.links)
     parents.set(link.childId, [...(parents.get(link.childId) ?? []), link.parentId]);
@@ -177,10 +145,6 @@ export function issueDetail(
     const runs: RunView[] = board.runs
       .filter((run) => run.taskId === task.id)
       .map((run) => {
-        const session = sessionOf(deps, run);
-        const runTokens = session ? session.inputTokens + session.outputTokens : null;
-        tokens += runTokens ?? 0;
-        cost += session?.costUsd ?? 0;
         const claudeModel = text(run.metadata['claude_model']);
         return {
           id: run.id,
@@ -190,13 +154,13 @@ export function issueDetail(
           outcome: run.outcome,
           startedAt: isoSeconds(run.startedAt),
           endedAt: run.endedAt === null ? null : isoSeconds(run.endedAt),
-          model: runModel(deps, run, task, session),
+          model: runModel(deps, run, task),
           laneModel: claudeModel
             ? { model: claudeModel, provider: 'anthropic', source: 'session' }
             : null,
           summary: run.summary,
-          tokens: runTokens,
-          costUsd: session?.costUsd ?? null,
+          tokens: null,
+          costUsd: null,
           verdict: verdicts.get(run.id) ?? null,
         };
       });
@@ -224,7 +188,7 @@ export function issueDetail(
         task,
         task.status === 'review' || (task.status === 'running' && current?.role === 'reviewer'),
       ),
-      // The type of a past block stays recorded by Hermes: it only counts if the card is blocked.
+      // The type of a past block stays recorded on the card: it only counts if the card is blocked.
       blockKind: task.status === 'blocked' ? task.blockKind : null,
       blockReason: task.status === 'blocked' ? text(lastBlock?.payload['reason']) : null,
       parents: parents.get(task.id) ?? [],
@@ -233,10 +197,7 @@ export function issueDetail(
       changedFiles: [...files].map(([path, edits]) => ({ path, edits })),
       testsPassed,
       testsTotal,
-      evidence: (deps.files.evidence(task.id) ?? []).map((file) => ({
-        ...file,
-        at: isoSeconds(file.at),
-      })),
+      evidence: [],
     };
   });
 
@@ -253,7 +214,7 @@ export function issueDetail(
     .map((event) => ({
       id: event.id,
       at: event.at,
-      source: 'hermes',
+      source: FACTORY_RUNTIME,
       profile: event.profile,
       cardId: event.cardId,
       label: event.label,
@@ -267,15 +228,15 @@ export function issueDetail(
     issue,
     cards,
     timeline: [...kanban, ...hooks].sort((left, right) => left.at.localeCompare(right.at)),
-    tokens,
-    costUsd: Math.round(cost * 10_000) / 10_000,
+    tokens: 0,
+    costUsd: 0,
     acceptance: source
       ? acceptanceOf(
           source,
           // Proofs read for another head (GitHub moved meanwhile) are not this head's: none is shown.
           prepared.proofs && (prepared.head === undefined || prepared.head === source.head)
             ? prepared.proofs
-            : ids.flatMap((id) => deps.files.gateProofs(id, source.head.slice(0, 7))),
+            : [],
           twinsOf(deps, source.prUrl, source.pr),
         )
       : null,
@@ -293,65 +254,16 @@ function repoOf(prUrl: string): string | null {
   return /^https:\/\/github\.com\/[^/]+\/([^/]+)\/pull\/\d+/.exec(prUrl)?.[1] ?? null;
 }
 
-/**
- * Transcripts of a run: Hermes session (with card raw log), then Claude Code lane if any. On the core's
- * side, they come read from the core (`prepared`, #60).
- */
+/** Transcripts of a run, as the core gives them (#60): the agent's session, then each Claude Code lane. */
 export function transcripts(
   deps: ViewDeps,
   runId: number,
-  prepared?: RunTranscripts | null,
+  prepared: RunTranscripts | null,
 ): TranscriptView[] | null {
-  const board = deps.hub.boardData;
-  const run = board.runs.find((item) => item.id === runId);
-  const task = run ? board.tasks.find((item) => item.id === run.taskId) : undefined;
+  const run = deps.hub.boardData.runs.find((item) => item.id === runId);
+  const task = run ? deps.hub.boardData.tasks.find((item) => item.id === run.taskId) : undefined;
   if (!run || !task) return null;
-  if (prepared !== undefined) return preparedTranscripts(runId, run.profile, prepared);
-  const session = sessionOf(deps, run);
-  const terminal = deps.files.cardLog(task.id) ?? [];
-  const views: TranscriptView[] = [
-    {
-      runId,
-      source: 'hermes',
-      title: msg('transcript.hermes', { profile: run.profile, session: session?.id ?? null }),
-      name: null,
-      startedAt: session ? session.startedAt * 1000 : null,
-      endedAt: session && session.endedAt !== null ? session.endedAt * 1000 : null,
-      costUsd: session?.costUsd ?? null,
-      entries: session
-        ? deps.sessions
-            .transcript(run.profile, session.id)
-            .map((entry) => ({ ...entry, at: iso(entry.at) }))
-        : [],
-      terminal,
-    },
-  ];
-  if (task.workspacePath) {
-    const from = run.startedAt * 1000 - 60_000;
-    const to = (run.endedAt ?? deps.now() / 1000) * 1000 + 10 * 60_000;
-    const lanes = deps.files.claudeTranscripts(task.workspacePath, from, to);
-    // When the run is still running, the last-launched lane is "en cours": its
-    // endedAt is null even though the file has a last timestamp.
-    const isRunning = run.endedAt === null;
-    const lastStarted = lanes.reduce<number | null>((acc, lane) => {
-      if (lane.startedAt === null) return acc;
-      return acc === null || lane.startedAt > acc ? lane.startedAt : acc;
-    }, null);
-    for (const lane of lanes) {
-      views.push({
-        runId,
-        source: 'claude-code',
-        title: msg('transcript.claudeCode', { costUsd: lane.costUsd }),
-        name: lane.name,
-        startedAt: lane.startedAt,
-        endedAt: isRunning && lane.startedAt === lastStarted ? null : lane.endedAt,
-        costUsd: lane.costUsd,
-        entries: lane.entries.map((entry) => ({ ...entry, at: iso(entry.at) })),
-        terminal: [],
-      });
-    }
-  }
-  return views;
+  return preparedTranscripts(runId, run.profile, prepared);
 }
 
 /** A run's transcripts as the core gives them (#60): no session id, start, end nor cost is published. */
@@ -365,13 +277,13 @@ function preparedTranscripts(
   return [
     {
       runId,
-      source: 'hermes',
-      title: msg('transcript.hermes', { profile, session: null }),
+      source: FACTORY_RUNTIME,
+      title: msg('transcript.agent', { profile, session: null }),
       name: null,
       startedAt: null,
       endedAt: null,
       costUsd: null,
-      entries: entries(prepared?.hermes ?? []),
+      entries: entries(prepared?.agent ?? []),
       terminal: prepared?.terminal ?? [],
     },
     ...(prepared?.lanes ?? []).map((lane): TranscriptView => ({
@@ -388,10 +300,10 @@ function preparedTranscripts(
   ];
 }
 
-/** Hermes timeouts that cut agent work: set in its config, or defaults. */
+/** The factory's timeouts that cut agent work: set in its config, or defaults. */
 function limitsOf(facts: ProfileFacts | null): ProfileLimit[] {
   if (!facts) return [];
-  // A negative or zero value disables the limit in Hermes: nothing set to show.
+  // A negative or zero value disables the limit: nothing set to show.
   const set = (value: number | null) => (value !== null && value > 0 ? value : null);
   return [
     {
@@ -416,10 +328,7 @@ function limitsOf(facts: ProfileFacts | null): ProfileLimit[] {
   ];
 }
 
-/**
- * The agents' screen. On the core's side, each agent's drift comes read from the core (`drift`, #60)
- * instead of its configurations.
- */
+/** The agents' screen; each agent's drift comes read from the core (`drift`, #60). */
 export function profileViews(
   deps: ViewDeps,
   periodDays = 30,
@@ -447,11 +356,7 @@ export function profileViews(
     const passes = verdicts.filter((verdict) => verdict.implementer === name);
     const chain = live ? [...(live.model ? [live.model] : []), ...live.fallbacks] : [];
     const facts = safeFacts(deps, name);
-    const timeouts =
-      deps.profiles.hookTimeouts?.(name) ??
-      (facts
-        ? hookTimeoutsByPlugin(safeLogs(deps, name, since, deps.now() / 1000), facts)
-        : new Map<string, number>());
+    const timeouts = deps.profiles.hookTimeouts?.(name) ?? new Map<string, number>();
     return {
       name,
       role: (manifest.profiles[name]?.skills ?? []).join(', ') || msg('agent.role.default'),
@@ -537,25 +442,6 @@ export function usageReport(deps: ViewDeps, periodDays: number): UsageReport {
     day.rateLimited += row.rateLimited;
     daily.set(row.day, day);
   }
-  if (observed.length === 0) {
-    // Before webhooks: usage recorded by Hermes in sessions (model as it sees it, often "auto").
-    for (const profile of deps.hub.profiles) {
-      for (const row of safeUsage(deps, profile, deps.now() / 1000 - periodDays * 86_400)) {
-        add(row.model, row.provider, {
-          calls: row.calls,
-          input: row.inputTokens,
-          output: row.outputTokens,
-          rateLimited: 0,
-          errors: 0,
-          cost: row.costUsd,
-        });
-        byProfile.set(profile, (byProfile.get(profile) ?? 0) + row.inputTokens + row.outputTokens);
-        const day = daily.get(row.day) ?? { tokens: 0, rateLimited: 0 };
-        day.tokens += row.inputTokens + row.outputTokens;
-        daily.set(row.day, day);
-      }
-    }
-  }
   return {
     periodDays,
     models: [...models.values()].sort(
@@ -577,22 +463,6 @@ function safeFacts(deps: ViewDeps, profile: string): ProfileFacts | null {
     return deps.profiles.facts(profile);
   } catch {
     return null;
-  }
-}
-
-function safeLogs(deps: ViewDeps, profile: string, from: number, to: number) {
-  try {
-    return deps.agentLog?.facts(profile, from, to) ?? [];
-  } catch {
-    return [];
-  }
-}
-
-function safeUsage(deps: ViewDeps, profile: string, since: number) {
-  try {
-    return deps.sessions.usageSince(profile, since);
-  } catch {
-    return [];
   }
 }
 

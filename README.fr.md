@@ -96,7 +96,7 @@ Autour d’eux, la recette donne le reste des preuves, ci-dessous.
 - **Les jumeaux vivants.** L’app avant et après la pull request, toutes deux en marche dans sa recette, tes gestes rejoués de l’une sur l’autre (voir [Les jumeaux vivants](#les-jumeaux-vivants--teste-la-pr-pas-son-diff)).
 - **Interventions et déblocage.** La question entière de l’agent, et une zone de réponse. Ta réponse est postée sur l’issue en `/factory unblock <réponse>`, à ton nom sur GitHub ; le bot de la factory réagit, la carte repart, et l’app suit chaque étape. Une carte retenue pour une autre raison vient avec les commandes exactes à copier. Les blocages qui t’attendent arrivent aussi sur ton smartphone en notification push, avec une pastille sur l’icône de l’app.
 - **Agents et modèles.** Chaque agent avec son rôle, sa chaîne de modèles dans l’ordre des fallbacks, son effort, ses skills et ses plugins, les refus de ses gardes sur 7 jours, son taux de passage en gate et sa durée médiane de run, et la dérive entre la configuration en service et celle du dépôt.
-- **Santé.** Gateway, dispatcher, pause, dashboard, fournisseurs de modèles (freellmapi, NVIDIA, llama.cpp et sa VRAM, Claude Code), serveurs MCP, API et webhooks GitHub, tâches cron, et les sources de factory-live lui-même.
+- **Santé.** Gateway, dispatcher, pause, dashboard, fournisseurs de modèles (freellmapi, NVIDIA, llama.cpp et sa VRAM, Claude Code), serveurs MCP, API et webhooks GitHub, tâches cron, et workflow-core, la source de factory-live.
 - **Coûts et quotas.** Jetons, appels et réponses 429 par jour, par modèle et par agent, et le coût estimé des runs Claude, sur 24 heures, 7 ou 30 jours.
 - **Historique et stats.** Issues terminées, délai médian du label au merge, blocages, ton temps de réponse médian, temps par station, passage en gate du premier coup pour chaque harnais et modèle, et les dernières issues terminées avec leur version.
 
@@ -107,59 +107,44 @@ L’en-tête dit toujours l’état du lien : en direct, connexion, hors ligne a
 ```mermaid
 flowchart LR
   subgraph host["Ta machine, Linux ou WSL"]
-    W["Workers Hermès<br/>un par carte"]
-    G["Gateway et dispatcher<br/>avec factory-live-probe"]
-    D[("kanban.db, state.db,<br/>logs des cartes, transcriptions Claude Code")]
+    H["La factory<br/>Hermès Agent et son kanban"]
+    C["workflow-core<br/>lit la factory, juge les fiches"]
   end
   subgraph box["factory-live, Docker, 127.0.0.1:8446"]
-    I["Ingestion signée<br/>HMAC, anti-rejeu"]
+    R["La lecture du socle<br/>état complet, puis son flux"]
     S["État en direct et historique<br/>volume SQLite"]
     A["Hono : REST, SSE, Web Push"]
   end
   P["La PWA<br/>ordinateur, tablette, smartphone"]
   GH["GitHub<br/>issues, PR, CI"]
-  W -- "webhooks sortants" --> I
-  G -- "santé toutes les 30 s" --> I
-  D -. "lecture seule" .-> S
-  I --> S --> A
+  H -. "lecture seule" .-> C
+  C -- "API et flux SSE, secret partagé" --> R
+  R --> S --> A
   A -- "SSE et Web Push, par ton tailnet" --> P
   P -- "ta réponse" --> A
   A -- "commentaire /factory unblock" --> GH
-  GH -. "le bot débloque la carte" .-> W
+  GH -. "le bot débloque la carte" .-> H
 ```
 
-- **Webhooks sortants natifs, signés.** Le réglage `hooks.outbound` d’Hermès Agent poste chaque événement (appels d’outils, réponses de modèles, événements du kanban, sessions, skills, sous-agents) vers `/api/ingest/hermes`, signé HMAC-SHA256 avec un secret partagé. Hermès les envoie depuis une file bornée dans un thread démon : un agent n’est jamais ralenti, et rien n’est écrit sur disque pour factory-live. Les hooks qui transportent toute la conversation ne sont pas abonnés.
-- **Une sonde de santé.** Le plugin `factory-live-probe` tourne dans le gateway, vérifie les services toutes les 30 secondes et poste un rapport signé vers `/api/ingest/health`. Après 90 secondes sans rapport, la sonde est dite muette.
-- **Les cartes, par workflow-core.** Les tableaux, leurs cartes et leurs runs, le diagnostic d’un blocage et l’état de la machine viennent de l’API HTTP de workflow-core et de son flux Server-Sent Events, derrière un secret partagé. Chaque événement porte l’état complet de la carte et un curseur ; après un redémarrage, factory-live reprend au curseur, et un `reset` lui fait relire tout l’état. workflow-core ouvre les bases d’Hermès en lecture seule ; factory-live n’en ouvre aucune. La base d’OpenCode porte des jetons OAuth : elle n’est jamais montée.
+- **La factory, par workflow-core, et rien d’autre.** Les tableaux, leurs cartes et leurs runs, les fiches des workflows, les agents au travail, l’activité, les coûts, les interventions avec le diagnostic d’un blocage et l’état de la machine viennent de l’API HTTP de workflow-core et de son flux Server-Sent Events, derrière un secret partagé. Chaque événement porte l’état complet de la carte et un curseur ; après un redémarrage, factory-live reprend au curseur, et un `reset` lui fait relire tout l’état. workflow-core ouvre les bases de la factory en lecture seule ; factory-live n’en monte aucune, ni le dépôt de la factory, ni aucune transcription.
+- **Les fiches que juge le socle.** La ligne du code et le studio se dessinent depuis les fiches que workflow-core sert et juge. Aucune n’est embarquée dans l’app : avant la première, la ligne dit qu’elle l’attend ; quand le socle ne répond plus, la dernière reste.
 - **Un seul flux pour tous les écrans.** Le serveur tient l’état en direct et envoie chaque changement par Server-Sent Events. Un `ping` après 15 secondes de silence garde le lien honnête ; un flux muet 45 secondes est relancé, et l’app dit quand elle est hors ligne.
 - **Une Progressive Web App.** Installée depuis le navigateur, sans store, sur ordinateur, Android, iPhone ou iPad ; un service worker garde la coque disponible hors ligne, et l’app s’ouvre sur le dernier état reçu, gardé sur l’appareil. L’API ne passe jamais par le cache.
 - **Push.** Web Push avec des clés VAPID générées au premier démarrage, seulement pour les blocages qui t’attendent. Le contact envoyé aux services de push est l’adresse du dépôt, jamais un e-mail.
-- **Le banc de jumeaux.** La factory fait tourner chaque paire de jumeaux dans Docker, sur des réseaux internes sans Internet, chaque app dans un Chromium Neko diffusé en WebRTC, derrière un miroir qui rejoue les gestes d’un jumeau sur l’autre. factory-live ne lance aucun conteneur : il lit l’état de la paire sur le tableau, se connecte à Neko pour l’app (le mot de passe de session reste sur le serveur) et relaie tes gestes au miroir, derrière la même garde que le déblocage.
+- **Le banc de jumeaux.** La factory fait tourner chaque paire de jumeaux dans Docker, sur des réseaux internes sans Internet, chaque app dans un Chromium Neko diffusé en WebRTC, derrière un miroir qui rejoue les gestes d’un jumeau sur l’autre. factory-live ne lance aucun conteneur : il lit l’état de la paire dans workflow-core, demande au miroir une session de spectateur pour chaque jumeau (aucun mot de passe n’arrive à factory-live) et relaie tes gestes au miroir, derrière la même garde que le déblocage.
 - **Déblocage.** Une GitHub App dédiée, créée en un clic depuis factory-live, lit issues, PR et CI avec son jeton d’installation ; le commentaire part avec ton jeton utilisateur, et le bot de la factory le prend donc pour le tien.
 
 Le code suit une clean architecture vérifiée en CI : règles pures dans `packages/domain`, contrats zod dans `packages/contracts`, cas d’usage derrière des ports dans `apps/server/src/application`, adaptateurs et HTTP autour, et la PWA dans `apps/web`. Le détail : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) et [docs/decisions/](docs/decisions/).
 
-Si factory-live s’arrête, la factory ne le remarque pas : les envois échouent sans bloquer aucun agent, et factory-live se recale sur les bases à son redémarrage.
+Si factory-live s’arrête, ni la factory ni workflow-core ne le remarquent : factory-live relit tout l’état du socle à son redémarrage.
 
 ## Démarrer
 
-Il te faut Linux ou WSL avec Docker, Hermès Agent avec un kanban, Tailscale pour tes autres appareils, et un compte GitHub.
+Il te faut Linux ou WSL avec Docker, Hermès Agent avec un kanban lu par workflow-core, Tailscale pour tes autres appareils, et un compte GitHub.
 
-### 1. Côté Hermès
+### 1. workflow-core
 
-Chaque agent déclare factory-live dans ses hooks sortants, avec les événements à envoyer :
-
-```yaml
-hooks:
-  outbound:
-    - name: factory-live
-      url: http://127.0.0.1:8446/api/ingest/hermes
-      secret_env: FACTORY_LIVE_HOOK_SECRET
-      timeout: 2
-      events: [pre_tool_call, post_tool_call, post_api_request, api_request_error, on_session_end]
-```
-
-Le secret est une valeur aléatoire dans `~/.hermes/.env` (`FACTORY_LIVE_HOOK_SECRET`), copiée dans `~/.config/factory-live/hook-secret` en mode 600. Le plugin `factory-live-probe` tourne dans le gateway. Dans la factory de Code My Life, son installateur fait ces trois étapes.
+factory-live lit la factory par workflow-core (`code-my-life/workflow-core`), sur cette machine au port 8447. Copie son secret partagé (`WORKFLOW_CORE_SECRET` de `~/.config/workflow-core/.env`) dans `~/.config/factory-live/workflow-core-secret`, sans retour à la ligne, en mode 600. Sans son adresse ou son secret, factory-live s’arrête au démarrage en nommant ce qui manque.
 
 ### 2. Le conteneur
 
@@ -197,17 +182,17 @@ Ouvre `http://localhost:8446/api/github/setup` et confirme sur GitHub : factory-
 
 Les variables de `docker/compose.yaml`, posées dans `docker/.env` :
 
-| Variable           | Rôle                                                                                           |
-| ------------------ | ---------------------------------------------------------------------------------------------- |
-| `PUBLIC_ORIGINS`   | Les adresses de l’app : `http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`        |
-| `TAILSCALE_LOGINS` | Les logins Tailscale autorisés à écrire depuis un autre appareil, par exemple `<login>@github` |
-| `HERMES_BOARD`     | Le kanban de la factory (`factory`)                                                            |
-| `GITHUB_OWNER`     | L’organisation ou le compte GitHub de la factory                                               |
-| `FACTORY_REPO`     | Le dépôt de la factory, lu pour sa configuration (dérive)                                      |
-| `DASHBOARD_URL`    | L’adresse du dashboard Hermès, liée depuis l’app                                               |
-| `LOG_LEVEL`        | `info` par défaut                                                                              |
+| Variable            | Rôle                                                                                                      |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| `PUBLIC_ORIGINS`    | Les adresses de l’app : `http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`                   |
+| `TAILSCALE_LOGINS`  | Les logins Tailscale autorisés à écrire depuis un autre appareil, par exemple `<login>@github`            |
+| `GITHUB_OWNER`      | L’organisation ou le compte GitHub de la factory                                                          |
+| `WORKFLOW_CORE_URL` | L’adresse de workflow-core vue du conteneur (`http://host.docker.internal:8447`)                          |
+| `WORKFLOWS`         | Les workflows suivis par leur propre API, pour leurs éléments (`studio=http://host.docker.internal:8448`) |
+| `DASHBOARD_URL`     | L’adresse du dashboard de la factory, liée depuis l’app                                                   |
+| `LOG_LEVEL`         | `info` par défaut                                                                                         |
 
-Les valeurs par défaut visent la factory de Code My Life ; le login GitHub autorisé à débloquer se règle dans `apps/server/src/config.ts`. Exploitation, montages, secrets et pannes : [docs/RUNBOOK.md](docs/RUNBOOK.md).
+Les valeurs par défaut visent la factory de Code My Life ; le login GitHub autorisé à débloquer se règle dans `apps/server/src/config.ts`. Son secret est `~/.config/factory-live/workflow-core-secret`. Exploitation, montages, secrets et pannes : [docs/RUNBOOK.md](docs/RUNBOOK.md).
 
 ## Développement
 
@@ -216,7 +201,7 @@ Node.js 24.15 ou plus.
 ```bash
 npm ci
 npm run dev:web       # l’app sur les données de démo, http://127.0.0.1:5173
-npm run dev:server    # le serveur sur ton ~/.hermes, en lecture seule, port 8446
+npm run dev:server    # le serveur sur workflow-core (WORKFLOW_CORE_URL et workflow-core-secret requis), port 8446
 npm run verify        # format, lint (ESLint, Stylelint avec les règles de Primer), types, texte, architecture, tests, build
 npm run e2e           # Playwright : la démo sur écrans d’ordinateur et de smartphone, l’app live sur un faux serveur d’API
 ```
@@ -224,14 +209,13 @@ npm run e2e           # Playwright : la démo sur écrans d’ordinateur et de s
 - **Mode démo.** `VITE_DATA_SOURCE=demo`, par défaut en développement et pour les tests de bout en bout, rejoue un scénario réaliste de la factory sans serveur (`apps/web/src/demo/`) ; `live` branche l’app sur l’API. Le site publie la même démo.
 - **Tests de bout en bout.** Chromium en local ; WebKit (le moteur de Safari) et les captures de référence tournent dans l’image officielle de Playwright, comme en CI. La commande est dans [docs/RUNBOOK.md](docs/RUNBOOK.md).
 - **Le site.** `npm run site:build` construit les pages et la démo dans `site/dist`, `npm run site:preview` les sert sur `http://127.0.0.1:4195/factory-live/`, `npm run site:test` les vérifie, et `npm run site:captures` refait les captures.
-- **Règles.** Le test d’abord, un mot par concept à l’écran, composants et jetons de Primer, aucune écriture dans Hermès : [AGENTS.md](AGENTS.md).
+- **Règles.** Le test d’abord, un mot par concept à l’écran, composants et jetons de Primer, la factory lue par workflow-core seul : [AGENTS.md](AGENTS.md).
 
 La CI lance `npm run verify` sur Node 24 et 26, construit et démarre l’image Docker, et lance les tests de bout en bout sous Chromium et WebKit. Le site a son propre workflow, qui le construit et le teste à chaque pull request et le déploie depuis `main`.
 
 ## Sécurité
 
-- **Lecture seule.** Les bases d’Hermès sont ouvertes en lecture seule et jamais écrites ; la base d’OpenCode et ses jetons ne sont jamais montés.
-- **Entrées signées.** Webhooks et rapports de la sonde sont signés HMAC-SHA256 et vérifiés contre une fenêtre d’anti-rejeu : un envoi non signé ou hors fenêtre est refusé, un doublon n’est jamais appliqué deux fois.
+- **La factory lue par workflow-core seul.** Rien de la factory n’est monté dans le conteneur : ses bases, son dépôt et les transcriptions restent dehors ; workflow-core se lit par HTTP, derrière un secret partagé.
 - **Une seule écriture.** Le commentaire `/factory unblock`, posté à ton nom sur GitHub, seulement depuis cette machine ou depuis le login Tailscale autorisé, avec contrôle de l’origine et 30 écritures par minute au plus.
 - **Exposition.** Le conteneur écoute sur `127.0.0.1:8446` ; les autres appareils le joignent par ton tailnet avec `tailscale serve`, jamais Funnel. Pas de mot de passe : le tailnet est la frontière.
 - **Conteneur.** Utilisateur 1000:1000, système de fichiers racine en lecture seule, aucune capacité.

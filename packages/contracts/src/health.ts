@@ -1,16 +1,17 @@
 import { z } from 'zod';
 import { Timestamp } from './common.ts';
 import { Text } from './messages.ts';
+import { FACTORY_RUNTIME } from './runtime.ts';
 
 export const HealthStatus = z.enum(['ok', 'degraded', 'down', 'unknown']);
 export type HealthStatus = z.infer<typeof HealthStatus>;
 
-/** État d'un service de la factory, vu par la sonde ou déduit des signaux passifs. */
+/** The state of a service of the factory, checked by the core or deduced from passive signals. */
 export const ServiceHealth = z.object({
   id: z.string(),
-  /** Tels que la sonde les envoie, ou fabriqués par factory-live pour ce qu'il observe lui-même. */
+  /** As the core sends them, or made by factory-live for what it observes itself. */
   label: Text,
-  group: z.enum(['hermes', 'models', 'tools', 'intake', 'factory-live']),
+  group: z.enum([FACTORY_RUNTIME, 'models', 'tools', 'intake', 'factory-live']),
   status: HealthStatus,
   detail: Text,
   checkedAt: Timestamp.nullable(),

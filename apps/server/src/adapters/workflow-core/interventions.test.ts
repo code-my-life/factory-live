@@ -14,10 +14,10 @@ import {
   until,
 } from '../../test/core-scenario.ts';
 import type { Side } from '../../test/core-scenario.ts';
-import { tempDir } from '../../test/hermes-fixtures.ts';
+import { tempDir } from '../../test/board-fixtures.ts';
 import type { CoreIntervention } from '@factory-live/contracts/workflow-core';
 import { commentGestures, coreInterventionState } from './interventions.ts';
-import type { TempDir } from '../../test/hermes-fixtures.ts';
+import type { TempDir } from '../../test/board-fixtures.ts';
 
 /** A real diagnosis, as factory-live computed it on an incident (a question of the agent). */
 const DIAGNOSIS = (
@@ -49,7 +49,7 @@ const NEEDS_INPUT = {
     {
       kind: 'copy',
       label: { code: 'intervention.action.showCard', params: {} },
-      command: 'hermes kanban --board factory show t_1a9f0049',
+      command: 'kanban --board factory show t_1a9f0049',
     },
   ],
 };
@@ -125,7 +125,7 @@ describe('interventions lues par le socle (workflow-core, #59)', () => {
         {
           kind: 'copy',
           label: msg('intervention.action.showCard'),
-          command: 'hermes kanban --board factory show t_1a9f0049',
+          command: 'kanban --board factory show t_1a9f0049',
         },
         // factory-live adds the link of the card's issue, as today.
         {

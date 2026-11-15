@@ -19,7 +19,7 @@ const seconds = { seconds: z.number().nonnegative() };
 const attempt = { attempt: count.nullable(), attempts: count.nullable() };
 
 export const Message = z.discriminatedUnion('code', [
-  // Fil d'activité et action en cours (webhooks d'Hermès).
+  // The activity feed and the action in progress.
   message('activity.tool.unknown', none),
   message('activity.action.llm', none),
   message('activity.llm.tokens', { input: count, output: count }),
@@ -317,7 +317,7 @@ export const Message = z.discriminatedUnion('code', [
   message('unblock.sent', none),
 
   // Transcriptions, agents, coûts, notifications.
-  message('transcript.hermes', { profile: z.string(), session: z.string().nullable() }),
+  message('transcript.agent', { profile: z.string(), session: z.string().nullable() }),
   message('transcript.claudeCode', { costUsd: z.number().nonnegative().nullable() }),
   message('agent.role.default', none),
   message('usage.claudeNote', none),
@@ -331,7 +331,7 @@ export const Message = z.discriminatedUnion('code', [
   message('health.workflow.sheetInvalid', { error: z.string() }),
   message('health.codeSheet', none),
   message('health.codeSheet.published', none),
-  message('health.codeSheet.embedded', { reason: z.string() }),
+  message('health.codeSheet.pending', none),
   message('health.core', none),
   message('health.core.ok', none),
   message('health.core.unreachable', seconds),

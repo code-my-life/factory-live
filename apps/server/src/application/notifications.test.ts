@@ -41,7 +41,7 @@ function studio(items: WorkflowView['items']): WorkflowView {
   return {
     name: 'studio',
     sheet: STUDIO_SHEET,
-    sheetError: null,
+    sheetRefusal: null,
     items,
     readAt: NOW,
     unreachableSince: null,

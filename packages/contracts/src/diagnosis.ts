@@ -3,10 +3,10 @@ import { Timestamp } from './common.ts';
 import { Text } from './messages.ts';
 
 /*
- * Le diagnostic d'un blocage : pourquoi une carte s'arrête, qui doit agir, et si « Débloquer » suffit.
- * Il est calculé par des règles du domaine sur des faits lus dans les sources d'Hermès (kanban,
- * sessions, journal, config des agents, plugins, worktree), jamais par un modèle : chaque phrase est
- * un code du catalogue `Message`, chaque citation un texte d'Hermès ou de l'agent, tel quel.
+ * The diagnosis of a blocker: why a card stops, who must act, and whether « Débloquer » is enough. The core
+ * (workflow-core) computes it by rules on facts read in the factory's sources (kanban, sessions, journal,
+ * agents' config, plugins, worktree), never by a model: each sentence is a code of the `Message` catalogue,
+ * each quote a text of the factory or of the agent, as it is.
  */
 
 /** Les causes que factory-live sait reconnaître ; `unexplained` quand aucune règle ne s'applique. */
@@ -65,10 +65,10 @@ export const Setting = z.object({
   key: z.string(),
   unit: z.enum(['seconds', 'turns']),
   observed: z.number().nonnegative().nullable(),
-  /** `null` : absent de la config, la valeur par défaut d'Hermès s'applique. */
+  /** `null`: absent from the config, the factory's default applies. */
   current: z.number().nonnegative().nullable(),
   defaultValue: z.number().nonnegative().nullable(),
-  /** Limite réellement appliquée, plafonds d'Hermès compris (le plafond des outils englobe le hook). */
+  /** The limit really applied, the factory's caps included (the tools' cap wraps the hook). */
   effective: z.number().nonnegative().nullable(),
   repo: z.number().nonnegative().nullable(),
 });
@@ -93,7 +93,7 @@ export const Evidence = z.object({
   until: Timestamp.nullable(),
   runId: z.number().int().positive().nullable(),
   fact: Text,
-  /** Texte d'Hermès, d'un outil ou de l'agent, tel quel : coupé et secrets masqués. */
+  /** A text of the factory, of a tool or of the agent, as it is: cut, its secrets masked. */
   quote: z.string().max(400).nullable(),
   count: z.number().int().positive().nullable(),
 });
@@ -131,7 +131,7 @@ export type Finding = z.infer<typeof Finding>;
 /**
  * Ce qu'il s'est passé dans un run de l'épisode. `role` : le run est la cause de son propre échec (le
  * modèle s'est arrêté seul), ou il a subi la conséquence d'une cause (outils refusés par une garde ou
- * par Hermès).
+ * par la factory).
  */
 export const RunVerdict = z.object({
   runId: z.number().int().positive(),

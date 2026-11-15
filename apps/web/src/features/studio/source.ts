@@ -4,16 +4,14 @@ import {
   StudioItem,
   StudioItemDetail,
   StudioWord,
-  parseWorkflowSheet,
 } from '@factory-live/contracts';
-import type {
-  StudioGestureInput,
-  WorkflowSheet,
-  WorkflowSheetResult,
-} from '@factory-live/contracts';
+import type { StudioGestureInput, WorkflowSheet } from '@factory-live/contracts';
 import { z } from 'zod';
+import { DEMO_STUDIO } from '../../demo/sheets.ts';
 import { DEMO_AGENTS, DEMO_DERIVED_WORDS, DEMO_VIDEOS, DEMO_WORDS } from '../../demo/studio.ts';
-import { STUDIO_SHEET, kindAt, nextStation, returnOf } from './model.ts';
+import { sheetStateOf } from '../line/graph/sheetState.ts';
+import type { SheetState } from '../line/graph/sheetState.ts';
+import { kindAt, nextStation, returnOf } from './model.ts';
 import type { StudioAgent } from './model.ts';
 
 /** The answer to a gesture: done, or refused with why (the state stays as it was). */
@@ -25,7 +23,7 @@ export interface StudioStatus {
   configured: boolean;
   /** False until the studio has given a sheet: the page says it is reading, not why it failed. */
   sheetRead: boolean;
-  sheet: WorkflowSheetResult;
+  sheet: SheetState;
   /** Since when the studio does not answer (ms), or `null`: the last state read stays shown. */
   unreachableSince: number | null;
   error: string | null;
@@ -34,7 +32,8 @@ export interface StudioStatus {
 /**
  * Where the studio's page reads the studio: its sheet, its videos, a video's detail and aligned words,
  * its agents, and the owner's gesture. The demo has its own studio; the live one is read through this
- * server, which follows the studio's generic API (#31).
+ * server, which follows the studio's generic API (#31) for its videos, and serves the sheet workflow-core
+ * judged (#72).
  */
 export interface StudioSource {
   readonly kind: 'demo' | 'live';
@@ -57,9 +56,7 @@ export interface StudioSource {
  * « ok » sends a waiting video to the next station, and relaunches a failed lane; « refaire » sends it
  * back along its station's return.
  */
-export function createDemoStudioSource(
-  sheet: WorkflowSheet | null = STUDIO_SHEET.ok ? STUDIO_SHEET.sheet : null,
-): StudioSource {
+export function createDemoStudioSource(sheet: WorkflowSheet | null = DEMO_STUDIO): StudioSource {
   const now = Date.now();
   const videos = new Map<string, StudioItemDetail>(
     DEMO_VIDEOS.map(({ minutes, ...video }) => [
@@ -84,7 +81,7 @@ export function createDemoStudioSource(
       Promise.resolve({
         configured: true,
         sheetRead: true,
-        sheet: STUDIO_SHEET,
+        sheet: { ok: true, sheet: DEMO_STUDIO },
         unreachableSince: null,
         error: null,
       }),
@@ -118,7 +115,7 @@ export function createDemoStudioSource(
 
 const WorkflowView = z.object({
   sheet: z.unknown(),
-  sheetError: z.string().nullable(),
+  sheetRefusal: z.string().nullable(),
   items: z.array(StudioItem),
   unreachableSince: z.number().nullable(),
   error: z.string().nullable(),
@@ -133,8 +130,9 @@ const NOT_READ: StudioStatus = {
 };
 
 /**
- * The live studio, read through this server (`/api/workflows/studio`): the sheet and the videos in one
- * read, shared by the calls that come together. No studio configured: a studio with nothing in it.
+ * The live studio, read through this server (`/api/workflows/studio`): the sheet the core serves and the
+ * videos in one read, shared by the calls that come together. No studio configured: a studio with nothing in
+ * it.
  */
 export function createLiveStudioSource(
   fetchImpl: typeof fetch = (input, init) => fetch(input, init),
@@ -153,12 +151,13 @@ export function createLiveStudioSource(
           return { status: { ...NOT_READ, configured: false }, items: [] };
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const view = WorkflowView.parse(await response.json());
-        // No sheet yet and no error: still reading. An error is the workflow's own, shown as is.
-        const sheetRead = view.sheet !== null || view.sheetError !== null;
-        const sheet: WorkflowSheetResult =
+        // No sheet yet and no refusal: still waiting for the core's sheet (#72). A refusal is the core's
+        // own, shown as is; the last sheet it served stays drawn.
+        const sheetRead = view.sheet !== null || view.sheetRefusal !== null;
+        const sheet: SheetState =
           view.sheet === null
-            ? { ok: false, error: view.sheetError ?? '' }
-            : parseWorkflowSheet(view.sheet);
+            ? { ok: false, error: view.sheetRefusal ?? '' }
+            : sheetStateOf(view.sheet, null);
         return {
           status: {
             configured: true,

@@ -1,6 +1,7 @@
-import { parseWorkflowSheet } from '@factory-live/contracts';
+import { WorkflowSheet } from '@factory-live/contracts';
 import type { JourneyStep } from '@factory-live/contracts';
 import { describe, expect, it } from 'vitest';
+import { DEMO_CODE_LINE } from '../../../demo/sheets.ts';
 import { journeyEdges } from './layout.ts';
 
 /**
@@ -15,22 +16,27 @@ const step = (station: string, lane: string | null = null) => ({
 describe('journeyEdges à travers un groupe', () => {
   it('une issue passe la gate par le membre de sa lane, sur ses deux courbes du fan', () => {
     expect(
-      journeyEdges([step('implementation', 'sabotage'), step('gate', 'sabotage'), step('review')]),
+      journeyEdges(
+        [step('implementation', 'sabotage'), step('gate', 'sabotage'), step('review')],
+        DEMO_CODE_LINE,
+      ),
     ).toEqual(['in:sabotage', 'out:sabotage']);
   });
 
   it('sans lane, ou avec une lane qu’aucun membre ne porte, elle passe par le premier membre', () => {
-    expect(journeyEdges([step('implementation'), step('gate'), step('review')])).toEqual([
-      'in:failfirst',
-      'out:failfirst',
-    ]);
     expect(
-      journeyEdges([step('implementation', 'nope'), step('gate', 'nope'), step('review', 'nope')]),
+      journeyEdges([step('implementation'), step('gate'), step('review')], DEMO_CODE_LINE),
+    ).toEqual(['in:failfirst', 'out:failfirst']);
+    expect(
+      journeyEdges(
+        [step('implementation', 'nope'), step('gate', 'nope'), step('review', 'nope')],
+        DEMO_CODE_LINE,
+      ),
     ).toEqual(['in:failfirst', 'out:failfirst']);
   });
 
   it('un groupe sans fan sur sa fiche se traverse par ses liens de ligne, quelle que soit la lane', () => {
-    const parsed = parseWorkflowSheet({
+    const sheet = WorkflowSheet.parse({
       item: { type: 'video', label: 'Vidéo' },
       groups: [{ key: 'check', label: 'Contrôle', icon: 'shield-check' }],
       stations: [
@@ -44,9 +50,9 @@ describe('journeyEdges à travers un groupe', () => {
       ],
       models: [],
     });
-    if (!parsed.ok) throw new Error(parsed.error);
-    expect(
-      journeyEdges([step('write', 'b'), step('check', 'b'), step('done')], parsed.sheet),
-    ).toEqual(['line:write', 'line:check']);
+    expect(journeyEdges([step('write', 'b'), step('check', 'b'), step('done')], sheet)).toEqual([
+      'line:write',
+      'line:check',
+    ]);
   });
 });

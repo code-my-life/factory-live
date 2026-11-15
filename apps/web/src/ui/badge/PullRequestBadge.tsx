@@ -19,7 +19,7 @@ const STATE_ICON = {
 /**
  * A PR: its repository (PR icon tinted with its state) as the label, its number as the value, in the
  * repository's hue. Link to the PR on GitHub; the state is not always known (PR picked up from
- * Hermes runs): the icon is then that of an open PR, with no color. With no known repository, the
+ * the factory's runs): the icon is then that of an open PR, with no color. With no known repository, the
  * number alone.
  */
 export function PullRequestBadge({

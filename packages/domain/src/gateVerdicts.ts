@@ -1,4 +1,4 @@
-import type { Board, Comment, Run, Task } from './hermes.ts';
+import type { Board, Comment, Run, Task } from './board.ts';
 
 /*
  * La gate scriptée de la factory (ADR 0015 de hermes-software-factory) : une voie de contrôle, pas un agent. Elle ne

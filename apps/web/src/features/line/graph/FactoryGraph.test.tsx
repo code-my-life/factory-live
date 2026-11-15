@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../../i18n/I18nProvider.tsx';
 import { MotionProvider } from '../../../ui/motion.tsx';
+import { DEMO_CODE_LINE } from '../../../demo/sheets.ts';
 import { FactoryGraph } from './FactoryGraph.tsx';
 import { boxOf, providerRows } from './model.ts';
 import type { LineIssue } from './model.ts';
@@ -266,7 +267,7 @@ describe('FactoryGraph', () => {
       const worker = { ...agent(state), issueKey: summary.key };
       return {
         items: [{ issue: summary, box: boxOf(summary), agent: worker, intervention: null }],
-        providers: providerRows([worker]),
+        providers: providerRows([worker], DEMO_CODE_LINE),
       };
     };
     const show = (state: AgentActivity['state']) => {

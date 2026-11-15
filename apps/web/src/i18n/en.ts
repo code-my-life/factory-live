@@ -410,7 +410,7 @@ const server: ServerMessages = {
   'github.answerAcknowledged': () => 'The bot acknowledged the answer',
   'unblock.sent': () => 'Answer sent from factory-live',
 
-  'transcript.hermes': ({ profile, session }) =>
+  'transcript.agent': ({ profile, session }) =>
     `Hermès session of ${profile}${session ? ` (${session})` : ''}`,
   'transcript.claudeCode': ({ costUsd }) =>
     `Claude Code lane${costUsd === null ? '' : ` (${f.usd(costUsd)})`}`,
@@ -428,7 +428,7 @@ const server: ServerMessages = {
   'health.workflow.sheetInvalid': ({ error }) => `Invalid sheet, the previous one stays: ${error}`,
   'health.codeSheet': () => 'Sheet of the code line',
   'health.codeSheet.published': () => 'Published by the factory (config/workflow.json)',
-  'health.codeSheet.embedded': ({ reason }) => `Embedded copy: ${reason}`,
+  'health.codeSheet.pending': () => 'Not yet received from the core',
   'health.core': () => 'Core (workflow-core)',
   'health.core.ok': () => 'Answering',
   'health.core.unreachable': ({ seconds }) =>
@@ -604,6 +604,8 @@ export const en: Messages = {
 
   workflow: {
     invalid: 'This workflow’s sheet is refused: the graph cannot be drawn',
+    waitingTitle: 'Sheet of the code line',
+    waiting: 'Waiting for the core’s sheet: the line is drawn as soon as it serves it.',
   },
 
   /** The screen of a workflow the core declares besides the code line and the studio (#65). */

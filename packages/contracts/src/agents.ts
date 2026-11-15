@@ -3,9 +3,9 @@ import { IssueKey, StationId, Timestamp } from './common.ts';
 import { Text } from './messages.ts';
 
 /**
- * Modèle effectivement utilisé et d'où vient l'information :
- * `live` (dernier appel observé), `session` (usage enregistré par Hermès),
- * `override` (forcé sur la carte), `config` (configuration du profil).
+ * The model actually used, and where the information comes from: `live` (the last call observed),
+ * `session` (the usage the factory recorded), `override` (forced on the card), `config` (the agent's
+ * configuration).
  */
 export const ModelRef = z.object({
   model: z.string(),
@@ -26,7 +26,7 @@ export type CurrentAction = z.infer<typeof CurrentAction>;
 export const AgentState = z.enum(['idle', 'queued', 'thinking', 'tool', 'cli', 'blocked']);
 export type AgentState = z.infer<typeof AgentState>;
 
-/** Un profil Hermès vu en direct. */
+/** An agent of the factory, seen live. */
 export const AgentActivity = z.object({
   profile: z.string(),
   station: StationId,
@@ -62,9 +62,9 @@ export const ConfigDrift = z.object({
 export type ConfigDrift = z.infer<typeof ConfigDrift>;
 
 /**
- * Les délais d'Hermès qui coupent le travail d'un agent : hook d'un plugin (`hook_callback_timeout`),
- * plafond d'un outil, hook compris (`tool_deadline`), commande du terminal, tours d'un run.
- * `value` : réglé dans la config de l'agent ; `null`, la valeur par défaut d'Hermès s'applique.
+ * The factory's delays that cut an agent's work: a plugin's hook (`hook_callback_timeout`), a tool's cap, hook
+ * included (`tool_deadline`), a terminal command, the turns of a run. `value`: set in the agent's config;
+ * `null`, the factory's default applies.
  */
 export const LimitKey = z.enum([
   'hook_callback_timeout',

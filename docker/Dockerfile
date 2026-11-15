@@ -32,9 +32,6 @@ FROM ${NODE_IMAGE} AS runtime
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=8446 \
-    HERMES_HOME=/hermes \
-    FACTORY_REPO=/factory \
-    CLAUDE_PROJECTS=/claude-projects \
     DATA_DIR=/data \
     SECRETS_DIR=/run/secrets/factory-live \
     WEB_DIST=/app/apps/web/dist

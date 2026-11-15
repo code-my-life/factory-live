@@ -2,31 +2,27 @@ import {
   AcceptanceLayoutPreference,
   ApiError,
   GitHubAccess,
-  HermesHookBody,
   IssueDetail,
   PushPayload,
   Snapshot,
   StreamEvent,
   msg,
 } from '@factory-live/contracts';
-import { mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
-import { HOOK_TIMEOUT_MESSAGE } from '@factory-live/domain';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHmac } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { trackUnblockReactions } from '../application/unblock.ts';
 import type { GesturesPort } from '../application/ports.ts';
-import { toHookEvent } from '../ingest/hermes.ts';
-import { sign } from '../ingest/signature.ts';
 import { NOW, NOW_S, ORIGINS, SECRET, harness } from '../test/harness.ts';
 import type { Harness } from '../test/harness.ts';
-import { insertEvent, insertRun, insertTask, schemaFor, tempDir } from '../test/hermes-fixtures.ts';
-import type { TempDir } from '../test/hermes-fixtures.ts';
+import { insertEvent, insertRun, updateTask } from '../test/board-fixtures.ts';
 import { TwinBench } from '../adapters/twins/bench.ts';
+import type { DeclaredPair } from '../adapters/twins/bench.ts';
 import { WorkflowApi } from '../adapters/workflows/api.ts';
 import { FakeWorkflow, MASTER, waitingVideo } from '../test/workflow-fixtures.ts';
 import { contentSecurityPolicy } from './app.ts';
 import { CoreHistory } from '../adapters/workflow-core/history.ts';
+import { boardOf } from '../adapters/workflow-core/cards.ts';
 import { WorkflowCoreReader } from '../adapters/workflow-core/reader.ts';
 import { createLogger } from '../logger.ts';
 import { fakeCore } from '../test/fake-core.ts';
@@ -44,41 +40,6 @@ afterEach(() => {
 
 /** Ce PC, tel que le navigateur l'annonce : sans un hôte autorisé, factory-live refuse tout (DNS rebinding). */
 const THIS_PC = { host: 'localhost:8446' };
-/** Hermès et la sonde postent sur 127.0.0.1, au port du service (install.sh de la factory). */
-const FROM_HERMES = { host: '127.0.0.1:8446' };
-
-function hook(
-  event: string,
-  patch: Record<string, unknown> = {},
-  deliveryId = `d-${Math.random().toString(16).slice(2)}`,
-) {
-  return {
-    hook_event_name: event,
-    profile: 'coder',
-    tool_name: null,
-    tool_input: null,
-    session_id: '20261028_170000_abcdef',
-    cwd: '/home/user/.hermes/kanban/boards/factory/workspaces/t_1a9f0049',
-    extra: {},
-    delivery_id: deliveryId,
-    timestamp: new Date(NOW - 1_000).toISOString(),
-    ...patch,
-  };
-}
-
-function postHook(body: unknown, secret = SECRET) {
-  const raw = JSON.stringify(body);
-  return h.app.request('/api/ingest/hermes', {
-    method: 'POST',
-    body: raw,
-    headers: {
-      ...FROM_HERMES,
-      'content-type': 'application/json',
-      'x-hermes-signature-256': sign(raw, secret),
-    },
-  });
-}
-
 const LOCAL = {
   host: 'localhost:8446',
   origin: 'http://localhost:8446',
@@ -179,7 +140,7 @@ describe('contrôle de l’hôte, contre le DNS rebinding', () => {
         ]);
   });
 
-  it('refuse aussi les écritures et l’ingestion, avant leur propre garde', async () => {
+  it('refuse aussi les écritures, avant leur propre garde', async () => {
     const id = encodeURIComponent((await snapshot()).interventions[0]?.id ?? '');
     const unblock = await h.app.request(`/api/interventions/${id}/unblock`, {
       method: 'POST',
@@ -187,19 +148,7 @@ describe('contrôle de l’hôte, contre le DNS rebinding', () => {
       body: JSON.stringify({ text: 'ok' }),
     });
     expect(await refusal(unblock)).toEqual([421, 'host_refused']);
-    const raw = JSON.stringify(
-      hook('pre_tool_call', { tool_name: 'terminal', tool_input: { command: 'npm test' } }),
-    );
-    const ingest = await h.app.request('/api/ingest/hermes', {
-      method: 'POST',
-      body: raw,
-      headers: { host: 'evil.example:8446', 'x-hermes-signature-256': sign(raw, SECRET) },
-    });
-    expect(await refusal(ingest)).toEqual([421, 'host_refused']);
     expect(h.github.calls.filter((call) => call.method === 'POST')).toHaveLength(0);
-    expect((await snapshot()).agents.find((agent) => agent.profile === 'coder')?.state).not.toBe(
-      'tool',
-    );
   });
 
   it('laisse passer ce PC sur le port du service et l’hôte tailnet de la configuration', async () => {
@@ -220,20 +169,20 @@ describe('contrôle de l’hôte, contre le DNS rebinding', () => {
   });
 });
 
-describe('santé du kanban dans /healthz', () => {
-  const healthz = () => h.app.request('/healthz', { headers: FROM_HERMES });
-  const UNREADABLE = 'unable to open database file';
+describe('santé du socle dans /healthz', () => {
+  const healthz = () => h.app.request('/healthz', { headers: { host: '127.0.0.1:8446' } });
+  const UNREACHABLE = 'fetch failed: connect ECONNREFUSED';
 
-  it('/healthz répond 503 après 60 s de lecture du kanban en échec', async () => {
-    h.kanbanWatch.failed(UNREADABLE, h.clock.now);
+  it('/healthz répond 503 après 60 s sans réponse du socle', async () => {
+    h.coreWatch.failed(UNREACHABLE, h.clock.now);
     h.clock.now += 61_000;
     const response = await healthz();
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ ok: false, version: 'test' });
   });
 
-  it('/healthz reste 200 pendant une coupure du kanban de moins de 60 s', async () => {
-    h.kanbanWatch.failed(UNREADABLE, h.clock.now);
+  it('/healthz reste 200 pendant une coupure du socle de moins de 60 s', async () => {
+    h.coreWatch.failed(UNREACHABLE, h.clock.now);
     h.clock.now += 59_000;
     const response = await healthz();
     expect(response.status).toBe(200);
@@ -241,112 +190,24 @@ describe('santé du kanban dans /healthz', () => {
   });
 });
 
-describe('ingestion des webhooks d’Hermès', () => {
-  it('applique un webhook signé : l’agent et le fil changent', async () => {
-    const response = await postHook(
-      hook('pre_tool_call', { tool_name: 'terminal', tool_input: { command: 'npm test' } }),
-    );
-    expect(response.status).toBe(202);
-    const data = await snapshot();
-    expect(data.agents.find((agent) => agent.profile === 'coder')).toMatchObject({
-      state: 'tool',
-      cardId: 't_1a9f0049',
-      issueKey: 'cv-site#49',
-      action: { label: 'terminal', detail: 'npm test' },
-    });
-    expect(data.activity.at(-1)).toMatchObject({
-      kind: 'tool',
-      status: 'running',
-      issueKey: 'cv-site#49',
-    });
-  });
-
-  it('rattache la reprise de la gate à sa carte, pas à la carte impl dont elle occupe le worktree', async () => {
-    const worktree = '/home/user/perso/cv-site/.worktrees/t_1a9f0049';
-    insertTask(h.writer, {
-      id: 't_9a7e0049',
-      title: 'rework cv-site#49 : tests manquants (revue gate)',
-      status: 'running',
-      assignee: 'gate',
-      createdAt: NOW_S - 60,
-    });
-    h.writer
-      .prepare(
-        "UPDATE tasks SET workspace_kind = 'dir', workspace_path = ? WHERE id = 't_9a7e0049'",
-      )
-      .run(worktree);
-    h.syncKanban();
-    await postHook(
-      hook('pre_tool_call', {
-        profile: 'gate',
-        cwd: worktree,
-        tool_name: 'terminal',
-        tool_input: { command: 'npm test' },
-      }),
-    );
-    const data = await snapshot();
-    expect(data.agents.find((agent) => agent.profile === 'gate')).toMatchObject({
-      cardId: 't_9a7e0049',
-      state: 'tool',
-      action: { label: 'terminal', detail: 'npm test' },
-    });
-    expect(data.activity.at(-1)).toMatchObject({ profile: 'gate', cardId: 't_9a7e0049' });
-  });
-
-  it('refuse une signature fausse, n’applique pas deux fois un nouvel essai, refuse un envoi périmé', async () => {
-    expect((await postHook(hook('pre_tool_call'), 'autre-secret')).status).toBe(401);
-    const body = hook(
-      'on_skill_lifecycle',
-      { extra: { action: 'loaded', skill_name: 'factory-author-proof' } },
-      'delivery-fixe',
-    );
-    expect((await postHook(body)).status).toBe(202);
-    expect((await postHook(body)).status).toBe(202);
-    expect((await snapshot()).activity.filter((event) => event.kind === 'skill')).toHaveLength(1);
-    expect(
-      (
-        await postHook(
-          hook('pre_tool_call', { timestamp: new Date(NOW - 3_600_000).toISOString() }),
-        )
-      ).status,
-    ).toBe(400);
-  });
-
-  it('refuse un corps qui n’est pas un webhook d’Hermès', async () => {
-    expect((await postHook({ bonjour: 1 })).status).toBe(400);
-  });
-
-  it('prend le rapport signé de la sonde : gateway en marche, pause visible', async () => {
-    const report = JSON.stringify({
-      v: 1,
-      probe: 'factory-live-probe',
-      at: new Date(NOW).toISOString().replace('Z', '+00:00'),
-      gatewayPid: 4242,
-      kanban: { max_in_progress: 3, max_in_progress_per_profile: 1 },
-      checks: [
-        {
-          id: 'pause',
-          label: 'Pause (ESTOP)',
-          status: 'degraded',
-          detail: 'Factory en pause : maintenance',
-          metrics: {},
+describe('ingestion retirée (#72)', () => {
+  it("les routes d'ingestion d'Hermès n'existent plus", async () => {
+    // A body signed with the old secret's scheme: no route reads it any more.
+    const body = JSON.stringify({ event: 'pre_tool_call', delivery_id: 'd-1' });
+    const signature = `sha256=${createHmac('sha256', SECRET).update(body).digest('hex')}`;
+    for (const path of ['/api/ingest/hermes', '/api/ingest/health']) {
+      const response = await h.app.request(path, {
+        method: 'POST',
+        body,
+        headers: {
+          host: '127.0.0.1:8446',
+          'content-type': 'application/json',
+          'x-factory-live-signature-256': signature,
         },
-      ],
-    });
-    const response = await h.app.request('/api/ingest/health', {
-      method: 'POST',
-      body: report,
-      headers: { ...FROM_HERMES, 'x-factory-live-signature-256': sign(report, SECRET) },
-    });
-    expect(response.status).toBe(202);
-    const data = await snapshot();
-    expect(data.factory).toMatchObject({
-      paused: true,
-      pauseReason: 'maintenance',
-      live: true,
-      maxInProgress: 3,
-    });
-    expect(data.health.find((item) => item.id === 'gateway')).toMatchObject({ status: 'ok' });
+      });
+      expect(response.status, path).toBe(404);
+    }
+    expect((await snapshot()).activity).toEqual([]);
   });
 });
 
@@ -408,11 +269,9 @@ describe('déblocage depuis l’app', () => {
       headers: LOCAL,
       body: JSON.stringify({ text: 'Prends PostgreSQL' }),
     });
-    insertEvent(h.writer, { taskId: 't_1a9f0049', kind: 'unblocked', createdAt: NOW_S + 5 });
-    h.writer
-      .prepare("UPDATE tasks SET status = 'ready', block_kind = NULL WHERE id = 't_1a9f0049'")
-      .run();
-    h.syncKanban();
+    insertEvent(h.core, { taskId: 't_1a9f0049', kind: 'unblocked', createdAt: NOW_S + 5 });
+    updateTask(h.core, 't_1a9f0049', { status: 'ready', block_kind: null });
+    h.syncBoard();
     expect(h.store.unblock(id)?.state).toBe('resumed');
   });
 
@@ -613,7 +472,7 @@ describe('détail d’une issue', () => {
 
 describe('PR relevée par la factory', () => {
   it('donne le lien de la PR noté dans les runs, même sans GitHub relié', async () => {
-    insertRun(h.writer, {
+    insertRun(h.core, {
       taskId: 't_1a9f0049',
       profile: 'coder',
       status: 'done',
@@ -622,7 +481,7 @@ describe('PR relevée par la factory', () => {
       endedAt: NOW_S - 200,
       metadata: { pr_url: 'https://github.com/code-my-life/cv-site/pull/52' },
     });
-    h.syncKanban();
+    h.syncBoard();
     const detail = IssueDetail.parse(
       await (await h.app.request('/api/issues/cv-site/49', { headers: THIS_PC })).json(),
     );
@@ -631,6 +490,17 @@ describe('PR relevée par la factory', () => {
       prUrl: 'https://github.com/code-my-life/cv-site/pull/52',
     });
   });
+});
+
+/** A fact of the core's activity (#66): the coder runs a command on the blocked card. */
+const activity = (id: string, text: string) => ({
+  id,
+  at: NOW - 1_000,
+  kind: 'tool' as const,
+  profile: 'coder',
+  cardId: 't_1a9f0049',
+  text,
+  status: 'running' as const,
 });
 
 describe('flux SSE', () => {
@@ -675,9 +545,7 @@ describe('flux SSE', () => {
     expect(response.headers.get('content-type')).toContain('text/event-stream');
     const reading = read(response, 3);
     await new Promise((resolve) => setTimeout(resolve, 20));
-    await postHook(
-      hook('pre_tool_call', { tool_name: 'terminal', tool_input: { command: 'npm test' } }),
-    );
+    h.hub.addCoreActivity([activity('f1', 'npm test')]);
     h.hub.flush();
     const events = await reading;
     expect(events[0]?.event).toBe('snapshot');
@@ -696,7 +564,7 @@ describe('flux SSE', () => {
   it('reprend après une coupure sans renvoyer d’instantané', async () => {
     h.hub.flush();
     const lastId = h.buffer.lastId;
-    await postHook(hook('pre_tool_call', { tool_name: 'terminal', tool_input: { command: 'ls' } }));
+    h.hub.addCoreActivity([activity('f2', 'ls')]);
     h.hub.flush();
     const events = await read(
       await h.app.request('/api/stream', {
@@ -994,288 +862,6 @@ describe('documentation', () => {
   });
 });
 
-describe('diagnostic des blocages', () => {
-  const CARD = 't_1a9f0049';
-  const coder = () => join(h.dir.path, 'hermes', 'profiles', 'coder');
-  const CONFIG =
-    'model:\n  default: auto\n  provider: freellmapi\nplugins:\n  enabled: [coder-guard]\n';
-
-  /**
-   * Le run bloqué de cv-site#49 refait sur le modèle de factory-live#2 : son `git commit` est refusé par
-   * Hermès, qui a coupé le hook de coder-guard à 30 s. Config sans délai de hook, réglée avant l'incident.
-   */
-  function hookTimeoutIncident() {
-    const db = new DatabaseSync(join(coder(), 'state.db'));
-    db.exec(schemaFor('state', ['system_prompts', 'sessions', 'messages', 'session_model_usage']));
-    const sid = '20261028_163000_abcdef';
-    db.prepare(
-      "INSERT INTO sessions (id, source, profile_name, model, started_at) VALUES (?, 'kanban', 'coder', 'auto', ?)",
-    ).run(sid, NOW_S - 4_998);
-    const message = db.prepare(
-      'INSERT INTO messages (session_id, role, content, tool_call_id, tool_calls, tool_name, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    );
-    message.run(sid, 'user', `work kanban task ${CARD}`, null, null, null, NOW_S - 4_998);
-    const commit = { command: 'git commit -m "feat: page projets"' };
-    message.run(
-      sid,
-      'assistant',
-      null,
-      null,
-      JSON.stringify([
-        {
-          id: 'c1',
-          type: 'function',
-          function: { name: 'terminal', arguments: JSON.stringify(commit) },
-        },
-      ]),
-      null,
-      NOW_S - 1_000,
-    );
-    message.run(
-      sid,
-      'tool',
-      JSON.stringify({ error: HOOK_TIMEOUT_MESSAGE }),
-      'c1',
-      null,
-      'terminal',
-      NOW_S - 969,
-    );
-    db.close();
-    mkdirSync(join(coder(), 'plugins', 'coder-guard'), { recursive: true });
-    writeFileSync(
-      join(coder(), 'plugins', 'coder-guard', '__init__.py'),
-      'def register(ctx):\n    ctx.register_hook("pre_tool_call", pre_tool)\n',
-    );
-    writeConfig(CONFIG, NOW_S - 86_400);
-    h.hub.refreshDiagnoses();
-  }
-
-  function writeConfig(yaml: string, mtime: number) {
-    writeFileSync(join(coder(), 'config.yaml'), yaml);
-    utimesSync(join(coder(), 'config.yaml'), mtime, mtime);
-  }
-
-  const unblock = (id: string, body: Record<string, unknown>) =>
-    h.app.request(`/api/interventions/${encodeURIComponent(id)}/unblock`, {
-      method: 'POST',
-      headers: LOCAL,
-      body: JSON.stringify(body),
-    });
-
-  it('dit la cause, qui agit et si débloquer suffit, sans réseau ni modèle', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const before = h.github.calls.length;
-    hookTimeoutIncident();
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(h.github.calls).toHaveLength(before);
-    fetchSpy.mockRestore();
-    const [intervention] = (await snapshot()).interventions;
-    expect(intervention?.diagnosis?.primary).toMatchObject({
-      code: 'guard_hook_timeout',
-      actor: 'you_factory',
-      cause: { state: 'present' },
-      subject: { plugin: 'coder-guard' },
-    });
-    expect(intervention?.diagnosis?.unblock.when).toBe('after_fix');
-    expect(intervention?.diagnosis?.sources).toMatchObject({ transcript: true, config: true });
-  });
-
-  it('confirme par le journal d’Hermès, à l’heure de Paris, quel hook a été coupé', async () => {
-    hookTimeoutIncident();
-    expect((await snapshot()).interventions[0]?.diagnosis?.sources.agentLog).toBe(false);
-    // 17:43:51 UTC, 18:43:51 à Paris : la ligne du dépassement, 30 s après le `git commit`.
-    mkdirSync(join(coder(), 'logs'), { recursive: true });
-    writeFileSync(
-      join(coder(), 'logs', 'agent.log'),
-      "2026-10-28 18:43:51,000 WARNING [20261028_163000_abcdef] hermes_cli.plugins: Hook 'pre_tool_call' callback pre_tool timed out after 30s \u2014 skipping\n",
-    );
-    h.clock.now = NOW + 16_000;
-    h.hub.refreshDiagnoses();
-    const primary = (await snapshot()).interventions[0]?.diagnosis?.primary;
-    expect(primary).toMatchObject({ code: 'guard_hook_timeout', confidence: 'certain' });
-    expect(primary?.evidence.find((item) => item.source === 'agent_log')).toMatchObject({
-      at: new Date((NOW_S - 969) * 1000).toISOString(),
-    });
-  });
-
-  it('refuse de débloquer tant que la cause est là, sauf à le vouloir', async () => {
-    hookTimeoutIncident();
-    const id = (await snapshot()).interventions[0]?.id as string;
-    expect(await refusal(await unblock(id, { text: 'Reprends' }))).toEqual([409, 'cause_present']);
-    expect(h.github.calls.filter((call) => call.method === 'POST')).toHaveLength(0);
-    const forced = await unblock(id, { text: 'Reprends', acknowledgeCause: true });
-    expect(forced.status).toBe(200);
-    expect(h.github.calls.filter((call) => call.method === 'POST')).toHaveLength(1);
-  });
-
-  it('voit la correction de la config en direct, et laisse alors débloquer', async () => {
-    hookTimeoutIncident();
-    writeConfig(`${CONFIG}  hook_callback_timeout: 600\n`, NOW_S - 300);
-    h.hub.refreshDiagnoses();
-    const [intervention] = (await snapshot()).interventions;
-    expect(intervention?.diagnosis?.primary.cause).toMatchObject({ state: 'fixed' });
-    expect(intervention?.diagnosis?.unblock.when).toBe('now');
-    expect((await unblock(intervention?.id as string, { text: 'Reprends' })).status).toBe(200);
-  });
-
-  it('garde l’intervention débloquée et suit le run suivant, sans la compter', async () => {
-    hookTimeoutIncident();
-    const id = (await snapshot()).interventions[0]?.id as string;
-    insertEvent(h.writer, { taskId: CARD, kind: 'unblocked', createdAt: NOW_S - 100 });
-    h.writer.prepare(`UPDATE tasks SET status = 'running' WHERE id = '${CARD}'`).run();
-    insertRun(h.writer, {
-      taskId: CARD,
-      profile: 'coder',
-      status: 'running',
-      startedAt: NOW_S - 90,
-    });
-    h.syncKanban();
-    const data = await snapshot();
-    expect(data.interventions).toEqual([
-      expect.objectContaining({
-        id,
-        resolvedAt: new Date((NOW_S - 100) * 1000).toISOString(),
-        followUp: { runId: 3, outcome: null, sameCause: null },
-      }),
-    ]);
-    expect(data.issues.find((issue) => issue.key === 'cv-site#49')?.interventionIds).toEqual([]);
-    expect(h.hub.openInterventions).toEqual([]);
-    expect(await refusal(await unblock(id, { text: 'Encore' }))).toEqual([
-      404,
-      'intervention_unknown',
-    ]);
-    // Une demi-heure plus tard, elle n'est plus suivie.
-    h.clock.now = NOW + 31 * 60_000;
-    h.hub.tick();
-    expect((await snapshot()).interventions).toEqual([]);
-  });
-
-  it('donne à la page de l’issue le verdict des runs et les vraies preuves', async () => {
-    hookTimeoutIncident();
-    const evidence = join(
-      h.dir.path,
-      'hermes',
-      'kanban',
-      'boards',
-      'factory',
-      'workspaces',
-      CARD,
-      'evidence',
-    );
-    mkdirSync(evidence, { recursive: true });
-    writeFileSync(join(evidence, '01-test-fails-on-base.txt'), 'FAIL');
-    const detail = IssueDetail.parse(
-      await (await h.app.request('/api/issues/cv-site/49', { headers: THIS_PC })).json(),
-    );
-    const card = detail.cards.find((item) => item.id === CARD);
-    expect(card?.runs.at(-1)?.verdict).toMatchObject({ finding: 'guard_hook_timeout' });
-    expect(card?.evidence.map((file) => [file.name, file.bytes])).toEqual([
-      ['01-test-fails-on-base.txt', 4],
-    ]);
-    expect(detail.cards.find((item) => item.id === 't_b1ef0049')?.blockKind).toBeNull();
-  });
-});
-
-describe('délais des gardes', () => {
-  const coder = () => join(h.dir.path, 'hermes', 'profiles', 'coder');
-
-  /** coder-guard tel qu'il est dans la factory : ses contrôles peuvent durer 900 s, son hook en a 30. */
-  function coderGuard() {
-    mkdirSync(join(coder(), 'plugins', 'coder-guard'), { recursive: true });
-    writeFileSync(
-      join(coder(), 'plugins', 'coder-guard', '__init__.py'),
-      [
-        'def _run(cmd: str, cwd: Path, timeout: int = 900) -> tuple[int, str]:',
-        '    r = subprocess.run(["bash", "-lc", cmd], cwd=cwd, timeout=timeout)',
-        'def register(ctx):',
-        '    ctx.register_hook("pre_tool_call", pre_tool)',
-        '',
-      ].join('\n'),
-    );
-    writeFileSync(
-      join(coder(), 'config.yaml'),
-      'model:\n  default: auto\n  provider: freellmapi\nplugins:\n  enabled: [coder-guard]\n',
-    );
-    mkdirSync(join(coder(), 'logs'), { recursive: true });
-    writeFileSync(
-      join(coder(), 'logs', 'agent.log'),
-      "2026-10-28 18:43:51,000 WARNING [20261028_163000_abcdef] hermes_cli.plugins: Hook 'pre_tool_call' callback pre_tool timed out after 30s \\u2014 skipping\n",
-    );
-  }
-
-  it('signale la garde qui peut dépasser son hook, dans la santé et sur l’écran Agents', async () => {
-    coderGuard();
-    h.hub.refreshDiagnoses();
-    const guards = (await snapshot()).health.find((item) => item.id === 'guards');
-    expect(guards).toMatchObject({
-      status: 'degraded',
-      detail: msg('health.guards.risk', { count: 1 }),
-      metrics: [
-        {
-          label: msg('health.guards.riskItem', { profile: 'coder', plugin: 'coder-guard' }),
-          value: msg('health.guards.limits', { longest: 900, limit: 30 }),
-        },
-      ],
-    });
-    const profiles = (await (
-      await h.app.request('/api/profiles', { headers: THIS_PC })
-    ).json()) as {
-      name: string;
-      plugins: { name: string; timeouts: number; longestSeconds: number | null }[];
-    }[];
-    expect(profiles.find((profile) => profile.name === 'coder')?.plugins).toEqual([
-      expect.objectContaining({ name: 'coder-guard', timeouts: 1, longestSeconds: 900 }),
-    ]);
-  });
-
-  it('suit en direct la config et le code de la garde', async () => {
-    coderGuard();
-    h.hub.refreshDiagnoses();
-    const guards = async () => (await snapshot()).health.find((item) => item.id === 'guards');
-    // 600 s, le maximum d'Hermès : le plafond des outils (420 s) coupe encore avant les 900 s.
-    const config = join(coder(), 'config.yaml');
-    writeFileSync(
-      config,
-      'model:\n  default: auto\n  provider: freellmapi\nplugins:\n  enabled: [coder-guard]\n  hook_callback_timeout: 600\n',
-    );
-    utimesSync(config, new Date(), new Date(Date.now() + 5_000));
-    h.hub.refreshDiagnoses();
-    expect((await guards())?.metrics).toEqual([
-      expect.objectContaining({ value: msg('health.guards.limits', { longest: 900, limit: 420 }) }),
-    ]);
-    // La garde ne lance plus rien de plus long que 300 s : plus de risque.
-    const plugin = join(coder(), 'plugins', 'coder-guard', '__init__.py');
-    writeFileSync(
-      plugin,
-      'def register(ctx):\n    ctx.register_hook("pre_tool_call", pre_tool)\nrun(timeout=300)\n',
-    );
-    utimesSync(plugin, new Date(), new Date(Date.now() + 10_000));
-    h.hub.refreshDiagnoses();
-    expect(await guards()).toMatchObject({ status: 'ok', detail: msg('health.guards.ok') });
-  });
-});
-
-describe('erreurs d’API classées par Hermès', () => {
-  it('compte une limite de débit d’après le type d’erreur, même sans code 429', async () => {
-    const error = (extra: Record<string, unknown>) =>
-      postHook(
-        hook('api_request_error', {
-          extra: { model: 'nemotron-3-ultra', provider: 'nvidia', ...extra },
-        }),
-      );
-    expect(
-      (await error({ error: { type: 'rate_limit', message: 'Too many requests' } })).status,
-    ).toBe(202);
-    expect(
-      (await error({ error: { type: 'server_error', message: 'Bad gateway' }, status_code: 502 }))
-        .status,
-    ).toBe(202);
-    h.hub.flush();
-    const nvidia = (await snapshot()).health.find((item) => item.id === 'provider:nvidia');
-    expect(nvidia?.metrics).toEqual([{ label: msg('health.metric.rateLimited'), value: '1' }]);
-  });
-});
-
 /** GitHub's answers for the PR #52 of cv-site#49, read by the cache to build its recette (#22). */
 function prRoutes(): Record<string, () => Response> {
   const fixture = (path: string) =>
@@ -1374,7 +960,7 @@ describe('recette d’une PR', () => {
   let pr: Harness;
   beforeEach(async () => {
     pr = harness({ githubRoutes: prRoutes() });
-    insertRun(pr.writer, {
+    insertRun(pr.core, {
       taskId: 't_1a9f0049',
       profile: 'coder',
       status: 'done',
@@ -1383,7 +969,7 @@ describe('recette d’une PR', () => {
       endedAt: NOW_S - 200,
       metadata: { pr_url: 'https://github.com/code-my-life/cv-site/pull/52' },
     });
-    pr.syncKanban();
+    pr.syncBoard();
     await pr.refreshGitHub();
   });
   afterEach(() => pr.close());
@@ -1522,16 +1108,8 @@ describe('jumeaux vivants', () => {
         label: 'App',
         kind: 'web',
         changed: true,
-        base: {
-          sha: 'a'.repeat(40),
-          stream: 'http://127.0.0.1:52125/?usr=p&pwd=secret',
-          poster: null,
-        },
-        head: {
-          sha: 'b'.repeat(40),
-          stream: 'http://127.0.0.1:52127/?usr=p&pwd=secret',
-          poster: null,
-        },
+        base: { sha: 'a'.repeat(40), stream: null, poster: null },
+        head: { sha: 'b'.repeat(40), stream: null, poster: null },
         differences: null,
       },
     ],
@@ -1539,31 +1117,30 @@ describe('jumeaux vivants', () => {
     divergence: null,
     mirror: 52129,
   };
-  let dir: TempDir;
   let relayed: string[];
 
   beforeEach(() => {
     h.close();
-    dir = tempDir();
-    writeFileSync(join(dir.path, 'factory-live-25.json'), JSON.stringify(PAIR));
     relayed = [];
-    const twins = new TwinBench({
-      file: (repo, pr) =>
-        repo === 'factory-live' && pr === 25 ? join(dir.path, 'factory-live-25.json') : null,
+    // The pair as the core publishes it (#60): the mirror opens each twin's session.
+    const { mirror, ...twins } = PAIR;
+    const bench = new TwinBench({
+      declared: (repo, pr) =>
+        repo === 'factory-live' && pr === 25
+          ? { twins: twins as DeclaredPair['twins'], mirror }
+          : null,
       host: '127.0.0.1',
       fetchImpl: ((url: string) => {
         relayed.push(url);
         return Promise.resolve(
-          url.endsWith('/api/login')
-            ? Response.json({ token: 'tok' })
+          url.endsWith('/viewer/head')
+            ? Response.json({ port: 52127, token: 'tok' })
             : new Response(null, { status: 200 }),
         );
       }) as typeof fetch,
     });
-    h = harness({ twins });
+    h = harness({ twins: bench });
   });
-
-  afterEach(() => dir.remove());
 
   it('la session d’un jumeau suit l’hôte de la PWA, sans mot de passe', async () => {
     const response = await h.app.request('/api/twins/factory-live/25/session/head', {
@@ -1751,41 +1328,19 @@ describe('workflows suivis par leur API (#31)', () => {
 });
 
 describe('coûts lus par le socle (#66)', () => {
-  it('côté socle, les coûts viennent du socle et les jours passés restent', async () => {
+  it('les coûts viennent du socle et les jours passés restent', async () => {
     const day = (offset: number) => new Date(NOW - offset * 86_400_000).toISOString();
-    // Hermes' side: three days of calls, received as webhooks, one of them refused for quota. They are
-    // applied as the ingestion route applies them: the route itself refuses a two-day-old timestamp.
-    const receive = (body: unknown) => h.hub.applyHook(toHookEvent(HermesHookBody.parse(body)));
+    // Three days of calls, one of them refused for quota.
     const calls = [
       { at: day(2), profile: 'coder', model: 'agnes-2.5-flash', input: 1_000, output: 200 },
       { at: day(1), profile: 'coder', model: 'agnes-2.5-flash', input: 2_000, output: 300 },
       { at: day(1), profile: 'gate', model: 'qwen-3.6', input: 500, output: 50 },
       { at: day(0), profile: 'gate', model: 'qwen-3.6', input: 700, output: 70 },
     ];
-    for (const call of calls)
-      receive(
-        hook('post_api_request', {
-          profile: call.profile,
-          timestamp: call.at,
-          extra: {
-            provider: 'freellmapi',
-            response_model: call.model,
-            usage: { input_tokens: call.input, output_tokens: call.output },
-          },
-        }),
-      );
-    receive(
-      hook('api_request_error', {
-        profile: 'gate',
-        timestamp: day(0),
-        extra: { model: 'qwen-3.6', provider: 'freellmapi', status_code: 429 },
-      }),
-    );
-    const fromHermes = await (
-      await h.app.request('/api/usage?days=7', { headers: THIS_PC })
-    ).json();
+    // The page the factory's webhooks gave for these calls, before #72.
+    const reference = USAGE_REFERENCE;
 
-    // The core's side: the same consumption, as workflow-core serves it, one row per day, model and agent.
+    // The same consumption, as workflow-core serves it, one row per day, model and agent.
     // The refusal for quota counts on the row of its day, model and agent, as the core counts it.
     const rows = calls.map((call, index) => ({
       day: call.at.slice(0, 10),
@@ -1826,6 +1381,7 @@ describe('coûts lus par le socle (#66)', () => {
         sheet: () => undefined,
         workflows: () => undefined,
         gestures: () => undefined,
+        ownSheet: () => undefined,
         failed: () => undefined,
         live: () => undefined,
         activity: () => undefined,
@@ -1846,12 +1402,12 @@ describe('coûts lus par le socle (#66)', () => {
       reader.start();
       await until(() => fake.requests.some((request) => request.path.endsWith('/usage')));
       await until(async () => (await usagePage(core)).models.length > 0);
-      expect(await usagePage(core)).toEqual(fromHermes);
+      expect(await usagePage(core)).toEqual(reference);
 
       // The core no longer serves the oldest day: it stays in factory-live's own table.
       served.rows = served.rows.filter((row) => row.day !== day(2).slice(0, 10));
       await reader.refreshUsage(7);
-      expect(await usagePage(core)).toEqual(fromHermes);
+      expect(await usagePage(core)).toEqual(reference);
       expect(core.store.usageSince(day(2).slice(0, 10)).map((row) => row.day)).toContain(
         day(2).slice(0, 10),
       );
@@ -1864,6 +1420,17 @@ describe('coûts lus par le socle (#66)', () => {
 });
 
 const CORE_SECRET = 'secret-du-socle-de-test';
+
+const reference = (name: string): object =>
+  JSON.parse(
+    readFileSync(
+      new URL(`../../../../fixtures/workflow-core/references/${name}.json`, import.meta.url),
+      'utf8',
+    ),
+  ) as object;
+/** The usage page and the history page of the harness' factory, as computed before #72. */
+const USAGE_REFERENCE = reference('usage');
+const HISTORY_REFERENCE = reference('history');
 
 async function usagePage(on: Harness) {
   return (await (await on.app.request('/api/usage?days=7', { headers: THIS_PC })).json()) as {
@@ -1880,12 +1447,13 @@ async function until(condition: () => boolean | Promise<boolean>, timeoutMs = 3_
 }
 
 describe('historique lu par le socle (#63)', () => {
-  it('côté socle, l’historique donne les mêmes statistiques que côté Hermès', async () => {
+  it('l’historique lu par le socle donne les statistiques de la référence', async () => {
     const stats = async (on: Harness) =>
       (await (await on.app.request('/api/history?days=30', { headers: THIS_PC })).json()) as object;
-    const fromHermes = await stats(h);
+    // The statistics the kanban gave for the harness' factory (cv-site#49), before #72.
+    const reference = HISTORY_REFERENCE;
 
-    // The same miniature factory as the harness's kanban (cv-site#49), as workflow-core serves it.
+    // The harness' factory (cv-site#49), as workflow-core serves it.
     const item = (fields: Record<string, unknown>) => ({
       body: null,
       assignee: null,
@@ -1949,13 +1517,14 @@ describe('historique lu par le socle (#63)', () => {
         ],
       }),
     ];
-    const core = harness({ source: 'workflow-core' });
+    const core = harness();
+    // The harness' board is read from the core below, from an empty board.
+    core.hub.replaceBoard(boardOf([]), core.clock.now);
     const fake = await fakeCore(CORE_SECRET, {
       ...coreState(),
       items: { factory: items, studio: [] },
     });
     const history = new CoreHistory(core.store, () => core.clock.now);
-    history.seed('factory', core.store.board());
     const reader = new WorkflowCoreReader({
       url: fake.url,
       secret: CORE_SECRET,
@@ -1984,12 +1553,13 @@ describe('historique lu par le socle (#63)', () => {
         verdicts: () => undefined,
         agents: () => undefined,
         gestures: () => undefined,
+        ownSheet: () => undefined,
       },
     });
     try {
       reader.start();
       await until(() => core.hub.boardData.tasks.length === 2);
-      expect(await stats(core)).toEqual(fromHermes);
+      expect(await stats(core)).toEqual(reference);
     } finally {
       await reader.stop();
       await fake.close();

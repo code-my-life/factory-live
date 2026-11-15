@@ -8,6 +8,7 @@
 // A generic workflow, `essai`, has two items. After a `reset` (`AFTER`), cv-site#52 is at the gate and
 // cv-site#49 has gone.
 import { readFileSync } from 'node:fs';
+import { FACTORY_RUNTIME } from '../packages/contracts/src/runtime.ts';
 
 const root = new URL('../', import.meta.url);
 const read = (path) => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
@@ -188,8 +189,8 @@ export function essaiItems(now) {
   ];
 }
 
-/** The code line's sheet: the one factory-live embeds, as the core would serve it. */
-export const CODE_SHEET = read('apps/web/src/features/line/graph/workflows/code-line.json');
+/** The code line's sheet, as the core serves it: the one of the demonstration. */
+export const CODE_SHEET = read('apps/web/src/demo/sheets/factory.json');
 
 /** The coder at work on cv-site#52, running `npm test` (#66). */
 export function liveAgents(now) {
@@ -227,7 +228,7 @@ export function interventions(now, generation = 1) {
         {
           kind: 'copy',
           label: { code: 'intervention.action.showCard', params: {} },
-          command: `hermes kanban --board factory show ${BLOCKED_CARD}`,
+          command: `kanban --board factory show ${BLOCKED_CARD}`,
         },
       ],
     },
@@ -312,8 +313,8 @@ export function machine(now) {
     mode: 'normal',
     boards: { factory: { last_read_at: checked }, essai: { last_read_at: checked } },
     checks: [
-      check('gateway', 'Gateway', 'hermes'),
-      check('pause', 'Pause', 'hermes'),
+      check('gateway', 'Gateway', FACTORY_RUNTIME),
+      check('pause', 'Pause', FACTORY_RUNTIME),
       check('freellmapi', 'freellmapi', 'models'),
     ],
   };

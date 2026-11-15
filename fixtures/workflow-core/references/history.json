@@ -1,0 +1,19 @@
+{
+  "periodDays": 30,
+  "issuesDone": 0,
+  "medianLeadTimeMinutes": null,
+  "stationMinutes": [
+    {
+      "station": "brief",
+      "medianMinutes": 16.666666666666668
+    },
+    {
+      "station": "implementation",
+      "medianMinutes": 73.33333333333333
+    }
+  ],
+  "gatePassRate": [],
+  "blocks": 1,
+  "medianHumanResponseMinutes": null,
+  "recent": []
+}

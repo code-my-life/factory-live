@@ -1,4 +1,4 @@
-import { parseWorkflowSheet } from '@factory-live/contracts';
+import { WorkflowSheet } from '@factory-live/contracts';
 import type {
   DeclaredData,
   GenericCardView,
@@ -28,40 +28,43 @@ const MINUTE = 60_000;
 const at = (now: number, minutesAgo: number) => new Date(now - minutesAgo * MINUTE).toISOString();
 
 /** The workflow's sheet, as the core would serve it, judged. */
-export const ESSAI_SHEET = parseWorkflowSheet({
-  item: { type: 'essai', label: 'Essai' },
-  stations: [
-    {
-      key: 'preparation',
-      label: 'Préparation',
-      icon: 'package',
-      kind: 'script',
-      col: 0,
-      row: 1,
-    },
-    { key: 'redaction', label: 'Rédaction', icon: 'pencil', kind: 'ai', col: 1, row: 1 },
-    {
-      key: 'validation',
-      label: 'Validation',
-      icon: 'check-circle',
-      kind: 'owner',
-      col: 2,
-      row: 1,
-    },
-  ],
-  edges: [
-    { from: 'preparation', to: 'redaction', kind: 'line' },
-    { from: 'redaction', to: 'validation', kind: 'line' },
-    {
-      from: 'validation',
-      to: 'redaction',
-      kind: 'return',
-      id: 'refaire:redaction',
-      label: 'Refaire la note',
-    },
-  ],
-  models: [],
-});
+export const ESSAI_SHEET = {
+  ok: true as const,
+  sheet: WorkflowSheet.parse({
+    item: { type: 'essai', label: 'Essai' },
+    stations: [
+      {
+        key: 'preparation',
+        label: 'Préparation',
+        icon: 'package',
+        kind: 'script',
+        col: 0,
+        row: 1,
+      },
+      { key: 'redaction', label: 'Rédaction', icon: 'pencil', kind: 'ai', col: 1, row: 1 },
+      {
+        key: 'validation',
+        label: 'Validation',
+        icon: 'check-circle',
+        kind: 'owner',
+        col: 2,
+        row: 1,
+      },
+    ],
+    edges: [
+      { from: 'preparation', to: 'redaction', kind: 'line' },
+      { from: 'redaction', to: 'validation', kind: 'line' },
+      {
+        from: 'validation',
+        to: 'redaction',
+        kind: 'return',
+        id: 'refaire:redaction',
+        label: 'Refaire la note',
+      },
+    ],
+    models: [],
+  }),
+};
 
 const LONG_TITLE =
   'Comparer les trois jeux de données d’essai du trimestre, rapprocher les écarts de plus de cinq pour cent, ' +

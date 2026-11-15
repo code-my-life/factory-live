@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { aRun, aTask } from './fixtures.test-helpers.ts';
-import type { Board, Comment, Task } from './hermes.ts';
+import type { Board, Comment, Task } from './board.ts';
 import type { DeliveryFacts } from './issues.ts';
 import { journeyOf } from './journey.ts';
 

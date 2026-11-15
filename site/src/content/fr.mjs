@@ -127,7 +127,7 @@ export default {
       {
         id: 'health',
         title: 'Santé',
-        text: 'Gateway, dispatcher, fournisseurs de modèles et outils, vérifiés par une sonde toutes les 30&nbsp;secondes.',
+        text: 'Gateway, dispatcher, fournisseurs de modèles et outils, tels que workflow-core les vérifie sur la machine de la factory.',
         view: 'sante',
         alt: 'La santé de la factory : le gateway Hermès, le dispatcher du kanban, la pause, le dashboard et quatre fournisseurs de modèles, tous joignables.',
       },
@@ -150,20 +150,20 @@ export default {
   how: {
     title: 'Comment ça marche',
     intro:
-      'Rien n’est écrit pour factory-live. Il écoute ce qu’Hermès Agent envoie déjà et lit ce qu’il garde déjà.',
+      'Rien n’est écrit pour factory-live. Il lit la factory par workflow-core, le socle commun des workflows, et GitHub, rien d’autre.',
     stageLabel: 'Étape',
     stages: [
       {
         id: 'listen',
         label: 'Écouter',
-        title: 'Hermès poste des webhooks signés',
-        text: 'Les webhooks sortants natifs d’Hermès Agent envoient chaque appel d’outil, chaque réponse de modèle et chaque événement du kanban en un POST HTTP signé HMAC-SHA256. L’envoi ne bloque jamais un agent. Une sonde dans le gateway ajoute la santé de la factory toutes les 30&nbsp;secondes.',
+        title: 'La factory, telle que le socle la voit',
+        text: 'workflow-core suit les tableaux d’Hermès Agent, juge les fiches des workflows, calcule le diagnostic d’un blocage et vérifie la santé de la machine. Chaque changement arrive à factory-live par son flux, derrière un secret partagé : l’état complet de la carte et un curseur pour reprendre.',
       },
       {
         id: 'read',
         label: 'Lire',
         title: 'Le kanban est seulement lu',
-        text: '<code>kanban.db</code>, les sessions de chaque agent et les logs des cartes sont ouverts en lecture seule, par des requêtes courtes. factory-live voit un changement en moins de 300&nbsp;ms et s’y recale après un redémarrage.',
+        text: 'workflow-core lit les tableaux, les sessions de chaque agent et les logs des cartes en lecture seule, et les sert par son API et son flux. factory-live n’en ouvre aucun : il voit un changement dès que le socle l’annonce, et relit tout l’état après un redémarrage.',
       },
       {
         id: 'stream',
@@ -189,8 +189,8 @@ export default {
           items: [
             ['listen unblock', 'Workers, un par carte'],
             ['listen', 'Gateway et dispatcher'],
-            ['listen', 'Sonde de santé'],
-            ['read', '<code>kanban.db</code>, sessions, logs'],
+            ['listen', 'workflow-core'],
+            ['read', 'Tableaux, sessions, logs'],
           ],
         },
         {
@@ -199,7 +199,7 @@ export default {
           title: 'factory-live',
           sub: 'Docker, 127.0.0.1:8446',
           items: [
-            ['listen', 'Ingestion signée'],
+            ['listen', 'Lecture du socle'],
             ['read', 'État en direct et historique'],
             ['stream', 'REST et SSE'],
             ['stream', 'Web Push'],
@@ -229,7 +229,7 @@ export default {
         },
       ],
       links: [
-        { from: 'hermes', stages: { listen: 'webhooks signés', read: 'lecture seule' } },
+        { from: 'hermes', stages: { listen: 'par workflow-core', read: 'son API et son flux' } },
         { from: 'live', stages: { stream: 'SSE et Web Push' } },
         { from: 'screens', stages: { unblock: 'ta réponse' } },
       ],
@@ -239,36 +239,10 @@ export default {
   },
   start: {
     title: 'L’installer à côté de ta factory',
-    text: 'factory-live tourne sur la machine d’Hermès Agent, sous Linux ou WSL, avec Docker et Tailscale. Cinq étapes, une dizaine de minutes.',
+    text: 'factory-live tourne à côté de workflow-core, qui lit ta factory, sous Linux ou WSL, avec Docker et Tailscale. Quatre étapes, une dizaine de minutes.',
     guide: 'Le guide complet dans le README',
     tabsLabel: 'Étapes',
     steps: [
-      {
-        id: 'hermes',
-        label: 'Hermès',
-        hint: 'Webhooks et sonde',
-        rows: [
-          {
-            title: 'Envoyer les webhooks',
-            text: 'Chaque agent déclare factory-live dans ses hooks sortants. L’installateur de la factory les écrit.',
-            code: `hooks:
-  outbound:
-    - name: factory-live
-      url: http://127.0.0.1:8446/api/ingest/hermes
-      secret_env: FACTORY_LIVE_HOOK_SECRET
-      timeout: 2
-      events: [pre_tool_call, post_tool_call, post_api_request, …]`,
-          },
-          {
-            title: 'Partager un secret',
-            text: 'Un secret aléatoire dans <code>~/.hermes/.env</code>, copié dans <code>~/.config/factory-live/hook-secret</code> en mode 600. Il n’est jamais affiché.',
-          },
-          {
-            title: 'Lancer la sonde',
-            text: 'Le plugin <code>factory-live-probe</code> tourne dans le gateway et poste la santé de la factory toutes les 30&nbsp;secondes.',
-          },
-        ],
-      },
       {
         id: 'container',
         label: 'Conteneur',
@@ -282,7 +256,7 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
           },
           {
             title: 'Démarrer le service',
-            text: 'Le conteneur lit les bases d’Hermès en lecture seule et écoute sur 127.0.0.1:8446.',
+            text: 'Le conteneur lit la factory par workflow-core, ne monte aucune de ses bases, et écoute sur 127.0.0.1:8446.',
             code: 'docker compose -f docker/compose.yaml up -d --build',
           },
           {
@@ -357,7 +331,7 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
     ],
   },
   security: {
-    title: 'En lecture seule, par construction',
+    title: 'Il lit, et n’écrit que ce que tu demandes, en ton nom',
     text: 'factory-live n’écrit que ce que tu demandes, en ton nom : un geste comme <code>/factory unblock</code>, ou une issue qu’il ouvre pour toi.',
     groups: [
       {
@@ -420,7 +394,7 @@ PUBLIC_ORIGINS=http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`,
         state: 'done',
         icon: 'ServerIcon',
         title: 'Serveur',
-        text: 'Webhooks signés, kanban en lecture seule, REST et SSE.',
+        text: 'Lecture par workflow-core, son flux et un secret partagé, REST et SSE.',
       },
       {
         state: 'done',

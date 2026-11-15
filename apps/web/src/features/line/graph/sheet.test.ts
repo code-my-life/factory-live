@@ -1,6 +1,12 @@
+import { WorkflowSheet } from '@factory-live/contracts';
 import { describe, expect, it } from 'vitest';
-import { CODE_LINE, CODE_LINE_SHEET, LANES, layout } from './layout.ts';
+import { DEMO_CODE_LINE } from '../../../demo/sheets.ts';
+import { lanesOf, layout } from './layout.ts';
 import type { BoxId, Fill } from './layout.ts';
+
+/** The code line's sheet, as the demo holds it. */
+const CODE_LINE = DEMO_CODE_LINE;
+const LANES = lanesOf(CODE_LINE);
 
 const BOXES: readonly BoxId[] = [
   'intake',
@@ -36,7 +42,7 @@ const DRAWING = import.meta.glob<string>(
 
 describe('la fiche de la ligne du code', () => {
   it('la fiche de la factory donne les boîtes et les liens de la ligne d’usine', () => {
-    expect(CODE_LINE_SHEET.ok).toBe(true);
+    expect(WorkflowSheet.safeParse(CODE_LINE).success).toBe(true);
 
     // The values of main before the graph read its sheet, for the demo's busiest moment.
     const geometry = layout(

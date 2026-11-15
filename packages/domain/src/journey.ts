@@ -1,6 +1,6 @@
 import { cardKindOf } from './cards.ts';
 import { scriptedVerdicts } from './gateVerdicts.ts';
-import type { Board, Task } from './hermes.ts';
+import type { Board, Task } from './board.ts';
 import type { DeliveryFacts, GateLane, LineStation } from './issues.ts';
 
 /** How a step ended: green, red (gate, main), changes requested at the review. */

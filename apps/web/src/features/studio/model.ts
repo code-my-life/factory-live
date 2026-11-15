@@ -1,4 +1,3 @@
-import { parseWorkflowSheet } from '@factory-live/contracts';
 import type {
   IssueStatus,
   IssueSummary,
@@ -8,16 +7,12 @@ import type {
   WorkflowSheet,
 } from '@factory-live/contracts';
 import type { LineIssue, ProviderRow } from '../line/graph/model.ts';
-import studio from './workflows/studio.json';
 
 /**
  * The studio as the standard graph draws it: its sheet (a copy of `hermes/workflow.json` of
  * video-factory), a video as an item of the graph, an agent of the studio as a provider's row.
  * Nothing here draws or places a station; the sheet does.
  */
-
-/** The studio's sheet, read and checked once; its error, if any, shows instead of the graph. */
-export const STUDIO_SHEET = parseWorkflowSheet(studio);
 
 /** An agent of the studio and the station where it calls its model. */
 export interface StudioAgent {

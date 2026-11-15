@@ -1,14 +1,12 @@
-import { MODELS_KEY, parseWorkflowSheet } from '@factory-live/contracts';
-import type { JourneyStep, WorkflowSheet } from '@factory-live/contracts';
+import { MODELS_KEY, WorkflowSheet } from '@factory-live/contracts';
+import type { JourneyStep } from '@factory-live/contracts';
 import { describe, expect, it } from 'vitest';
 import { journeyEdges, layout } from './layout.ts';
 import type { Box } from './layout.ts';
 
-/** A sheet any workflow could publish, checked like the code line's. */
+/** A sheet any workflow could publish, its form checked by the contract's schema. */
 function sheetOf(input: unknown): WorkflowSheet {
-  const parsed = parseWorkflowSheet(input);
-  if (!parsed.ok) throw new Error(parsed.error);
-  return parsed.sheet;
+  return WorkflowSheet.parse(input);
 }
 
 type Cell = [key: string, kind: string, col: number, row: number, group?: string];

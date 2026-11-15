@@ -1,0 +1,159 @@
+{
+  "stations": [
+    {
+      "id": "intake",
+      "profiles": []
+    },
+    {
+      "id": "brief",
+      "profiles": []
+    },
+    {
+      "id": "implementation",
+      "profiles": []
+    },
+    {
+      "id": "gate",
+      "profiles": []
+    },
+    {
+      "id": "review",
+      "profiles": []
+    },
+    {
+      "id": "merge",
+      "profiles": []
+    },
+    {
+      "id": "ci",
+      "profiles": []
+    },
+    {
+      "id": "deploy",
+      "profiles": []
+    },
+    {
+      "id": "done",
+      "profiles": []
+    },
+    {
+      "id": "diagnostic",
+      "profiles": []
+    }
+  ],
+  "issues": [
+    {
+      "key": "cv-site#50",
+      "repo": "cv-site",
+      "number": 50,
+      "title": "Formulaire de contact",
+      "url": "https://github.com/code-my-life/cv-site/issues/50",
+      "labels": [],
+      "station": "implementation",
+      "previousStation": null,
+      "stationChangedAt": "2026-11-12T10:00:00.000Z",
+      "status": "active",
+      "claudeModel": null,
+      "harness": "coder",
+      "pr": null,
+      "prUrl": "https://github.com/code-my-life/cv-site/pull/51",
+      "activeProfiles": ["coder"],
+      "interventionIds": [],
+      "startedAt": "2026-11-12T09:10:00.000Z",
+      "updatedAt": "2026-11-12T09:59:30.000Z",
+      "type": null,
+      "lane": "failfirst",
+      "journey": [
+        {
+          "station": "intake",
+          "lane": null,
+          "outcome": null,
+          "at": "2026-11-12T09:10:00.000Z"
+        },
+        {
+          "station": "implementation",
+          "lane": null,
+          "outcome": null,
+          "at": "2026-11-12T09:11:40.000Z"
+        }
+      ]
+    },
+    {
+      "key": "cv-site#49",
+      "repo": "cv-site",
+      "number": 49,
+      "title": "Page Projets",
+      "url": "https://github.com/code-my-life/cv-site/issues/49",
+      "labels": [],
+      "station": "implementation",
+      "previousStation": null,
+      "stationChangedAt": "2026-11-12T10:00:00.000Z",
+      "status": "waiting_human",
+      "claudeModel": null,
+      "harness": "coder",
+      "pr": null,
+      "prUrl": null,
+      "activeProfiles": [],
+      "interventionIds": ["needs_input:t_1a9f0049:1"],
+      "startedAt": "2026-11-12T08:00:00.000Z",
+      "updatedAt": "2026-11-12T09:50:00.000Z",
+      "type": null,
+      "lane": "failfirst",
+      "journey": [
+        {
+          "station": "intake",
+          "lane": null,
+          "outcome": null,
+          "at": "2026-11-12T08:00:00.000Z"
+        },
+        {
+          "station": "brief",
+          "lane": null,
+          "outcome": null,
+          "at": "2026-11-12T08:01:40.000Z"
+        },
+        {
+          "station": "implementation",
+          "lane": null,
+          "outcome": null,
+          "at": "2026-11-12T08:36:40.000Z"
+        }
+      ]
+    }
+  ],
+  "sideCards": [],
+  "interventions": [
+    {
+      "id": "needs_input:t_1a9f0049:1",
+      "kind": "needs_input",
+      "issueKey": "cv-site#49",
+      "cardId": "t_1a9f0049",
+      "profile": "coder",
+      "openedAt": "2026-11-12T09:50:00.000Z",
+      "push": true,
+      "severity": "critical",
+      "title": "Quelle base de données ?",
+      "question": "Quelle base de données ?",
+      "actions": [
+        {
+          "kind": "unblock"
+        },
+        {
+          "kind": "link",
+          "label": {
+            "code": "intervention.action.openIssue",
+            "params": {
+              "issueKey": "cv-site#49"
+            }
+          },
+          "url": "https://github.com/code-my-life/cv-site/issues/49"
+        }
+      ],
+      "unblock": null,
+      "diagnosis": null,
+      "resolvedAt": null,
+      "followUp": null
+    }
+  ],
+  "agents": []
+}

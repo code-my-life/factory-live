@@ -1,8 +1,10 @@
+import { FACTORY_RUNTIME } from '@factory-live/contracts';
 import { render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider.tsx';
+import { i18nOf } from '../../i18n/i18n.ts';
 import { ModelBadge } from '../ModelBadge.tsx';
 import { AgentBadge } from './AgentBadge.tsx';
 import { Badge } from './Badge.tsx';
@@ -96,9 +98,9 @@ describe('ChecksBadge', () => {
 
 describe('VersionBadge', () => {
   it('écrit la version en police de code, précédée de ce qu’elle versionne', () => {
-    const { container } = render(<VersionBadge of="Hermès" version="0.22.2" />);
-    expect(screen.getByText('Hermès')).toBeInTheDocument();
-    expect(badgeOf(container)).toHaveAttribute('title', 'Hermès : 0.22.2');
+    const { container } = render(<VersionBadge of="factory-live" version="0.22.2" />);
+    expect(screen.getByText('factory-live')).toBeInTheDocument();
+    expect(badgeOf(container)).toHaveAttribute('title', 'factory-live : 0.22.2');
     expect(badgeOf(container)).toHaveAttribute('data-code');
   });
 
@@ -137,7 +139,7 @@ describe('icônes et couleurs des badges de concept', () => {
   });
 
   it('marque une version d’une étiquette', () => {
-    const { container } = render(<VersionBadge of="Hermès" version="0.22.2" />);
+    const { container } = render(<VersionBadge of="factory-live" version="0.22.2" />);
     expect(label(container)?.querySelector('svg')).not.toBeNull();
   });
 });
@@ -148,7 +150,7 @@ describe('label background of badges', () => {
   it('every badge keeps a grey label, with no paint of its own (the CI label included)', () => {
     // The label is grey for all: the tint of an element goes on the value and the frame only.
     const { container: issue } = render(<IssueBadge issueKey="cv-site#49" />);
-    const { container: version } = render(<VersionBadge of="Hermès" version="0.22.2" />);
+    const { container: version } = render(<VersionBadge of="factory-live" version="0.22.2" />);
     const { container: card } = render(<CardBadge kind="impl" id="t_5e21c0d9" />);
     const { container: checks } = render(<ChecksBadge checks="success" />);
     for (const badge of [issue, version, card, checks]) {
@@ -309,7 +311,7 @@ describe('le tableau 1 de l’inventaire, un badge par ligne', () => {
       expect(value(container)).toHaveTextContent('#56');
       unmount();
     }
-    // Unknown state (PR picked up from Hermes runs): open PR icon, no color.
+    // Unknown state (PR picked up from the factory's runs): open PR icon, no color.
     const { container } = render(
       <PullRequestBadge repo="cv-site" number={56} url="https://github.com/x/y/pull/56" />,
     );
@@ -351,10 +353,11 @@ describe('le tableau 1 de l’inventaire, un badge par ligne', () => {
   });
 
   it('version : la teinte de son produit, étiquette `versions` et non `tag`', () => {
-    const { container: hermes } = render(<VersionBadge of="Hermès" version="0.22.2" />);
-    expectHue(hermes, 'purple');
     const { container: live } = render(<VersionBadge of="factory-live" version="0.2.0" />);
     expectHue(live, 'blue');
+    // A product without a hue of its own takes one from its name, never factory-live's.
+    const { container: other } = render(<VersionBadge of="workflow-core" version="0.4.0" />);
+    expect(badgeOf(other)?.getAttribute('data-hue')).not.toBe('blue');
     const { container: bare } = render(<VersionBadge version="0.2.0" />);
     expect(bare.querySelectorAll('[data-segment]')).toHaveLength(1);
     expect(badgeOf(bare)).not.toHaveAttribute('data-hue');
@@ -441,7 +444,7 @@ describe('le tableau 1 de l’inventaire, un badge par ligne', () => {
   it('source : l’icône de la source, « source », son nom, la teinte de la source', () => {
     const rows = [
       ['kanban', 'Kanban', 'olive'],
-      ['hermes', 'Hermès', 'purple'],
+      [FACTORY_RUNTIME, i18nOf('fr').t.activity.source[FACTORY_RUNTIME], 'purple'],
       ['github', 'GitHub', 'gray'],
       ['comment', 'Commentaire', 'lemon'],
       ['factory-live', 'factory-live', 'blue'],

@@ -243,7 +243,7 @@ export class FactoryViews implements DeclaredViewsPort {
     const session = tables(named(data, DATA.session))[0];
     const log = named(data, DATA.log).find((value) => value.type === 'text');
     return {
-      hermes: session ? linesOf(session, `${runId}:hermes`) : [],
+      agent: session ? linesOf(session, `${runId}:agent`) : [],
       lanes: tables(named(data, DATA.claude)).map((table, index) => ({
         name: table.label,
         entries: linesOf(table, `${runId}:lane${index}`),

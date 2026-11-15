@@ -11,11 +11,10 @@ import type {
  * The owner's gestures, generic (#61, ADR 0016): factory-live posts a gesture only when the workflow declares
  * it, as a comment `/<workflow> <gesture> <note>` on the issue of an item, or as an issue opened in the
  * declared repository; always in the name of the connected account (the App's user token, or the fallback
- * token of ADR 0003). No gesture is written in the code: the list comes from the core, or on Hermes' side
- * from the default list of main.ts.
+ * token of ADR 0003). No gesture is written in the code: the list comes from the core.
  */
 
-/** The key of the code line's workflow, on the core as on Hermes' side. */
+/** The key of the code line's workflow on the core. */
 export const CODE_WORKFLOW = 'factory';
 
 /**
@@ -28,18 +27,6 @@ export function declaredIn(
 ): readonly DeclaredGesture[] | null {
   return Object.hasOwn(declared, workflow) ? (declared[workflow] ?? null) : null;
 }
-
-/**
- * On Hermes' side of the switch, the code line declares what it always did: the unblocking, a comment on the
- * issue of a blocked card. On the core's side, the list comes from workflow-core (`gestures` of each workflow).
- */
-export const HERMES_SIDE_GESTURES: Readonly<Record<string, readonly DeclaredGesture[]>> = {
-  [CODE_WORKFLOW]: [{ name: 'unblock', kind: 'comment', repo: null }],
-};
-
-export const hermesSideGestures: GesturesPort = {
-  declared: (workflow) => declaredIn(HERMES_SIDE_GESTURES, workflow),
-};
 
 export class GestureError extends Error {
   readonly status: 404 | 409 | 502 | 503;

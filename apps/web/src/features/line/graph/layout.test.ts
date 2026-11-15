@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { INTAKE_SHOWN, LANES, MIN_SCALE, ROW_H, layout } from './layout.ts';
+import { DEMO_CODE_LINE } from '../../../demo/sheets.ts';
+import { INTAKE_SHOWN, MIN_SCALE, ROW_H, lanesOf, layout } from './layout.ts';
 import type { BoxId, Edge, Fill } from './layout.ts';
+
+/** The code line's sheet, as the demo holds it. */
+const CODE_LINE = DEMO_CODE_LINE;
+const LANES = lanesOf(CODE_LINE);
 
 const BOXES: readonly BoxId[] = [
   'intake',
@@ -52,7 +57,7 @@ describe('layout', () => {
 
   it('chaque lien a ses deux ports, sans port partagé ni courbes croisées dans les éventails de la gate', () => {
     for (const fill of cases) {
-      const { edges } = layout(fill);
+      const { edges } = layout(fill, CODE_LINE);
       const ports = edges.flatMap((edge) => [edge.from, edge.to]);
       expect(ports).toHaveLength(edges.length * 2);
       const keys = ports.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`);
@@ -74,7 +79,7 @@ describe('layout', () => {
 
   it('les boîtes ne se chevauchent pas, quelle que soit leur hauteur', () => {
     for (const fill of cases) {
-      const boxes = Object.values(layout(fill).boxes);
+      const boxes = Object.values(layout(fill, CODE_LINE).boxes);
       for (const a of boxes)
         for (const b of boxes) {
           if (a === b) continue;

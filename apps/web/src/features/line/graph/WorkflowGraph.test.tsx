@@ -1,5 +1,5 @@
-import { parseWorkflowSheet } from '@factory-live/contracts';
-import type { IssueSummary, WorkflowSheet } from '@factory-live/contracts';
+import { WorkflowSheet } from '@factory-live/contracts';
+import type { IssueSummary } from '@factory-live/contracts';
 import { render, waitFor, within } from '@testing-library/react';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -62,9 +62,7 @@ function draw(sheet: WorkflowSheet) {
 
 describe('WorkflowGraph', () => {
   it('une fiche de trois postes se dessine avec la nature de chacun et les fournisseurs', () => {
-    const parsed = parseWorkflowSheet(STUDIO);
-    if (!parsed.ok) throw new Error(parsed.error);
-    const { container } = draw(parsed.sheet);
+    const { container } = draw(WorkflowSheet.parse(STUDIO));
     const box = (key: string) => container.querySelector(`[data-box="${key}"]`) as HTMLElement;
 
     // Each station, named by its sheet, says who does its work.
@@ -86,12 +84,11 @@ describe('WorkflowGraph', () => {
     expect(container.querySelectorAll('[data-box]')).toHaveLength(4);
 
     // Without an `ai` station, no providers.
-    const scripted = parseWorkflowSheet({
+    const scripted = WorkflowSheet.parse({
       ...STUDIO,
       stations: STUDIO.stations.map((station) => ({ ...station, kind: 'script' })),
     });
-    if (!scripted.ok) throw new Error(scripted.error);
-    const plain = draw(scripted.sheet);
+    const plain = draw(scripted);
     expect(plain.container.querySelector('[data-box="models"]')).toBeNull();
     expect(plain.container.querySelectorAll('[data-kind="script"]')).toHaveLength(3);
   });
@@ -129,9 +126,7 @@ describe('WorkflowGraph', () => {
     return [{ issue, box: station, agent: null, intervention: null }];
   };
   const studio = () => {
-    const parsed = parseWorkflowSheet(STUDIO);
-    if (!parsed.ok) throw new Error(parsed.error);
-    return parsed.sheet;
+    return WorkflowSheet.parse(STUDIO);
   };
   const view = (sheet: WorkflowSheet, items: LineIssue[]) => (
     <I18nProvider>

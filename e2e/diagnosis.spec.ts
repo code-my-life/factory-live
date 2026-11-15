@@ -1,9 +1,17 @@
 import { expect, test } from '@playwright/test';
+import { HOOK_FIX_COMMAND } from '../apps/web/src/demo/commands.ts';
+import { fr } from './texts.ts';
+
+/** The summary of a guard past the delay of the factory's hooks, as the dictionary writes it. */
+const GUARD_PAST_DELAY = fr.server['diagnosis.summary.guardHookTimeout']({
+  plugin: 'coder-guard',
+  seconds: 30,
+});
 
 /*
- * La réplique de factory-live#2 (2026-10-29) : coder-guard dépasse le délai des hooks d'Hermès au
- * `git commit`. Le diagnostic doit dire la cause, qui agit, si « Débloquer » suffit, et retenir le
- * déblocage tant que la cause est là ; la démo corrige la config à 72 s, puis la reporte à 84 s.
+ * The replica of factory-live#2 (2026-10-29): coder-guard runs past the delay of the factory's hooks at
+ * `git commit`. The diagnosis must say the cause, who acts, whether « Débloquer » is enough, and hold the
+ * unblocking while the cause is there; the demo fixes the config at 72 s, then puts it back at 84 s.
  */
 
 test('le diagnostic dit pourquoi la carte bloque, qui agit, et retient le déblocage tant que la cause est là', async ({
@@ -12,15 +20,11 @@ test('le diagnostic dit pourquoi la carte bloque, qui agit, et retient le déblo
   await page.clock.install();
   await page.goto('/interventions/iv-hook');
   const detail = page.getByRole('article');
-  await expect(detail.getByRole('heading', { level: 2 })).toHaveText(
-    'Le contrôle de coder-guard dépasse le délai des hooks d’Hermès (30 s)',
-  );
+  await expect(detail.getByRole('heading', { level: 2 })).toHaveText(GUARD_PAST_DELAY);
   const panel = detail.getByRole('region', { name: 'Diagnostic du blocage' });
   await expect(panel.getByText('À toi, côté factory')).toBeVisible();
   await expect(panel.getByText('Cause toujours là')).toBeVisible();
-  await expect(
-    panel.getByText('hermes -p coder config set plugins.hook_callback_timeout 600'),
-  ).toBeVisible();
+  await expect(panel.getByText(HOOK_FIX_COMMAND)).toBeVisible();
   // Le texte de l'agent reste là, tel quel, sous le diagnostic.
   await expect(detail.getByText(/^Terminal et tous les outils bloqués/)).toBeVisible();
 
@@ -53,9 +57,7 @@ test('la page de l’issue donne la cause, le verdict de chaque run et les vraie
   page,
 }) => {
   await page.goto('/issues/factory-live/2');
-  await expect(page.locator('[data-variant="critical"]')).toContainText(
-    'dépasse le délai des hooks d’Hermès',
-  );
+  await expect(page.locator('[data-variant="critical"]')).toContainText(GUARD_PAST_DELAY);
   await expect(page.getByText('Pourquoi elle bloque')).toBeVisible();
   for (const verdict of [
     'arrêté sans appel kanban (le modèle)',
@@ -103,9 +105,7 @@ test('le disjoncteur d’un modèle faible : la gate sort trois fois sans rendre
   await expect(panel.getByText(/^Donner un autre modèle à la carte/)).toBeVisible();
   await page.goto('/issues/cv-site/52');
   await expect(
-    page
-      .getByText('Hermès l’avait relancé pour qu’il rende la carte : il est sorti quand même')
-      .first(),
+    page.getByText(fr.server['timeline.protocolViolation.nudged']({})).first(),
   ).toBeVisible();
 });
 

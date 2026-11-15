@@ -1,5 +1,5 @@
 // A fake workflow-core for the « live » e2e (#67): the routes and the SSE stream that factory-live's
-// server reads when LIVE_SOURCE=workflow-core, behind a test secret, on the scenario of
+// server reads, behind a test secret, on the scenario of
 // fake-core-scenario.mjs; and the GitHub that factory-live's screens read (issue, PR, comment of a
 // gesture), under /github. Every answer of the core is checked against the core's JSON Schema copied in
 // packages/contracts: a scenario that drifts from the real core fails its test instead of passing.
@@ -354,4 +354,4 @@ createServer(async (request, response) => {
     console.error(String(error));
     return json(response, 500, { error: 'fake_core', detail: String(error) });
   }
-}).listen(port, '127.0.0.1');
+}).listen(port, process.env.HOST ?? '127.0.0.1');

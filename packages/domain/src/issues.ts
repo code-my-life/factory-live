@@ -1,6 +1,6 @@
 import { cardKindOf, issueKeyOf, issueRefOfTask, runRoleOf } from './cards.ts';
 import { awaitingApproval } from './gateVerdicts.ts';
-import type { Board, Task } from './hermes.ts';
+import type { Board, Task } from './board.ts';
 
 export type Station =
   'intake' | 'brief' | 'implementation' | 'gate' | 'release' | 'done' | 'stopped';

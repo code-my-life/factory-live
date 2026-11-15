@@ -75,7 +75,8 @@ export interface FakeCore {
 const frame = (event: { cursor: string; kind: string }) =>
   `id: ${event.cursor}\nevent: ${event.kind}\ndata: ${JSON.stringify(event)}\n\n`;
 
-export async function fakeCore(secret: string, state: FakeCoreState): Promise<FakeCore> {
+/** A fake core on `port` (0: any free one; a port given again restarts a core stopped there). */
+export async function fakeCore(secret: string, state: FakeCoreState, port = 0): Promise<FakeCore> {
   const streams = new Set<ServerResponse>();
   const requests: FakeCoreRequest[] = [];
   const core: Omit<FakeCore, 'url'> & { url: string } = {
@@ -234,7 +235,7 @@ export async function fakeCore(secret: string, state: FakeCoreState): Promise<Fa
     if (wait > 0) setTimeout(() => handle(request, response), wait);
     else handle(request, response);
   });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  await new Promise<void>((resolve) => server.listen(port, '127.0.0.1', resolve));
   core.url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   return core;
 }

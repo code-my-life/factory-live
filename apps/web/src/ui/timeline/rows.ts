@@ -1,4 +1,4 @@
-import { msg } from '@factory-live/contracts';
+import { FACTORY_RUNTIME, msg } from '@factory-live/contracts';
 import type { ActivityEvent, TimelineEntry } from '@factory-live/contracts';
 import {
   BlockedIcon,
@@ -88,7 +88,7 @@ export function fromActivity(event: ActivityEvent, { t, text }: I18n): TimelineR
 
 const SOURCE_ICON: Record<TimelineEntry['source'], Icon> = {
   kanban: WorkflowIcon,
-  hermes: PulseIcon,
+  [FACTORY_RUNTIME]: PulseIcon,
   github: GitPullRequestIcon,
   comment: CommentIcon,
   'factory-live': InfoIcon,
@@ -112,7 +112,7 @@ export function fromTimelineEntry(entry: TimelineEntry, { t, text }: I18n): Time
     icon: entry.tone === 'done' ? CheckIcon : entry.tone === 'danger' ? BlockedIcon : sourceIcon,
     iconLabel: sourceLabel,
     condensed:
-      entry.source === 'comment' || (entry.source === 'hermes' && entry.tone === 'neutral'),
+      entry.source === 'comment' || (entry.source === FACTORY_RUNTIME && entry.tone === 'neutral'),
     agent: entry.profile,
     title: `${text(entry.label)}${entry.repeats ? t.activity.repeats(entry.repeats) : ''}`,
     detail: entry.detail === null ? null : text(entry.detail),

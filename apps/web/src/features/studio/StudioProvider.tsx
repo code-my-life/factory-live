@@ -1,7 +1,9 @@
-import type { StudioGestureInput, StudioItem, WorkflowSheetResult } from '@factory-live/contracts';
+import type { StudioGestureInput, StudioItem } from '@factory-live/contracts';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { STUDIO_SHEET, waitsForOwner } from './model.ts';
+import { DEMO_STUDIO } from '../../demo/sheets.ts';
+import type { SheetState } from '../line/graph/sheetState.ts';
+import { waitsForOwner } from './model.ts';
 import type { StudioAgent } from './model.ts';
 import { createLiveStudioSource, createStudioSource } from './source.ts';
 import type { GestureResult, StudioSource, StudioStatus } from './source.ts';
@@ -16,7 +18,7 @@ export interface StudioState {
   /** False until the studio has given a sheet. */
   sheetRead: boolean;
   /** The studio's sheet, as its source gives it: the graph is drawn from it alone. */
-  sheet: WorkflowSheetResult;
+  sheet: SheetState;
   /** Since when the studio does not answer (ms), and why: the last state read stays shown. */
   unreachableSince: number | null;
   error: string | null;
@@ -29,7 +31,7 @@ export interface StudioState {
   gesture: (id: string, gesture: StudioGestureInput) => Promise<GestureResult>;
 }
 
-const waitingOf = (parsed: WorkflowSheetResult, items: readonly StudioItem[]) =>
+const waitingOf = (parsed: SheetState, items: readonly StudioItem[]) =>
   parsed.ok ? items.filter((item) => waitsForOwner(parsed.sheet, item)) : [];
 
 /** The live studio is read again every so often: the server follows it every 5 s while watched. */
@@ -53,8 +55,8 @@ const StudioContext = createContext<StudioState>({
   source: EMPTY_SOURCE,
   ready: true,
   configured: false,
-  sheetRead: true,
-  sheet: STUDIO_SHEET,
+  sheetRead: false,
+  sheet: { ok: false, error: '' },
   unreachableSince: null,
   error: null,
   items: [],
@@ -117,7 +119,8 @@ export function StudioProvider({
     const status: StudioStatus = read?.status ?? {
       configured: source.kind === 'demo',
       sheetRead: source.kind === 'demo',
-      sheet: STUDIO_SHEET,
+      // The demo draws its own sheet; the live build waits for the one the core serves (#72).
+      sheet: source.kind === 'demo' ? { ok: true, sheet: DEMO_STUDIO } : { ok: false, error: '' },
       unreachableSince: null,
       error: null,
     };

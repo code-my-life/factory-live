@@ -1826,7 +1826,7 @@ export function createInitialState(now: number): DemoState {
       {
         runId: RUNS.teamImpl,
         source: 'hermes',
-        title: msg('transcript.hermes', { profile: 'coder-claude', session: null }),
+        title: msg('transcript.agent', { profile: 'coder-claude', session: null }),
         name: null,
         startedAt: now - 11 * min * 1000,
         endedAt: now - 7 * min * 1000,
@@ -2043,7 +2043,7 @@ export function createInitialState(now: number): DemoState {
       {
         runId: RUNS.contactGate,
         source: 'hermes',
-        title: msg('transcript.hermes', { profile: 'gate', session: null }),
+        title: msg('transcript.agent', { profile: 'gate', session: null }),
         name: null,
         startedAt: now - 6 * min * 1000,
         endedAt: null,
@@ -2080,7 +2080,7 @@ export function createInitialState(now: number): DemoState {
       {
         runId: RUNS.teamBrief,
         source: 'hermes',
-        title: msg('transcript.hermes', { profile: 'coordinator-claude', session: null }),
+        title: msg('transcript.agent', { profile: 'coordinator-claude', session: null }),
         name: null,
         startedAt: now - 38 * min * 1000,
         endedAt: now - 31 * min * 1000,

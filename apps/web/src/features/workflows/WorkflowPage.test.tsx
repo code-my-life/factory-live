@@ -50,7 +50,7 @@ function renderShell(source: WorkflowsSource) {
   );
 }
 
-/** A source that declares no generic workflow, as a server on Hermes' side. */
+/** A source that declares no generic workflow. */
 const NONE: WorkflowsSource = {
   kind: 'live',
   workflows: () => Promise.resolve([]),

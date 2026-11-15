@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { WorkflowSheet } from '@factory-live/contracts';
 import { describe, expect, it } from 'vitest';
 import { FakeWorkflow, STUDIO_SHEET, waitingVideo } from '../../test/workflow-fixtures.ts';
 import { WorkflowApi } from './api.ts';
@@ -15,12 +16,15 @@ function studio(fake: FakeWorkflow, now = () => NOW) {
 }
 
 describe('WorkflowApi', () => {
-  it("la fiche et les éléments viennent de l'API du workflow, et une station ajoutée apparaît sans redéploiement", async () => {
+  it("les éléments viennent de l'API du workflow, la fiche du socle, et une station ajoutée apparaît sans redéploiement", async () => {
     const fake = new FakeWorkflow();
     fake.items = [waitingVideo(), waitingVideo({ id: 'sans-carte', station: null })];
     const api = studio(fake);
 
     expect(await api.refresh()).toBe(true);
+    // The sheet comes from workflow-core (#72): the workflow's own API is not asked for it.
+    expect(api.view().sheet).toBeNull();
+    expect(api.setSheet(STUDIO_SHEET, null)).toBe(true);
     const view = api.view();
     expect(view.sheet).toEqual(STUDIO_SHEET);
     // An item without a station is not on the line yet: it is not shown.
@@ -39,7 +43,7 @@ describe('WorkflowApi', () => {
     expect(view).toMatchObject({ readAt: NOW, unreachableSince: null, error: null });
     expect(await api.refresh()).toBe(false);
 
-    // The workflow adds a station to its sheet: the next read shows it, nothing else changes here.
+    // The workflow adds a station to its sheet: the core's next sheet shows it, nothing else changes here.
     const sheet = structuredClone(STUDIO_SHEET);
     sheet.stations.push({
       key: 'sous-titres',
@@ -50,8 +54,8 @@ describe('WorkflowApi', () => {
       row: 1,
     });
     sheet.edges.push({ from: 'revue', to: 'sous-titres', kind: 'branch' });
-    fake.sheet = sheet;
-    expect(await api.refresh()).toBe(true);
+    expect(api.setSheet(sheet, null)).toBe(true);
+    expect(api.setSheet(sheet, null)).toBe(false);
     expect(api.view().sheet?.stations.map(({ key }) => key)).toEqual([
       'script',
       'revue',
@@ -59,11 +63,11 @@ describe('WorkflowApi', () => {
       'sous-titres',
     ]);
 
-    // An invalid sheet keeps the last valid one and says why.
-    fake.sheet = { ...sheet, models: ['nulle-part'] };
-    await api.refresh();
+    // A sheet the core refuses keeps the last valid one and says why.
+    expect(api.setSheet(null, 'models names an unknown station "nulle-part"')).toBe(true);
     expect(api.view().sheet).toEqual(sheet);
-    expect(api.view().sheetError).toContain('nulle-part');
+    expect(api.view().sheetRefusal).toContain('nulle-part');
+    expect(fake.calls.some((call) => call.path === '/api/workflow')).toBe(false);
 
     // The detail of an item: its files on this server, its page at the host the viewer came by.
     const detailFetch = fake.fetch;
@@ -182,8 +186,10 @@ describe('WorkflowApi', () => {
     });
 
     await api.refresh();
+    // The studio's real sheet, as the core serves it (#72), its form checked by the contract's schema.
+    api.setSheet(WorkflowSheet.parse((real('workflow') as { sheet: unknown }).sheet), null);
     const view = api.view();
-    expect(view.sheetError).toBeNull();
+    expect(view.sheetRefusal).toBeNull();
     expect(view.sheet?.item).toEqual({ type: 'video', label: 'Vidéo' });
     expect(
       view.sheet?.stations.filter(({ kind }) => kind === 'owner').map(({ key }) => key),

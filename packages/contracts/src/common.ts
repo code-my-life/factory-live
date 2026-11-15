@@ -22,7 +22,7 @@ export const StationId = z.enum([
 ]);
 export type StationId = z.infer<typeof StationId>;
 
-/** Statuts du kanban Hermès (colonnes du board). */
+/** The statuses of the factory's kanban (the board's columns). */
 export const KanbanStatus = z.enum([
   'triage',
   'todo',

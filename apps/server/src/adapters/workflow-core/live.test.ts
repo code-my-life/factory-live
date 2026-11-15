@@ -1,14 +1,12 @@
 import { readFileSync } from 'node:fs';
-import { HermesHookBody } from '@factory-live/contracts';
 import { profileStation } from '@factory-live/domain';
 import { afterEach, describe, expect, it } from 'vitest';
-import { toHookEvent } from '../../ingest/hermes.ts';
 import { fakeCore } from '../../test/fake-core.ts';
 import type { FakeCore, FakeCoreState } from '../../test/fake-core.ts';
 import { NOW_S, SECRET, coreSide, coreState, newHub, until } from '../../test/core-scenario.ts';
 import type { Side } from '../../test/core-scenario.ts';
-import { tempDir } from '../../test/hermes-fixtures.ts';
-import type { TempDir } from '../../test/hermes-fixtures.ts';
+import { tempDir } from '../../test/board-fixtures.ts';
+import type { TempDir } from '../../test/board-fixtures.ts';
 import { coreActivityFact } from './live.ts';
 
 /** The agents of the factory as workflow-core publishes them (#129), captured on the machine. */
@@ -211,7 +209,7 @@ describe('direct de la ligne du code par le socle (workflow-core, #66)', () => {
     await first.reader.stop();
 
     // A new server on the same base: the feed comes back from it, then the core serves the same fact.
-    const again = newHub(dir, 'core-data', 'workflow-core');
+    const again = newHub(dir, 'core-data');
     again.addCoreActivity([coreActivityFact(fact as Parameters<typeof coreActivityFact>[0])]);
     expect(again.snapshot().activity.map((line) => line.id)).toEqual(['core-f1']);
   });
@@ -223,12 +221,12 @@ describe('direct de la ligne du code par le socle (workflow-core, #66)', () => {
     await until(() => hub.snapshot().agents.length === AGENTS.agents.length, 2_000);
 
     const agents = hub.snapshot().agents;
-    // One line per agent the core publishes, as the Hermes reading gives one per profile.
+    // One line per agent the core publishes.
     expect(agents.map((agent) => agent.profile).sort()).toEqual(
       AGENTS.agents.map((agent) => agent.name).sort(),
     );
     for (const agent of agents) expect(agent.station).toBe(profileStation(agent.profile));
-    // At rest, an agent shows its configured model (a card in progress may override it, as on Hermes' side).
+    // At rest, an agent shows its configured model (a card in progress may override it).
     for (const agent of agents.filter((item) => item.cardId === null)) {
       const published = AGENTS.agents.find((item) => item.name === agent.profile)!;
       expect(agent.model).toEqual(
@@ -265,25 +263,5 @@ describe('direct de la ligne du code par le socle (workflow-core, #66)', () => {
     expect(
       agents.filter((agent) => agent.profile !== 'coder').every((agent) => agent.state !== 'tool'),
     ).toBe(true);
-  });
-
-  it('côté socle, un webhook d’Hermès ne change pas l’instantané', async () => {
-    const state = coreState();
-    state.live = { factory: [CODER] };
-    const { hub } = await start(state);
-    const before = hub.snapshot();
-
-    const samples = JSON.parse(
-      readFileSync(
-        new URL('../../../../../fixtures/hermes-webhooks/outbound-sample.json', import.meta.url),
-        'utf8',
-      ),
-    ) as { body: unknown }[];
-    for (const sample of samples) hub.applyHook(toHookEvent(HermesHookBody.parse(sample.body)));
-
-    const after = hub.snapshot();
-    expect(after.agents).toEqual(before.agents);
-    expect(after.activity).toEqual(before.activity);
-    expect(after.health).toEqual(before.health);
   });
 });

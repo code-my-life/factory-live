@@ -9,6 +9,7 @@ import { MotionToggle } from '../../ui/motion.tsx';
 import { issueKeyFromParams } from '../../ui/paths.ts';
 import { useNow } from '../../ui/useNow.ts';
 import { IssuePage } from '../issues/IssuePage.tsx';
+import { useCodeSheet } from './graph/codeSheet.ts';
 import { FactoryGraph } from './graph/FactoryGraph.tsx';
 import { lineIssues, providerRows } from './graph/model.ts';
 import styles from './line.module.css';
@@ -40,7 +41,11 @@ export function FactoryLinePage() {
   const params = useParams();
   const fromLink = issueKeyFromParams(params.repo, params.number);
   const items = useMemo(() => lineIssues(snapshot), [snapshot]);
-  const providers = useMemo(() => providerRows(snapshot.agents), [snapshot.agents]);
+  const { sheet } = useCodeSheet();
+  const providers = useMemo(
+    () => (sheet ? providerRows(snapshot.agents, sheet) : []),
+    [snapshot.agents, sheet],
+  );
 
   // The owner's pick holds for the link it was made on; until then, or after another link, the
   // link's issue opens, else the first that waits for the owner. `null`: the owner closed it.

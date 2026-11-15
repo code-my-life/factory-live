@@ -1,3 +1,4 @@
+import { FACTORY_RUNTIME } from '@factory-live/contracts';
 /**
  * The badge hues: Primer's « display » palette, 19 hues made for labels
  * (`--display-<hue>-bgColor-muted`, `-borderColor-muted`, `-fgColor`, with the values of each
@@ -84,7 +85,7 @@ export const FIXED_HUES: Readonly<Record<HueKind, Readonly<Record<string, Hue>>>
     'hermes-software-factory': 'purple',
     'liquid-paper': 'teal',
   },
-  product: { Hermès: 'purple', 'factory-live': 'blue' },
+  product: { 'factory-live': 'blue' },
   board: { factory: 'brown' },
   provider: {
     'claude-code': 'coral',
@@ -126,7 +127,7 @@ export const FIXED_HUES: Readonly<Record<HueKind, Readonly<Record<string, Hue>>>
   mcp: { graphify: 'pink' },
   source: {
     kanban: 'olive',
-    hermes: 'purple',
+    [FACTORY_RUNTIME]: 'purple',
     github: 'gray',
     comment: 'lemon',
     'factory-live': 'blue',

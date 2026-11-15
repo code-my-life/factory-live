@@ -1,3 +1,4 @@
+import { FACTORY_RUNTIME } from '@factory-live/contracts';
 import type { TranscriptView } from '@factory-live/contracts';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -22,8 +23,8 @@ describe('TranscriptPanel', () => {
     mockTranscripts = [
       {
         runId: 1,
-        source: 'hermes',
-        title: { code: 'transcript.hermes', params: { profile: 'coder-claude', session: null } },
+        source: FACTORY_RUNTIME,
+        title: { code: 'transcript.agent', params: { profile: 'coder-claude', session: null } },
         name: null,
         startedAt: baseTime - 10000,
         endedAt: baseTime,
@@ -78,7 +79,7 @@ describe('TranscriptPanel', () => {
 
     render(<TranscriptPanel runId={1} />);
 
-    // SegmentedControl must show 4 buttons (Hermes + 3 Claude Code lanes)
+    // SegmentedControl must show 4 buttons (the agent's session + 3 Claude Code lanes)
     const buttons = screen.getAllByRole('button', { name: /Claude Code/ });
     expect(buttons).toHaveLength(3); // Three unnamed "Claude Code" lanes
 
@@ -89,7 +90,7 @@ describe('TranscriptPanel', () => {
     // The displayed lane must render its entries (TranscriptPanel.tsx:230 coverage)
     expect(screen.getByText('Test entry text')).toBeInTheDocument();
 
-    // Order must be: Session Hermes, Implementation, Correction, Correction 2, Terminal
+    // Order must be: the agent's session, Implementation, Correction, Correction 2, Terminal
     // (based on lane name read from custom-title)
   });
 
@@ -261,11 +262,11 @@ describe('TranscriptPanel', () => {
       'Lane Claude Code: “In Progress Lane”, since 11:15:22 AM (in progress)',
     );
 
-    // Test non-claude-code source (hermes) - should use text(view.title)
-    const hermesView: TranscriptView = {
+    // Test non-claude-code source (the agent's session) - should use text(view.title)
+    const sessionView: TranscriptView = {
       runId: 1,
-      source: 'hermes',
-      title: { code: 'transcript.hermes', params: { profile: 'coder-claude', session: null } },
+      source: FACTORY_RUNTIME,
+      title: { code: 'transcript.agent', params: { profile: 'coder-claude', session: null } },
       name: null,
       startedAt: startTime,
       endedAt: endTime,
@@ -273,8 +274,10 @@ describe('TranscriptPanel', () => {
       entries: [],
       terminal: [],
     };
-    const hermesLegendFr = legendForView(hermesView, fr.t, [], 0, fr.fmt, fr.text);
-    expect(hermesLegendFr).toBe('Session Hermès de coder-claude');
+    const sessionLegendFr = legendForView(sessionView, fr.t, [], 0, fr.fmt, fr.text);
+    expect(sessionLegendFr).toBe(
+      fr.t.server['transcript.agent']({ profile: 'coder-claude', session: null }),
+    );
   });
 
   it('au-delà de six sources le choix devient un menu à toute largeur', () => {
@@ -290,8 +293,8 @@ describe('TranscriptPanel', () => {
     mockTranscripts = [
       {
         runId: 1,
-        source: 'hermes',
-        title: { code: 'transcript.hermes', params: { profile: 'coder-claude', session: null } },
+        source: FACTORY_RUNTIME,
+        title: { code: 'transcript.agent', params: { profile: 'coder-claude', session: null } },
         name: null,
         startedAt: baseTime - 10000,
         endedAt: baseTime,
@@ -368,7 +371,7 @@ describe('TranscriptPanel', () => {
     ];
     render(<TranscriptPanel runId={1} />);
     // Verify the component renders without error
-    const elements = screen.getAllByText('Session Hermès');
+    const elements = screen.getAllByText(i18nOf('fr').t.transcript.source[FACTORY_RUNTIME]);
     expect(elements.length).toBeGreaterThan(0);
   });
 

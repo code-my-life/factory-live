@@ -1,42 +1,100 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { DatabaseSync } from 'node:sqlite';
 import { GitHubAppAuth } from '../adapters/github/app.ts';
 import { GitHubCache } from '../adapters/github/cache.ts';
 import { GitHubClient } from '../adapters/github/client.ts';
-import { AgentLogReader } from '../adapters/hermes/agentLog.ts';
-import { CardFiles } from '../adapters/hermes/files.ts';
-import { KanbanReader } from '../adapters/hermes/kanban.ts';
-import { HermesPaths } from '../adapters/hermes/paths.ts';
-import { ProfileConfigReader } from '../adapters/hermes/profiles.ts';
-import { SessionReader } from '../adapters/hermes/sessions.ts';
 import { PushNotifier } from '../adapters/push/webpush.ts';
 import type { StoredSubscription } from '../adapters/store/history.ts';
 import { HistoryStore } from '../adapters/store/history.ts';
+import { CoreProfiles } from '../adapters/workflow-core/agents.ts';
+import { coreInterventionState } from '../adapters/workflow-core/interventions.ts';
 import { createApp } from '../http/app.ts';
 import type { TwinBench } from '../adapters/twins/bench.ts';
 import type { WorkflowApi } from '../adapters/workflows/api.ts';
 import { StreamBuffer } from '../http/stream.ts';
-import { DiagnosisService } from '../application/diagnosis.ts';
+import { CoreWatch } from '../application/core-watch.ts';
+import { declaredIn } from '../application/gestures.ts';
 import { Hub } from '../application/hub.ts';
-import { KanbanWatch } from '../application/kanban-watch.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
-import type { GesturesPort, GenericWorkflowsPort } from '../application/ports.ts';
+import type {
+  DeclaredGesture,
+  DeclaredViewsPort,
+  GesturesPort,
+  GenericWorkflowsPort,
+} from '../application/ports.ts';
+import type { AgentsResponse, CoreIntervention } from '@factory-live/contracts/workflow-core';
 import { createLogger } from '../logger.ts';
 import { allowedHosts, appAddresses } from '../config.ts';
 import { appPem } from './github-fixtures.ts';
-import { insertEvent, insertRun, insertTask, kanbanDb, tempDir } from './hermes-fixtures.ts';
-import type { TempDir } from './hermes-fixtures.ts';
+import {
+  coreBoard,
+  insertEvent,
+  insertLink,
+  insertRun,
+  insertTask,
+  tempDir,
+} from './board-fixtures.ts';
+import type { CoreBoard, TempDir } from './board-fixtures.ts';
 
 export const SECRET = 'secret-de-test';
 export const NOW = Date.parse('2026-10-28T18:00:00Z');
 export const NOW_S = Math.floor(NOW / 1000);
 export const ORIGINS = ['http://localhost:8446', 'https://machine.tailnet.ts.net:8446'];
 
+const LIMITS = [
+  { key: 'hook_callback_timeout', value: null, default: 30, unit: 'seconds' },
+  { key: 'tool_deadline', value: null, default: 420, unit: 'seconds' },
+  { key: 'terminal_timeout', value: null, default: 180, unit: 'seconds' },
+  { key: 'max_turns', value: null, default: null, unit: 'turns' },
+];
+
+const agent = (name: string, skill: string) => ({
+  name,
+  skills: [skill],
+  model: { name: 'auto', provider: 'freellmapi' },
+  fallbacks: [],
+  effort: null,
+  toolsets: [],
+  plugins: [{ name: 'factory-notify', longest_seconds: null, hook_timeouts: 0 }],
+  mcp: [],
+  limits: LIMITS,
+});
+
+/** The harness' agents as workflow-core serves them (#93): four agents in the manifest's order, the kanban at 2 and 1. */
+export const HARNESS_AGENTS = {
+  kanban: { max_in_progress: 2, max_in_progress_per_profile: 1 },
+  guard_risks: [],
+  agents: [
+    agent('coordinator', 'factory-brief'),
+    agent('coder', 'factory-author-proof'),
+    agent('gate', 'factory-gate'),
+    agent('release', 'factory-release'),
+  ],
+} as unknown as AgentsResponse;
+
+/** The intervention the core publishes for the blocked card of cv-site#49 (#59). */
+export const HARNESS_INTERVENTION = {
+  id: 'needs_input:t_1a9f0049:1',
+  kind: 'needs_input',
+  item: 't_1a9f0049',
+  event: 1,
+  opened_at: new Date((NOW_S - 600) * 1000).toISOString(),
+  agent: 'coder',
+  severity: 'critical',
+  push: true,
+  title: { quote: 'Quelle base de données ?' },
+  question: { quote: 'Quelle base de données ?\nPostgreSQL ou SQLite ?' },
+  actions: [{ kind: 'gesture', gesture: 'unblock' }],
+} as unknown as CoreIntervention;
+
+/** The gestures the code line declares to the core (#61): the unblocking, a comment on the issue. */
+export const HARNESS_GESTURES: Record<string, DeclaredGesture[]> = {
+  factory: [{ name: 'unblock', kind: 'comment', repo: null }],
+};
+
 export interface Harness {
   dir: TempDir;
-  writer: DatabaseSync;
-  kanban: KanbanReader;
+  /** The cards the core serves; `syncBoard` gives them to the hub, as a read of the core does. */
+  core: CoreBoard;
   store: HistoryStore;
   hub: Hub;
   buffer: StreamBuffer;
@@ -49,20 +107,20 @@ export interface Harness {
   unblock: UnblockDeps;
   pushes: { subscription: StoredSubscription; payload: string }[];
   clock: { now: number };
-  /** The kanban read watch behind `/healthz` (#50), on the harness clock. */
-  kanbanWatch: KanbanWatch;
-  /** The exit codes the kanban watch asked for. */
-  exits: number[];
-  syncKanban(): void;
+  /** The core's reachability behind `/healthz` (#62), on the harness clock. */
+  coreWatch: CoreWatch;
+  /** The core's cards read again, as the reader gives them to the hub. */
+  syncBoard(): void;
   /** One pass of the GitHub cache over the tracked issues, as `main.ts` runs every 30 s. */
   refreshGitHub(): Promise<boolean>;
   close(): void;
 }
 
 /**
- * Une factory miniature au schéma réel d'Hermès : l'issue cv-site#49, brief terminé, impl bloquée sur
- * une décision (needs_input). GitHub (API, App et connexion OAuth) et Web Push sont simulés ; sans App
- * créée, l'accès GitHub passe par le jeton de repli (`jeton`, ou aucun avec `githubToken: null`).
+ * A miniature factory, as the core serves it: the issue cv-site#49, its brief done, its impl blocked on a
+ * decision (needs_input), the intervention the core publishes for it, and the agents it describes. GitHub
+ * (API, App and OAuth login) and Web Push are simulated; without an App, GitHub is reached with the fallback
+ * token (`jeton`, or none with `githubToken: null`).
  */
 export function harness(
   options: {
@@ -76,48 +134,24 @@ export function harness(
     workflows?: WorkflowApi[];
     /** The generic workflows workflow-core declares (#65), for their screen. */
     generic?: GenericWorkflowsPort;
-    /** The gestures each workflow declares (#61); absent: Hermes' side default list. */
+    /** The factory's declared data (#60). */
+    declared?: DeclaredViewsPort;
+    /** The gestures each workflow declares (#61); absent: those of `HARNESS_GESTURES`. */
     gestures?: GesturesPort;
-    /**
-     * Where the hub reads the factory (#63): on workflow-core's side, the hub starts empty and the kanban of
-     * the harness is not read; the test feeds the hub from a fake core.
-     */
-    source?: 'hermes' | 'workflow-core';
+    /** The interventions the core publishes; absent: `HARNESS_INTERVENTION`. */
+    interventions?: CoreIntervention[];
   } = {},
 ): Harness {
   const dir = tempDir();
-  const hermes = join(dir.path, 'hermes');
-  const factory = join(dir.path, 'factory');
-  const boardDir = join(hermes, 'kanban', 'boards', 'factory');
-  mkdirSync(boardDir, { recursive: true });
-  for (const profile of ['coordinator', 'coder', 'gate', 'release']) {
-    mkdirSync(join(hermes, 'profiles', profile), { recursive: true });
-    mkdirSync(join(factory, 'profiles', profile), { recursive: true });
-    const config = `model:\n  default: auto\n  provider: freellmapi\nplugins:\n  enabled: [factory-notify]\n`;
-    writeFileSync(join(hermes, 'profiles', profile, 'config.yaml'), config);
-    writeFileSync(
-      join(factory, 'profiles', profile, 'config.yaml'),
-      profile === 'coder' ? config.replace('auto', 'agnes-2.5-flash') : config,
-    );
-  }
-  writeFileSync(
-    join(hermes, 'config.yaml'),
-    'kanban:\n  max_in_progress: 2\n  max_in_progress_per_profile: 1\n',
-  );
-  writeFileSync(
-    join(factory, 'factory.yaml'),
-    'github_user: cddev\nprojects:\n  cv-site: {repo: code-my-life/cv-site}\nprofiles:\n  coordinator: {skills: [factory-brief], plugins: [factory-notify]}\n  coder: {skills: [factory-author-proof], plugins: [coder-guard]}\n  gate: {skills: [factory-gate], plugins: [gate-readonly]}\n  release: {skills: [factory-release], plugins: [merge-guard]}\n',
-  );
-
-  const writer = kanbanDb(join(boardDir, 'kanban.db'));
-  insertTask(writer, {
+  const core = coreBoard();
+  insertTask(core, {
     id: 't_b1ef0049',
     title: 'brief cv-site#49 : Page Projets',
     status: 'done',
     assignee: 'coordinator',
     createdAt: NOW_S - 7_200,
   });
-  insertTask(writer, {
+  insertTask(core, {
     id: 't_1a9f0049',
     title: 'impl cv-site#49 : Page Projets',
     status: 'blocked',
@@ -125,10 +159,8 @@ export function harness(
     blockKind: 'needs_input',
     createdAt: NOW_S - 6_000,
   });
-  writer
-    .prepare("INSERT INTO task_links (parent_id, child_id) VALUES ('t_b1ef0049', 't_1a9f0049')")
-    .run();
-  insertRun(writer, {
+  insertLink(core, 't_b1ef0049', 't_1a9f0049');
+  insertRun(core, {
     taskId: 't_b1ef0049',
     profile: 'coordinator',
     status: 'done',
@@ -136,7 +168,7 @@ export function harness(
     startedAt: NOW_S - 7_100,
     endedAt: NOW_S - 6_100,
   });
-  insertRun(writer, {
+  insertRun(core, {
     taskId: 't_1a9f0049',
     profile: 'coder',
     status: 'done',
@@ -144,7 +176,7 @@ export function harness(
     startedAt: NOW_S - 5_000,
     endedAt: NOW_S - 600,
   });
-  insertEvent(writer, {
+  insertEvent(core, {
     taskId: 't_1a9f0049',
     kind: 'blocked',
     runId: 2,
@@ -156,17 +188,8 @@ export function harness(
   const now = () => clock.now;
   const log = createLogger('silent');
   const store = new HistoryStore(join(dir.path, 'data'));
-  const paths = new HermesPaths({
-    profilesDir: join(hermes, 'profiles'),
-    boardDir,
-    factoryRepo: factory,
-  });
-  const profiles = new ProfileConfigReader(hermes, factory, paths);
-  const sessions = new SessionReader(join(hermes, 'profiles'));
-  const files = new CardFiles(boardDir, join(dir.path, 'claude-projects'), paths);
-  const agentLog = new AgentLogReader(paths, 'Europe/Paris', (profile, at) =>
-    sessions.sessionsActiveAt(profile, at),
-  );
+  const profiles = new CoreProfiles();
+  profiles.update(HARNESS_AGENTS, NOW);
   const github: Harness['github'] = { calls: [], reactions: [] };
   const fakeFetch = ((input: string | URL | Request, init: RequestInit = {}) => {
     const url = input instanceof Request ? input.url : input.toString();
@@ -249,33 +272,26 @@ export function harness(
       heldAfterSeconds: 1_800,
       keepFinishedMs: 86_400_000,
     },
-    {
-      store,
-      profiles,
-      github: cache,
-      diagnoses: new DiagnosisService({
-        sessions,
-        profiles,
-        files,
-        agentLog,
-        log,
-        boardName: 'factory',
-      }),
-      log,
-      now,
-      ...(options.source ? { source: options.source } : {}),
-    },
+    { store, profiles, github: cache, log, now },
   );
   const buffer = new StreamBuffer();
   hub.subscribe((event) => buffer.push(event));
-  const kanban = new KanbanReader(join(boardDir, 'kanban.db'));
-  const syncKanban = () => {
-    if (options.source === 'workflow-core') return;
-    if (kanban.changed()) hub.applyKanban(kanban.read(), clock.now);
+  const syncBoard = () => hub.replaceBoard(core.board(), clock.now);
+  syncBoard();
+  const gestures = options.gestures ?? {
+    declared: (workflow: string) => declaredIn(HARNESS_GESTURES, workflow),
   };
-  syncKanban();
-  const exits: number[] = [];
-  const kanbanWatch = new KanbanWatch({ now, log, requestExit: (code) => exits.push(code) });
+  const declared = new Set(
+    (gestures.declared('factory') ?? [])
+      .filter((gesture) => gesture.kind === 'comment')
+      .map((gesture) => gesture.name),
+  );
+  hub.replaceCoreInterventions(
+    (options.interventions ?? [HARNESS_INTERVENTION]).map((item) =>
+      coreInterventionState(item, declared),
+    ),
+  );
+  const coreWatch = new CoreWatch({ now, log });
   const pushes: Harness['pushes'] = [];
   const notifier = new PushNotifier(
     store,
@@ -294,7 +310,7 @@ export function harness(
     factoryBot: 'code-my-life-factory[bot]',
     log,
     now,
-    ...(options.gestures ? { gestures: options.gestures } : {}),
+    gestures,
   };
   const app = createApp({
     hub,
@@ -303,11 +319,8 @@ export function harness(
     views: {
       hub,
       store,
-      sessions,
       profiles,
       github: cache,
-      files,
-      agentLog,
       owner: 'code-my-life',
       boardName: 'factory',
       dashboardUrl: 'https://machine.tailnet.ts.net:9443',
@@ -320,8 +333,8 @@ export function harness(
     ...(options.twins ? { twins: options.twins } : {}),
     ...(options.workflows ? { workflows: options.workflows } : {}),
     ...(options.generic ? { generic: options.generic } : {}),
-    kanbanHealthy: () => kanbanWatch.healthy(),
-    hookSecret: SECRET,
+    ...(options.declared ? { declared: options.declared } : {}),
+    coreHealthy: () => coreWatch.healthy(),
     origins: ORIGINS,
     allowedHosts: allowedHosts(8446, ORIGINS),
     tailscaleLogins: ['alice@github'],
@@ -333,8 +346,7 @@ export function harness(
   });
   return {
     dir,
-    writer,
-    kanban,
+    core,
     store,
     hub,
     buffer,
@@ -344,13 +356,10 @@ export function harness(
     unblock,
     pushes,
     clock,
-    kanbanWatch,
-    exits,
-    syncKanban,
+    coreWatch,
+    syncBoard,
     refreshGitHub: () => cache.refresh(hub.trackedIssues(), clock.now),
     close: () => {
-      kanban.close();
-      writer.close();
       store.close();
       dir.remove();
     },

@@ -1,3 +1,4 @@
+import { FACTORY_RUNTIME } from '@factory-live/contracts';
 import type { ServiceHealth } from '@factory-live/contracts';
 import { Heading } from '@primer/react';
 import { useSnapshot } from '../../data/FactoryProvider.tsx';
@@ -12,7 +13,7 @@ import { needsWatch } from '../../ui/vocabulary.ts';
 import styles from './health.module.css';
 
 const GROUPS: readonly ServiceHealth['group'][] = [
-  'hermes',
+  FACTORY_RUNTIME,
   'models',
   'tools',
   'intake',

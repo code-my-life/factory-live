@@ -1,3 +1,4 @@
+import { FACTORY_RUNTIME } from '@factory-live/contracts';
 import type { TranscriptEntry, TranscriptView } from '@factory-live/contracts';
 import {
   CommentDiscussionIcon,
@@ -136,9 +137,9 @@ function choices(
   const result: { label: string; choice: ViewChoice; startedAt: number | null }[] = [];
   const labelCounts = new Map<string, number>();
   for (const view of sorted) {
-    if (view.source === 'hermes') {
+    if (view.source === FACTORY_RUNTIME) {
       result.push({
-        label: t.transcript.source.hermes,
+        label: t.transcript.source[FACTORY_RUNTIME],
         choice: { kind: 'entries', view },
         startedAt: view.startedAt,
       });
@@ -202,7 +203,7 @@ export function sourceVariant(count: number) {
     : { narrow: 'dropdown' as const, regular: 'default' as const };
 }
 
-/** Full transcript of a run, on demand: Hermès session, CLI lane, or raw log. */
+/** Full transcript of a run, on demand: the agent's session, CLI lane, or raw log. */
 export function TranscriptPanel({ runId }: { runId: number }) {
   const { t, fmt, text } = useI18n();
   const views = useTranscripts(runId);

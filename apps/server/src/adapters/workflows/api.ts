@@ -2,8 +2,8 @@ import {
   StudioGesture,
   StudioItem,
   StudioWord,
-  parseWorkflowSheet,
   type StudioItemDetail,
+  type WorkflowSheet,
 } from '@factory-live/contracts';
 import { z } from 'zod';
 import type { WorkflowView } from '../../application/ports.ts';
@@ -11,10 +11,11 @@ import type { WorkflowView } from '../../application/ports.ts';
 export type { WorkflowView };
 
 /**
- * A workflow followed by its generic API, version 1 (#31, video-factory's ADR 0006): its sheet and its
- * items read on a schedule, the last state kept when it does not answer; an item's detail, its words
- * and its files read on demand; the owner's gesture relayed. factory-live never reads the workflow's
- * store or files: a workflow that changes its sheet or its storage needs no change here.
+ * A workflow followed by its generic API, version 1 (#31, video-factory's ADR 0006): its items read on a
+ * schedule, the last state kept when it does not answer; an item's detail, its words and its files read on
+ * demand; the owner's gesture relayed. Its sheet comes from workflow-core, which judges it (#72, `setSheet`).
+ * factory-live never reads the workflow's store or files: a workflow that changes its sheet or its storage
+ * needs no change here.
  */
 
 type Fetch = typeof fetch;
@@ -71,7 +72,7 @@ export class WorkflowApi {
     this.state = {
       name: options.name,
       sheet: null,
-      sheetError: null,
+      sheetRefusal: null,
       items: [],
       readAt: null,
       unreachableSince: null,
@@ -135,22 +136,26 @@ export class WorkflowApi {
   }
 
   /**
-   * Reads the sheet and the items again. The sheet is read each time: a station added to it shows at
-   * the next read, without redeploying anything. A workflow that does not answer keeps its last state.
-   * Returns whether anything changed.
+   * The workflow's sheet as workflow-core serves it (#72): the sheet, or why the core refuses it, the last
+   * sheet staying. Returns whether anything changed.
+   */
+  setSheet(sheet: WorkflowSheet | null, refusal: string | null): boolean {
+    const next = { sheet: sheet ?? this.state.sheet, sheetRefusal: sheet ? null : refusal };
+    const changed =
+      JSON.stringify([next.sheet, next.sheetRefusal]) !==
+      JSON.stringify([this.state.sheet, this.state.sheetRefusal]);
+    this.state = { ...this.state, ...next };
+    return changed;
+  }
+
+  /**
+   * Reads the items again. A workflow that does not answer keeps its last state. Returns whether anything
+   * changed.
    */
   async refresh(): Promise<boolean> {
-    const before = JSON.stringify([
-      this.state.sheet,
-      this.state.items,
-      this.state.unreachableSince,
-    ]);
+    const before = JSON.stringify([this.state.items, this.state.unreachableSince]);
     try {
-      const [sheetBody, itemsBody] = await Promise.all([
-        this.json('/api/workflow'),
-        this.json('/api/items'),
-      ]);
-      const parsed = parseWorkflowSheet(sheetBody.sheet);
+      const itemsBody = await this.json('/api/items');
       const now = this.now();
       const items = z
         .array(ApiItem)
@@ -161,8 +166,6 @@ export class WorkflowApi {
       for (const key of this.firstSeen.keys()) if (!here.has(key)) this.firstSeen.delete(key);
       this.state = {
         ...this.state,
-        sheet: parsed.ok ? parsed.sheet : this.state.sheet,
-        sheetError: parsed.ok ? null : parsed.error,
         items,
         readAt: now,
         unreachableSince: null,
@@ -175,9 +178,7 @@ export class WorkflowApi {
         error: cause instanceof Error ? cause.message : String(cause),
       };
     }
-    return (
-      before !== JSON.stringify([this.state.sheet, this.state.items, this.state.unreachableSince])
-    );
+    return before !== JSON.stringify([this.state.items, this.state.unreachableSince]);
   }
 
   /** An item's detail, its files' addresses on this server, its links at the host the viewer came by. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { aLink, aRun, aTask, anEvent } from './fixtures.test-helpers.ts';
-import type { Board } from './hermes.ts';
+import type { Board } from './board.ts';
 import {
   finishedIssues,
   gateVerdicts,

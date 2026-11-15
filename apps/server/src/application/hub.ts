@@ -4,26 +4,20 @@ import type {
   AppAddresses,
   Diagnosis,
   Intervention,
-  ProbeReport,
   RunVerdict,
   Snapshot,
   StreamEvent,
 } from '@factory-live/contracts';
-import { applyHook, branchOf, guardRisks } from '@factory-live/domain';
+import { branchOf } from '@factory-live/domain';
 import type {
   Board,
   Comment,
   Intervention as FoundIntervention,
   GuardRisk,
-  HookEvent,
   LiveAgent,
-  ProfileFacts,
   Task,
 } from '@factory-live/domain';
-import { DIAGNOSED } from './diagnosis.ts';
-import type { DiagnosisService } from './diagnosis.ts';
 import { buildHealth } from './health.ts';
-import type { HealthSignals } from './health.ts';
 import {
   coreActivityEvent,
   coreIntervention,
@@ -35,7 +29,6 @@ import {
   projectIssues,
   projectSideCards,
   stationViews,
-  toActivityEvent,
 } from './projection.ts';
 import type { ProjectionInput, ResolvedIntervention } from './projection.ts';
 import type {
@@ -59,7 +52,7 @@ import type {
 export interface HubOptions {
   owner: string;
   boardName: string;
-  /** Dashboard d'Hermès (lien des interventions) ; `null` : pas de lien. */
+  /** The factory's dashboard (the interventions' link); `null`: no link. */
   dashboardUrl: string | null;
   /** Où ouvrir l'app, d'après la configuration (Réglages). */
   addresses: AppAddresses;
@@ -71,64 +64,45 @@ export interface HubDeps {
   store: HistoryPort;
   profiles: ProfilesPort;
   github: GitHubReadPort | null;
-  /** Le diagnostic des blocages ; `null` : interventions sans diagnostic. */
-  diagnoses: DiagnosisService | null;
   log: LoggerPort;
   now: () => number;
   /** The workflows followed by their API, as last read (#31); absent: none. */
   workflows?: () => readonly WorkflowView[];
-  /** Where the code line's sheet comes from (#31). */
-  codeSheet?: () => PublishedSheet;
-  /**
-   * Where the factory is read (#57, ADR 0015); `hermes` by default. On workflow-core's side, the board
-   * starts empty (the kanban mirror holds Hermes' cards, not the core's), the agents and the activity come
-   * from the core (#66), and Hermes' webhooks no longer change anything.
-   */
-  source?: 'hermes' | 'workflow-core';
+  /** The code line's sheet, the last the core served; `null` before the first (#31, #72). */
+  codeSheet?: () => PublishedSheet | null;
 }
 
 type Slice = 'board' | 'agents' | 'health';
 type FullBoard = Board & { comments: Comment[] };
 
 const ACTIVITY_KEPT = 200;
-const STALE_AGENT_MS = 20 * 60_000;
 const PR_KEYS = ['pr_url', 'published_pr'];
+/** The interventions that have an explanation: neither a PR to approve nor a red CI of main. */
+const DIAGNOSED: ReadonlySet<FoundIntervention['kind']> = new Set([
+  'needs_input',
+  'capability',
+  'transient',
+  'gave_up',
+  'triage_loop',
+  'held_active_pr',
+]);
 /** Une intervention débloquée reste visible ce temps-là, pour suivre la reprise de la carte. */
 const RESOLVED_KEPT_MS = 30 * 60_000;
 /** Statuts d'une carte repartie (débloquée, relayée) : son intervention se ferme. */
 const RESUMED = new Set(['ready', 'running', 'review', 'done']);
 const RESUME_EVENTS = new Set(['unblocked', 'claimed', 'promoted', 'status', 'assigned']);
 
-interface ProviderStats {
-  lastOkAt: number | null;
-  lastErrorAt: number | null;
-  rateLimited: number[];
-}
-
 /**
- * État en direct de la factory : le kanban (miroir compris), les webhooks, la sonde et GitHub entrent ;
- * le flux SSE et l'instantané sortent. Les tranches ne sont renvoyées que si elles ont changé.
+ * The factory's live state: what the core (workflow-core) serves and GitHub come in; the SSE stream and the
+ * snapshot go out. A slice is sent again only when it changed.
  */
 export class Hub {
-  private board: FullBoard;
-  private live = new Map<string, LiveAgent>();
+  /** The board as the core last served it; empty before its first read. */
+  private board: FullBoard = { tasks: [], runs: [], links: [], events: [], comments: [] };
+  /** No live agent but the core's (`coreAgents`): the projection reads an empty map. */
+  private readonly live = new Map<string, LiveAgent>();
   private activity: ActivityEvent[];
   private pendingActivity: ActivityEvent[] = [];
-  private readonly bootId = Date.now().toString(36);
-  private seq = 0;
-  private probe: { report: ProbeReport; receivedAt: number } | null = null;
-  private lastTickAt: number | null = null;
-  private lastHookAt: number | null = null;
-  private hookTimes: number[] = [];
-  private providers = new Map<string, ProviderStats>();
-  private claudeLastSessionAt: number | null = null;
-  private kanbanStatus: HealthSignals['kanban'] = {
-    state: 'pending',
-    cards: 0,
-    error: null,
-    readAt: null,
-  };
-  private sessionsStatus: HealthSignals['sessions'] = { error: null };
   private readonly stations: Map<string, StationRecord>;
   private issueOfCard = new Map<string, string>();
   private readonly listeners = new Set<(event: StreamEvent) => void>();
@@ -152,9 +126,8 @@ export class Hub {
     string,
     { intervention: FoundIntervention; resolvedAt: number }
   >();
-  /** Les gardes à risque, relues quand la config ou le code d'un plugin d'un agent change. */
+  /** The guards at risk, as the core computes them. */
   private guards: { risks: GuardRisk[]; checkedAt: number } | null = null;
-  private guardsStamp: string | null = null;
   private root: RootSettings;
   private factoryProfiles: string[];
   private readonly configModels = new Map<string, { model: string; provider: string } | null>();
@@ -164,22 +137,14 @@ export class Hub {
 
   private readonly options: HubOptions;
   private readonly deps: HubDeps;
-  /** Whether the factory is read from workflow-core (`source`), set once at start. */
-  private readonly onCore: boolean;
 
   constructor(options: HubOptions, deps: HubDeps) {
     this.options = options;
     this.deps = deps;
-    this.onCore = deps.source === 'workflow-core';
-    this.board = this.onCore
-      ? { tasks: [], runs: [], links: [], events: [], comments: [] }
-      : deps.store.board();
-    this.issueOfCard = issueOfCards(this.board);
     this.stations = deps.store.stations();
     this.activity = deps.store.recentActivity(ACTIVITY_KEPT);
     this.root = deps.profiles.root();
     this.factoryProfiles = this.loadProfiles();
-    // Le miroir du kanban suffit pour montrer les interventions avant la première lecture.
     this.found = this.foundNow();
   }
 
@@ -192,7 +157,7 @@ export class Hub {
     return profiles;
   }
 
-  /** Relit configs et réglages (appelé de temps en temps : un `hermes config set` change le modèle). */
+  /** Reads configs and settings again (called after each read of the core's agents: a model may change). */
   reloadConfig(): void {
     this.root = this.deps.profiles.root();
     this.factoryProfiles = this.loadProfiles();
@@ -226,35 +191,6 @@ export class Hub {
 
   // --- Entrées -------------------------------------------------------------------------------
 
-  applyKanban(delta: KanbanDelta, readAt: number): void {
-    this.deps.store.mirror(delta);
-    const tasks = new Map(this.board.tasks.map((task) => [task.id, task]));
-    for (const task of delta.tasks) tasks.set(task.id, task);
-    const runs = new Map(this.board.runs.map((run) => [run.id, run]));
-    for (const run of delta.runs) runs.set(run.id, run);
-    const links = new Map(
-      this.board.links.map((link) => [`${link.parentId}>${link.childId}`, link]),
-    );
-    for (const link of delta.links) links.set(`${link.parentId}>${link.childId}`, link);
-    const seenEvents = new Set(this.board.events.map((event) => event.id));
-    const seenComments = new Set(this.board.comments.map((comment) => comment.id));
-    this.board = {
-      tasks: [...tasks.values()],
-      runs: [...runs.values()].sort((left, right) => left.id - right.id),
-      links: [...links.values()],
-      events: [...this.board.events, ...delta.events.filter((event) => !seenEvents.has(event.id))],
-      comments: [
-        ...this.board.comments,
-        ...delta.comments.filter((comment) => !seenComments.has(comment.id)),
-      ],
-    };
-    this.issueOfCard = issueOfCards(this.board);
-    this.kanbanStatus = { state: 'read', cards: this.board.tasks.length, error: null, readAt };
-    this.trackUnblocks(delta, readAt);
-    this.trackInterventions();
-    this.dirty.add('board').add('agents').add('health');
-  }
-
   /**
    * The whole board, read from workflow-core (#57): it replaces the one held, so a card gone from the
    * core is gone here too. Nothing is written in the kanban mirror (ADR 0019): the core holds the state.
@@ -269,7 +205,6 @@ export class Hub {
       comments: [...board.comments],
     };
     this.issueOfCard = issueOfCards(this.board);
-    this.kanbanStatus = { state: 'read', cards: this.board.tasks.length, error: null, readAt };
     this.trackUnblocks(
       { ...board, events: board.events.filter((event) => !seenEvents.has(event.id)) },
       readAt,
@@ -303,7 +238,7 @@ export class Hub {
     for (const [id, entry] of this.resolved)
       if (ids.has(id) || now - entry.resolvedAt > RESOLVED_KEPT_MS) this.resolved.delete(id);
     this.found = found;
-    this.refreshDiagnoses();
+    this.refreshGuards();
   }
 
   /** Quand la carte est repartie : premier événement de reprise, sinon premier run, après l'intervention. */
@@ -343,50 +278,16 @@ export class Hub {
     };
   }
 
-  /**
-   * Recalcule ce qui dépend des fichiers d'Hermès quand ils changent : les diagnostics (config d'un
-   * agent, plugin, preuves) et les délais des gardes de la santé. Appelé après chaque lecture du
-   * kanban, et par une minuterie pour voir une correction en direct.
-   */
-  refreshDiagnoses(): void {
-    this.refreshGuards();
-    const diagnoses = this.deps.diagnoses;
-    if (!diagnoses) return;
-    const all = [...this.found, ...[...this.resolved.values()].map((entry) => entry.intervention)];
-    if (diagnoses.refresh(this.board, all, this.deps.now())) this.dirty.add('board');
-  }
-
-  /** Les gardes dont le code peut attendre au moins le délai de leur hook, agent par agent. */
+  /** The guards at risk, as the core computes them (#96); `null` while it served nothing. */
   private refreshGuards(): void {
-    // A source that computes the guards itself (workflow-core, #96): its list as it is, without the rule.
-    const published = this.deps.profiles.guardRisks?.();
-    if (published !== undefined) {
-      if (JSON.stringify(published?.risks) !== JSON.stringify(this.guards?.risks))
-        this.dirty.add('health');
-      this.guards = published;
-      return;
-    }
-    const stamp = () =>
-      this.factoryProfiles.map((profile) => this.deps.profiles.factsStamp(profile)).join('#');
-    if (this.guardsStamp !== null && stamp() === this.guardsStamp) return;
-    const facts = this.factoryProfiles.flatMap((profile): ProfileFacts[] => {
-      try {
-        const read = this.deps.profiles.facts(profile);
-        return read ? [read] : [];
-      } catch {
-        return [];
-      }
-    });
-    // L'empreinte se relit après coup : `facts` y ajoute les fichiers des plugins qu'il a lus.
-    this.guardsStamp = stamp();
-    const risks = guardRisks(facts);
-    if (JSON.stringify(risks) !== JSON.stringify(this.guards?.risks)) this.dirty.add('health');
-    this.guards = { risks, checkedAt: this.deps.now() };
+    const published = this.deps.profiles.guardRisks?.() ?? null;
+    if (JSON.stringify(published?.risks) !== JSON.stringify(this.guards?.risks))
+      this.dirty.add('health');
+    this.guards = published;
   }
 
   diagnosisOf(interventionId: string): Diagnosis | null {
-    if (this.onCore) return this.coreDiagnoses.get(interventionId) ?? null;
-    return this.deps.diagnoses?.of(interventionId) ?? null;
+    return this.coreDiagnoses.get(interventionId) ?? null;
   }
 
   /**
@@ -396,7 +297,6 @@ export class Hub {
    */
   private foundNow(): FoundIntervention[] {
     const input = this.projectionInput();
-    if (!this.onCore) return foundInterventions(input);
     const own = foundInterventions(input).filter(
       (item) => item.kind === 'pr_approval' || item.kind === 'main_red',
     );
@@ -461,27 +361,14 @@ export class Hub {
     this.dirty.add('board');
   }
 
-  /** The cause a diagnosis names first, from the core on its side, else from the diagnosis service. */
+  /** The cause the core's diagnosis names first. */
   private primaryOf(interventionId: string): string | null {
-    if (this.onCore) return this.coreDiagnoses.get(interventionId)?.primary.code ?? null;
-    return this.deps.diagnoses?.primaryOf(interventionId) ?? null;
+    return this.coreDiagnoses.get(interventionId)?.primary.code ?? null;
   }
 
-  /** Le verdict des runs en échec d'une carte (page d'une issue), calculé à la demande et gardé. */
+  /** The verdicts of a card's failed runs (an issue's page), as the core computes them. */
   verdictsOf(task: Task): ReadonlyMap<number, RunVerdict> {
-    if (this.onCore) return this.coreVerdicts.get(task.id) ?? new Map();
-    return this.deps.diagnoses?.verdictsOf(this.board, task, this.deps.now()) ?? new Map();
-  }
-
-  /** La lecture de `kanban.db` échoue : `error`, le message de l'erreur, tel quel. */
-  kanbanFailed(error: string): void {
-    this.kanbanStatus = { ...this.kanbanStatus, state: 'failed', error };
-    this.dirty.add('health');
-  }
-
-  sessionsFailed(error: string | null): void {
-    this.sessionsStatus = { error };
-    this.dirty.add('health');
+    return this.coreVerdicts.get(task.id) ?? new Map();
   }
 
   /** workflow-core answered (#62): a read or an event of its stream. */
@@ -543,112 +430,6 @@ export class Hub {
     this.deps.store.appendActivity(lines);
   }
 
-  applyHook(event: HookEvent): void {
-    // On workflow-core's side, the live state comes from the core: a webhook still received changes nothing.
-    if (this.onCore) return;
-    const now = this.deps.now();
-    this.lastHookAt = now;
-    this.hookTimes.push(now);
-    if (event.event === 'on_kanban_dispatch_tick') {
-      this.lastTickAt = event.at;
-      this.dirty.add('health');
-      return;
-    }
-    this.account(event);
-    const running = this.board.tasks.filter((task) => task.status === 'running');
-    const result = applyHook(this.live, event, running);
-    this.live = result.agents;
-    const lines = result.lines
-      .map((line) => toActivityEvent(line, this.seq++, this.issueOfCard))
-      .map((item) => ({ ...item, id: `${this.bootId}-${item.id}` }));
-    if (lines.length > 0) {
-      this.activity = [...this.activity, ...lines].slice(-ACTIVITY_KEPT);
-      this.pendingActivity.push(...lines);
-      this.deps.store.appendActivity(lines);
-    }
-    // Un refus ou une erreur sur une carte : son diagnostic se relit au prochain passage (2 s au plus).
-    for (const line of lines)
-      if (line.cardId && (line.status === 'blocked' || line.status === 'error'))
-        this.deps.diagnoses?.touch(line.cardId);
-    this.dirty.add('agents');
-  }
-
-  private account(event: HookEvent): void {
-    const extra = event.extra;
-    const provider = typeof extra['provider'] === 'string' ? extra['provider'] : null;
-    const model =
-      typeof extra['response_model'] === 'string'
-        ? extra['response_model']
-        : typeof extra['model'] === 'string'
-          ? extra['model']
-          : null;
-    const day = new Date(event.at).toISOString().slice(0, 10);
-    if (
-      event.event === 'pre_tool_call' &&
-      typeof event.toolInput?.['command'] === 'string' &&
-      /(?:^|[\s;&|(])claude\s+-p\b/.test(event.toolInput['command'])
-    ) {
-      this.claudeLastSessionAt = event.at;
-      this.dirty.add('health');
-    }
-    if (!provider || !model) return;
-    const stats = this.providers.get(provider) ?? {
-      lastOkAt: null,
-      lastErrorAt: null,
-      rateLimited: [],
-    };
-    if (event.event === 'post_api_request') {
-      const usage = (extra['usage'] ?? {}) as Record<string, unknown>;
-      stats.lastOkAt = event.at;
-      this.deps.store.addUsage({
-        day,
-        model,
-        provider,
-        profile: event.profile,
-        calls: 1,
-        input: Number(usage['input_tokens'] ?? 0) || 0,
-        output: Number(usage['output_tokens'] ?? 0) || 0,
-      });
-    } else if (event.event === 'api_request_error') {
-      // Hermès classe lui-même l'échec (`error.type`) : une limite de débit sans code 429 en est une.
-      const error = extra['error'];
-      const type =
-        typeof error === 'object' && error !== null
-          ? (error as Record<string, unknown>)['type']
-          : null;
-      const limited = extra['status_code'] === 429 || type === 'rate_limit';
-      stats.lastErrorAt = event.at;
-      if (limited) stats.rateLimited.push(event.at);
-      this.deps.store.addUsage({
-        day,
-        model,
-        provider,
-        profile: event.profile,
-        rateLimited: limited ? 1 : 0,
-        errors: limited ? 0 : 1,
-      });
-    } else {
-      return;
-    }
-    this.providers.set(provider, stats);
-    this.dirty.add('health');
-  }
-
-  applyProbe(report: ProbeReport, receivedAt: number): void {
-    this.probe = { report, receivedAt };
-    // Plafonds du dispatcher : la sonde les lit dans le config.yaml racine, que le conteneur ne voit pas.
-    const settings = report.kanban;
-    if (settings) {
-      this.root = {
-        maxInProgress: settings.max_in_progress ?? this.root.maxInProgress,
-        maxInProgressPerProfile:
-          settings.max_in_progress_per_profile ?? this.root.maxInProgressPerProfile,
-      };
-      this.dirty.add('agents').add('board');
-    }
-    this.dirty.add('health');
-  }
-
   githubChanged(): void {
     this.dirty.add('board').add('health');
   }
@@ -707,29 +488,9 @@ export class Hub {
 
   private healthSlice() {
     const now = this.deps.now();
-    this.hookTimes = this.hookTimes.filter((at) => now - at < 60_000);
-    const providers = new Map(
-      [...this.providers].map(([name, stats]) => {
-        stats.rateLimited = stats.rateLimited.filter((at) => now - at < 10 * 60_000);
-        return [
-          name,
-          {
-            lastOkAt: stats.lastOkAt,
-            lastErrorAt: stats.lastErrorAt,
-            rateLimited10m: stats.rateLimited.length,
-          },
-        ];
-      }),
-    );
     const github = this.deps.github;
     return buildHealth({
       now,
-      probe: this.probe,
-      lastTickAt: this.lastTickAt,
-      lastHookAt: this.lastHookAt,
-      hooksPerMinute: this.hookTimes.length,
-      kanban: this.kanbanStatus,
-      sessions: this.sessionsStatus,
       github: github
         ? {
             configured: true,
@@ -746,31 +507,25 @@ export class Hub {
             checkedAt: null,
           },
       webhookDeliveries: github?.lastDelivery ?? null,
-      providers,
-      claudeLastSessionAt: this.claudeLastSessionAt,
       guards: this.guards,
       running: this.board.tasks.filter((task) => task.status === 'running').length,
       maxInProgress: this.root.maxInProgress,
       maxInProgressPerProfile: this.root.maxInProgressPerProfile,
       ...(this.deps.workflows ? { workflows: this.deps.workflows() } : {}),
       ...(this.deps.codeSheet ? { codeSheet: this.deps.codeSheet() } : {}),
-      ...(this.onCore
-        ? {
-            core: {
-              unreachableSince: this.coreUnreachableSince,
-              error: this.coreError,
-              machine: this.coreMachine,
-              checks: this.coreChecks,
-            },
-          }
-        : {}),
+      core: {
+        unreachableSince: this.coreUnreachableSince,
+        error: this.coreError,
+        machine: this.coreMachine,
+        checks: this.coreChecks,
+      },
     });
   }
 
   private boardSlice() {
     const input = this.projectionInput();
     const interventions = projectInterventions(input, this.found);
-    if (this.onCore && this.coreUnreachableSince !== null)
+    if (this.coreUnreachableSince !== null)
       interventions.unshift(this.coreDown(this.coreUnreachableSince));
     const issues = projectIssues(input, interventions);
     const now = this.deps.now();
@@ -838,29 +593,15 @@ export class Hub {
   }
 
   private agentsSlice() {
-    if (this.onCore) {
-      // One line per profile the core publishes (#103), at rest or with its card from the board, as on
-      // Hermes' side; an agent of the core's live state replaces its profile's line, or joins the list.
-      const live = projectCoreAgents(this.coreAgents, this.board.runs, this.issueOfCard);
-      const byProfile = new Map(live.map((agent) => [agent.profile, agent]));
-      const lines = projectAgents(this.projectionInput(), this.issueOfCard).map(
-        (agent) => byProfile.get(agent.profile) ?? agent,
-      );
-      const known = new Set(lines.map((agent) => agent.profile));
-      return [...lines, ...live.filter((agent) => !known.has(agent.profile))];
-    }
-    const now = this.deps.now();
-    const running = new Set(
-      this.board.tasks.filter((task) => task.status === 'running').map((task) => task.id),
+    // One line per profile the core publishes (#103), at rest or with its card from the board; an agent of
+    // the core's live state replaces its profile's line, or joins the list.
+    const live = projectCoreAgents(this.coreAgents, this.board.runs, this.issueOfCard);
+    const byProfile = new Map(live.map((agent) => [agent.profile, agent]));
+    const lines = projectAgents(this.projectionInput(), this.issueOfCard).map(
+      (agent) => byProfile.get(agent.profile) ?? agent,
     );
-    for (const [key, agent] of this.live) {
-      if (
-        now - agent.lastHeartbeatAt > STALE_AGENT_MS &&
-        !(agent.cardId && running.has(agent.cardId))
-      )
-        this.live.delete(key);
-    }
-    return projectAgents(this.projectionInput(), this.issueOfCard);
+    const known = new Set(lines.map((agent) => agent.profile));
+    return [...lines, ...live.filter((agent) => !known.has(agent.profile))];
   }
 
   snapshot(): Snapshot {

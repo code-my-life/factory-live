@@ -3,15 +3,7 @@ import { msg } from '@factory-live/contracts';
 import type { Run, Task } from '@factory-live/domain';
 import { describe, expect, it } from 'vitest';
 import { Hub } from './hub.ts';
-import type {
-  AgentLogPort,
-  CardFilesPort,
-  CoreInterventionState,
-  HistoryPort,
-  LoggerPort,
-  ProfilesPort,
-  SessionsPort,
-} from './ports.ts';
+import type { CoreInterventionState, HistoryPort, LoggerPort, ProfilesPort } from './ports.ts';
 import { KEEP_FINISHED_MS } from './projection.ts';
 import { issueDetail } from './views.ts';
 
@@ -26,26 +18,8 @@ const profiles: ProfilesPort = {
   manifest: () => ({ owner: null, projects: {}, profiles: {} }),
   root: () => ({ maxInProgress: 0, maxInProgressPerProfile: 0 }),
   facts: () => null,
-  factsStamp: () => '',
 };
-const sessions: SessionsPort = {
-  sessionOfRun: () => null,
-  modelUsage: () => [],
-  usageSince: () => [],
-  transcript: () => [],
-  runFacts: () => null,
-  sessionsActiveAt: () => null,
-};
-const files: CardFilesPort = {
-  cardLog: () => null,
-  claudeTranscripts: () => [],
-  evidence: () => null,
-  evidenceStamp: () => '',
-  gateProofs: () => [],
-};
-const agentLog: AgentLogPort = { facts: () => null };
 const store = {
-  board: () => ({ tasks: [], runs: [], links: [], events: [], comments: [] }),
   stations: () => new Map(),
   recentActivity: () => [],
   saveStation: () => {},
@@ -115,10 +89,8 @@ function coreHub(): Hub {
       store,
       profiles,
       github: null,
-      diagnoses: null,
       log: silent,
       now: () => NOW,
-      source: 'workflow-core',
     },
   );
 }
@@ -159,10 +131,8 @@ describe('vues côté socle (#59)', () => {
         store,
         profiles,
         github: null,
-        diagnoses: null,
         log: silent,
         now: () => NOW,
-        source: 'workflow-core',
       },
     );
     hub.replaceBoard(
@@ -189,11 +159,8 @@ describe('vues côté socle (#59)', () => {
       {
         hub,
         store,
-        sessions,
         profiles,
         github: null,
-        files,
-        agentLog,
         owner: 'code-my-life',
         boardName: 'factory',
         dashboardUrl: null,

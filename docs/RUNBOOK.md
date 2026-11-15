@@ -23,16 +23,14 @@ Exposition tailnet : `tailscale serve --bg --https=8446 http://127.0.0.1:8446` (
 
 ## Valeurs propres à ce PC (`docker/.env`)
 
-Le nom tailnet de ce PC, le login Tailscale autorisé à écrire et l'adresse du dashboard d'Hermès n'entrent jamais dans le dépôt, qui est public : leurs vraies valeurs sont dans `docker/.env`, ignoré par git, que compose lit à chaque `up`. Modèle commenté : `docker/.env.example`. Sans `docker/.env`, factory-live ne répond qu'à ce PC (`http://localhost:8446`) et n'accepte d'écriture que de lui.
+Le nom tailnet de ce PC, le login Tailscale autorisé à écrire et l'adresse du dashboard de la factory n'entrent jamais dans le dépôt, qui est public : leurs vraies valeurs sont dans `docker/.env`, ignoré par git, que compose lit à chaque `up`. Modèle commenté : `docker/.env.example`. Sans `docker/.env`, factory-live ne répond qu'à ce PC (`http://localhost:8446`) et n'accepte d'écriture que de lui.
 
 | Variable            | Rôle                                                                                                               | Forme                                                           |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
 | `PUBLIC_ORIGINS`    | adresses de la PWA : ce PC, puis l'adresse tailnet (Réglages, « Installer l'app », retours de GitHub, hôtes admis) | `http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446` |
 | `TAILSCALE_LOGINS`  | logins Tailscale autorisés à écrire depuis les autres appareils                                                    | `<login>@github`                                                |
-| `DASHBOARD_URL`     | dashboard d'Hermès, lien des interventions ; vide : pas de lien                                                    | `https://<machine>.<tailnet>.ts.net:<port>`                     |
+| `DASHBOARD_URL`     | dashboard de la factory, lien des interventions ; vide : pas de lien                                               | `https://<machine>.<tailnet>.ts.net:<port>`                     |
 | `ALLOWED_HOSTS`     | hôtes acceptés en plus (`nom:port`), par exemple si le port publié change                                          | vide                                                            |
-| `HERMES_TZ`         | fuseau de ce PC (IANA) : le journal d'Hermès note l'heure locale sans fuseau, le conteneur est en UTC              | `Europe/Paris` (défaut)                                         |
-| `LIVE_SOURCE`       | source de la lecture (ADR 0015) : `workflow-core`, le socle, par défaut (#68) ; `hermes`, le retour arrière        | vide (défaut `workflow-core`)                                   |
 | `WORKFLOW_CORE_URL` | adresse du socle vue du conteneur                                                                                  | `http://host.docker.internal:8447` (défaut)                     |
 
 Après un changement : `docker compose -f docker/compose.yaml up -d`. Le fichier ne s'affiche pas en entier (`grep -c` ou `cut -d= -f1` pour vérifier ses clés). `npm run check:text` refuse tout nom tailnet ou login Tailscale réel dans le dépôt : doc, tests et démo n'emploient que le gabarit ci-dessus, l'exemple fictif `machine.tailnet.ts.net` et `alice@github`.
@@ -45,11 +43,11 @@ Après un changement : `docker compose -f docker/compose.yaml up -d`. Le fichier
 | Ce PC        | `http://localhost:8446` dans Edge ou Chrome, icône d'installation dans la barre d'adresse                            | idem ; Windows doit autoriser les notifications d'Edge ou de Chrome              |
 | Mac          | adresse tailnet dans Safari (Fichier, « Ajouter au Dock ») ou Chrome                                                 | idem                                                                             |
 
-L'en-tête dit l'état du lien : « En direct », « Connexion… », « Hors ligne · dernier état il y a … » (l'app montre le dernier état reçu), « En pause » (factory en pause), « Factory muette » (factory-live ne reçoit plus rien de la factory : voir Pannes).
+L'en-tête dit l'état du lien : « En direct », « Connexion… », « Hors ligne · dernier état il y a … » (l'app montre le dernier état reçu), « En pause » (factory en pause), « Factory muette » (le socle ne voit plus le gateway de la factory : voir Pannes).
 
 ## Tests de bout en bout
 
-`npm run e2e` lance Playwright sous Chromium : la démo (bureau et iPhone), et l'app « live », servie par le vrai serveur de factory-live côté socle (`LIVE_SOURCE=workflow-core`, lancé par `e2e/live-server.mjs` avec une base et des secrets temporaires) et branchée sur un faux workflow-core (`e2e/fake-api.mjs`, scénario dans `e2e/fake-core-scenario.mjs`). Le faux socle vérifie chacune de ses réponses avec les JSON Schema copiés du socle, répond aussi aux appels à GitHub, et se pilote par ses routes `/__control/…` : couper et rétablir le socle, annoncer un changement de carte, ouvrir une nouvelle époque par un `reset`, lire les commentaires postés. Les quatre projets `live-*` partagent ce montage et passent l'un après l'autre. WebKit (Safari, iPhone) et les captures de référence tournent dans l'image officielle de Playwright, comme en CI (il manque à WSL des bibliothèques pour WebKit) :
+`npm run e2e` lance Playwright sous Chromium : la démo (bureau et iPhone), et l'app « live », servie par le vrai serveur de factory-live (lancé par `e2e/live-server.mjs` avec une base et des secrets temporaires) et branchée sur un faux workflow-core (`e2e/fake-api.mjs`, scénario dans `e2e/fake-core-scenario.mjs`). Le faux socle vérifie chacune de ses réponses avec les JSON Schema copiés du socle, répond aussi aux appels à GitHub, et se pilote par ses routes `/__control/…` : couper et rétablir le socle, annoncer un changement de carte, ouvrir une nouvelle époque par un `reset`, lire les commentaires postés. Les quatre projets `live-*` partagent ce montage et passent l'un après l'autre. WebKit (Safari, iPhone) et les captures de référence tournent dans l'image officielle de Playwright, comme en CI (il manque à WSL des bibliothèques pour WebKit) :
 
 ```sh
 docker run --rm --ipc=host --user "$(id -u):$(id -g)" -e HOME=/tmp -e E2E_WEBKIT=1 \
@@ -78,40 +76,25 @@ Publication : le workflow Site (`.github/workflows/pages.yml`) publie depuis mai
 
 ## Ce que le conteneur voit
 
-| Montage                           | Mode               | Pourquoi                                                                                           |
-| --------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------- |
-| `~/.hermes/kanban/boards/factory` | écriture (dossier) | `kanban.db` lue en `readOnly` ; SQLite y partage le `-shm` du WAL ; preuves des cartes             |
-| `~/.hermes/profiles`              | écriture (dossier) | `state.db` et `config.yaml` des agents, même raison ; journal et plugins actifs pour le diagnostic |
-| `~/perso/hermes-software-factory` | lecture            | `factory.yaml` et configs du dépôt (dérive)                                                        |
-| `~/.claude/projects`              | lecture            | transcriptions des lanes Claude Code                                                               |
-| `~/.config/factory-live`          | lecture            | secrets : `hook-secret`, `github-token` (repli facultatif)                                         |
+| Montage                    | Mode     | Pourquoi                                                                   |
+| -------------------------- | -------- | -------------------------------------------------------------------------- |
+| volume `factory-live-data` | écriture | la base de factory-live (`factory-live.db`) : historique, push, déblocages |
+| `~/.config/factory-live`   | lecture  | secrets : `workflow-core-secret`, `github-token` (repli facultatif)        |
 
-Le diagnostic ne lit d'un agent que sa config, son journal (`logs/agent.log`, `agent.log.1`), le code de ses plugins actifs et les preuves de ses cartes, par une liste blanche (`apps/server/src/adapters/hermes/paths.ts`) : ni lien symbolique, ni sortie de dossier, ni `.env`, ni `auth.json`. Jamais monté : `~/.hermes` en entier (son `.env` porte toutes les clés), `opencode.db` (jetons OAuth d'OpenCode). Les dossiers et non les fichiers : Hermès réécrit ses fichiers par renommage, un fichier monté seul resterait figé. Le réglage `kanban.max_in_progress` arrive par la sonde du gateway.
+Rien de la factory n'est monté (#72) : ni `~/.hermes`, ni le dépôt de la factory, ni les transcriptions de Claude Code. factory-live lit la factory par le socle, à `WORKFLOW_CORE_URL` (`host.docker.internal:8447` vu du conteneur).
 
 ## Diagnostic des blocages
 
-Chaque intervention dit sa cause, qui agit, si « Débloquer » suffit et quoi faire (ADR 0009). Des règles du domaine l'établissent sur les faits d'Hermès, sans modèle ; tant que la cause est présente côté factory, le serveur refuse le déblocage (`cause_present`), sauf « Débloquer quand même ».
+Chaque intervention dit sa cause, qui agit, si « Débloquer » suffit et quoi faire (ADR 0009). Le socle l'établit sur les faits de la factory, sans modèle, et factory-live l'affiche tel quel ; tant que la cause est présente côté factory, le serveur refuse le déblocage (`cause_present`), sauf « Débloquer quand même ».
 
 | Besoin                        | Commande ou fichier                                                                                                                   |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | Lire le diagnostic en cours   | `curl -s localhost:8446/api/snapshot \| jq '.interventions[] \| {id, cause: .diagnosis.primary.code, when: .diagnosis.unblock.when}'` |
 | Verdicts des runs d'une issue | `curl -s localhost:8446/api/issues/<dépôt>/<numéro> \| jq '.cards[].runs[] \| {id, outcome, verdict: .verdict.finding}'`              |
-| Formats d'Hermès reconnus     | `packages/domain/src/diagnosis/hermesText.ts` (résultats d'outils, erreurs des runs, lignes du journal)                               |
-| Règles                        | `packages/domain/src/diagnosis/rules.ts`, choix de la cause et conseil dans `diagnose.ts`                                             |
 
-**Capturer un incident réel**, pour en faire un cas de test : `npm run capture:incident -- <carte> --name <cas> [--anchor <événement>]`. Le script lit en lecture seule le kanban, les sessions et le journal (`HERMES_HOME`, `HERMES_TZ`) et écrit l'entrée sur la sortie standard, anonymisée (dossier personnel, utilisateur, machine, jetons). Ajouter le nom à `IncidentName` et l'entrée à `INCIDENTS` (`incidents.test-helpers.ts`), relire, puis `npm run check:text`. Sans `--anchor`, l'événement raconté est le dernier échec de la carte ; relire `status`, `blockKind` et `blockRecurrences`, qui doivent être ceux du moment de l'incident.
+Un blocage sort « inexpliqué », ou une règle manque : elle s'ajoute dans le socle (`code-my-life/workflow-core`), pas ici. Les phrases d'un code nouveau s'ajoutent au catalogue (`packages/contracts/src/messages.ts`), puis dans `fr.ts` et `en.ts`.
 
-**Ajouter une règle** quand un blocage sort « inexpliqué » :
-
-1. capturer l'incident (ci-dessus) et écrire le test qui échoue dans `diagnose.test.ts` (cas réel) ou `rules.test.ts` (format exact d'Hermès) ;
-2. si le texte d'Hermès est nouveau, l'ajouter à `hermesText.ts`, tel qu'Hermès l'écrit, avec un test, jamais une lecture du texte de l'agent ;
-3. écrire la règle dans `rules.ts` (cause, qui agit, état de la cause, preuves, étapes) et l'ajouter à `RULES` ; le code à `FindingCode` (domaine et contrats), son rang à `TIER`, ce qu'elle explique à `EXPLAINS` ;
-4. ses phrases : codes `diagnosis.*` au catalogue (`packages/contracts/src/messages.ts`), puis dans `fr.ts` et `en.ts` ;
-5. `npm run verify:fast`.
-
-La tuile Santé « Délais des gardes » lit les mêmes faits avant tout blocage : pour chaque agent, le délai effectif de ses hooks (le plus petit de `plugins.hook_callback_timeout`, plafonné à 600 s, et de `timeouts.tools.sequential_call`, 420 s par défaut) et la plus longue commande que le code de chaque garde peut lancer (ses `timeout=` écrits en dur). Elle se relit dès qu'une config ou un plugin change.
-
-Le fuseau du journal suit `HERMES_TZ` (`docker/.env`) : après un changement d'heure ou de fuseau de ce PC, le diagnostic date le journal d'après lui ; une heure qui existe deux fois en octobre suit l'ordre du journal.
+La tuile Santé « Délais des gardes » montre les gardes à risque que le socle calcule : pour chaque agent, le délai effectif de ses hooks et la plus longue commande que le code de chaque garde peut lancer.
 
 ## Recette des PR
 
@@ -130,46 +113,39 @@ Un critère reste « non prouvé » alors que sa PR cite un test : le nom entre 
 
 Les jumeaux d'une PR (ADR 0013) tournent sur le banc de la factory (`scripts/factory-twins.py`), jamais dans factory-live. Le widget « Jumeaux interactifs » les montre dès que la factory a écrit l'état de la paire.
 
-| Besoin                        | Commande ou fichier                                                                                 |
-| ----------------------------- | --------------------------------------------------------------------------------------------------- |
-| État de la paire, lu ici      | `~/.hermes/kanban/boards/<tableau>/twins/<dépôt>-<pr>.json` (`AcceptanceTwins` et port du miroir)   |
-| Démarrer ou arrêter une paire | `python3 scripts/factory-twins.py up\|down <dépôt> <pr> [--tailnet]`, depuis le dépôt de la factory |
-| Miroir en direct              | `curl -s localhost:8446/api/twins/<dépôt>/<pr>/state`                                               |
-| Hôte des ports du banc        | `TWINS_HOST` : `host.docker.internal` dans le conteneur (`docker/compose.yaml`)                     |
+| Besoin                        | Commande ou fichier                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------ |
+| État de la paire, lu ici      | données déclarées de la factory dans le socle (`pr:<dépôt>#<pr>`, #60) : la paire et le port du miroir |
+| Démarrer ou arrêter une paire | `python3 scripts/factory-twins.py up\|down <dépôt> <pr> [--tailnet]`, depuis le dépôt de la factory    |
+| Miroir en direct              | `curl -s localhost:8446/api/twins/<dépôt>/<pr>/state`                                                  |
+| Hôte des ports du banc        | `TWINS_HOST` : `host.docker.internal` dans le conteneur (`docker/compose.yaml`)                        |
 
 Un écran reste sur « Connexion au jumeau… » : la paire tourne-t-elle (`factory-twins.py status`) ? Depuis un autre appareil, la paire doit être démarrée avec `--tailnet`.
 
 ### Studio et workflows
 
-Le studio de video-factory est suivi par son API (ADR 0014), servie sur ce PC par `vf studio serve` (service `video-factory-studio`, port 8448). factory-live ne lit ni son tableau ni ses fichiers.
+Le studio de video-factory est suivi par son API (ADR 0014) pour ses vidéos, ses médias et le geste, servie sur ce PC par `vf studio serve` (service `video-factory-studio`, port 8448) ; sa fiche vient du socle (#72). factory-live ne lit ni son tableau ni ses fichiers.
 
-| Besoin                        | Commande ou fichier                                                                                 |
-| ----------------------------- | --------------------------------------------------------------------------------------------------- |
-| Workflows suivis              | `WORKFLOWS` : `studio=http://host.docker.internal:8448` (`docker/compose.yaml`), virgules entre eux |
-| Ce que factory-live en lit    | `curl -s localhost:8446/api/workflows/studio \| jq '{unreachableSince, error, items}'`              |
-| L'API du studio elle-même     | `curl -s localhost:8448/api/items`                                                                  |
-| Fiche de la ligne du code     | `/factory/config/workflow.json` (dépôt de la factory monté en lecture seule)                        |
-| Fiche lue, ou copie embarquée | `curl -s localhost:8446/api/workflows \| jq .code`                                                  |
+| Besoin                          | Commande ou fichier                                                                                  |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Workflows suivis                | `WORKFLOWS` : `studio=http://host.docker.internal:8448` (`docker/compose.yaml`), virgules entre eux  |
+| Ce que factory-live en lit      | `curl -s localhost:8446/api/workflows/studio \| jq '{unreachableSince, error, items}'`               |
+| L'API du studio elle-même       | `curl -s localhost:8448/api/items`                                                                   |
+| Fiches de la ligne et du studio | servies par le socle (`/api/workflows/factory/sheet`, `/api/workflows/studio/sheet`), jugées par lui |
+| Fiche de la ligne reçue         | `curl -s localhost:8446/api/workflows \| jq .code` (`null` : pas encore reçue, la ligne l'attend)    |
 
 Le studio est « injoignable » dans la Santé : le service tourne-t-il (`systemctl --user status video-factory-studio`) ? La page Studio garde le dernier état reçu en attendant.
 
-## Source de la lecture : le socle ou Hermès
+## La lecture par le socle
 
-Depuis #68, factory-live lit par défaut le socle (`workflow-core`, port 8447 de ce PC) : son API et son flux, derrière le secret `workflow-core-secret`. Il exige au démarrage `WORKFLOW_CORE_URL` et ce secret, et s'arrête en nommant ce qui manque. Les montages d'Hermès, du dépôt de la factory et des transcriptions restent dans `docker/compose.yaml` pour le retour arrière.
+factory-live lit la factory par le socle (`workflow-core`, port 8447 de ce PC), seulement (#72) : son API et son flux, derrière le secret `workflow-core-secret`. Il exige au démarrage `WORKFLOW_CORE_URL` et ce secret, et s'arrête en nommant ce qui manque. Il n'y a plus d'interrupteur : une variable `LIVE_SOURCE` encore posée dans `docker/.env` est ignorée.
 
-- **Retour arrière** : `LIVE_SOURCE=hermes` dans `docker/.env`, puis `docker compose -f docker/compose.yaml up -d` : factory-live relit Hermès, entier, comme avant l'epic.
-- **Retour au socle** : retirer la ligne `LIVE_SOURCE` (ou la mettre à `workflow-core`), puis `docker compose -f docker/compose.yaml up -d`.
-- **Contrôle** : `curl -s http://127.0.0.1:8446/healthz` répond `"ok": true` ; côté socle, il passe en échec après 60 secondes sans le socle (#62), et la page Santé montre la tuile « Socle ».
-
-Ordre de la mise en production de cette release (une fois) :
-
-1. **Avant** que `release/0.12.0` arrive dans `main` (le déploiement redémarre alors le conteneur sur le nouveau défaut) : poser `LIVE_SOURCE=hermes` dans `docker/.env`. La production reste sur Hermès.
-2. La release dans `main`, le conteneur redémarré : faire l'essai de la tâche code-my-life/factory-live#58 (le socle joignable depuis le conteneur, l'interrupteur essayé puis rebasculé sur Hermès).
-3. La bascule, tâche code-my-life/factory-live#69 : retirer la ligne `LIVE_SOURCE=hermes` de `docker/.env`, relancer, observer une journée, essayer le retour arrière.
+- **Contrôle** : `curl -s http://127.0.0.1:8446/healthz` répond `"ok": true` ; il passe en échec après 60 secondes sans le socle (#62), et la page Santé montre la tuile « Socle ».
+- **Socle arrêté** : la ligne garde la dernière fiche et le dernier état reçus, une intervention « Socle injoignable » s'ouvre ; au démarrage sans socle, la ligne attend sa première fiche, sans page cassée.
+- **Retour arrière** (R4 de l'epic) : relancer le code d'avant le retrait (`git checkout <commit d'avant>`, puis `docker compose -f docker/compose.yaml up -d --build`), avec ses montages et ses variables ; la base de factory-live garde les tables de l'ancien miroir du kanban.
 
 ## Secrets
 
-- `~/.config/factory-live/hook-secret` : secret HMAC partagé avec Hermès (`FACTORY_LIVE_HOOK_SECRET` de `~/.hermes/.env`), créé une fois par `install.sh` de la factory (étape 5b), jamais affiché. Absent : l'ingestion répond 503.
 - GitHub App `factory-live` (ADR 0003) : ses clés et les jetons de Clément sont dans la base du volume (`factory-live.db`, mode 600). Mise en place, une fois :
   1. ouvrir `http://localhost:8446/api/github/setup` (ou l'adresse tailnet), « Continuer sur GitHub », garder le nom proposé, « Create GitHub App » ;
   2. GitHub enchaîne sur l'installation : choisir « All repositories », « Install » ;
@@ -177,27 +153,21 @@ Ordre de la mise en production de cette release (une fois) :
      État : `curl -s localhost:8446/api/github/status`. Déconnexion : Réglages, ou `POST /api/github/logout`. Révocation complète : supprimer l'App dans les réglages de l'organisation sur GitHub.
 - `~/.config/factory-live/github-token` : facultatif, jeton fine-grained de `cddev` servant de repli tant que l'App n'est pas en place (propriétaire `code-my-life` ; Metadata, Issues lecture et écriture, Pull requests, Actions, Contents et Webhooks en lecture), `chmod 600`. Après l'avoir déposé : `docker restart factory-live`.
 - Clés VAPID (push) : générées au premier démarrage dans la base du volume.
-- `~/.config/factory-live/workflow-core-secret` : le secret partagé du socle (`WORKFLOW_CORE_SECRET` de `~/.config/workflow-core/.env`), copié sans retour à la ligne, mode 600, jamais affiché (tâche code-my-life/factory-live#58). Absent avec la source `workflow-core` : le démarrage s'arrête en le nommant.
+- `~/.config/factory-live/workflow-core-secret` : le secret partagé du socle (`WORKFLOW_CORE_SECRET` de `~/.config/workflow-core/.env`), copié sans retour à la ligne, mode 600, jamais affiché (tâche code-my-life/factory-live#58). Absent : le démarrage s'arrête en le nommant.
 
 ## Pannes
 
 | Symptôme                                              | Cause probable                                                                        | Action                                                                                                                          |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Santé : « Sonde muette »                              | gateway arrêté, ou factory-live injoignable depuis WSL                                | `hermes gateway status` ; `curl -s localhost:8446/healthz`                                                                      |
-| Santé : « Aucun tick reçu »                           | webhooks du profil default absents                                                    | `hermes config get hooks.outbound` ; relancer `./install.sh` de la factory                                                      |
-| Sources : `kanban.db illisible`, schéma inattendu     | mise à jour d'Hermès qui a changé une table                                           | lire le détail (colonne citée), adapter `apps/server/src/adapters/hermes/`                                                      |
-| Workers : « outbound webhook … failed » dans leur log | factory-live arrêté                                                                   | `docker compose -f docker/compose.yaml up -d` ; la factory n'est pas gênée                                                      |
 | Déblocage : 503                                       | ni connexion GitHub ni jeton de repli                                                 | Réglages, « Se connecter à GitHub » (`/api/github/login`)                                                                       |
 | GitHub : « Installation de l'App illisible » ou repli | App créée mais pas installée                                                          | `/api/github/status` donne `installUrl` : installer sur « All repositories »                                                    |
 | Connexion GitHub : « Seul le compte cddev … »         | autre compte GitHub ouvert dans ce navigateur                                         | se déconnecter de GitHub, puis relancer la connexion                                                                            |
 | Déblocage : 😕 sur le commentaire                     | plus aucune carte bloquée sur l'issue                                                 | rien à faire, la carte est déjà repartie                                                                                        |
-| En-tête « Factory muette »                            | ni sonde ni webhook depuis 10 min (gateway arrêté)                                    | `hermes gateway status` ; voir « Sonde muette »                                                                                 |
+| En-tête « Factory muette »                            | le socle voit le gateway de la factory arrêté                                         | état du gateway sur la machine de la factory ; tuile « Gateway » de la page Santé                                               |
 | En-tête « Hors ligne » sur l'iPhone                   | hors du tailnet, ou conteneur arrêté                                                  | Tailscale actif sur l'iPhone ; `docker ps --filter name=factory-live`                                                           |
 | Aucun push sur l'iPhone                               | app pas installée, permission refusée, mode Concentration                             | Réglages de l'app (elle dit ce qui manque) ; Réglages iOS, Notifications, factory-live                                          |
 | Erreur du front sur un appareil                       | remontée au journal du serveur                                                        | `docker logs factory-live \| grep '"component":"client"'`                                                                       |
 | Écriture refusée (403) depuis l'iPhone                | login Tailscale absent de `TAILSCALE_LOGINS`                                          | `TAILSCALE_LOGINS` dans `docker/.env`, puis `up -d`                                                                             |
 | Réponse 421 « Hôte inconnu » (`host_refused`)         | adresse hors liste : port publié différent, autre nom que localhost ou le nom tailnet | ajouter `nom:port` à `ALLOWED_HOSTS` (ou l'origine à `PUBLIC_ORIGINS`) dans `docker/.env`, puis `up -d`                         |
 | Déblocage refusé : « la cause est encore là »         | diagnostic : cause présente côté factory (`cause_present`)                            | suivre « Que faire » de l'intervention, ou « Débloquer quand même » en connaissance de cause                                    |
-| Diagnostic « inexpliqué »                             | aucune règle ne reconnaît ce blocage                                                  | lire les derniers signaux affichés ; puis « Ajouter une règle » (section Diagnostic des blocages)                               |
-| Heures du journal décalées d'une heure                | `HERMES_TZ` ne suit pas le fuseau de ce PC                                            | corriger `HERMES_TZ` dans `docker/.env`, puis `up -d`                                                                           |
 | Santé : « Délais des gardes » en jaune                | une garde peut lancer une commande d'au moins le délai effectif de son hook           | relever `plugins.hook_callback_timeout` (600 s au plus) et `timeouts.tools.sequential_call`, ou sortir le contrôle long du hook |

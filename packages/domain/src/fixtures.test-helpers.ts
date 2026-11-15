@@ -1,4 +1,4 @@
-import type { Link, Run, Task, TaskEvent } from './hermes.ts';
+import type { Link, Run, Task, TaskEvent } from './board.ts';
 
 /** Fabriques de données de test : des valeurs neutres, chaque test précise ce qui compte pour lui. */
 export function aTask(patch: Partial<Task> = {}): Task {

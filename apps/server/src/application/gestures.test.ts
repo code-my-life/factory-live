@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GestureError, hermesSideGestures, postGesture } from './gestures.ts';
+import { GestureError, declaredIn, postGesture } from './gestures.ts';
 import type { GestureDeps } from './gestures.ts';
 import type { DeclaredGesture, LoggerPort } from './ports.ts';
 
@@ -86,8 +86,8 @@ describe('gestes déclarés (#61)', () => {
       note: '',
     });
     expect(inherited).toMatchObject({ status: 404, code: 'unknown_workflow' });
-    expect(hermesSideGestures.declared('toString')).toBeNull();
-    expect(hermesSideGestures.declared('constructor')).toBeNull();
+    expect(declaredIn(DECLARED, 'toString')).toBeNull();
+    expect(declaredIn(DECLARED, 'constructor')).toBeNull();
 
     expect(calls).toEqual([]);
   });

@@ -3,12 +3,12 @@ import type { CoreActivityFact, CoreAgentState } from '../../application/ports.t
 
 /**
  * The live state of the code line as workflow-core serves it (#66), in factory-live's units: times from
- * ISO 8601 to ms epoch, a missing provider as « ? », as the Hermes reader shows an unknown one.
+ * ISO 8601 to ms epoch, a missing provider as « ? », as the screen shows an unknown one.
  */
 
 const ms = (at: string): number => Date.parse(at);
 
-/** The provider of a delegated command line's model, as the Hermes reader names it. */
+/** The provider of a delegated command line's model, as the screen names it. */
 const laneProvider = (label: string): string => (/claude/i.test(label) ? 'anthropic' : 'opencode');
 
 export function coreAgentState(agent: CoreAgent): CoreAgentState {
