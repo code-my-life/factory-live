@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { expectNoHorizontalOverflow } from './helpers.ts';
+import { AGENT_SESSION, literally } from './texts.ts';
 
 test.skip(
   ({ isMobile }) => !isMobile,
@@ -166,7 +167,9 @@ test('sur téléphone, le choix de la source est un menu, sans débordement', as
 
   // On mobile, the source selector should be a dropdown menu
   const sourceSelector = page
-    .getByRole('button', { name: /Session Hermès|Claude Code|Terminal/ })
+    .getByRole('button', {
+      name: new RegExp(`${literally(AGENT_SESSION).source}|Claude Code|Terminal`),
+    })
     .first();
   await expect(sourceSelector).toBeVisible();
 

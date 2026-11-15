@@ -45,7 +45,7 @@ export default defineConfig({
         id: '/',
         name: 'factory-live',
         short_name: 'factory-live',
-        description: 'La factory Hermès en temps réel : ligne d’usine, agents, interventions.',
+        description: 'La factory en temps réel : ligne d’usine, agents, interventions.',
         lang: 'fr',
         dir: 'ltr',
         start_url: '/',

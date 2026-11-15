@@ -6,11 +6,11 @@ import type {
   Snapshot,
   WorkflowSheet,
 } from '@factory-live/contracts';
-import { CODE_LINE, planOf } from './layout.ts';
+import { planOf } from './layout.ts';
 import type { BoxId } from './layout.ts';
 
 /**
- * What Hermès says, turned into the keys of the code line's sheet: the box an issue stands in, the
+ * What the factory says, turned into the keys of the code line's sheet: the box an issue stands in, the
  * stations an agent serves. Nothing here places or draws a station; the sheet does.
  */
 
@@ -96,7 +96,7 @@ export interface ProviderRow {
 /** The models behind the agents of the line, one row per provider and model, in the order of the agents. */
 export function providerRows(
   agents: readonly AgentActivity[],
-  sheet: WorkflowSheet = CODE_LINE,
+  sheet: WorkflowSheet,
 ): ProviderRow[] {
   const fed = planOf(sheet).fed;
   const served = (profile: string) =>
@@ -121,10 +121,7 @@ export function providerRows(
 }
 
 /** The stations whose feed from the providers flows: an agent there calls its model right now. */
-export function callingStations(
-  items: readonly LineIssue[],
-  sheet: WorkflowSheet = CODE_LINE,
-): Set<BoxId> {
+export function callingStations(items: readonly LineIssue[], sheet: WorkflowSheet): Set<BoxId> {
   const fed = planOf(sheet).fed;
   const calling = new Set<BoxId>();
   for (const item of items) {

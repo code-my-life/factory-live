@@ -1,15 +1,14 @@
 import type { CoreItem } from '@factory-live/contracts/workflow-core';
-import type { Board, Comment } from '@factory-live/domain';
 import type { HistoryPort, KanbanDelta } from '../../application/ports.ts';
-import { boardOf, itemsOfBoard } from './cards.ts';
+import { boardOf } from './cards.ts';
 
 /**
  * factory-live's own history on the core's side (#63, ADR 0019): every item the core serves is kept in
- * factory-live's base, its last full state, and stays there once Hermes purged it. The code line's board is
- * the core's current items, then the items it no longer serves, from the history. It is not a copy of the
- * kanban: only what the core served, in the core's form, and the mirror poured once at the first start.
+ * factory-live's base, its last full state, and stays there once the factory purged it. The code line's board
+ * is the core's current items, then the items it no longer serves, from the history: only what the core
+ * served, in the core's form.
  */
-/** The statuses of a finished card, the only ones Hermes purges. */
+/** The statuses of a finished card, the only ones the factory purges. */
 const FINISHED = new Set(['done', 'archived']);
 
 export class CoreHistory {
@@ -17,19 +16,14 @@ export class CoreHistory {
   private readonly now: () => number;
   /**
    * By workflow, the finished cards the core no longer serves, read once from the history and kept until it
-   * changes them: a card that changes does not reload every stored state (the history outlives Hermes' purge).
+   * changes them: a card that changes does not reload every stored state (the history outlives the factory's
+   * purge).
    */
   private readonly gone = new Map<string, Map<string, CoreItem>>();
 
   constructor(store: HistoryPort, now: () => number) {
     this.store = store;
     this.now = now;
-  }
-
-  /** At the first start on the core's side: the kanban mirror goes into the history, once. */
-  seed(workflow: string, mirror: Board & { comments: Comment[] }): boolean {
-    const items = itemsOfBoard(mirror).map((item) => ({ id: item.id, state: item }));
-    return this.store.seedHistory(workflow, items, this.now());
   }
 
   /** Items read from the core; `complete` for a full read, where the others are gone. */
@@ -67,7 +61,7 @@ export class CoreHistory {
   private goneOf(workflow: string): Map<string, CoreItem> {
     let gone = this.gone.get(workflow);
     if (!gone) {
-      // Only a finished card is kept: Hermes purges finished cards; a card gone unfinished (deleted, or a
+      // Only a finished card is kept: the factory purges finished cards; a card gone unfinished (deleted, or a
       // journal rebuilt without it) leaves the line, as a full read of the core says (#57).
       gone = new Map(
         this.store

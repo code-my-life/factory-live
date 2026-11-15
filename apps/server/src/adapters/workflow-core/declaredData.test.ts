@@ -1,10 +1,11 @@
-import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import type * as NodeFs from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import type * as NodeSqlite from 'node:sqlite';
-import { ProfileView } from '@factory-live/contracts';
+import type { AcceptanceView } from '@factory-live/contracts';
+import { FACTORY_RUNTIME } from '@factory-live/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { acceptanceOf } from '../../application/acceptance.ts';
 import type { AcceptanceSource, GitHubReadPort } from '../../application/ports.ts';
@@ -13,12 +14,11 @@ import type { ViewDeps } from '../../application/views.ts';
 import { createLogger } from '../../logger.ts';
 import { fakeCore } from '../../test/fake-core.ts';
 import type { FakeCore } from '../../test/fake-core.ts';
-import { CardFiles, HermesPaths, SECRET, TwinBench, coreState } from '../../test/core-scenario.ts';
+import { SECRET, TwinBench, coreState } from '../../test/core-scenario.ts';
 import { harness } from '../../test/harness.ts';
 import type { Harness } from '../../test/harness.ts';
-import { tempDir } from '../../test/hermes-fixtures.ts';
-import type { TempDir } from '../../test/hermes-fixtures.ts';
-import { noAgentLog, noCardFiles, noSessions } from './absent.ts';
+import { tempDir } from '../../test/board-fixtures.ts';
+import type { TempDir } from '../../test/board-fixtures.ts';
 import { FactoryViews } from './factoryViews.ts';
 
 // What the core's side opens, recorded at the boundary (C5): every path given to node:fs and node:sqlite.
@@ -63,42 +63,18 @@ const BASE = 'c9fa041a00000000000000000000000000000000';
 const CARD = 't_1a9f0049';
 const PASSWORD = 'mot-de-passe-des-spectateurs';
 
-/** The pair as the bench writes it in the board (hermes-software-factory, `factory-twins.py`). */
-const BENCH_FILE = {
-  surfaces: [
-    {
-      id: 'app',
-      label: 'App',
-      kind: 'web',
-      changed: true,
-      base: {
-        sha: BASE,
-        stream: `http://127.0.0.1:52000/?usr=proprietaire&pwd=${PASSWORD}`,
-        poster: null,
-      },
-      head: {
-        sha: HEAD,
-        stream: `http://127.0.0.1:52002/?usr=proprietaire&pwd=${PASSWORD}`,
-        poster: null,
-      },
-      differences: 2,
-    },
-    {
-      id: 'site',
-      label: 'Site',
-      kind: 'site',
-      changed: false,
-      base: { sha: BASE, stream: null, poster: null },
-      head: { sha: HEAD, stream: null, poster: null },
-      differences: null,
-    },
-  ],
-  state: 'ready',
-  divergence: 'clic sur « Débloquer » non rejoué',
-  mirror: 52004,
-};
+/**
+ * The recette of the PR the reading of the bench's file and of the gate's proofs on disk gave, before #72: the
+ * pair (its two surfaces, ready, the divergence) and the three proofs of the head.
+ */
+const ACCEPTANCE_REFERENCE = JSON.parse(
+  readFileSync(
+    new URL('../../../../../fixtures/workflow-core/references/acceptance.json', import.meta.url),
+    'utf8',
+  ),
+) as AcceptanceView;
 
-/** The same pair, as workflow-core publishes it (workflow-core#120): no session, no password. */
+/** The pair as workflow-core publishes it (workflow-core#120): no session, no password. */
 function coreTwins(mirror: number) {
   return [
     {
@@ -217,33 +193,11 @@ async function coreSide(data: Record<string, unknown[] | 'invalid_id'>) {
   return { views, bench };
 }
 
-/** The Hermes side: the bench's file and the gate's proofs on disk, read by today's readers. */
-function hermesSide() {
-  dir = tempDir();
-  const board = join(dir.path, 'board');
-  mkdirSync(join(board, 'twins'), { recursive: true });
-  writeFileSync(join(board, 'twins', `${REPO}-${PR}.json`), JSON.stringify(BENCH_FILE));
-  const gate = join(board, 'workspaces', CARD, 'evidence', 'gate', HEAD.slice(0, 7));
-  mkdirSync(gate, { recursive: true });
-  PROOFS.forEach(([rule, text], index) =>
-    writeFileSync(join(gate, `${String(index + 1).padStart(2, '0')}-${rule}.txt`), text),
-  );
-  const paths = new HermesPaths({
-    profilesDir: join(dir.path, 'profiles'),
-    boardDir: board,
-    factoryRepo: join(dir.path, 'factory'),
-  });
-  const files = new CardFiles(board, join(dir.path, 'claude'), paths);
-  const bench = new TwinBench({ file: (repo, pr) => paths.twins(repo, pr), host: '127.0.0.1' });
-  return { files, bench };
-}
-
-/** A view of the core's side, on the harness' hub: nothing of Hermes' readers. */
+/** A view read from the core, on the harness' hub. */
 function coreViewDeps(on: Harness): ViewDeps {
   return {
     hub: on.hub,
     store: on.store,
-    sessions: noSessions,
     profiles: {
       profiles: () => ['coder'],
       live: () => null,
@@ -255,11 +209,8 @@ function coreViewDeps(on: Harness): ViewDeps {
       }),
       root: () => ({ maxInProgress: 0, maxInProgressPerProfile: 0 }),
       facts: () => null,
-      factsStamp: () => '',
     },
     github: null,
-    files: noCardFiles,
-    agentLog: noAgentLog,
     owner: 'code-my-life',
     boardName: 'factory',
     dashboardUrl: null,
@@ -270,14 +221,10 @@ function coreViewDeps(on: Harness): ViewDeps {
 
 describe('données déclarées de la factory lues par le socle (#60)', () => {
   it('côté socle, la recette d’une PR montre les jumeaux et les preuves publiés', async () => {
-    const hermes = hermesSide();
-    const fromHermes = acceptanceOf(
-      source(),
-      hermes.files.gateProofs(CARD, HEAD.slice(0, 7)),
-      hermes.bench.view(REPO, PR),
-    );
-    expect(fromHermes.twins?.surfaces).toHaveLength(2);
-    expect(fromHermes.proofs).toHaveLength(3);
+    dir = tempDir();
+    const reference = ACCEPTANCE_REFERENCE;
+    expect(reference.twins?.surfaces).toHaveLength(2);
+    expect(reference.proofs).toHaveLength(3);
 
     const { views, bench } = await coreSide({
       [`pr:${REPO}#${PR}`]: coreTwins(52004),
@@ -286,7 +233,7 @@ describe('données déclarées de la factory lues par le socle (#60)', () => {
     const proofs = await views.acceptance(REPO, PR, [CARD], HEAD);
     const fromCore = acceptanceOf(source(), proofs, bench.view(REPO, PR));
 
-    expect(fromCore).toEqual(fromHermes);
+    expect(fromCore).toEqual(reference);
     expect(fromCore.twins?.surfaces[0]?.base.stream).toBe(
       ['/api', 'twins', REPO, PR, 'session', 'base'].join('/'),
     );
@@ -325,12 +272,12 @@ describe('données déclarées de la factory lues par le socle (#60)', () => {
     expect(JSON.stringify(bench.pair(REPO, PR))).not.toContain('pwd');
   });
 
-  it('côté socle, la transcription d’un run est celle de la lecture d’Hermès', async () => {
+  it('la transcription d’un run lue par le socle', async () => {
     h = harness();
-    // What the Hermes reading gives for these messages: the case of sessions.test.ts that transcribes a
-    // message, a reasoning, a tool call and its results, at the session's times.
+    // The entries the reading of the agent's sessions gave for these messages before #72: a message, a
+    // reasoning, a tool call and its results, at the session's times.
     const at = (s: number) => new Date((1_000 + s) * 1000).toISOString();
-    const hermesEntries = [
+    const sessionEntries = [
       {
         at: at(1),
         role: 'user',
@@ -380,7 +327,7 @@ describe('données déclarées de la factory lues par le socle (#60)', () => {
         status: 'error',
       },
     ];
-    const row = (entry: (typeof hermesEntries)[number]) => [
+    const row = (entry: (typeof sessionEntries)[number]) => [
       entry.at,
       entry.role,
       entry.text,
@@ -395,7 +342,7 @@ describe('données déclarées de la factory lues par le socle (#60)', () => {
           name: 'agent-session',
           label: "Session de l'agent",
           values: [
-            { type: 'table', label: "Session de l'agent", columns, rows: hermesEntries.map(row) },
+            { type: 'table', label: "Session de l'agent", columns, rows: sessionEntries.map(row) },
           ],
         },
         {
@@ -423,9 +370,9 @@ describe('données déclarées de la factory lues par le socle (#60)', () => {
     const prepared = await views.transcripts(2);
     const shown = transcripts(coreViewDeps(h), 2, prepared);
 
-    expect(shown?.map((view) => view.source)).toEqual(['hermes', 'claude-code']);
-    expect(shown?.[0]?.entries.map(({ id: _, ...entry }) => entry)).toEqual(hermesEntries);
-    expect(new Set(shown?.[0]?.entries.map((entry) => entry.id)).size).toBe(hermesEntries.length);
+    expect(shown?.map((view) => view.source)).toEqual([FACTORY_RUNTIME, 'claude-code']);
+    expect(shown?.[0]?.entries.map(({ id: _, ...entry }) => entry)).toEqual(sessionEntries);
+    expect(new Set(shown?.[0]?.entries.map((entry) => entry.id)).size).toBe(sessionEntries.length);
     expect(shown?.[0]?.terminal).toEqual(['\u001b[32mok\u001b[0m', 'fin']);
     expect(shown?.[1]).toMatchObject({ name: 'impl factory-live#24', terminal: [] });
     expect(shown?.[1]?.entries.map((entry) => [entry.role, entry.text, entry.model])).toEqual([
@@ -433,16 +380,14 @@ describe('données déclarées de la factory lues par le socle (#60)', () => {
     ]);
   });
 
-  it('côté socle, la dérive d’un agent est celle de la lecture d’Hermès', async () => {
+  it('la dérive d’un agent lue par le socle est celle de la référence', async () => {
     h = harness();
-    // The Hermes reading: the coder's model in service (`auto`) differs from the repository's.
-    const hermes = (
-      (await (
-        await h.app.request('/api/profiles', { headers: { host: 'localhost:8446' } })
-      ).json()) as unknown[]
-    ).map((view) => ProfileView.parse(view));
-    const fromHermes = hermes.find((view) => view.name === 'coder')?.drift;
-    expect(fromHermes?.length).toBeGreaterThan(0);
+    // The coder's drift the reading of its configurations gave before #72: its model in service (`auto`)
+    // and its plugins differ from the repository's.
+    const reference = [
+      { field: 'model' as const, live: 'auto (freellmapi)', repo: 'agnes-2.5-flash (freellmapi)' },
+      { field: 'plugins' as const, live: 'factory-notify', repo: 'coder-guard' },
+    ];
 
     const { views } = await coreSide({
       'agent:coder': [
@@ -454,7 +399,7 @@ describe('données déclarées de la factory lues par le socle (#60)', () => {
               type: 'table',
               label: 'Dérive de la configuration',
               columns: ['Champ', 'Service', 'Dépôt'],
-              rows: fromHermes!.map((drift) => [drift.field, drift.live, drift.repo]),
+              rows: reference.map((drift) => [drift.field, drift.live, drift.repo]),
             },
           ],
         },
@@ -464,7 +409,7 @@ describe('données déclarées de la factory lues par le socle (#60)', () => {
     const drift = await views.drift(['coder']);
     const coder = profileViews(coreViewDeps(h), 30, drift).find((view) => view.name === 'coder');
 
-    expect(coder?.drift).toEqual(fromHermes);
+    expect(coder?.drift).toEqual(reference);
   });
 
   it('une donnée en erreur s’affiche, une donnée absente donne l’état sans jumeaux', async () => {
@@ -544,7 +489,7 @@ describe('données déclarées de la factory lues par le socle (#60)', () => {
     expect((await views.transcripts(1))?.terminal).toEqual([]);
   });
 
-  it('côté socle, ni Hermès, ni le dépôt de la factory, ni Claude Code ne sont lus', async () => {
+  it('ni la factory, ni son dépôt, ni Claude Code ne sont lus', async () => {
     h = harness();
     const { views, bench } = await coreSide({
       [`pr:${REPO}#${PR}`]: coreTwins(52004),

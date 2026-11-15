@@ -56,8 +56,13 @@ export interface CoreSink {
    * declares the code line, whose board is then empty, without the history of its past cards (#63).
    */
   board(delta: KanbanDelta, readAt: number, declared: boolean): void;
-  /** The code line's sheet, as the core judged it. */
+  /** The code line's sheet, as the core judged it; sent from the first one the core serves. */
   sheet(sheet: PublishedSheet): void;
+  /**
+   * The sheet of a workflow whose items its own adapter reads (the studio, #72), as the core judged it: the
+   * sheet it serves, or why it refuses it (`refusal`, the last sheet staying), at each full read.
+   */
+  ownSheet(workflow: string, sheet: WorkflowSheet | null, refusal: string | null): void;
   /** The other workflows the core declares, besides the code line and those read by their own adapter. */
   workflows(views: WorkflowView[]): void;
   /** A read or the stream failed: the last state stays. */
@@ -102,7 +107,10 @@ export interface WorkflowCoreReaderOptions {
   secret: string;
   /** The key of the code line's workflow (`factory`). */
   code: string;
-  /** The workflows still read by their own adapter (`studio`, until its epic): never read here. */
+  /**
+   * The workflows whose items, files and gestures are read by their own adapter (`studio`, until its epic):
+   * only their sheet is read here (`ownSheet`).
+   */
   own: readonly string[];
   /** The pause before a new attempt, after a failure: 2 s at most. */
   retryMs?: number;
@@ -113,6 +121,12 @@ export interface WorkflowCoreReaderOptions {
 }
 
 const RETRY_MS = 2_000;
+/** The core's codes for a sheet it does not serve (yet), as opposed to one it refuses (`invalid_sheet`). */
+const NOT_SERVED: ReadonlySet<string> = new Set([
+  'sheet_unavailable',
+  'not_found',
+  'unknown_workflow',
+]);
 /** The period of the agents' statistics the core counts (hook timeouts): the agents' screen's. */
 const AGENTS_DAYS = 30;
 /** The reads of run verdicts at once (#59): enough to fill a board at start, without flooding the core. */
@@ -160,7 +174,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
   private items = new Map<string, Map<string, CoreItem>>();
   private readonly sheets = new Map<string, CoreSheet>();
   /** Why the core refuses a workflow's sheet, as it says it (#65); absent while it accepts it. */
-  private readonly sheetErrors = new Map<string, string>();
+  private readonly sheetRefusals = new Map<string, string>();
   private readonly readAt = new Map<string, number>();
   /** The code line's open interventions, by id, with their card (#59). */
   private openCards = new Map<string, string>();
@@ -270,6 +284,8 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
     const keys = listed.workflows
       .map((workflow) => workflow.key)
       .filter((key) => !this.options.own.includes(key));
+    for (const workflow of listed.workflows)
+      if (this.options.own.includes(workflow.key)) await this.readOwnSheet(workflow.key);
     const items = new Map<string, Map<string, CoreItem>>();
     for (const key of keys) {
       try {
@@ -279,12 +295,12 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
           signal,
         );
         this.sheets.set(key, answer.sheet);
-        this.sheetErrors.delete(key);
+        this.sheetRefusals.delete(key);
       } catch (error) {
         // A sheet of a wrong form, or none: the last good one stays. The core's refusal is kept to say why.
         if (signal.aborted) throw error;
         if (error instanceof CoreError && error.code === 'invalid_sheet')
-          this.sheetErrors.set(key, error.detail ?? error.message);
+          this.sheetRefusals.set(key, error.detail ?? error.message);
         this.options.log.warn(
           { workflow: key, error: errorText(error) },
           'fiche du socle refusée : la dernière reçue reste',
@@ -323,6 +339,35 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
         if (hasFailedRun(item)) this.scheduleVerdicts(item.id);
     }
     await this.refreshMachine();
+  }
+
+  /** The sheet of a workflow read by its own adapter (#72): sent as the core judged it. */
+  private async readOwnSheet(key: string): Promise<void> {
+    const signal = this.abort.signal;
+    try {
+      const answer = await this.client.get(workflowPath(key, '/sheet'), coreSheetResponse, signal);
+      this.options.sink.ownSheet(key, answer.sheet as WorkflowSheet, null);
+    } catch (error) {
+      if (signal.aborted) throw error;
+      // Refused by the core: why, the last sheet staying. Not served yet, or the core unreachable: the last
+      // sheet stays, nothing to say on screen.
+      if (error instanceof CoreError && error.code === 'invalid_sheet') {
+        this.options.sink.ownSheet(key, null, error.detail ?? error.message);
+        this.options.log.warn(
+          { workflow: key, error: errorText(error) },
+          'fiche du socle refusée : la dernière reçue reste',
+        );
+      } else if (error instanceof CoreError && NOT_SERVED.has(error.code ?? ''))
+        this.options.log.info(
+          { workflow: key, code: error.code, error: errorText(error) },
+          'fiche du socle pas encore servie : la dernière reçue reste',
+        );
+      else
+        this.options.log.warn(
+          { workflow: key, error: errorText(error) },
+          'fiche du socle non lue (socle injoignable ou réponse inattendue) : la dernière reçue reste',
+        );
+    }
   }
 
   /**
@@ -646,9 +691,12 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
       this.options.sink.workflows(this.views());
       return;
     }
-    const sheet = this.sheets.get(key);
-    // The core judged the sheet and its schema checked its form: the code line draws it as it is.
-    if (sheet) this.options.sink.sheet({ source: 'published', sheet: sheet as WorkflowSheet });
+    const sheet = (this.sheets.get(key) as WorkflowSheet | undefined) ?? null;
+    const refusal = this.sheetRefusals.get(key);
+    // The core judged the sheet and its schema checked its form: the code line draws it as it is. A sheet the
+    // core refuses keeps the last one it served, and says why.
+    if (refusal !== undefined) this.options.sink.sheet({ source: 'published', sheet, refusal });
+    else if (sheet) this.options.sink.sheet({ source: 'published', sheet });
     this.options.sink.board(
       boardOf([...(this.items.get(key)?.values() ?? [])]),
       this.options.now(),
@@ -666,7 +714,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
       .map(([key, items]) => ({
         name: key,
         sheet: this.sheets.get(key) ?? null,
-        sheetError: this.sheetErrors.get(key) ?? null,
+        sheetRefusal: this.sheetRefusals.get(key) ?? null,
         items: [...items.values()].map(genericItem),
         unreachableSince: since,
       }));
@@ -705,7 +753,7 @@ export class WorkflowCoreReader implements GenericWorkflowsPort {
       .map((key) => ({
         name: key,
         sheet: (this.sheets.get(key) as WorkflowSheet | undefined) ?? null,
-        sheetError: null,
+        sheetRefusal: null,
         items: [],
         readAt: this.readAt.get(key) ?? null,
         unreachableSince: this.unreachableSince,

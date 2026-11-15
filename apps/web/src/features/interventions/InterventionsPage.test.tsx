@@ -12,7 +12,8 @@ import { DEMO_WORDS, PRESENTER_SCRIPT, derivedWords, spokenText } from '../../de
 import { I18nProvider } from '../../i18n/I18nProvider.tsx';
 import { frameOf } from '../../ui/media/index.ts';
 import { MotionProvider } from '../../ui/motion.tsx';
-import { STUDIO_SHEET, pathTo } from '../studio/model.ts';
+import { DEMO_STUDIO } from '../../demo/sheets.ts';
+import { pathTo } from '../studio/model.ts';
 import { createDemoStudioSource, createLiveStudioSource } from '../studio/source.ts';
 import type { StudioSource } from '../studio/source.ts';
 import { StudioPage } from '../studio/StudioPage.tsx';
@@ -356,11 +357,10 @@ describe('le Studio, ses états et sa source', () => {
     none.unmount();
 
     // A studio that stopped answering: its last state stays, and the page says so.
-    if (!STUDIO_SHEET.ok) throw new Error(STUDIO_SHEET.error);
     answer.current = Response.json({
       name: 'studio',
-      sheet: STUDIO_SHEET.sheet,
-      sheetError: null,
+      sheet: DEMO_STUDIO,
+      sheetRefusal: null,
       items: [
         {
           id: 'essai',
@@ -455,9 +455,8 @@ describe('le Studio, ses états et sa source', () => {
     for (const word of words) expect(StudioWord.safeParse(word).success).toBe(true);
     expect(StudioWord.safeParse({ mot: 'x', debut: 1, fin: 1, garde: true }).success).toBe(false);
     // A station off the line is its own way.
-    if (!STUDIO_SHEET.ok) throw new Error(STUDIO_SHEET.error);
-    expect(pathTo(STUDIO_SHEET.sheet, 'ailleurs')).toEqual(['ailleurs']);
-    expect(pathTo(STUDIO_SHEET.sheet, 'revue')).toEqual([
+    expect(pathTo(DEMO_STUDIO, 'ailleurs')).toEqual(['ailleurs']);
+    expect(pathTo(DEMO_STUDIO, 'revue')).toEqual([
       'idee',
       'script',
       'approbation',

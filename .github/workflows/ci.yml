@@ -54,12 +54,25 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: docker build -f docker/Dockerfile -t factory-live:ci .
-      - name: Le conteneur démarre et répond, utilisateur 1000, racine en lecture seule, healthcheck sain
+      - name: Le conteneur démarre sur un socle et répond, utilisateur 1000, racine en lecture seule, healthcheck sain
         run: |
-          # Hermes' side, named: since #68 the default source is workflow-core, which needs its address and secret.
-          docker run -d --name fl --read-only --tmpfs /tmp -v fl-data:/data --user 1000:1000 --health-interval 2s --health-start-period 1s -e LIVE_SOURCE=hermes -p 127.0.0.1:8446:8446 factory-live:ci
+          # factory-live reads the factory from workflow-core alone (#72): the e2e's fake core, run with the image's
+          # own Node and dependencies, on a network of their own; its test secret in the secrets' folder.
+          docker network create fl-net
+          docker run -d --name core --network fl-net -e HOST=0.0.0.0 -e PORT=4182 \
+            -v "$PWD/e2e:/app/e2e:ro" -v "$PWD/fixtures:/app/fixtures:ro" \
+            -v "$PWD/packages/contracts/src:/app/packages/contracts/src:ro" \
+            -v "$PWD/apps/web/src/demo/sheets:/app/apps/web/src/demo/sheets:ro" \
+            --entrypoint node factory-live:ci e2e/fake-api.mjs
+          mkdir -p "$RUNNER_TEMP/secrets"
+          printf 'secret-du-socle-des-e2e' > "$RUNNER_TEMP/secrets/workflow-core-secret"
+          chmod -R a+rX "$RUNNER_TEMP/secrets"
+          docker run -d --name fl --network fl-net --read-only --tmpfs /tmp -v fl-data:/data --user 1000:1000 --health-interval 2s --health-start-period 1s -v "$RUNNER_TEMP/secrets:/run/secrets/factory-live:ro" -e WORKFLOW_CORE_URL=http://core:4182 -e GITHUB_API=http://core:4182/github -p 127.0.0.1:8446:8446 factory-live:ci
           ok=0; for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8446/healthz && { ok=1; break; }; sleep 1; done
-          if [ "$ok" != 1 ]; then docker logs fl; exit 1; fi
+          if [ "$ok" != 1 ]; then docker logs core; docker logs fl; exit 1; fi
+          # The code line's sheet comes from the core: none is embedded in the image.
+          read=0; for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8446/api/workflows | grep -q '"source":"published"' && { read=1; break; }; sleep 1; done
+          if [ "$read" != 1 ]; then docker logs core; docker logs fl; exit 1; fi
           curl -fsS http://127.0.0.1:8446/api/openapi.json > /dev/null
           # Contrôle de l'hôte (DNS rebinding) : un nom inconnu reçoit 421, le healthcheck de l'image reste sain.
           test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: evil.example:8446' http://127.0.0.1:8446/healthz)" = 421

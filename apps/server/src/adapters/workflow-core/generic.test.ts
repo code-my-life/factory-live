@@ -6,8 +6,8 @@ import { NOW_S, SECRET, card, coreSide, coreState, until } from '../../test/core
 import type { Side } from '../../test/core-scenario.ts';
 import { harness } from '../../test/harness.ts';
 import type { Harness } from '../../test/harness.ts';
-import { tempDir } from '../../test/hermes-fixtures.ts';
-import type { TempDir } from '../../test/hermes-fixtures.ts';
+import { tempDir } from '../../test/board-fixtures.ts';
+import type { TempDir } from '../../test/board-fixtures.ts';
 
 /** A generic workflow of three stations, as the core serves it, judged. */
 const TRIAL_SHEET = {
@@ -111,7 +111,7 @@ describe('workflows génériques du socle (#65)', () => {
     const { reader } = await start(trialState());
 
     const [trial] = reader.genericWorkflows();
-    expect(trial).toMatchObject({ name: 'trial', sheet: TRIAL_SHEET, sheetError: null });
+    expect(trial).toMatchObject({ name: 'trial', sheet: TRIAL_SHEET, sheetRefusal: null });
     // The code line and the studio are not generic workflows.
     expect(reader.genericWorkflows().map((workflow) => workflow.name)).toEqual(['trial']);
 
@@ -160,7 +160,7 @@ describe('workflows génériques du socle (#65)', () => {
     const { reader } = await start(state);
 
     const [trial] = reader.genericWorkflows();
-    expect(trial?.sheetError).toBe('duplicate-station: "write" twice');
+    expect(trial?.sheetRefusal).toBe('duplicate-station: "write" twice');
     expect(trial?.items.map((item) => item.id)).toEqual(['t_trial1']);
   });
 

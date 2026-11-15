@@ -40,7 +40,13 @@ const WORDS = TEXT.split(' ').map((mot, index) => ({
 async function serveStudio(page: Page): Promise<void> {
   await page.route('**/api/workflows/studio', (route) =>
     route.fulfill({
-      json: { sheet: SHEET, sheetError: null, items: [ITEM], unreachableSince: null, error: null },
+      json: {
+        sheet: SHEET,
+        sheetRefusal: null,
+        items: [ITEM],
+        unreachableSince: null,
+        error: null,
+      },
     }),
   );
   await page.route(`**${AT}`, (route) =>

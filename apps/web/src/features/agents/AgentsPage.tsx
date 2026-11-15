@@ -45,14 +45,14 @@ function DriftSide({ badges, fallback }: { badges: ReactNode[] | null; fallback:
   return <>{badges}</>;
 }
 
-/** La limite appliquée : la valeur réglée, sinon celle d'Hermès par défaut ; `null` : sans limite. */
+/** The limit applied: the value set, else the factory's default; `null`: no limit. */
 function applied(limit: ProfileLimit | undefined): number | null {
   return limit ? (limit.value ?? limit.defaultValue) : null;
 }
 
 /**
- * Le délai réel du hook d'un plugin : celui du hook, plafonné par celui de l'appel d'outil, qui
- * englobe le hook (le plafond des outils d'Hermès coupe aussi un contrôle lancé dans un hook).
+ * The real delay of a plugin's hook: the hook's, capped by the tool call's, which wraps the hook (the
+ * factory's tool deadline also cuts a check run in a hook).
  */
 function effectiveHookLimit(limits: readonly ProfileLimit[]): number | null {
   const hook = applied(limits.find((limit) => limit.key === 'hook_callback_timeout'));
@@ -61,7 +61,7 @@ function effectiveHookLimit(limits: readonly ProfileLimit[]): number | null {
   return tool === null ? hook : Math.min(hook, tool);
 }
 
-/** Les délais d'Hermès qui coupent le travail de l'agent, réglés ou par défaut. */
+/** The factory's delays that cut the agent's work, set or by default. */
 function Limits({ limits }: { limits: readonly ProfileLimit[] }) {
   const { t, fmt } = useI18n();
   if (limits.length === 0) return null;

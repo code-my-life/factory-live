@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { IssueKey, Timestamp } from './common.ts';
 import { Text } from './messages.ts';
+import { FACTORY_RUNTIME } from './runtime.ts';
 
 /** Une ligne du fil d'activité : appel d'outil, appel au modèle, événement kanban, GitHub ou garde. */
 export const ActivityEvent = z.object({
@@ -19,7 +20,7 @@ export const ActivityEvent = z.object({
 });
 export type ActivityEvent = z.infer<typeof ActivityEvent>;
 
-/** Une entrée de transcription, quelle que soit la source (session Hermès ou lane CLI). */
+/** A transcript entry, whatever its source (the agent's session or a CLI lane). */
 export const TranscriptEntry = z.object({
   id: z.string(),
   at: Timestamp,
@@ -32,14 +33,14 @@ export const TranscriptEntry = z.object({
 export type TranscriptEntry = z.infer<typeof TranscriptEntry>;
 
 /**
- * A transcript of a run. A lane run has two: the Hermès session that drives
+ * A transcript of a run. A lane run has two: the agent's session that drives
  * it and the CLI session (Claude Code or OpenCode). `terminal` is the raw log of the card (ANSI).
  * The fields `name`, `startedAt`, `endedAt`, `costUsd` come from the `custom-title` record
  * (for the name) and the first/last dated records of the transcript.
  */
 export const TranscriptView = z.object({
   runId: z.number().int().positive(),
-  source: z.enum(['hermes', 'claude-code', 'opencode']),
+  source: z.enum([FACTORY_RUNTIME, 'claude-code', 'opencode']),
   title: Text,
   /** Lane name read from the last `custom-title` record, or `null` without it. */
   name: z.string().nullable(),

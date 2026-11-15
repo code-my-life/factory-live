@@ -1,5 +1,6 @@
 import { msg } from '@factory-live/contracts';
 import type { Diagnosis, EvidenceFile, Finding, RunVerdict } from '@factory-live/contracts';
+import { HOOK_FIX_COMMAND } from './commands.ts';
 
 /*
  * Les diagnostics de la démo, écrits à la main comme le serveur les calcule. La réplique de
@@ -211,7 +212,7 @@ export function hookTimeoutDiagnosis(
     steps: [
       {
         text: msg('diagnosis.step.setValue', { key: HOOK_KEY, value: 600, profile: 'coder' }),
-        command: `hermes -p coder config set ${HOOK_KEY} 600`,
+        command: HOOK_FIX_COMMAND,
         done: fix !== null,
       },
       {

@@ -6,27 +6,6 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-const WRITE_FUNCTIONS = [
-  'writeFile',
-  'writeFileSync',
-  'appendFile',
-  'appendFileSync',
-  'rm',
-  'rmSync',
-  'unlink',
-  'unlinkSync',
-  'mkdir',
-  'mkdirSync',
-  'rename',
-  'renameSync',
-  'copyFile',
-  'copyFileSync',
-  'truncate',
-  'truncateSync',
-];
-const READ_ONLY_MESSAGE =
-  'Les adaptateurs Hermès lisent seulement : aucune écriture dans ~/.hermes.';
-
 export default defineConfig([
   globalIgnores([
     '**/dist/**',
@@ -105,22 +84,6 @@ export default defineConfig([
               importNames: ['Token', 'IssueLabelToken'],
               message: 'Use a `Badge` from `ui/badge` (issue #11): no Primer `Token` in the app.',
             },
-          ],
-        },
-      ],
-    },
-  },
-  {
-    files: ['apps/server/src/adapters/hermes/**/*.ts'],
-    // Les tests préparent leurs bases dans un dossier temporaire, jamais dans ~/.hermes.
-    ignores: ['apps/server/src/adapters/hermes/**/*.test.ts'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          paths: [
-            { name: 'node:fs', importNames: WRITE_FUNCTIONS, message: READ_ONLY_MESSAGE },
-            { name: 'node:fs/promises', importNames: WRITE_FUNCTIONS, message: READ_ONLY_MESSAGE },
           ],
         },
       ],

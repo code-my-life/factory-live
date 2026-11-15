@@ -182,7 +182,7 @@ export class GitHubAppAuth implements TokenSource {
         name: `factory-live-${this.options.owner}`.slice(0, 34),
         url: repoUrl,
         description:
-          'factory-live : la factory Hermès en temps réel. Lit issues, PR et CI ; poste les gestes du propriétaire en son nom.',
+          'factory-live : la factory en temps réel. Lit issues, PR et CI ; poste les gestes du propriétaire en son nom.',
         hook_attributes: { url: repoUrl, active: false },
         redirect_url: `${origin}/api/github/manifest/callback`,
         callback_urls: this.options.origins.map((item) => `${item}/api/github/oauth/callback`),

@@ -1,0 +1,253 @@
+[
+  {
+    "name": "coordinator",
+    "role": "factory-brief",
+    "station": "brief",
+    "modelChain": [
+      {
+        "model": "auto",
+        "provider": "freellmapi",
+        "source": "config"
+      }
+    ],
+    "effort": null,
+    "toolsets": [],
+    "skills": ["factory-brief"],
+    "plugins": [
+      {
+        "name": "factory-notify",
+        "refusals": 0,
+        "timeouts": 0,
+        "longestSeconds": null
+      }
+    ],
+    "limits": [
+      {
+        "key": "hook_callback_timeout",
+        "value": null,
+        "defaultValue": 30,
+        "unit": "seconds"
+      },
+      {
+        "key": "tool_deadline",
+        "value": null,
+        "defaultValue": 420,
+        "unit": "seconds"
+      },
+      {
+        "key": "terminal_timeout",
+        "value": null,
+        "defaultValue": 180,
+        "unit": "seconds"
+      },
+      {
+        "key": "max_turns",
+        "value": null,
+        "defaultValue": null,
+        "unit": "turns"
+      }
+    ],
+    "mcp": [],
+    "drift": [],
+    "stats": {
+      "runs": 1,
+      "gatePassRate": null,
+      "medianRunMinutes": 16.666666666666668,
+      "costUsd": null
+    }
+  },
+  {
+    "name": "coder",
+    "role": "factory-author-proof",
+    "station": "implementation",
+    "modelChain": [
+      {
+        "model": "auto",
+        "provider": "freellmapi",
+        "source": "config"
+      }
+    ],
+    "effort": null,
+    "toolsets": [],
+    "skills": ["factory-author-proof"],
+    "plugins": [
+      {
+        "name": "factory-notify",
+        "refusals": 0,
+        "timeouts": 0,
+        "longestSeconds": null
+      }
+    ],
+    "limits": [
+      {
+        "key": "hook_callback_timeout",
+        "value": null,
+        "defaultValue": 30,
+        "unit": "seconds"
+      },
+      {
+        "key": "tool_deadline",
+        "value": null,
+        "defaultValue": 420,
+        "unit": "seconds"
+      },
+      {
+        "key": "terminal_timeout",
+        "value": null,
+        "defaultValue": 180,
+        "unit": "seconds"
+      },
+      {
+        "key": "max_turns",
+        "value": null,
+        "defaultValue": null,
+        "unit": "turns"
+      }
+    ],
+    "mcp": [],
+    "drift": [
+      {
+        "field": "model",
+        "live": "auto (freellmapi)",
+        "repo": "agnes-2.5-flash (freellmapi)"
+      },
+      {
+        "field": "plugins",
+        "live": "factory-notify",
+        "repo": "coder-guard"
+      }
+    ],
+    "stats": {
+      "runs": 1,
+      "gatePassRate": null,
+      "medianRunMinutes": 73.33333333333333,
+      "costUsd": null
+    }
+  },
+  {
+    "name": "gate",
+    "role": "factory-gate",
+    "station": "gate",
+    "modelChain": [
+      {
+        "model": "auto",
+        "provider": "freellmapi",
+        "source": "config"
+      }
+    ],
+    "effort": null,
+    "toolsets": [],
+    "skills": ["factory-gate"],
+    "plugins": [
+      {
+        "name": "factory-notify",
+        "refusals": 0,
+        "timeouts": 0,
+        "longestSeconds": null
+      }
+    ],
+    "limits": [
+      {
+        "key": "hook_callback_timeout",
+        "value": null,
+        "defaultValue": 30,
+        "unit": "seconds"
+      },
+      {
+        "key": "tool_deadline",
+        "value": null,
+        "defaultValue": 420,
+        "unit": "seconds"
+      },
+      {
+        "key": "terminal_timeout",
+        "value": null,
+        "defaultValue": 180,
+        "unit": "seconds"
+      },
+      {
+        "key": "max_turns",
+        "value": null,
+        "defaultValue": null,
+        "unit": "turns"
+      }
+    ],
+    "mcp": [],
+    "drift": [
+      {
+        "field": "plugins",
+        "live": "factory-notify",
+        "repo": "gate-readonly"
+      }
+    ],
+    "stats": {
+      "runs": 0,
+      "gatePassRate": null,
+      "medianRunMinutes": null,
+      "costUsd": null
+    }
+  },
+  {
+    "name": "release",
+    "role": "factory-release",
+    "station": "release",
+    "modelChain": [
+      {
+        "model": "auto",
+        "provider": "freellmapi",
+        "source": "config"
+      }
+    ],
+    "effort": null,
+    "toolsets": [],
+    "skills": ["factory-release"],
+    "plugins": [
+      {
+        "name": "factory-notify",
+        "refusals": 0,
+        "timeouts": 0,
+        "longestSeconds": null
+      }
+    ],
+    "limits": [
+      {
+        "key": "hook_callback_timeout",
+        "value": null,
+        "defaultValue": 30,
+        "unit": "seconds"
+      },
+      {
+        "key": "tool_deadline",
+        "value": null,
+        "defaultValue": 420,
+        "unit": "seconds"
+      },
+      {
+        "key": "terminal_timeout",
+        "value": null,
+        "defaultValue": 180,
+        "unit": "seconds"
+      },
+      {
+        "key": "max_turns",
+        "value": null,
+        "defaultValue": null,
+        "unit": "turns"
+      }
+    ],
+    "mcp": [],
+    "drift": [
+      {
+        "field": "plugins",
+        "live": "factory-notify",
+        "repo": "merge-guard"
+      }
+    ],
+    "stats": {
+      "runs": 0,
+      "gatePassRate": null,
+      "medianRunMinutes": null,
+      "costUsd": null
+    }
+  }
+]

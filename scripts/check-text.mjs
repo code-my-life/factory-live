@@ -74,8 +74,8 @@ for (const file of files.filter((name) => /^\.github\/workflows\/.+\.ya?ml$/.tes
     workflows.push(`${file} (permissions: contents: read attendu en tête)`);
 }
 
-// Vocabulaire de l'interface : un concept, un mot (AGENTS.md). Un profil Hermès s'appelle « agent »
-// à l'écran ; on cherche hors commentaires dans le code de la PWA et dans les textes du serveur.
+// Interface vocabulary, one concept, one word (AGENTS.md): a profile of the factory is called "agent" on screen.
+// Looked for outside comments, in the PWA's code and in the server's texts.
 const GLOSSARY = [{ pattern: /\bprofils?\b/i, word: 'agent' }];
 const UI_SOURCES = /^apps\/(web\/src|server\/src\/application)\/.*\.tsx?$/;
 const vocabulary = [];

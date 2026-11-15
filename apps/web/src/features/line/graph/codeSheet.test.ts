@@ -1,36 +1,44 @@
 import { describe, expect, it } from 'vitest';
+import { DEMO_CODE_LINE } from '../../../demo/sheets.ts';
 import { readCodeSheet } from './codeSheet.ts';
-import { CODE_LINE_SHEET } from './layout.ts';
 
 describe('readCodeSheet', () => {
-  it('la ligne du code se dessine depuis la fiche publiée, la copie embarquée en repli', async () => {
-    if (!CODE_LINE_SHEET.ok) throw new Error(CODE_LINE_SHEET.error);
+  it('la ligne du code se dessine depuis la fiche du socle, sans copie embarquée', async () => {
     const answer =
       (body: unknown, status = 200) =>
       () =>
         Promise.resolve(Response.json(body, { status }));
     const renamed = {
-      ...CODE_LINE_SHEET.sheet,
-      stations: CODE_LINE_SHEET.sheet.stations.map((station, index) =>
+      ...DEMO_CODE_LINE,
+      stations: DEMO_CODE_LINE.stations.map((station, index) =>
         index === 0 ? { ...station, label: 'Arrivée' } : station,
       ),
     };
     expect(await readCodeSheet(answer({ code: { source: 'published', sheet: renamed } }))).toEqual({
-      ok: true,
       sheet: renamed,
+      refusal: null,
     });
-    // Missing on the factory, invalid, or this server does not answer: the embedded copy.
-    expect(await readCodeSheet(answer({ code: { source: 'embedded', reason: 'absent' } }))).toBe(
-      CODE_LINE_SHEET,
-    );
+    // Not received from the core yet, of a wrong form, or this server does not answer: no sheet.
+    expect(await readCodeSheet(answer({ code: null }))).toBeNull();
+    expect(
+      await readCodeSheet(answer({ code: { source: 'published', sheet: { item: 1 } } })),
+    ).toBeNull();
+    expect(await readCodeSheet(answer({}, 502))).toBeNull();
+    expect(await readCodeSheet(() => Promise.reject(new TypeError('offline')))).toBeNull();
+  });
+
+  it('une fiche refusée par le socle dit pourquoi, la dernière reçue restant', async () => {
+    const answer = (body: unknown) => () => Promise.resolve(Response.json(body));
+    const refusal = 'duplicate station "impl"';
+    // Refused with a sheet served before: both, the line drawn under the banner.
     expect(
       await readCodeSheet(
-        answer({ code: { source: 'published', sheet: { ...renamed, models: ['x'] } } }),
+        answer({ code: { source: 'published', sheet: DEMO_CODE_LINE, refusal } }),
       ),
-    ).toBe(CODE_LINE_SHEET);
-    expect(await readCodeSheet(answer({}, 502))).toBe(CODE_LINE_SHEET);
-    expect(await readCodeSheet(() => Promise.reject(new TypeError('offline')))).toBe(
-      CODE_LINE_SHEET,
-    );
+    ).toEqual({ sheet: DEMO_CODE_LINE, refusal });
+    // Refused before any sheet: the reason alone.
+    expect(
+      await readCodeSheet(answer({ code: { source: 'published', sheet: null, refusal } })),
+    ).toEqual({ sheet: null, refusal });
   });
 });

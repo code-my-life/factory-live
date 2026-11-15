@@ -27,7 +27,7 @@ export interface FactoryDataSource {
   /** Quand l'état affiché a été reçu (ms) : le dernier connu, gardé sur l'appareil, s'affiche hors ligne. */
   getLastUpdate(): number | null;
   getIssueDetail(key: IssueKey): IssueDetail | null;
-  /** Transcriptions d'un run : session Hermès, puis lane CLI s'il y en a une. */
+  /** A run's transcripts: the agent's session, then the CLI lane if there is one. */
   getTranscripts(runId: number): readonly TranscriptView[] | null;
   getProfiles(): readonly ProfileView[];
   getUsage(periodDays: UsagePeriod): UsageReport;

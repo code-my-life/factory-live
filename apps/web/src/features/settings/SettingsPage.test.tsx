@@ -199,7 +199,7 @@ describe('SettingsPage server version in live mode', () => {
       </I18nProvider>,
     );
 
-    // Should fetch /healthz and display version 0.2.0 instead of static 0.1.0 and remove Hermès version
+    // Should fetch /healthz and display version 0.2.0 instead of static 0.1.0, and no other version
     await waitFor(() => {
       expect(screen.getByText('0.2.0')).toBeInTheDocument();
     });

@@ -1,4 +1,4 @@
-import { parseWorkflowSheet } from '@factory-live/contracts';
+import { sheetStateOf } from './sheetState.ts';
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../../i18n/I18nProvider.tsx';
@@ -26,8 +26,11 @@ afterEach(() => {
 
 describe('SheetGraph', () => {
   it('une fiche refusée montre pourquoi, à la place du graphe', () => {
-    const parsed = parseWorkflowSheet({ item: { type: 'video', label: 'Vidéo' } });
+    // A sheet the core refuses, as it says it, or a sheet of a wrong form: both show why.
+    const parsed = sheetStateOf(null, 'duplicate station "write"');
     if (parsed.ok) throw new Error('the sheet should be refused');
+    const malformed = sheetStateOf({ item: { type: 'video', label: 'Vidéo' } }, null);
+    expect(malformed.ok).toBe(false);
     const { container } = render(
       <I18nProvider>
         <SheetGraph

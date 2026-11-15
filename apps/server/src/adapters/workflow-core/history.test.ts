@@ -7,7 +7,7 @@ import { CoreHistory } from './history.ts';
 function memory() {
   const rows = new Map<string, HistoryItem>();
   let reads = 0;
-  const port: Pick<HistoryPort, 'recordItems' | 'historyItems' | 'seedHistory'> = {
+  const port: Pick<HistoryPort, 'recordItems' | 'historyItems'> = {
     recordItems: (_workflow, items, at, complete) => {
       for (const item of items)
         rows.set(item.id, {
@@ -25,7 +25,6 @@ function memory() {
       reads += 1;
       return [...rows.values()];
     },
-    seedHistory: () => false,
   };
   return { port: port as HistoryPort, reads: () => reads };
 }

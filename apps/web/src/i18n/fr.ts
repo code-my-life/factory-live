@@ -486,7 +486,7 @@ const server: ServerMessages = {
   'github.answerAcknowledged': () => 'Le bot a pris la réponse en compte',
   'unblock.sent': () => 'Réponse envoyée depuis factory-live',
 
-  'transcript.hermes': ({ profile, session }) =>
+  'transcript.agent': ({ profile, session }) =>
     `Session Hermès de ${profile}${session ? ` (${session})` : ''}`,
   'transcript.claudeCode': ({ costUsd }) =>
     `Lane Claude Code${costUsd === null ? '' : ` (${f.usd(costUsd)})`}`,
@@ -504,7 +504,7 @@ const server: ServerMessages = {
   'health.workflow.sheetInvalid': ({ error }) => `Fiche invalide, la précédente reste : ${error}`,
   'health.codeSheet': () => 'Fiche de la ligne du code',
   'health.codeSheet.published': () => 'Publiée par la factory (config/workflow.json)',
-  'health.codeSheet.embedded': ({ reason }) => `Copie embarquée : ${reason}`,
+  'health.codeSheet.pending': () => 'Pas encore reçue du socle',
   'health.core': () => 'Socle (workflow-core)',
   'health.core.ok': () => 'Répond',
   'health.core.unreachable': ({ seconds }) =>
@@ -656,6 +656,9 @@ export const fr = {
   workflow: {
     /** Over the reason a workflow's sheet is refused, given as is. */
     invalid: 'La fiche de ce workflow est refusée : le graphe ne peut pas se dessiner',
+    /** The code line before the core's first sheet (#72). */
+    waitingTitle: 'Fiche de la ligne du code',
+    waiting: 'En attente de la fiche du socle : la ligne se dessine dès qu’il la sert.',
   },
 
   /** The screen of a workflow the core declares besides the code line and the studio (#65). */

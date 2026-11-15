@@ -1,6 +1,6 @@
 import type { ApiErrorCode } from '@factory-live/contracts';
 import type { Hub } from './hub.ts';
-import { CODE_WORKFLOW, GestureError, hermesSideGestures, postGesture } from './gestures.ts';
+import { CODE_WORKFLOW, GestureError, postGesture } from './gestures.ts';
 import type {
   GesturesPort,
   GitHubWritePort,
@@ -35,11 +35,8 @@ export interface UnblockDeps {
   factoryBot: string;
   log: LoggerPort;
   now: () => number;
-  /**
-   * The gestures each workflow declares (#61): the core's on its side, the default list on Hermes' side.
-   * Absent: the default list.
-   */
-  gestures?: GesturesPort;
+  /** The gestures each workflow declares to the core (#61). */
+  gestures: GesturesPort;
   /** The workflow of the code line's interventions (`factory`). */
   workflow?: string;
 }
@@ -115,7 +112,7 @@ export async function unblockIntervention(
     // The unblocking is the gesture `unblock` of the intervention's workflow (#61): posted only if declared.
     const sent = await postGesture(
       {
-        gestures: deps.gestures ?? hermesSideGestures,
+        gestures: deps.gestures,
         github: deps.github,
         issueOf: () => issueKey,
         store: deps.store,

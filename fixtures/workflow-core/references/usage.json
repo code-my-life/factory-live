@@ -1,0 +1,56 @@
+{
+  "periodDays": 7,
+  "models": [
+    {
+      "model": "agnes-2.5-flash",
+      "provider": "freellmapi",
+      "calls": 2,
+      "inputTokens": 3000,
+      "outputTokens": 500,
+      "costUsd": null,
+      "rateLimited": 0,
+      "errors": 0
+    },
+    {
+      "model": "qwen-3.6",
+      "provider": "freellmapi",
+      "calls": 2,
+      "inputTokens": 1200,
+      "outputTokens": 120,
+      "costUsd": null,
+      "rateLimited": 1,
+      "errors": 0
+    }
+  ],
+  "byProfile": [
+    {
+      "profile": "coder",
+      "tokens": 3500
+    },
+    {
+      "profile": "gate",
+      "tokens": 1320
+    }
+  ],
+  "daily": [
+    {
+      "day": "2026-10-26",
+      "tokens": 1200,
+      "rateLimited": 0
+    },
+    {
+      "day": "2026-10-27",
+      "tokens": 2850,
+      "rateLimited": 0
+    },
+    {
+      "day": "2026-10-28",
+      "tokens": 770,
+      "rateLimited": 1
+    }
+  ],
+  "claudeSubscriptionNote": {
+    "code": "usage.claudeNote",
+    "params": {}
+  }
+}

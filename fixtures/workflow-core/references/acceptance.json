@@ -1,0 +1,90 @@
+{
+  "pr": 24,
+  "head": "9a72096265a97aab5223e2e1d77bf48411a8c962",
+  "base": "c9fa041a00000000000000000000000000000000",
+  "criteria": [
+    {
+      "id": "C1",
+      "text": "la page s'affiche",
+      "status": "nok",
+      "reason": "unproven",
+      "proof": "capture",
+      "url": "https://github.com/code-my-life/factory-live/pull/24"
+    }
+  ],
+  "checks": [],
+  "gate": null,
+  "tests": [],
+  "proofs": [
+    {
+      "kind": "run",
+      "status": "info",
+      "detail": "failfirst",
+      "url": "https://github.com/code-my-life/factory-live/pull/24",
+      "content": "test rouge avant la correction, vert après",
+      "before": null,
+      "after": null
+    },
+    {
+      "kind": "run",
+      "status": "info",
+      "detail": "coverage",
+      "url": "https://github.com/code-my-life/factory-live/pull/24",
+      "content": "couverture 91 %",
+      "before": null,
+      "after": null
+    },
+    {
+      "kind": "run",
+      "status": "info",
+      "detail": "capture",
+      "url": "https://github.com/code-my-life/factory-live/pull/24",
+      "content": "captures identiques",
+      "before": null,
+      "after": null
+    }
+  ],
+  "threads": [],
+  "reviewRounds": 1,
+  "twins": {
+    "surfaces": [
+      {
+        "id": "app",
+        "label": "App",
+        "kind": "web",
+        "changed": true,
+        "base": {
+          "sha": "c9fa041a00000000000000000000000000000000",
+          "stream": "/api/twins/factory-live/24/session/base",
+          "poster": null
+        },
+        "head": {
+          "sha": "9a72096265a97aab5223e2e1d77bf48411a8c962",
+          "stream": "/api/twins/factory-live/24/session/head",
+          "poster": null
+        },
+        "differences": 2
+      },
+      {
+        "id": "site",
+        "label": "Site",
+        "kind": "site",
+        "changed": false,
+        "base": {
+          "sha": "c9fa041a00000000000000000000000000000000",
+          "stream": null,
+          "poster": null
+        },
+        "head": {
+          "sha": "9a72096265a97aab5223e2e1d77bf48411a8c962",
+          "stream": null,
+          "poster": null
+        },
+        "differences": null
+      }
+    ],
+    "state": "ready",
+    "divergence": "clic sur « Débloquer » non rejoué"
+  },
+  "twinsAbsent": null
+}

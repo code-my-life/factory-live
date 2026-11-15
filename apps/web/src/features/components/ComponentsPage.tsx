@@ -1,4 +1,3 @@
-import { parseWorkflowSheet } from '@factory-live/contracts';
 import type {
   AgentActivity,
   IssueStatus,
@@ -10,6 +9,7 @@ import { ChevronDownIcon, ChevronUpIcon } from '@primer/octicons-react';
 import { Banner, Button, Heading } from '@primer/react';
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
+import { SAMPLE_REFUSAL, sampleStudioSheet } from '../../demo/components.ts';
 import { DEMO_WORDS } from '../../demo/studio.ts';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { VideoPlayer, WordTrack, frameOf } from '../../ui/media/index.ts';
@@ -193,41 +193,8 @@ export function ComponentsPage() {
   const c = t.components;
   const s = c.sample;
 
-  // The sample workflow: a video studio of three stations, one per kind of work that varies.
-  const studio = useMemo(
-    () =>
-      parseWorkflowSheet({
-        item: { type: 'video', label: s.item },
-        stations: [
-          { key: 'write', label: s.write, icon: 'pencil', kind: 'ai', col: 0, row: 1 },
-          { key: 'render', label: s.render, icon: 'video', kind: 'script', col: 1, row: 1 },
-          { key: 'approve', label: s.approve, icon: 'eye', kind: 'owner', col: 2, row: 1 },
-        ],
-        edges: [
-          { from: 'write', to: 'render', kind: 'line' },
-          { from: 'render', to: 'approve', kind: 'line' },
-          { from: 'approve', to: 'write', kind: 'return', label: s.again },
-        ],
-        models: ['write'],
-      }),
-    [s],
-  );
-  const refused = useMemo(
-    () =>
-      parseWorkflowSheet({
-        item: { type: 'video', label: s.item },
-        stations: [
-          { key: 'write', label: s.write, icon: 'pencil', kind: 'ai', col: 0, row: 1 },
-          { key: 'write', label: s.render, icon: 'video', kind: 'script', col: 1, row: 1 },
-        ],
-        edges: [],
-        models: [],
-      }),
-    [s],
-  );
-  const sheet: WorkflowSheet = studio.ok
-    ? studio.sheet
-    : { item: { type: '', label: '' }, stations: [], edges: [], models: [] };
+  // The sample workflow, from the demonstration's data: a video studio of three stations.
+  const sheet: WorkflowSheet = useMemo(() => sampleStudioSheet(s), [s]);
   const plan = planOf(sheet);
   const text = useSheetText(plan);
   const palette = useMemo(() => paletteOf(['fan', 'branch']), []);
@@ -500,23 +467,17 @@ export function ComponentsPage() {
         <h2 id="components-sheet" className={page.sectionTitle}>
           {c.sheet.title}
         </h2>
-        {studio.ok ? (
-          <WorkflowGraph
-            sheet={studio.sheet}
-            items={[thinking, ...items.slice(1)]}
-            providers={providerRows(true)}
-            selectedKey={null}
-            onSelect={noop}
-            now={NOW}
-            maxInProgress={2}
-          />
-        ) : (
-          <Banner variant="critical" title={t.workflow.invalid} description={studio.error} />
-        )}
+        <WorkflowGraph
+          sheet={sheet}
+          items={[thinking, ...items.slice(1)]}
+          providers={providerRows(true)}
+          selectedKey={null}
+          onSelect={noop}
+          now={NOW}
+          maxInProgress={2}
+        />
         <h3 className={page.sectionTitle}>{c.sheet.invalid}</h3>
-        {refused.ok ? null : (
-          <Banner variant="critical" title={t.workflow.invalid} description={refused.error} />
-        )}
+        <Banner variant="critical" title={t.workflow.invalid} description={SAMPLE_REFUSAL} />
       </section>
     </section>
   );

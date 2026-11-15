@@ -1,4 +1,4 @@
-import type { Run, Task, TaskEvent } from './hermes.ts';
+import type { Run, Task, TaskEvent } from './board.ts';
 
 export interface IssueRef {
   repo: string;

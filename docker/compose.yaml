@@ -21,7 +21,6 @@ services:
       - '127.0.0.1:8446:8446'
     environment:
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      HERMES_BOARD: ${HERMES_BOARD:-factory}
       GITHUB_OWNER: ${GITHUB_OWNER:-code-my-life}
       # Valeurs propres à ce PC (nom tailnet, login Tailscale, dashboard) : dans docker/.env, jamais
       # dans le dépôt (modèle : docker/.env.example). Sans elles, factory-live ne répond qu'à ce PC.
@@ -29,28 +28,18 @@ services:
       PUBLIC_ORIGINS: ${PUBLIC_ORIGINS:-http://localhost:8446}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
       DASHBOARD_URL: ${DASHBOARD_URL:-}
-      # Le journal d'Hermès note l'heure locale de ce PC sans fuseau ; le conteneur, lui, est en UTC.
-      HERMES_TZ: ${HERMES_TZ:-Europe/Paris}
       # Le banc de jumeaux de la factory publie ses ports sur ce PC (ADR 0013).
       TWINS_HOST: host.docker.internal
       # Les workflows suivis par leur API générique (ADR 0014) : le studio de video-factory sur ce PC.
       WORKFLOWS: ${WORKFLOWS:-studio=http://host.docker.internal:8448}
-      # La source de la lecture (ADR 0015) : workflow-core par défaut (#68), le socle sur ce PC, son secret étant
-      # le fichier workflow-core-secret du dossier des secrets ; hermes est le retour arrière. Les montages
-      # d'Hermès, du dépôt de la factory et des transcriptions restent pour ce retour arrière.
-      LIVE_SOURCE: ${LIVE_SOURCE:-workflow-core}
+      # factory-live lit la factory par le socle (workflow-core, ADR 0015, #72), sur ce PC ; son secret est le
+      # fichier workflow-core-secret du dossier des secrets. Rien de la factory n'est monté ici.
       WORKFLOW_CORE_URL: ${WORKFLOW_CORE_URL:-http://host.docker.internal:8447}
     extra_hosts:
       - host.docker.internal:host-gateway
     volumes:
       - factory-live-data:/data
-      # Bases d'Hermès : dossiers en écriture pour le seul `-shm` de SQLite (lecteur WAL), bases ouvertes en lecture seule.
-      # Dossiers et non fichiers : Hermès réécrit ses fichiers par renommage, un fichier monté resterait figé.
-      - ${HOME}/.hermes/kanban/boards/${HERMES_BOARD:-factory}:/hermes/kanban/boards/${HERMES_BOARD:-factory}
-      - ${HOME}/.hermes/profiles:/hermes/profiles
-      - ${FACTORY_REPO:-${HOME}/perso/hermes-software-factory}:/factory:ro
-      - ${HOME}/.claude/projects:/claude-projects:ro
-      # Secrets hors dépôt : hook-secret (webhooks et sonde), github-token (déblocage, PR, CI).
+      # Secrets hors dépôt : workflow-core-secret (le socle), github-token (déblocage, PR, CI).
       - ${HOME}/.config/factory-live:/run/secrets/factory-live:ro
     logging:
       driver: json-file

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type * as NodeFs from 'node:fs';
 import type * as NodeSqlite from 'node:sqlite';
-import { ProfileView, msg } from '@factory-live/contracts';
+import { FACTORY_RUNTIME, ProfileView, msg } from '@factory-live/contracts';
 import { coreAgents } from '@factory-live/contracts/workflow-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { profileViews } from '../../application/views.ts';
@@ -13,9 +13,8 @@ import { fakeCore } from '../../test/fake-core.ts';
 import type { FakeCore, FakeCoreState } from '../../test/fake-core.ts';
 import { harness } from '../../test/harness.ts';
 import type { Harness } from '../../test/harness.ts';
-import { tempDir } from '../../test/hermes-fixtures.ts';
-import type { TempDir } from '../../test/hermes-fixtures.ts';
-import { noAgentLog, noCardFiles, noSessions } from './absent.ts';
+import { tempDir } from '../../test/board-fixtures.ts';
+import type { TempDir } from '../../test/board-fixtures.ts';
 import { CoreProfiles } from './agents.ts';
 import { FactoryViews } from './factoryViews.ts';
 
@@ -113,7 +112,7 @@ async function start(state: Partial<FakeCoreState>): Promise<Side> {
   return side;
 }
 
-/** The agents' screen on the core's side: the core's agents, on the harness' board and activity. */
+/** The agents' screen read from the core: the core's agents, on the harness' board and activity. */
 function coreViews(on: Harness, of: Side): ViewDeps {
   const board = on.hub.boardData;
   of.hub.replaceBoard(
@@ -129,11 +128,8 @@ function coreViews(on: Harness, of: Side): ViewDeps {
   return {
     hub: of.hub,
     store: on.store,
-    sessions: noSessions,
     profiles: of.profiles,
     github: null,
-    files: noCardFiles,
-    agentLog: noAgentLog,
     owner: 'code-my-life',
     boardName: 'factory',
     dashboardUrl: null,
@@ -144,19 +140,24 @@ function coreViews(on: Harness, of: Side): ViewDeps {
 
 const byName = (views: ProfileView[]) => Object.fromEntries(views.map((view) => [view.name, view]));
 
-async function hermesProfiles(on: Harness): Promise<ProfileView[]> {
-  const answer = await on.app.request('/api/profiles', { headers: { host: 'localhost:8446' } });
-  return ((await answer.json()) as unknown[]).map((view) => ProfileView.parse(view));
-}
+/** The agents' screen the reading of the factory's files gave for the harness' factory, before #72. */
+const AGENTS_REFERENCE = (
+  JSON.parse(
+    readFileSync(
+      new URL('../../../../../fixtures/workflow-core/references/agents.json', import.meta.url),
+      'utf8',
+    ),
+  ) as unknown[]
+).map((view) => ProfileView.parse(view));
 
 describe('écran Agents lu par le socle (#93)', () => {
-  it('côté socle, l’écran Agents est celui de la lecture d’Hermès', async () => {
+  it('l’écran Agents lu par le socle est celui de la référence', async () => {
     h = harness();
-    const fromHermes = await hermesProfiles(h);
-    expect(fromHermes.find((view) => view.name === 'coder')!.drift.length).toBeGreaterThan(0);
+    const reference = AGENTS_REFERENCE;
+    expect(reference.find((view) => view.name === 'coder')!.drift.length).toBeGreaterThan(0);
     // Each agent's drift, as the core publishes it in declared data (#60).
     const driftData = Object.fromEntries(
-      fromHermes.map((view) => [
+      reference.map((view) => [
         `agent:${view.name}`,
         [
           {
@@ -184,7 +185,7 @@ describe('écran Agents lu par le socle (#93)', () => {
 
     // The same agents, the same views field by field; the core lists them by name.
     expect(hub.profiles).toEqual(['coder', 'coordinator', 'gate', 'release']);
-    expect(byName(fromCore)).toEqual(byName(fromHermes));
+    expect(byName(fromCore)).toEqual(byName(reference));
     expect(profiles.profiles()).toEqual(hub.profiles);
   });
 
@@ -241,7 +242,7 @@ describe('écran Agents lu par le socle (#93)', () => {
     expect(hub.settings).toEqual({ maxInProgress: 3, maxInProgressPerProfile: 2 });
   });
 
-  it('côté socle, ni Hermès ni le dépôt de la factory ne sont lus pour les agents', async () => {
+  it('rien d’autre que la base de factory-live n’est ouvert pour les agents', async () => {
     h = harness();
     const { reader } = await start({ agents: { factory: AGENTS } });
     opened.on = true;
@@ -345,14 +346,13 @@ describe('écran Agents lu par le socle, revue (#93)', () => {
         },
       },
     });
-    hub.refreshDiagnoses();
     const guards = hub.snapshot().health.find((item) => item.id === 'guards');
 
     // The tile `health.test.ts` expects for these two risks, field by field (but its time of reading).
     expect(guards).toMatchObject({
       id: 'guards',
       label: msg('health.guards'),
-      group: 'hermes',
+      group: FACTORY_RUNTIME,
       status: 'degraded',
       detail: msg('health.guards.risk', { count: 2 }),
       metrics: [
@@ -374,7 +374,6 @@ describe('écran Agents lu par le socle, revue (#93)', () => {
 
   it('côté socle, aucune garde publiée donne la tuile sans risque', async () => {
     const { hub } = await start({ agents: { factory: { ...AGENTS, guard_risks: [] } } });
-    hub.refreshDiagnoses();
     expect(hub.snapshot().health.find((item) => item.id === 'guards')).toMatchObject({
       status: 'ok',
       detail: msg('health.guards.ok'),
@@ -393,7 +392,6 @@ describe('écran Agents lu par le socle, revue (#93)', () => {
     const { hub } = await start({
       agents: { factory: { ...AGENTS, agents: [risky], guard_risks: [] } },
     });
-    hub.refreshDiagnoses();
     expect(hub.snapshot().health.find((item) => item.id === 'guards')).toMatchObject({
       status: 'ok',
       metrics: [],

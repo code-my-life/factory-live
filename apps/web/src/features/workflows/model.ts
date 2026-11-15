@@ -1,9 +1,5 @@
-import type {
-  GenericItemView,
-  IssueSummary,
-  WorkflowSheet,
-  WorkflowSheetResult,
-} from '@factory-live/contracts';
+import type { GenericItemView, IssueSummary, WorkflowSheet } from '@factory-live/contracts';
+import type { SheetState } from '../line/graph/sheetState.ts';
 import type { LineIssue } from '../line/graph/model.ts';
 import { pathTo } from '../studio/model.ts';
 
@@ -21,7 +17,7 @@ export type GenericItem = GenericItemView;
 export interface GenericWorkflow {
   key: string;
   /** The sheet the core judged, or why it refuses it (or why this screen cannot read it). */
-  sheet: WorkflowSheetResult;
+  sheet: SheetState;
   items: GenericItem[];
   /** Since when the core does not answer (ms); the last sheet and items stay. */
   unreachableSince: number | null;

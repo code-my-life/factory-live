@@ -4,6 +4,7 @@ import { ModelRef } from './agents.ts';
 import { BlockKind, IssueKey, KanbanStatus, StationId, Timestamp } from './common.ts';
 import { EvidenceFile, RunVerdict } from './diagnosis.ts';
 import { Text } from './messages.ts';
+import { FACTORY_RUNTIME } from './runtime.ts';
 
 export const ChecksState = z.enum(['none', 'pending', 'success', 'failure']);
 export type ChecksState = z.infer<typeof ChecksState>;
@@ -99,7 +100,7 @@ export const IssueSummary = z.object({
   claudeModel: z.string().nullable(),
   harness: z.string().nullable(),
   pr: PullRequestView.nullable(),
-  /** Lien de la PR relevé dans les runs d'Hermès : connu même quand GitHub n'est pas relié. */
+  /** The PR's link noted in the factory's runs: known even when GitHub is not connected. */
   prUrl: z.url().nullable(),
   activeProfiles: z.array(z.string()),
   interventionIds: z.array(z.string()),
@@ -173,7 +174,7 @@ export type CardView = z.infer<typeof CardView>;
 export const TimelineEntry = z.object({
   id: z.string(),
   at: Timestamp,
-  source: z.enum(['kanban', 'hermes', 'github', 'comment', 'factory-live']),
+  source: z.enum(['kanban', FACTORY_RUNTIME, 'github', 'comment', 'factory-live']),
   profile: z.string().nullable(),
   cardId: z.string().nullable(),
   label: Text,

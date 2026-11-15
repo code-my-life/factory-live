@@ -40,14 +40,6 @@ const Env = z.object({
   PORT: z.coerce.number().int().min(1).max(65_535).default(8446),
   HOST: z.string().default('127.0.0.1'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
-  HERMES_HOME: z.string().default(join(homedir(), '.hermes')),
-  HERMES_BOARD: z
-    .string()
-    .regex(/^[\w-]+$/)
-    .default('factory'),
-  FACTORY_REPO: z.string().default(join(homedir(), 'perso', 'hermes-software-factory')),
-  CLAUDE_PROJECTS: z.string().default(join(homedir(), '.claude', 'projects')),
-  OPENCODE_DB: z.string().default(join(homedir(), '.local', 'share', 'opencode', 'opencode.db')),
   DATA_DIR: z.string().default(join(homedir(), '.local', 'share', 'factory-live')),
   SECRETS_DIR: z.string().default(join(homedir(), '.config', 'factory-live')),
   WEB_DIST: z.string().default(resolve(import.meta.dirname, '../../web/dist')),
@@ -65,7 +57,7 @@ const Env = z.object({
   PUBLIC_ORIGINS: urls,
   /** Hôtes autorisés en plus de ce PC et des origines publiques (port publié différent, autre nom). */
   ALLOWED_HOSTS: list(),
-  /** Adresse tailnet du dashboard d'Hermès, pour le lien des interventions (docker/.env) ; vide : pas de lien. */
+  /** The tailnet address of the factory's dashboard, linked from the interventions (docker/.env); empty: no link. */
   DASHBOARD_URL: z
     .union([z.literal(''), z.url()])
     .default('')
@@ -89,34 +81,9 @@ const Env = z.object({
     .pipe(z.array(z.object({ name: z.string().regex(/^[a-z][a-z0-9-]*$/), url: z.url() }))),
   FREELLMAPI_URL: z.string().default(''),
   HELD_AFTER_MINUTES: z.coerce.number().int().positive().default(30),
-  /**
-   * Fuseau de la machine où tourne Hermès : son journal (`logs/agent.log`) note l'heure locale sans
-   * fuseau. Le conteneur est en UTC ; sans ce réglage, les lignes du journal seraient décalées.
-   */
-  HERMES_TZ: z
-    .string()
-    .default('Europe/Paris')
-    .refine((zone) => {
-      try {
-        new Intl.DateTimeFormat('en-US', { timeZone: zone });
-        return true;
-      } catch {
-        return false;
-      }
-    }, 'fuseau IANA inconnu (exemple : Europe/Paris)'),
   /** Contact exigé par Web Push (claim `sub`) : l'URL du dépôt plutôt qu'une adresse e-mail. */
   VAPID_SUBJECT: z.string().default('https://github.com/code-my-life/factory-live'),
   DEMO: flag,
-  /**
-   * Where the server reads the factory (#57, ADR 0015): workflow-core by default since #68, or Hermes itself,
-   * the way back. One choice for the whole process; switching means changing it and restarting the container.
-   */
-  LIVE_SOURCE: z
-    .enum(['hermes', 'workflow-core'], {
-      error: (issue) =>
-        `LIVE_SOURCE vaut « ${String(issue.input)} » : hermes ou workflow-core attendu`,
-    })
-    .default('workflow-core'),
   /** workflow-core's address (`http://host.docker.internal:8447` from the container). */
   WORKFLOW_CORE_URL: z
     .union([z.literal(''), z.url()])
@@ -125,20 +92,18 @@ const Env = z.object({
 });
 
 export interface Secrets {
-  hookSecret: string | null;
   githubToken: string | null;
   /** The shared secret of workflow-core (`workflow-core-secret`). */
-  workflowCoreSecret: string | null;
+  workflowCoreSecret: string;
 }
 
-export type Config = z.infer<typeof Env> & {
+export type Config = Omit<z.infer<typeof Env>, 'WORKFLOW_CORE_URL'> & {
+  /** workflow-core's address, required: factory-live reads the factory from it alone (#72). */
+  WORKFLOW_CORE_URL: string;
   /** Valeurs de l'en-tête `Host` acceptées (`allowedHosts`). */
   allowedHosts: string[];
   /** Où ouvrir l'app, d'après les origines publiques (`appAddresses`). */
   addresses: AppAddresses;
-  boardDir: string;
-  kanbanDb: string;
-  profilesDir: string;
   secrets: Secrets;
 };
 
@@ -188,27 +153,20 @@ export function appAddresses(origins: readonly string[], port: number): AppAddre
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = Env.parse(env);
   const workflowCoreSecret = readSecret(parsed.SECRETS_DIR, 'workflow-core-secret');
-  if (parsed.LIVE_SOURCE === 'workflow-core') {
-    if (!parsed.WORKFLOW_CORE_URL)
-      throw new Error('LIVE_SOURCE=workflow-core : WORKFLOW_CORE_URL manque (adresse du socle)');
-    if (!workflowCoreSecret)
-      throw new Error(
-        `LIVE_SOURCE=workflow-core : le secret du socle manque (${join(parsed.SECRETS_DIR, 'workflow-core-secret')})`,
-      );
-  }
-  const boardDir = join(parsed.HERMES_HOME, 'kanban', 'boards', parsed.HERMES_BOARD);
+  if (!parsed.WORKFLOW_CORE_URL) throw new Error('WORKFLOW_CORE_URL manque (adresse du socle)');
+  if (!workflowCoreSecret)
+    throw new Error(
+      `Le secret du socle manque (${join(parsed.SECRETS_DIR, 'workflow-core-secret')})`,
+    );
   const origins =
     parsed.PUBLIC_ORIGINS.length > 0 ? parsed.PUBLIC_ORIGINS : [`http://localhost:${parsed.PORT}`];
   return {
     ...parsed,
+    WORKFLOW_CORE_URL: parsed.WORKFLOW_CORE_URL,
     PUBLIC_ORIGINS: origins,
     allowedHosts: allowedHosts(parsed.PORT, origins, parsed.ALLOWED_HOSTS),
     addresses: appAddresses(origins, parsed.PORT),
-    boardDir,
-    kanbanDb: join(boardDir, 'kanban.db'),
-    profilesDir: join(parsed.HERMES_HOME, 'profiles'),
     secrets: {
-      hookSecret: readSecret(parsed.SECRETS_DIR, 'hook-secret'),
       githubToken: readSecret(parsed.SECRETS_DIR, 'github-token'),
       workflowCoreSecret,
     },

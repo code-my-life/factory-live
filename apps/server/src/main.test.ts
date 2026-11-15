@@ -1,9 +1,9 @@
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { MockInstance } from 'vitest';
-import { insertTask, kanbanDb, tempDir } from './test/hermes-fixtures.ts';
-import type { TempDir } from './test/hermes-fixtures.ts';
+import { tempDir } from './test/board-fixtures.ts';
+import type { TempDir } from './test/board-fixtures.ts';
 
 type Fetch = (request: Request) => Response | Promise<Response>;
 
@@ -26,21 +26,9 @@ vi.mock('@hono/node-server', () => ({
 }));
 
 const START = new Date('2026-11-10T08:00:00.000Z');
-const ENV_KEYS = [
-  'HERMES_HOME',
-  'HERMES_BOARD',
-  'DATA_DIR',
-  'SECRETS_DIR',
-  'FACTORY_REPO',
-  'CLAUDE_PROJECTS',
-  'OPENCODE_DB',
-  'WEB_DIST',
-  'LOG_LEVEL',
-  'LIVE_SOURCE',
-] as const;
+const ENV_KEYS = ['DATA_DIR', 'SECRETS_DIR', 'WEB_DIST', 'LOG_LEVEL', 'WORKFLOW_CORE_URL'] as const;
 
 let root: TempDir;
-let kanbanPath: string;
 let savedEnv: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>>;
 let exit: MockInstance<typeof process.exit>;
 /** Exit codes the process really exited with: a real exit never returns, so later calls never happen. */
@@ -63,30 +51,20 @@ beforeAll(async () => {
     mkdirSync(path, { recursive: true });
     return path;
   };
-  const hermesHome = dir('hermes');
-  const boardDir = join(hermesHome, 'kanban', 'boards', 'factory');
-  mkdirSync(boardDir, { recursive: true });
-  kanbanPath = join(boardDir, 'kanban.db');
-  const db = kanbanDb(kanbanPath);
-  insertTask(db, { id: 't_main', title: 'Carte lue au démarrage', status: 'todo' });
-  db.close();
+  const secrets = dir('secrets');
+  writeFileSync(join(secrets, 'workflow-core-secret'), 'secret-du-socle-de-test');
 
   savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
   Object.assign(process.env, {
-    HERMES_HOME: hermesHome,
-    HERMES_BOARD: 'factory',
     DATA_DIR: dir('data'),
-    SECRETS_DIR: dir('secrets'),
-    FACTORY_REPO: dir('factory-repo'),
-    CLAUDE_PROJECTS: dir('claude-projects'),
-    OPENCODE_DB: join(root.path, 'opencode.db'),
+    SECRETS_DIR: secrets,
     WEB_DIST: dir('web-dist'),
-    // These tests follow the kanban read on Hermes' side: since #68, the default is workflow-core.
-    LIVE_SOURCE: 'hermes',
     LOG_LEVEL: 'fatal',
+    // Nothing answers there: the network is disabled below, the core stays unreachable.
+    WORKFLOW_CORE_URL: 'http://127.0.0.1:9',
   });
 
-  // No real network call: GitHub, workflows and push all go through the global fetch.
+  // No real network call: the core, GitHub, workflows and push all go through the global fetch.
   vi.stubGlobal('fetch', () => Promise.reject(new Error('network disabled in this test')));
   vi.useFakeTimers({ now: START });
   // The mocked exit returns, so main.ts's 5 s fallback timer still calls it once the process "ended".
@@ -122,38 +100,29 @@ afterAll(() => {
 });
 
 describe('racine de composition (main.ts)', () => {
-  it("main : /healthz passe à 503 après 60 s de kanban illisible, puis l'app s'arrête avec le code 1 après 3 min", async () => {
+  it('main : /healthz passe à 503 après 60 s sans réponse du socle, sans arrêter l’app', async () => {
     expect(await healthz()).toBe(200);
 
-    // The kanban file is overwritten in place (same inode, so the open handle sees it) and its WAL removed.
-    writeFileSync(kanbanPath, 'not a database');
-    rmSync(`${kanbanPath}-wal`, { force: true });
-    rmSync(`${kanbanPath}-shm`, { force: true });
-    vi.advanceTimersByTime(300);
-
-    vi.advanceTimersByTime(59_000 - 300);
+    vi.advanceTimersByTime(59_000);
     expect(await healthz()).toBe(200);
     vi.advanceTimersByTime(2_000);
     expect(await healthz()).toBe(503);
 
-    vi.advanceTimersByTime(178_000 - 61_000);
+    // A core that does not answer never stops factory-live: the last state stays (#62).
+    vi.advanceTimersByTime(10 * 60_000);
     expect(exit).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(3_000);
-    expect(exit).toHaveBeenCalledTimes(1);
-    expect(exit).toHaveBeenCalledWith(1);
-    expect(served.closed).toBe(1);
-
-    vi.advanceTimersByTime(10_000);
-    expect(exits).toEqual([1]);
-    expect(served.closed).toBe(1);
+    expect(served.closed).toBe(0);
   });
 
-  it("main : SIGTERM après l'arrêt demandé ne relance pas le nettoyage", () => {
+  it('main : SIGTERM arrête une seule fois, un second ne relance pas le nettoyage', () => {
     expect(sigterm).not.toBeNull();
-    exit.mockClear();
     sigterm?.();
     expect(served.closed).toBe(1);
-    expect(exit).not.toHaveBeenCalled();
-    expect(exits).toEqual([1]);
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(0);
+    sigterm?.();
+    vi.advanceTimersByTime(10_000);
+    expect(served.closed).toBe(1);
+    expect(exits).toEqual([0]);
   });
 });

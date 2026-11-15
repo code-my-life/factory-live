@@ -2,7 +2,7 @@ import { cardKindOf, runRoleOf } from './cards.ts';
 import type { RunRole } from './cards.ts';
 import { reviewRequests, scriptedVerdicts } from './gateVerdicts.ts';
 import type { ScriptedVerdict } from './gateVerdicts.ts';
-import type { Board, Run, Task } from './hermes.ts';
+import type { Board, Run, Task } from './board.ts';
 import { groupByIssue, issueStationOf } from './issues.ts';
 import type { Station } from './issues.ts';
 

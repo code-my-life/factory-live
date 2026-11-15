@@ -10,7 +10,7 @@ import {
 } from './issues.ts';
 import type { DeliveryFacts } from './issues.ts';
 import { aLink, aRun, aTask, anEvent } from './fixtures.test-helpers.ts';
-import type { Board, Task } from './hermes.ts';
+import type { Board, Task } from './board.ts';
 
 function board(tasks: Task[], patch: Partial<Board> = {}): Board {
   return { tasks, runs: [], events: [], links: [], ...patch };

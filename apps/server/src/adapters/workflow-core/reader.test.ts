@@ -3,14 +3,13 @@ import type * as NodeFs from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type * as NodeSqlite from 'node:sqlite';
-import { msg } from '@factory-live/contracts';
+import { FACTORY_RUNTIME, msg } from '@factory-live/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PublishedSheet } from '../../application/ports.ts';
-import { HistoryStore } from '../store/history.ts';
-import { KanbanReader } from '../hermes/kanban.ts';
 import { fakeCore } from '../../test/fake-core.ts';
 import type { FakeCore } from '../../test/fake-core.ts';
 import {
+  CORE_INTERVENTION,
   CORE_ITEMS,
   NOW,
   SECRET,
@@ -19,13 +18,12 @@ import {
   coreSide,
   coreState,
   line,
-  newHub,
   until,
-  writeHermesBoard,
 } from '../../test/core-scenario.ts';
 import type { Side } from '../../test/core-scenario.ts';
-import { tempDir } from '../../test/hermes-fixtures.ts';
-import type { TempDir } from '../../test/hermes-fixtures.ts';
+import { buildHealth } from '../../application/health.ts';
+import { tempDir } from '../../test/board-fixtures.ts';
+import type { TempDir } from '../../test/board-fixtures.ts';
 
 // What the server opens, recorded at the boundary (#57, C7): every path given to node:fs and node:sqlite.
 const opened = vi.hoisted(() => [] as string[]);
@@ -61,6 +59,14 @@ vi.mock('node:sqlite', async (importOriginal) => {
   return { ...real, DatabaseSync: RecordedDatabase };
 });
 
+/** The code line's snapshot the reading of the kanban gave for the miniature factory, before #72 (C1 of #57). */
+const LINE_REFERENCE = JSON.parse(
+  readFileSync(
+    new URL('../../../../../fixtures/workflow-core/references/line.json', import.meta.url),
+    'utf8',
+  ),
+) as ReturnType<typeof line>;
+
 let dir: TempDir;
 let core: FakeCore | null = null;
 let side: Side | null = null;
@@ -74,33 +80,27 @@ afterEach(async () => {
 });
 
 describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => {
-  it("côté socle, l'instantané de la ligne du code est celui de la lecture d'Hermès", async () => {
+  it("l'instantané de la ligne du code lu par le socle", async () => {
     dir = tempDir();
-    const path = join(dir.path, 'kanban.db');
-    writeHermesBoard(path);
-    const hermes = newHub(dir, 'hermes-data');
-    const kanban = new KanbanReader(path);
-    hermes.applyKanban(kanban.read(), NOW);
-    kanban.close();
-
     core = await fakeCore(SECRET, coreState());
     side = coreSide(dir, core);
     side.reader.start();
     await until(() => side!.boards.length > 0);
 
-    const fromHermes = line(hermes.snapshot());
-    expect(fromHermes.issues.length).toBeGreaterThan(0);
-    expect(fromHermes.interventions.length).toBeGreaterThan(0);
+    // The snapshot the reading of the kanban gave for the same miniature factory, before #72.
+    const reference = LINE_REFERENCE;
+    expect(reference.issues.length).toBeGreaterThan(0);
+    expect(reference.interventions.length).toBeGreaterThan(0);
     // Since workflow-core#37 (its C2, decided by the owner), a `needs_input` of the core also offers the
-    // command that shows the card, after Débloquer: the one difference with Hermes' side, written here.
+    // command that shows the card, after Débloquer: the one difference with that reference, written here.
     const showCard = {
       kind: 'copy' as const,
       label: msg('intervention.action.showCard'),
-      command: 'hermes kanban --board factory show t_1a9f0049',
+      command: CORE_INTERVENTION.actions[1]!.command,
     };
     const expected = {
-      ...fromHermes,
-      interventions: fromHermes.interventions.map((item) =>
+      ...reference,
+      interventions: reference.interventions.map((item) =>
         item.kind === 'needs_input'
           ? { ...item, actions: [item.actions[0]!, showCard, ...item.actions.slice(1)] }
           : item,
@@ -110,6 +110,31 @@ describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => 
     expect(line(side.hub.snapshot())).toEqual(expected);
     expect(side.sheet()).toEqual({ source: 'published', sheet: SHEET });
     expect(core.requests.every((request) => request.auth === `Bearer ${SECRET}`)).toBe(true);
+  });
+
+  it('la ligne du code attend sa première fiche du socle puis garde la dernière', async () => {
+    dir = tempDir();
+    // The core is down when factory-live starts: its port answers nothing.
+    const stopped = await fakeCore(SECRET, coreState());
+    const port = Number(new URL(stopped.url).port);
+    await stopped.close();
+    side = coreSide(dir, stopped);
+    side.reader.start();
+    await until(() => side!.failures.length > 0);
+    // No embedded copy stands in for it: the line waits for the core's sheet.
+    expect(side.sheet()).toBeNull();
+
+    // The core starts again: the line is drawn from its first sheet.
+    core = await fakeCore(SECRET, coreState(), port);
+    await until(() => side!.sheet() !== null);
+    expect(side.sheet()).toEqual({ source: 'published', sheet: SHEET });
+
+    // The core stops again: the line keeps the last sheet it served.
+    const failures = side.failures.length;
+    await core.close();
+    core = null;
+    await until(() => side!.failures.length > failures);
+    expect(side.sheet()).toEqual({ source: 'published', sheet: SHEET });
   });
 
   it('un changement de carte du socle atteint le flux en moins d’une seconde', async () => {
@@ -292,11 +317,74 @@ describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => 
     expect(side.hub.boardData.tasks).toHaveLength(3);
   });
 
-  it('la fiche du socle est vérifiée par le schéma tiré de son JSON Schema, sans sheetError', async () => {
+  it('une fiche de la ligne refusée par le socle dit pourquoi, la dernière reçue restant', async () => {
     dir = tempDir();
     const state = coreState();
-    // A sheet whose form is right but which breaks a cross rule of factory-live's own judge (two stations
-    // on one cell): the core judged it, factory-live does not judge it again.
+    // Refused from the start: no sheet to draw, the core's reason to show.
+    state.sheets['factory'] = { invalid: 'duplicate station "impl"' };
+    core = await fakeCore(SECRET, state);
+    side = coreSide(dir, core);
+    side.reader.start();
+    await until(() => side!.sheet() !== null && core!.openStreams() === 1);
+    expect(side.sheet()).toEqual({
+      source: 'published',
+      sheet: null,
+      refusal: 'duplicate station "impl"',
+    });
+    const tile = (sheet: ReturnType<Side['sheet']>) =>
+      buildHealth({
+        now: NOW,
+        github: {
+          configured: false,
+          ok: false,
+          detail: msg('health.github.noToken'),
+          remaining: null,
+          limit: null,
+          checkedAt: null,
+        },
+        webhookDeliveries: null,
+        guards: null,
+        running: 0,
+        maxInProgress: 2,
+        maxInProgressPerProfile: 1,
+        codeSheet: sheet,
+        core: { unreachableSince: null, error: null, machine: null },
+      }).health.find((item) => item.id === 'code-sheet');
+    expect(tile(side.sheet())).toMatchObject({
+      status: 'degraded',
+      detail: msg('health.workflow.sheetInvalid', { error: 'duplicate station "impl"' }),
+    });
+
+    // The core serves a good sheet, then refuses the next one: the good one stays, with the refusal.
+    core.state.sheets['factory'] = structuredClone(SHEET);
+    const reset = (n: number) =>
+      core!.send({
+        cursor: `1762999999:${n}`,
+        workflow: null,
+        item: null,
+        kind: 'reset',
+        at: '2026-11-12T10:05:00.000Z',
+        state: null,
+      });
+    reset(1);
+    await until(() => side!.sheet()?.sheet !== null && side!.sheet()?.refusal === undefined);
+    expect(side.sheet()).toEqual({ source: 'published', sheet: SHEET });
+    await until(() => core!.openStreams() === 1);
+    core.state.sheets['factory'] = { invalid: 'edge "x" leaves an unknown station' };
+    reset(2);
+    await until(() => side!.sheet()?.refusal !== undefined);
+    expect(side.sheet()).toEqual({
+      source: 'published',
+      sheet: SHEET,
+      refusal: 'edge "x" leaves an unknown station',
+    });
+  });
+
+  it('la fiche du socle est vérifiée par le schéma tiré de son JSON Schema, sans autre règle', async () => {
+    dir = tempDir();
+    const state = coreState();
+    // A sheet whose form is right but which breaks a cross rule of the old judge of factory-live (two
+    // stations on one cell): the core judged it, factory-live does not judge it again.
     const twoOnOneCell = structuredClone(SHEET);
     twoOnOneCell.stations[1] = { ...twoOnOneCell.stations[1]!, col: 0 };
     state.sheets['factory'] = twoOnOneCell;
@@ -325,14 +413,20 @@ describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => 
     expect(side.sheet()).toEqual({ source: 'published', sheet: twoOnOneCell });
     expect(side.boards.length).toBeGreaterThan(1);
 
-    // The adapter never calls factory-live's judge, nor reads an embedded sheet.
+    // The adapter never calls a judge of sheets, nor reads an embedded sheet. The names of the old judge
+    // and of the old embedded copy are spelled in pieces: no file of the server carries them any more (#72).
+    const retired = new RegExp(
+      [`sheet${'Error'}\\(`, `parse${'WorkflowSheet'}`, `code-line${'\\.json'}`, 'codeSheet'].join(
+        '|',
+      ),
+    );
     for (const file of ['reader.ts', 'client.ts', 'cards.ts']) {
       const code = readFileSync(join(import.meta.dirname, file), 'utf8');
-      expect(code, file).not.toMatch(/sheetError\(|parseWorkflowSheet|code-line\.json|codeSheet/);
+      expect(code, file).not.toMatch(retired);
     }
   });
 
-  it('côté socle, ni Hermès ni le dépôt de la factory ne sont lus, et le miroir n’est pas écrit', async () => {
+  it('rien d’autre que la base de factory-live n’est ouvert, et le miroir n’existe plus', async () => {
     dir = tempDir();
     core = await fakeCore(SECRET, coreState());
     const app = await startMain(dir, core);
@@ -349,35 +443,23 @@ describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => 
       await app.stop();
     }
 
-    const hermes = join(dir.path, 'hermes');
-    const factory = join(dir.path, 'factory-repo');
-    expect(opened.filter((path) => path.startsWith(hermes) || path.startsWith(factory))).toEqual(
-      [],
-    );
+    // Only factory-live's own folders: its base, its web build, its secrets.
+    const own = ['data', 'web-dist', 'secrets'].map((name) => join(dir.path, name));
+    expect(
+      opened.filter(
+        (path) => path.startsWith(dir.path) && !own.some((folder) => path.startsWith(folder)),
+      ),
+    ).toEqual([]);
     // The record is not empty for lack of watching: it saw factory-live's own base opened.
     expect(opened.some((path) => path.startsWith(join(dir.path, 'data')))).toBe(true);
     const data = new DatabaseSync(join(dir.path, 'data', 'factory-live.db'), { readOnly: true });
-    for (const table of ['tasks', 'runs', 'events', 'comments', 'links']) {
-      const row = data.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number };
-      expect(row.n, table).toBe(0);
-    }
+    const tables = data
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .all()
+      .map((row) => String(row['name']));
+    for (const table of ['tasks', 'runs', 'events', 'comments', 'links'])
+      expect(tables, table).not.toContain(table);
     data.close();
-  });
-
-  it('côté socle, le hub ne reprend pas les cartes du miroir d’Hermès', () => {
-    dir = tempDir();
-    // A mirror written by an earlier run on Hermes' side.
-    const store = new HistoryStore(join(dir.path, 'core-data'));
-    const path = join(dir.path, 'kanban.db');
-    writeHermesBoard(path);
-    const kanban = new KanbanReader(path);
-    store.mirror(kanban.read());
-    kanban.close();
-    store.close();
-
-    expect(newHub(dir, 'core-data').boardData.tasks).toHaveLength(3);
-    // On the core's side, nothing is shown before the core answers, even with the core down.
-    expect(newHub(dir, 'core-data', 'workflow-core').boardData.tasks).toEqual([]);
   });
 
   it('un workflow de la ligne du code retiré du socle vide le tableau', async () => {
@@ -426,7 +508,7 @@ describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => 
     const gateway = {
       id: 'gateway',
       label: 'Gateway',
-      group: 'hermes',
+      group: FACTORY_RUNTIME,
       status: 'down',
       detail: 'Dernier battement il y a 240 s',
       metrics: { pid: '4242' },
@@ -466,7 +548,7 @@ describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => 
     const gateway = {
       id: 'gateway',
       label: 'Gateway',
-      group: 'hermes',
+      group: FACTORY_RUNTIME,
       status: 'down',
       detail: 'Dernier battement il y a 240 s',
       metrics: {},
@@ -519,12 +601,15 @@ describe('lecture de la ligne du code par le socle (workflow-core, #57)', () => 
     expect(side.failures).toEqual([]);
 
     expect(side.generic()).toEqual([
-      expect.objectContaining({ name: 'essai', sheet: SHEET, sheetError: null, error: null }),
+      expect.objectContaining({ name: 'essai', sheet: SHEET, sheetRefusal: null, error: null }),
     ]);
-    // The studio keeps its own adapter: the core's studio is not read here.
-    expect(core.requests.some((request) => request.path.startsWith('/api/workflows/studio'))).toBe(
-      false,
-    );
+    // The studio keeps its own adapter for its items: only its sheet is read from the core (#72).
+    expect(
+      core.requests
+        .filter((request) => request.path.startsWith('/api/workflows/studio'))
+        .every((request) => request.path === '/api/workflows/studio/sheet'),
+    ).toBe(true);
+    expect(side.ownSheets.get('studio')).toEqual({ sheet: SHEET, refusal: null });
     expect(core.requests.some((request) => request.path === '/api/workflows/essai/items')).toBe(
       true,
     );
@@ -543,20 +628,15 @@ vi.mock('@hono/node-server', () => ({
 }));
 
 const MAIN_ENV = [
-  'HERMES_HOME',
   'DATA_DIR',
   'SECRETS_DIR',
-  'FACTORY_REPO',
-  'CLAUDE_PROJECTS',
-  'OPENCODE_DB',
   'WEB_DIST',
   'LOG_LEVEL',
-  'LIVE_SOURCE',
   'WORKFLOW_CORE_URL',
   'GITHUB_API',
 ] as const;
 
-/** Starts main.ts on the core's side, the HTTP server captured; `stop` sends it SIGTERM and restores. */
+/** Starts main.ts, the HTTP server captured; `stop` sends it SIGTERM and restores. */
 async function startMain(dir: TempDir, core: FakeCore) {
   const { mkdirSync, writeFileSync } = await import('node:fs');
   const at = (name: string) => {
@@ -568,15 +648,10 @@ async function startMain(dir: TempDir, core: FakeCore) {
   writeFileSync(join(secrets, 'workflow-core-secret'), SECRET);
   const saved = Object.fromEntries(MAIN_ENV.map((key) => [key, process.env[key]]));
   Object.assign(process.env, {
-    HERMES_HOME: join(dir.path, 'hermes'),
     DATA_DIR: at('data'),
     SECRETS_DIR: secrets,
-    FACTORY_REPO: join(dir.path, 'factory-repo'),
-    CLAUDE_PROJECTS: join(dir.path, 'hermes', 'claude-projects'),
-    OPENCODE_DB: join(dir.path, 'hermes', 'opencode.db'),
     WEB_DIST: at('web-dist'),
     LOG_LEVEL: 'fatal',
-    LIVE_SOURCE: 'workflow-core',
     WORKFLOW_CORE_URL: core.url,
     // GitHub is answered by the fake core (401): no request leaves the machine.
     GITHUB_API: core.url,

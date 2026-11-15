@@ -3,8 +3,8 @@ import type { APIRequestContext } from '@playwright/test';
 import { issueJob, stationJobs } from './helpers.ts';
 
 /**
- * The live app, served by factory-live's real server on the core's side (LIVE_SOURCE=workflow-core),
- * reading a fake workflow-core (e2e/fake-api.mjs, scenario in e2e/fake-core-scenario.mjs, #67).
+ * The live app, served by factory-live's real server, which reads a fake workflow-core (e2e/fake-api.mjs,
+ * scenario in e2e/fake-core-scenario.mjs, #67).
  */
 const CORE = 'http://127.0.0.1:4182';
 

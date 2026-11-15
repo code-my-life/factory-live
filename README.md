@@ -96,7 +96,7 @@ Around them, the acceptance gives the rest of the proofs, below.
 - **Live twins.** The app before and after the pull request, both running in its acceptance, your gestures mirrored from one to the other (see [Live twins](#live-twins-try-the-pull-request-not-its-diff)).
 - **Interventions and unblocking.** The whole question of the agent, and a reply box. Your answer is posted on the issue as `/factory unblock <answer>` under your GitHub account; the bot of the factory reacts, the card restarts, and the app follows each step. A card held for another reason comes with the exact commands to copy. Blockers that wait for you also reach your smartphone as a push notification, with a badge on the app icon.
 - **Agents and models.** Each agent with its role, its model chain in fallback order, its effort, skills and plugins, the refusals of its guards over 7 days, its gate pass rate and median run time, and any drift between the configuration in service and the one in the repository.
-- **Health.** Gateway, dispatcher, pause switch, dashboard, model providers (freellmapi, NVIDIA, llama.cpp and its VRAM, Claude Code), MCP servers, GitHub API and webhooks, cron jobs, and the sources of factory-live itself.
+- **Health.** Gateway, dispatcher, pause switch, dashboard, model providers (freellmapi, NVIDIA, llama.cpp and its VRAM, Claude Code), MCP servers, GitHub API and webhooks, cron jobs, and workflow-core, the source of factory-live.
 - **Costs and quotas.** Tokens, calls and 429 responses per day, per model and per agent, and the estimated cost of Claude runs, over 24 hours, 7 or 30 days.
 - **History and stats.** Issues done, median time from label to merge, blockers, your median response time, time per station, first-pass rate at the gate for each harness and model, and the last issues done with their version.
 
@@ -107,59 +107,44 @@ The header always tells the state of the link: live, connecting, offline with th
 ```mermaid
 flowchart LR
   subgraph host["Your machine, Linux or WSL"]
-    W["Hermes workers<br/>one per card"]
-    G["Gateway and dispatcher<br/>with factory-live-probe"]
-    D[("kanban.db, state.db,<br/>card logs, Claude Code transcripts")]
+    H["The factory<br/>Hermes Agent and its kanban"]
+    C["workflow-core<br/>reads the factory, judges the sheets"]
   end
   subgraph box["factory-live, Docker, 127.0.0.1:8446"]
-    I["Signed ingestion<br/>HMAC, anti-replay"]
+    R["The core's reader<br/>full state, then its stream"]
     S["Live state and history<br/>SQLite volume"]
     A["Hono: REST, SSE, Web Push"]
   end
   P["The PWA<br/>computer, tablet, smartphone"]
   GH["GitHub<br/>issues, pull requests, CI"]
-  W -- "outbound webhooks" --> I
-  G -- "health every 30 s" --> I
-  D -. "read-only" .-> S
-  I --> S --> A
+  H -. "read-only" .-> C
+  C -- "API and SSE stream, shared secret" --> R
+  R --> S --> A
   A -- "SSE and Web Push, over your tailnet" --> P
   P -- "your answer" --> A
   A -- "/factory unblock comment" --> GH
-  GH -. "the bot unblocks the card" .-> W
+  GH -. "the bot unblocks the card" .-> H
 ```
 
-- **Native outbound webhooks, signed.** The `hooks.outbound` setting of Hermes Agent posts each event (tool calls, model replies, kanban events, sessions, skills, subagents) to `/api/ingest/hermes`, signed with HMAC-SHA256 and a shared secret. Hermes sends them from a bounded queue in a daemon thread: an agent is never slowed down, and nothing is written to disk for factory-live. The hooks that carry whole conversations are not subscribed.
-- **A health probe.** The `factory-live-probe` plugin runs in the gateway, checks the services every 30 seconds and posts a signed report to `/api/ingest/health`. After 90 seconds without a report, the probe is marked silent.
-- **The cards, through workflow-core.** The boards, their cards and runs, the diagnosis of a blocker and the state of the machine come from the HTTP API of workflow-core and its Server-Sent Events stream, behind a shared secret. Each event carries the full state of the card and a cursor; after a restart, factory-live catches up from the cursor, and a `reset` makes it read the whole state again. workflow-core opens the Hermes databases read-only; factory-live opens none. The database of OpenCode holds OAuth tokens: it is never mounted.
+- **The factory, through workflow-core, and nothing else.** The boards, their cards and runs, the sheets of the workflows, the agents at work, the activity, the costs, the interventions with the diagnosis of a blocker and the state of the machine come from the HTTP API of workflow-core and its Server-Sent Events stream, behind a shared secret. Each event carries the full state of the card and a cursor; after a restart, factory-live catches up from the cursor, and a `reset` makes it read the whole state again. workflow-core opens the databases of the factory read-only; factory-live mounts none of them, nor the repository of the factory, nor any transcript.
+- **The sheets the core judges.** The code line and the studio are drawn from the sheets workflow-core serves and judges. None is embedded in the app: before the first one, the line says it waits for it; when the core stops answering, the last one stays.
 - **One stream for every screen.** The server keeps the live state and sends each change over Server-Sent Events. A `ping` after 15 seconds of silence keeps the link honest; a stream silent for 45 seconds is restarted, and the app says when it is offline.
 - **A Progressive Web App.** Installed from the browser, with no store, on a computer, Android, iPhone or iPad; a service worker keeps the shell available offline, and the app opens on the last state received, kept on the device. The API never goes through the cache.
 - **Push.** Web Push with VAPID keys generated on first start, only for the blockers that wait for you. The contact sent to push services is the repository address, never an e-mail.
-- **The twin bench.** The factory runs each pair of twins in Docker, on internal networks without Internet, each app in a Neko Chromium streamed over WebRTC, behind a mirror that replays gestures from one twin to the other. factory-live never starts a container: it reads the pair's state on the board, joins Neko on behalf of the app (the session's password stays on the server), and relays the owner's gestures to the mirror, behind the same guard as unblocking.
+- **The twin bench.** The factory runs each pair of twins in Docker, on internal networks without Internet, each app in a Neko Chromium streamed over WebRTC, behind a mirror that replays gestures from one twin to the other. factory-live never starts a container: it reads the pair's state from workflow-core, asks the mirror for a viewer's session of each twin (no password reaches factory-live), and relays the owner's gestures to the mirror, behind the same guard as unblocking.
 - **Unblocking.** A dedicated GitHub App, created in one click from factory-live, reads issues, pull requests and CI with its installation token; the comment is posted with your user token, so the bot of the factory takes it as yours.
 
 The code follows a clean architecture checked in CI: pure rules in `packages/domain`, zod contracts in `packages/contracts`, use cases behind ports in `apps/server/src/application`, adapters and HTTP around them, and the PWA in `apps/web`. Details, in French: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/decisions/](docs/decisions/).
 
-If factory-live stops, the factory does not notice: deliveries fail without blocking any agent, and factory-live catches up from the databases when it restarts.
+If factory-live stops, neither the factory nor workflow-core notices: factory-live reads the whole state of the core again when it restarts.
 
 ## Getting started
 
-You need Linux or WSL with Docker, Hermes Agent with a kanban board, Tailscale for your other devices, and a GitHub account.
+You need Linux or WSL with Docker, Hermes Agent with a kanban board read by workflow-core, Tailscale for your other devices, and a GitHub account.
 
-### 1. On the Hermes side
+### 1. workflow-core
 
-Each agent lists factory-live in its outbound hooks, with the events it should send:
-
-```yaml
-hooks:
-  outbound:
-    - name: factory-live
-      url: http://127.0.0.1:8446/api/ingest/hermes
-      secret_env: FACTORY_LIVE_HOOK_SECRET
-      timeout: 2
-      events: [pre_tool_call, post_tool_call, post_api_request, api_request_error, on_session_end]
-```
-
-The secret is a random value in `~/.hermes/.env` (`FACTORY_LIVE_HOOK_SECRET`), copied to `~/.config/factory-live/hook-secret` with mode 600. The `factory-live-probe` plugin runs in the gateway. In the factory of Code My Life, its installer does these three steps.
+factory-live reads the factory through workflow-core (`code-my-life/workflow-core`), on this machine at port 8447. Copy its shared secret (`WORKFLOW_CORE_SECRET` of `~/.config/workflow-core/.env`) to `~/.config/factory-live/workflow-core-secret`, without a trailing newline, with mode 600. Without its address or its secret, factory-live stops at start and names what is missing.
 
 ### 2. The container
 
@@ -197,17 +182,17 @@ Open `http://localhost:8446/api/github/setup` and confirm on GitHub: factory-liv
 
 The variables of `docker/compose.yaml`, set in `docker/.env`:
 
-| Variable           | Role                                                                                  |
-| ------------------ | ------------------------------------------------------------------------------------- |
-| `PUBLIC_ORIGINS`   | Addresses of the app: `http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446` |
-| `TAILSCALE_LOGINS` | Tailscale logins allowed to write from another device, for example `<login>@github`   |
-| `HERMES_BOARD`     | The kanban board of the factory (`factory`)                                           |
-| `GITHUB_OWNER`     | The GitHub organization or account of the factory                                     |
-| `FACTORY_REPO`     | The repository of the factory, read for its configuration (drift)                     |
-| `DASHBOARD_URL`    | The address of the Hermes dashboard, linked from the app                              |
-| `LOG_LEVEL`        | `info` by default                                                                     |
+| Variable            | Role                                                                                                 |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| `PUBLIC_ORIGINS`    | Addresses of the app: `http://localhost:8446,https://<machine>.<tailnet>.ts.net:8446`                |
+| `TAILSCALE_LOGINS`  | Tailscale logins allowed to write from another device, for example `<login>@github`                  |
+| `GITHUB_OWNER`      | The GitHub organization or account of the factory                                                    |
+| `WORKFLOW_CORE_URL` | The address of workflow-core from the container (`http://host.docker.internal:8447`)                 |
+| `WORKFLOWS`         | The workflows followed by their own API, for their items (`studio=http://host.docker.internal:8448`) |
+| `DASHBOARD_URL`     | The address of the dashboard of the factory, linked from the app                                     |
+| `LOG_LEVEL`         | `info` by default                                                                                    |
 
-The defaults target the factory of Code My Life; the GitHub login allowed to unblock is set in `apps/server/src/config.ts`. Operations, mounts, secrets and troubleshooting, in French: [docs/RUNBOOK.md](docs/RUNBOOK.md).
+The defaults target the factory of Code My Life; the GitHub login allowed to unblock is set in `apps/server/src/config.ts`. Its secret is `~/.config/factory-live/workflow-core-secret`. Operations, mounts, secrets and troubleshooting, in French: [docs/RUNBOOK.md](docs/RUNBOOK.md).
 
 ## Development
 
@@ -216,7 +201,7 @@ Node.js 24.15 or later.
 ```bash
 npm ci
 npm run dev:web       # the app on the demo data, http://127.0.0.1:5173
-npm run dev:server    # the server on your ~/.hermes, read-only, port 8446
+npm run dev:server    # the server on workflow-core (WORKFLOW_CORE_URL and workflow-core-secret required), port 8446
 npm run verify        # format, lint (ESLint, Stylelint with the rules of Primer), types, text, architecture, tests, build
 npm run e2e           # Playwright: the demo on computer and smartphone screens, the live app against a fake API
 ```
@@ -224,14 +209,13 @@ npm run e2e           # Playwright: the demo on computer and smartphone screens,
 - **Demo mode.** `VITE_DATA_SOURCE=demo`, the default for development and end-to-end tests, replays a realistic factory scenario without a server (`apps/web/src/demo/`); `live` connects the app to the API. The site publishes the same demo.
 - **End-to-end tests.** Chromium locally; WebKit (the engine of Safari) and the reference captures run in the official Playwright image, as in CI. The command is in [docs/RUNBOOK.md](docs/RUNBOOK.md).
 - **The site.** `npm run site:build` builds the pages and the demo into `site/dist`, `npm run site:preview` serves them at `http://127.0.0.1:4195/factory-live/`, `npm run site:test` checks them, and `npm run site:captures` remakes the screenshots.
-- **Rules.** Test first, one word per concept on screen, Primer components and tokens, no write to Hermes: [AGENTS.md](AGENTS.md), in French.
+- **Rules.** Test first, one word per concept on screen, Primer components and tokens, the factory read through workflow-core only: [AGENTS.md](AGENTS.md), in French.
 
 CI runs `npm run verify` on Node 24 and 26, builds and starts the Docker image, and runs the end-to-end tests in Chromium and WebKit. The site has its own workflow, which builds and tests it on every pull request and deploys it from `main`.
 
 ## Security
 
-- **Read-only.** The Hermes databases are opened read-only and never written; the OpenCode database and its tokens are never mounted.
-- **Signed input.** Webhooks and probe reports are signed with HMAC-SHA256 and checked against a replay window: an unsigned or out-of-window delivery is refused, a duplicate is never applied twice.
+- **Reads the factory through workflow-core only.** Nothing of the factory is mounted in the container: its databases, its repository and the transcripts stay outside; workflow-core is read over HTTP, behind a shared secret.
 - **One write.** The `/factory unblock` comment, posted under your GitHub account, only from this machine or from the allowed Tailscale login, with a same-origin check and at most 30 writes a minute.
 - **Exposure.** The container listens on `127.0.0.1:8446`; other devices reach it through your tailnet with `tailscale serve`, never Funnel. No password: the tailnet is the boundary.
 - **Container.** User 1000:1000, read-only root filesystem, no capability.

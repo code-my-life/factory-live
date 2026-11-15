@@ -133,7 +133,7 @@
   width: 100%;
 }
 
-/* Les versions en service (factory-live, Hermès), puis la source des données. */
+/* factory-live's version in service, then the source of the data. */
 .versions {
   display: flex;
   flex-wrap: wrap;

@@ -1,6 +1,6 @@
 import { cardKindOf } from './cards.ts';
 import { awaitingApproval } from './gateVerdicts.ts';
-import type { Board, Run, Task, TaskEvent } from './hermes.ts';
+import type { Board, Run, Task, TaskEvent } from './board.ts';
 import { groupByIssue } from './issues.ts';
 import { message } from './messages.ts';
 import type { Message, Text } from './messages.ts';
@@ -74,7 +74,7 @@ export interface InterventionContext {
   now: number;
   board: string;
   owner: string;
-  /** Dashboard d'Hermès ; `null` quand il n'est pas configuré : pas de lien vers lui. */
+  /** The factory's dashboard; `null` when it is not configured: no link to it. */
   dashboardUrl: string | null;
   heldAfterSeconds: number;
 }
@@ -89,7 +89,6 @@ const PUSHED: ReadonlySet<InterventionKind> = new Set([
   'held_active_pr',
 ]);
 
-const RESET_HOLD = new Set(['claimed', 'unblocked', 'promoted', 'created', 'status', 'assigned']);
 const MAIN_RED = /main rouge|workflows? de main|watch-main/i;
 
 function lastOf(events: readonly TaskEvent[], kind: string): TaskEvent | undefined {
@@ -125,7 +124,7 @@ export function branchOf(task: Task, runs: readonly Run[]): string | null {
   return branch && BRANCH.test(branch) && !branch.includes('..') ? branch : null;
 }
 
-/** Le lien de la PR d'un ensemble de cartes, relevé dans les runs d'Hermès (`pr_url`, `published_pr`). */
+/** The PR's link of a set of cards, noted in their runs (`pr_url`, `published_pr`). */
 export function pullRequestUrl(tasks: readonly Task[], board: Board): string | null {
   const ids = new Set(tasks.map((task) => task.id));
   const urls = board.runs
@@ -171,7 +170,11 @@ function build(
   };
 }
 
-function blockedIntervention(
+/**
+ * The two interventions factory-live still computes on the cards the core serves: a release ready (the PR to
+ * approve) and a red CI of main. The core publishes the others, with their diagnosis.
+ */
+function releaseIntervention(
   task: Task,
   events: readonly TaskEvent[],
   issueKey: string | null,
@@ -179,109 +182,39 @@ function blockedIntervention(
   board: Board,
   ctx: InterventionContext,
 ): Intervention | null {
+  if (cardKindOf(task) !== 'release') return null;
   const blocked = lastOf(events, 'blocked');
-  const gaveUp = lastOf(events, 'gave_up');
   const reason = text(blocked?.payload['reason']);
   const link = issueUrl(issueKey, ctx.owner);
   const issueLink: InterventionAction[] =
     link && issueKey
       ? [{ kind: 'link', label: message('intervention.action.openIssue', { issueKey }), url: link }]
       : [];
-  const unblock: InterventionAction[] = issueKey ? [{ kind: 'unblock' }] : [];
-  const showCard: InterventionAction = {
-    kind: 'copy',
-    label: message('intervention.action.showCard'),
-    command: `hermes kanban --board ${ctx.board} show ${task.id}`,
-  };
-
-  if (cardKindOf(task) === 'release') {
-    const pr = pullRequestUrl(issueTasks, board);
-    if (task.blockKind === 'needs_input') {
-      return build('pr_approval', task, issueKey, blocked, blocked?.createdAt ?? task.createdAt, {
-        severity: 'info',
-        title: firstLine(reason, message('intervention.title.prReady')),
-        question: reason || message('intervention.question.prReady'),
-        actions: pr
-          ? [{ kind: 'link', label: message('intervention.action.approvePr'), url: pr }]
-          : issueLink,
-      });
-    }
-    if (MAIN_RED.test(reason)) {
-      return build('main_red', task, issueKey, blocked, blocked?.createdAt ?? task.createdAt, {
-        severity: 'warning',
-        title: firstLine(reason, message('intervention.title.mainRed')),
-        question: reason,
-        actions: pr
-          ? [{ kind: 'link', label: message('intervention.action.prWorkflows'), url: pr }]
-          : issueLink,
-      });
-    }
-  }
-
-  if (gaveUp && (!blocked || gaveUp.id > blocked.id)) {
-    const failures = Number(gaveUp.payload['failures'] ?? 0);
-    return build('gave_up', task, issueKey, gaveUp, gaveUp.createdAt, {
-      severity: 'critical',
-      title: message('intervention.title.gaveUp', { failures: failures || null }),
-      question: text(gaveUp.payload['error']) || reason || message('intervention.question.gaveUp'),
-      actions: [...unblock, showCard, ...issueLink],
+  const pr = pullRequestUrl(issueTasks, board);
+  if (task.blockKind === 'needs_input') {
+    return build('pr_approval', task, issueKey, blocked, blocked?.createdAt ?? task.createdAt, {
+      severity: 'info',
+      title: firstLine(reason, message('intervention.title.prReady')),
+      question: reason || message('intervention.question.prReady'),
+      actions: pr
+        ? [{ kind: 'link', label: message('intervention.action.approvePr'), url: pr }]
+        : issueLink,
     });
   }
-
-  const opened = blocked?.createdAt ?? task.createdAt;
-  switch (task.blockKind) {
-    case 'needs_input':
-      return build('needs_input', task, issueKey, blocked, opened, {
-        severity: 'critical',
-        title: firstLine(reason, message('intervention.title.needsInput')),
-        question: reason || message('intervention.question.needsInput'),
-        actions: [...unblock, ...issueLink],
-      });
-    case 'capability':
-      return build('capability', task, issueKey, blocked, opened, {
-        severity: 'critical',
-        title: firstLine(reason, message('intervention.title.capability')),
-        question: reason || message('intervention.question.capability'),
-        actions: [...unblock, showCard, ...issueLink],
-      });
-    case 'transient':
-      return build('transient', task, issueKey, blocked, opened, {
-        severity: 'warning',
-        title: firstLine(reason, message('intervention.title.transient')),
-        question: reason || message('intervention.question.transient'),
-        actions: [
-          ...unblock,
-          {
-            kind: 'copy',
-            label: message('intervention.action.reassignCoder'),
-            command: `hermes kanban --board ${ctx.board} reassign ${task.id} coder --reason "échec passager de la lane" && hermes kanban --board ${ctx.board} unblock ${task.id}`,
-          },
-        ],
-      });
-    case 'dependency':
-      return null;
-    default:
-      return build('needs_input', task, issueKey, blocked, opened, {
-        severity: 'warning',
-        title: firstLine(reason, message('intervention.title.blocked')),
-        question: reason || message('intervention.question.blocked'),
-        actions: [...unblock, showCard, ...issueLink],
-        push: false,
-      });
+  if (MAIN_RED.test(reason)) {
+    return build('main_red', task, issueKey, blocked, blocked?.createdAt ?? task.createdAt, {
+      severity: 'warning',
+      title: firstLine(reason, message('intervention.title.mainRed')),
+      question: reason,
+      actions: pr
+        ? [{ kind: 'link', label: message('intervention.action.prWorkflows'), url: pr }]
+        : issueLink,
+    });
   }
+  return null;
 }
 
-function heldSince(events: readonly TaskEvent[]): number | null {
-  let since: number | null = null;
-  for (const event of events) {
-    if (RESET_HOLD.has(event.kind)) since = null;
-    else if (event.kind === 'respawn_guarded' && event.payload['reason'] === 'active_pr')
-      since ??= event.createdAt;
-  }
-  return since;
-}
-
-/** Ce qui attend une action de Clément, carte par carte, avec ce qu'il peut faire depuis l'app. */
+/** What waits for the owner's action on the cards, as factory-live computes it itself. */
 export function interventionsOf(board: Board, ctx: InterventionContext): Intervention[] {
   const issueOf = new Map<string, string>();
   const issueTasks = new Map<string, Task[]>();
@@ -303,33 +236,8 @@ export function interventionsOf(board: Board, ctx: InterventionContext): Interve
     const siblings = issueKey ? (issueTasks.get(issueKey) ?? []) : [task];
 
     if (task.status === 'blocked') {
-      const intervention = blockedIntervention(task, events, issueKey, siblings, board, ctx);
+      const intervention = releaseIntervention(task, events, issueKey, siblings, board, ctx);
       if (intervention) found.push(intervention);
-    } else if (task.status === 'triage' && lastOf(events, 'block_loop_detected')) {
-      const loop = lastOf(events, 'block_loop_detected');
-      found.push(
-        build('triage_loop', task, issueKey, loop, loop?.createdAt ?? task.createdAt, {
-          severity: 'critical',
-          title: message('intervention.title.triageLoop'),
-          question: message('intervention.question.triageLoop'),
-          actions: [
-            ...(ctx.dashboardUrl
-              ? [
-                  {
-                    kind: 'link' as const,
-                    label: message('intervention.action.dashboard'),
-                    url: ctx.dashboardUrl,
-                  },
-                ]
-              : []),
-            {
-              kind: 'copy',
-              label: message('intervention.action.showCard'),
-              command: `hermes kanban --board ${ctx.board} show ${task.id}`,
-            },
-          ],
-        }),
-      );
     } else if (task.status === 'review') {
       // Vert de la gate scriptée : la PR attend l'approbation humaine sur GitHub (la carte reste en revue jusqu'à la fusion).
       const green = awaitingApproval(task, board);
@@ -352,26 +260,6 @@ export function interventionsOf(board: Board, ctx: InterventionContext): Interve
                     },
                   ]
                 : [],
-          }),
-        );
-      }
-    } else if (task.status === 'ready') {
-      const since = heldSince(events);
-      if (since !== null && ctx.now - since >= ctx.heldAfterSeconds) {
-        const minutes = Math.round((ctx.now - since) / 60);
-        const owner = task.assignee ?? 'coder';
-        found.push(
-          build('held_active_pr', task, issueKey, undefined, since, {
-            severity: 'warning',
-            title: message('intervention.title.held', { minutes }),
-            question: message('intervention.question.held'),
-            actions: [
-              {
-                kind: 'copy',
-                label: message('intervention.action.relay', { owner }),
-                command: `hermes kanban --board ${ctx.board} reassign ${task.id} scribe --reason "relais active_pr" && hermes kanban --board ${ctx.board} reassign ${task.id} ${owner} --reason "reprise sur la PR"`,
-              },
-            ],
           }),
         );
       }

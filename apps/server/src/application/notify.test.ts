@@ -159,7 +159,6 @@ describe('notifyOpened', () => {
 /** A store that keeps the notifications claimed, shared between two hubs as one base across a restart. */
 function coreStore(claimed: Set<string>): HistoryPort {
   const store: Partial<HistoryPort> = {
-    board: () => ({ tasks: [], runs: [], links: [], events: [], comments: [] }),
     stations: () => new Map(),
     recentActivity: () => [],
     saveStation: () => {},
@@ -182,7 +181,6 @@ function coreHub(claimed: Set<string>, sent: PushMessage[]): Hub {
     manifest: () => ({ owner: null, projects: {}, profiles: {} }),
     root: () => ({ maxInProgress: 0, maxInProgressPerProfile: 0 }),
     facts: () => null,
-    factsStamp: () => '',
   };
   const hub = new Hub(
     {
@@ -197,10 +195,8 @@ function coreHub(claimed: Set<string>, sent: PushMessage[]): Hub {
       store,
       profiles,
       github: null,
-      diagnoses: null,
       log: silent,
       now: () => NOW,
-      source: 'workflow-core',
     },
   );
   const notifier: PushPort = {

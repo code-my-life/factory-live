@@ -12,8 +12,8 @@ export interface ModelEvidence {
 }
 
 /**
- * Modèle effectif d'un run, du plus sûr au moins sûr : le dernier appel observé, l'usage enregistré
- * par Hermès (le plus récent : un fallback ajoute une ligne), l'override de la carte, la config du profil.
+ * A run's effective model, from the surest to the least sure: the last call observed, the usage the factory
+ * recorded (the latest: a fallback adds a line), the card's override, the agent's config.
  */
 export function effectiveModel(evidence: ModelEvidence): ModelRef | null {
   if (evidence.live) return { ...evidence.live, source: 'live' };

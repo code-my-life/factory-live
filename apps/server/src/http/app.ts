@@ -8,10 +8,8 @@ import {
   ApiError,
   ClientLog,
   GitHubAccess,
-  HermesHookBody,
   HistoryStats,
   IssueDetail,
-  ProbeReport,
   ProfileView,
   PushKey,
   PushSubscriptionInput,
@@ -39,14 +37,12 @@ import type { PushNotifier } from '../adapters/push/webpush.ts';
 import type { TwinBench } from '../adapters/twins/bench.ts';
 import { ITEM_ID } from '../adapters/workflows/api.ts';
 import type { WorkflowApi } from '../adapters/workflows/api.ts';
-import type { PublishedSheet } from '../adapters/workflows/sheets.ts';
 import type { HistoryStore } from '../adapters/store/history.ts';
-import { toHookEvent } from '../ingest/hermes.ts';
-import { ReplayGuard, verifySignature } from '../ingest/signature.ts';
 import type { Hub } from '../application/hub.ts';
 import type {
   DeclaredViewsPort,
   GenericWorkflowsPort,
+  PublishedSheet,
   WorkflowView,
 } from '../application/ports.ts';
 import {
@@ -59,12 +55,7 @@ import {
 } from '../application/views.ts';
 import type { ViewDeps } from '../application/views.ts';
 import type { Logger } from '../logger.ts';
-import {
-  CODE_WORKFLOW,
-  GestureError,
-  hermesSideGestures,
-  postGesture,
-} from '../application/gestures.ts';
+import { CODE_WORKFLOW, GestureError, postGesture } from '../application/gestures.ts';
 import { UnblockError, unblockIntervention } from '../application/unblock.ts';
 import type { UnblockDeps } from '../application/unblock.ts';
 import { hostGuard, navigationGuard, requestOrigin, writeGuard } from './guard.ts';
@@ -86,20 +77,19 @@ export interface AppDeps {
   workflows?: readonly WorkflowApi[];
   /**
    * On workflow-core's side (#60): the factory's declared data the recette, the transcripts and the agents'
-   * screen read before showing; absent on Hermes' side.
+   * screen read before showing; absent in the tests that do not use them.
    */
   declared?: DeclaredViewsPort;
   /** The other workflows workflow-core declares (#57), listed with their sheet; their screen reads `generic`. */
   coreWorkflows?: () => readonly WorkflowView[];
   /** The generic workflows workflow-core declares, for their screen (#65); absent: none. */
   generic?: GenericWorkflowsPort;
-  /** The code line's sheet as the factory publishes it, or why the embedded copy is drawn (#31). */
-  codeSheet?: () => PublishedSheet;
+  /** The code line's sheet, the last the core served; `null` before the first (#31, #72). */
+  codeSheet?: () => PublishedSheet | null;
   /** Someone looks at a workflow: it is read more often for a while. */
   workflowWatched?: () => void;
-  /** False while the kanban read has been failing for a minute (#50): `/healthz` answers 503. True by default. */
-  kanbanHealthy?: () => boolean;
-  hookSecret: string | null;
+  /** False while the core has not answered for a while (#62): `/healthz` answers 503. True by default. */
+  coreHealthy?: () => boolean;
   origins: readonly string[];
   /** Valeurs de l'en-tête `Host` acceptées (configuration) ; tout autre hôte reçoit 421. */
   allowedHosts: readonly string[];
@@ -189,8 +179,6 @@ export function createApp(deps: AppDeps) {
     now: deps.now,
     perMinute: 6000,
   });
-  const replay = new ReplayGuard();
-  const decoder = new TextDecoder();
 
   app.use('*', async (c, next) => {
     await next();
@@ -211,53 +199,10 @@ export function createApp(deps: AppDeps) {
   });
 
   app.get('/healthz', (c) =>
-    deps.kanbanHealthy?.() === false
+    deps.coreHealthy?.() === false
       ? c.json({ ok: false, version: deps.version }, 503)
       : c.json({ ok: true, version: deps.version }),
   );
-
-  // --- Ingestion signée (Hermès, sonde) ------------------------------------------------------
-
-  app.post(
-    '/api/ingest/hermes',
-    bodyLimit({
-      maxSize: 4 * 1024 * 1024,
-      onError: (c) => c.json({ error: 'Corps trop gros' }, 413),
-    }),
-    async (c) => {
-      if (!deps.hookSecret) return c.json({ error: 'Ingestion désactivée : secret absent' }, 503);
-      const raw = new Uint8Array(await c.req.arrayBuffer());
-      if (!verifySignature(raw, c.req.header('x-hermes-signature-256'), deps.hookSecret))
-        return c.json({ error: 'Signature invalide' }, 401);
-      const parsed = HermesHookBody.safeParse(safeJson(decoder.decode(raw)));
-      if (!parsed.success) return c.json({ error: 'Corps inattendu' }, 400);
-      const verdict = replay.check(
-        parsed.data.delivery_id,
-        Date.parse(parsed.data.timestamp),
-        deps.now(),
-      );
-      if (verdict === 'stale') return c.json({ error: 'Livraison hors fenêtre' }, 400);
-      if (verdict === 'fresh') deps.hub.applyHook(toHookEvent(parsed.data));
-      return c.body(null, 202);
-    },
-  );
-
-  app.post('/api/ingest/health', bodyLimit({ maxSize: 256 * 1024 }), async (c) => {
-    if (!deps.hookSecret) return c.json({ error: 'Ingestion désactivée : secret absent' }, 503);
-    const raw = new Uint8Array(await c.req.arrayBuffer());
-    if (!verifySignature(raw, c.req.header('x-factory-live-signature-256'), deps.hookSecret))
-      return c.json({ error: 'Signature invalide' }, 401);
-    const parsed = ProbeReport.safeParse(safeJson(decoder.decode(raw)));
-    if (!parsed.success) return c.json({ error: 'Rapport inattendu' }, 400);
-    const verdict = replay.check(
-      `probe:${parsed.data.gatewayPid}:${parsed.data.at}`,
-      Date.parse(parsed.data.at),
-      deps.now(),
-    );
-    if (verdict === 'stale') return c.json({ error: 'Rapport hors fenêtre' }, 400);
-    if (verdict === 'fresh') deps.hub.applyProbe(parsed.data, deps.now());
-    return c.body(null, 202);
-  });
 
   // --- Lecture ---------------------------------------------------------------------------------
 
@@ -310,9 +255,11 @@ export function createApp(deps: AppDeps) {
     }),
     async (c) => {
       const id = c.req.valid('param').id;
-      const views = deps.declared
-        ? transcripts(deps.views, id, await deps.declared.transcripts(id))
-        : transcripts(deps.views, id);
+      const views = transcripts(
+        deps.views,
+        id,
+        deps.declared ? await deps.declared.transcripts(id) : null,
+      );
       return views
         ? c.json(views, 200)
         : c.json({ error: 'Run inconnu', code: 'not_found' as const }, 404);
@@ -452,7 +399,7 @@ export function createApp(deps: AppDeps) {
       try {
         const sent = await postGesture(
           {
-            gestures: deps.unblock.gestures ?? hermesSideGestures,
+            gestures: deps.unblock.gestures,
             github: deps.unblock.github,
             ...(deps.unblock.canWrite ? { canWrite: deps.unblock.canWrite } : {}),
             // Only the code line's items have an issue known here; another workflow's item gets none.
@@ -1079,7 +1026,7 @@ export function createApp(deps: AppDeps) {
     info: {
       title: 'factory-live',
       version: deps.version,
-      description: 'La factory Hermès en temps réel',
+      description: 'La factory en temps réel',
     },
   });
 
@@ -1112,12 +1059,4 @@ export function createApp(deps: AppDeps) {
   }
 
   return app;
-}
-
-function safeJson(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
 }

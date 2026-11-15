@@ -1,6 +1,6 @@
 // factory-live's real server for the « live » e2e (#67), between the live build of the app and the fake
-// workflow-core (e2e/fake-api.mjs): LIVE_SOURCE=workflow-core, a temporary base and secrets folder, its
-// GitHub answered by the fake core under /github. Nothing of the machine is read.
+// workflow-core (e2e/fake-api.mjs): a temporary base and secrets folder, its GitHub answered by the fake core
+// under /github. Nothing of the machine is read.
 import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,15 +27,10 @@ const server = spawn(process.execPath, ['--conditions=source', 'apps/server/src/
     PORT: port,
     HOST: '127.0.0.1',
     LOG_LEVEL: process.env.LOG_LEVEL ?? 'warn',
-    LIVE_SOURCE: 'workflow-core',
     WORKFLOW_CORE_URL: core,
     GITHUB_API: `${core}/github`,
     SECRETS_DIR: secrets,
     DATA_DIR: dir('data'),
-    // Folders of the machine nobody reads on the core's side: empty ones.
-    HERMES_HOME: dir('hermes'),
-    FACTORY_REPO: dir('factory'),
-    CLAUDE_PROJECTS: dir('claude'),
     WEB_DIST: dir('web'),
     WORKFLOWS: '',
     // The live build is served on 4181 and relays /api here (vite preview, changeOrigin).

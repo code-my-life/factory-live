@@ -1,9 +1,9 @@
 // Règles métier pures de factory-live : aucune dépendance, aucune entrée-sortie.
 export * from './activity.ts';
 export * from './cards.ts';
-export * from './diagnosis/index.ts';
+export * from './agents/index.ts';
 export * from './gateVerdicts.ts';
-export * from './hermes.ts';
+export * from './board.ts';
 export * from './interventions.ts';
 export * from './issues.ts';
 export * from './journey.ts';

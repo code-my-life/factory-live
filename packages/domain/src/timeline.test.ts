@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { aRun, anEvent } from './fixtures.test-helpers.ts';
 import { message } from './messages.ts';
 import { timelineOf } from './timeline.ts';
-import type { Comment } from './hermes.ts';
+import type { Comment } from './board.ts';
 
 const CARD = 't_d6702099';
 const assignees = new Map([[CARD, 'gate']]);
@@ -270,7 +270,7 @@ describe('timelineOf', () => {
       'protocol_violation',
       {
         exit_code: 0,
-        // La fin de la sortie du run 189 de factory-live#2, telle qu'Hermès l'a notée.
+        // The end of the output of run 189 of factory-live#2, as the factory noted it.
         worker_output:
           'o finish ⚠️ Kanban worker tried to exit without a terminal board call (kanban_complete/kanban_request_review/kanban_block) \u2014 nudging to finish',
       },

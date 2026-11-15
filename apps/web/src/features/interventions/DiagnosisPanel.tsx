@@ -1,3 +1,4 @@
+import { FACTORY_RUNTIME } from '@factory-live/contracts';
 import type {
   Actor,
   Cause,
@@ -117,15 +118,18 @@ function Steps({ steps }: { steps: readonly Step[] }) {
   );
 }
 
-/** Where a piece of evidence comes from: the kanban, GitHub (webhook), or Hermes (sessions, journal, config, plugins, worktree). */
+/**
+ * Where a piece of evidence comes from: the kanban, GitHub (webhook), or the factory's runtime (sessions,
+ * journal, config, plugins, worktree).
+ */
 const SOURCE_KIND: Record<Evidence['source'], SourceKind> = {
   kanban: 'kanban',
-  transcript: 'hermes',
+  transcript: FACTORY_RUNTIME,
   webhook: 'github',
-  agent_log: 'hermes',
-  config: 'hermes',
-  plugin: 'hermes',
-  workspace: 'hermes',
+  agent_log: FACTORY_RUNTIME,
+  config: FACTORY_RUNTIME,
+  plugin: FACTORY_RUNTIME,
+  workspace: FACTORY_RUNTIME,
 };
 
 function EvidenceList({ evidence }: { evidence: readonly Evidence[] }) {
@@ -236,8 +240,8 @@ function OtherFinding({ finding }: { finding: Finding }) {
 }
 
 /**
- * Le diagnostic d'un blocage, calculé par des règles sur les sources d'Hermès : la cause et son
- * mécanisme, qui agit, si « Débloquer » suffit, le réglage en cause, quoi faire, puis les preuves.
+ * The diagnosis of a blocker, as the core computes it on the factory's sources: the cause and its mechanism,
+ * who acts, whether « Débloquer » is enough, the setting at fault, what to do, then the evidence.
  */
 export function DiagnosisPanel({
   diagnosis,

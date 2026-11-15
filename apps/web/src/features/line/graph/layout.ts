@@ -1,4 +1,4 @@
-import { GateLane, MODELS_KEY, parseWorkflowSheet } from '@factory-live/contracts';
+import { GateLane, MODELS_KEY } from '@factory-live/contracts';
 import type {
   EdgeKind,
   JourneyStep,
@@ -7,7 +7,6 @@ import type {
   WorkflowSheet,
   WorkflowStation,
 } from '@factory-live/contracts';
-import codeLine from './workflows/code-line.json';
 
 /**
  * A workflow drawn as a run graph, from its sheet alone: one box per station holding its items as
@@ -17,12 +16,6 @@ import codeLine from './workflows/code-line.json';
  * node is the base under the stations whose agents call a model, and feeds each of them from below.
  * Values in px.
  */
-
-/** The sheet of the code line, read and checked once; its error, if any, shows instead of the graph. */
-export const CODE_LINE_SHEET = parseWorkflowSheet(codeLine);
-export const CODE_LINE: WorkflowSheet = CODE_LINE_SHEET.ok
-  ? CODE_LINE_SHEET.sheet
-  : { item: { type: '', label: '' }, stations: [], edges: [], models: [] };
 
 /** A station box's head: its icon, name, and the kind of work done there. */
 export const HEAD_H = 36;
@@ -437,10 +430,12 @@ export function planOf(sheet: WorkflowSheet): SheetPlan {
   return plan;
 }
 
-/** The members of the code line's group, the gate's proofs: `failfirst`, `sabotage`... */
-export const LANES: readonly GateLane[] = (planOf(CODE_LINE).members.values().next().value ?? [])
-  .map(suffixOf)
-  .filter((lane): lane is GateLane => GateLane.safeParse(lane).success);
+/** The members of a sheet's first group as gate lanes (the code line's: `failfirst`, `sabotage`...). */
+export function lanesOf(sheet: WorkflowSheet): GateLane[] {
+  return (planOf(sheet).members.values().next().value ?? [])
+    .map(suffixOf)
+    .filter((lane): lane is GateLane => GateLane.safeParse(lane).success);
+}
 
 /* ------------------------------------------------------------------------------------------------
  * The curves.
@@ -513,7 +508,7 @@ const columnX = (col: number) => MARGIN + col * COLUMN_STEP;
  * The layout.
  * ---------------------------------------------------------------------------------------------- */
 
-export function layout(fills: Record<BoxId, Fill>, sheet: WorkflowSheet = CODE_LINE): Layout {
+export function layout(fills: Record<BoxId, Fill>, sheet: WorkflowSheet): Layout {
   const plan = planOf(sheet);
   const box = (id: BoxId, x: number, y: number, w = COLUMN_W, head = HEAD_H): Box => ({
     id,
@@ -795,7 +790,7 @@ export function layout(fills: Record<BoxId, Fill>, sheet: WorkflowSheet = CODE_L
 type Step = Pick<JourneyStep, 'station' | 'lane'>;
 
 /** The connectors a journey ran on, in order; a loop taken twice appears twice. */
-export function journeyEdges(journey: readonly Step[], sheet: WorkflowSheet = CODE_LINE): string[] {
+export function journeyEdges(journey: readonly Step[], sheet: WorkflowSheet): string[] {
   const plan = planOf(sheet);
   const end = sheet.stations.find((station) => station.kind === 'end')?.key;
   const fanId = (key: string, side: 'in' | 'out', lane: string | null) => {

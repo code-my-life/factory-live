@@ -2,7 +2,7 @@
   "name": "factory-live",
   "version": "0.2.0",
   "private": true,
-  "description": "La factory Hermès en temps réel : ligne d'usine, agents, modèles, interventions.",
+  "description": "La factory en temps réel : ligne d'usine, agents, modèles, interventions.",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -25,8 +25,6 @@
     "test:coverage": "vitest run --coverage",
     "dev:web": "npm run dev -w @factory-live/web",
     "dev:server": "npm run dev -w @factory-live/server",
-    "capture:incident": "node scripts/capture-incident.mjs",
-    "export:diagnosis-references": "node --conditions=source scripts/export-diagnosis-references.mjs",
     "verify:fast": "npm run format:check && npm run lint && npm run lint:css && npm run typecheck && npm run check:text && npm run check:arch && npm run check:core-types && npm run test:coverage",
     "verify": "npm run verify:fast && npm run build",
     "lint:css": "stylelint \"apps/web/src/**/*.css\" \"site/src/**/*.css\"",

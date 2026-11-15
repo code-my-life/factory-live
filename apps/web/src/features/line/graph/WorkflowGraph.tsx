@@ -72,7 +72,7 @@ export interface WorkflowGraphProps {
  * curved connectors that plug into the boxes by round ports, one colour per branch. A connector steps
  * back at rest and comes forward when something goes through it: a card travelling to its new
  * station, the open item's journey (comets), a model answering an agent (points up its feed). The
- * sheet is valid: the caller reads it with `parseWorkflowSheet` and shows its error instead.
+ * sheet is the one workflow-core judged: a refused one shows its reason instead (`SheetGraph`).
  */
 export function WorkflowGraph({
   sheet,

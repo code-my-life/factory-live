@@ -1,14 +1,13 @@
-import { parseWorkflowSheet } from '@factory-live/contracts';
-import type { JourneyStep, WorkflowSheet } from '@factory-live/contracts';
+import { WorkflowSheet } from '@factory-live/contracts';
+import type { JourneyStep } from '@factory-live/contracts';
 import { describe, expect, it } from 'vitest';
+import { DEMO_CODE_LINE } from '../../../demo/sheets.ts';
 import { journeyEdges, layout } from './layout.ts';
 import type { Box, Edge } from './layout.ts';
 
-/** A sheet any workflow could publish, checked like the code line's. */
+/** A sheet any workflow could publish, its form checked by the contract's schema. */
 function sheetOf(input: unknown): WorkflowSheet {
-  const parsed = parseWorkflowSheet(input);
-  if (!parsed.ok) throw new Error(parsed.error);
-  return parsed.sheet;
+  return WorkflowSheet.parse(input);
 }
 
 type Cell = [key: string, kind: string, col: number, row: number, group?: string];
@@ -201,12 +200,14 @@ describe('le graphe d’une fiche quelconque', () => {
   });
 
   it('une issue arrêtée au bout d’une branche y finit par le lien de sa branche', () => {
-    expect(journeyEdges([step('diagnostic'), step('stopped')])).toEqual(['diag:out']);
-    expect(journeyEdges([step('diagnostic'), step('implementation')])).toEqual([]);
+    expect(journeyEdges([step('diagnostic'), step('stopped')], DEMO_CODE_LINE)).toEqual([
+      'diag:out',
+    ]);
+    expect(journeyEdges([step('diagnostic'), step('implementation')], DEMO_CODE_LINE)).toEqual([]);
   });
 
   it('un saut de plusieurs postes suit chaque lien de la ligne entre eux', () => {
-    expect(journeyEdges([step('intake'), step('implementation')])).toEqual([
+    expect(journeyEdges([step('intake'), step('implementation')], DEMO_CODE_LINE)).toEqual([
       'line:intake',
       'line:brief',
     ]);

@@ -69,7 +69,7 @@ export const GenericWorkflowView = z.object({
   /** The sheet the core last served, judged by it; `null` before the first. */
   sheet: z.unknown().nullable(),
   /** Why the core refuses the workflow's sheet, as it says it; `null` when it accepts it. */
-  sheetError: z.string().nullable(),
+  sheetRefusal: z.string().nullable(),
   items: z.array(GenericItemView),
   /** Since when the core does not answer; the last sheet and items stay. */
   unreachableSince: Timestamp.nullable(),

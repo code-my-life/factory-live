@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { AGENT_SESSION, literally } from './texts.ts';
 
 test('la ligne ouverte sur une issue montre sous le graphe les runs de la carte au travail, puis sa transcription', async ({
   page,
@@ -28,7 +29,7 @@ test('transcription : la session du plus récent au plus ancien, le terminal ouv
     .filter({ visible: true })
     .first()
     .click();
-  const session = page.getByRole('region', { name: /Session Hermès/ });
+  const session = page.getByRole('region', { name: literally(AGENT_SESSION) });
   const times = await session
     .locator('time')
     .evaluateAll((items) => items.map((item) => item.getAttribute('datetime') ?? ''));
@@ -38,9 +39,9 @@ test('transcription : la session du plus récent au plus ancien, le terminal ouv
   // On mobile (< 768px), Terminal is in a dropdown menu
   const viewportWidth = page.viewportSize()?.width ?? 1440;
   if (viewportWidth < 768) {
-    // Open the source selector dropdown by clicking the button showing "Session Hermès"
+    // Open the source selector dropdown by clicking the button showing the agent's session
     await page
-      .getByRole('button', { name: /Session Hermès/ })
+      .getByRole('button', { name: literally(AGENT_SESSION) })
       .first()
       .click();
     // Click Terminal in the dropdown
@@ -83,7 +84,7 @@ test('transcription : les lanes nommées tiennent sur une ligne de 28 px', async
   const sourceButtons = sourceList.getByRole('button');
   await expect(sourceButtons).toHaveCount(5);
   await expect(sourceButtons).toHaveText([
-    'Session Hermès',
+    AGENT_SESSION,
     'Implémentation',
     'Correction',
     'Correction 2',

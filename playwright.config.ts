@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 /**
  * The PWA's end-to-end tests: on the demo (a replayed scenario, no server) and on the « live » app,
- * served by factory-live's real server on the core's side (LIVE_SOURCE=workflow-core), reading a fake
+ * served by factory-live's real server, which reads workflow-core, here a fake
  * workflow-core (e2e/fake-api.mjs, #67). Chromium everywhere; WebKit (Safari, iPhone) with
  * `E2E_WEBKIT=1`, on CI in Playwright's official image (this PC lacks system libraries for WebKit).
  * The reference captures are made in that same image.

@@ -17,15 +17,11 @@ import type {
   WorkflowSheet,
 } from '@factory-live/contracts';
 import type {
-  Board,
   GuardRisk,
   Comment,
-  EvidenceFile,
   Link,
-  LogFact,
   ProfileFacts,
   Run,
-  SessionFacts,
   Task,
   TaskEvent,
 } from '@factory-live/domain';
@@ -43,7 +39,7 @@ export interface LoggerPort {
   debug(context: object, message: string): void;
 }
 
-// --- Kanban d'Hermès ---------------------------------------------------------------------------
+// --- Tableau de la factory ---------------------------------------------------------------------------
 
 /** What changed in the kanban since the last read. */
 export interface KanbanDelta {
@@ -91,52 +87,23 @@ export interface ProfilesPort {
   repo(profile: string): ProfileConfig | null;
   manifest(): FactoryManifest;
   root(): RootSettings;
-  // In-service timeouts, repo value and plugin hooks, for diagnosis; null = unreadable config.
+  // In-service timeouts and plugin hooks, as the core serves them; null = not served.
   facts(profile: string): ProfileFacts | null;
-  // Fingerprint of files read by `facts` (modification times); it changes when any of them changes.
-  factsStamp(profile: string): string;
-  /**
-   * How many times each plugin's hook ran past its delay, when the source counts them itself (workflow-core,
-   * #93); absent: the agents' screen counts them in the agent's journal.
-   */
+  /** How many times each plugin's hook ran past its delay, as workflow-core counts them (#93). */
   hookTimeouts?(profile: string): ReadonlyMap<string, number> | null;
   /**
-   * The guards at risk as the source computes them itself, with the time it was read (workflow-core, #96);
-   * absent: the hub finds them with the rule on each agent's facts. `null`: nothing read yet.
+   * The guards at risk as workflow-core computes them, with the time it was read (#96); absent or `null`:
+   * nothing read yet.
    */
   guardRisks?(): { risks: GuardRisk[]; checkedAt: number } | null;
   /**
-   * The agent's limits with their defaults, when the source publishes them (workflow-core, #93); absent:
-   * the agents' screen takes them from `facts` and Hermes' defaults.
+   * The agent's limits with their defaults, when workflow-core publishes them (#93); absent: the agents'
+   * screen takes them from `facts` and the factory's defaults.
    */
   limits?(profile: string): ProfileLimit[] | null;
 }
 
-// --- Sessions des workers ------------------------------------------------------------------------
-
-export interface SessionInfo {
-  id: string;
-  profile: string;
-  model: string | null;
-  title: string | null;
-  /** Secondes epoch. */
-  startedAt: number;
-  endedAt: number | null;
-  inputTokens: number;
-  outputTokens: number;
-  costUsd: number | null;
-}
-
-export interface ModelUsageRow {
-  model: string;
-  provider: string;
-  calls: number;
-  inputTokens: number;
-  outputTokens: number;
-  costUsd: number | null;
-  /** Secondes epoch. */
-  lastSeen: number;
-}
+// --- Transcriptions ----------------------------------------------------------------------------
 
 export interface TranscriptLine {
   id: string;
@@ -149,53 +116,12 @@ export interface TranscriptLine {
   status: 'ok' | 'error' | 'blocked' | null;
 }
 
-/** A card run, with what's needed to find its session without guessing. */
-export interface RunRef {
-  id: number;
-  taskId: string;
-  /** Secondes epoch. */
-  startedAt: number;
-  endedAt: number | null;
-  // `metadata.worker_session_id`, recorded by Hermes.
-  workerSessionId: string | null;
-  // The `hermes --resume <sid>` session, found in the run's error or output.
-  resumeSessionId: string | null;
-}
-
-export interface SessionsPort {
-  sessionOfRun(
-    profile: string,
-    run: { startedAt: number; endedAt: number | null; workerSessionId: string | null },
-  ): SessionInfo | null;
-  modelUsage(profile: string, sessionId: string): ModelUsageRow[];
-  usageSince(profile: string, since: number): (ModelUsageRow & { day: string })[];
-  transcript(profile: string, sessionId: string): TranscriptLine[];
-  /**
-   * Tool calls and results from these runs' sessions, for diagnosis. A run whose session
-   * cannot be found has none; `null` = unreadable agent database.
-   */
-  runFacts(profile: string, runs: readonly RunRef[]): SessionFacts[] | null;
-  // Agent sessions open at this instant (epoch seconds); `null` = unreadable database.
-  sessionsActiveAt(profile: string, at: number): string[] | null;
-}
-
-// --- Fichiers de la factory (logs de cartes, lanes Claude Code) -------------------------------------
-
-export interface LaneTranscript {
-  entries: TranscriptLine[];
-  name: string | null;
-  startedAt: number | null;
-  endedAt: number | null;
-  costUsd: number | null;
-}
-
-/** A proof of the gate for a head (#22): its rule, its place in the gate's order, its text (cut). */
 /**
  * What a run's transcripts are made of, read from workflow-core's declared data (#60): the agent's session,
  * each Claude Code session, the card's raw log. Times in ms epoch.
  */
 export interface RunTranscripts {
-  hermes: TranscriptLine[];
+  agent: TranscriptLine[];
   lanes: { name: string | null; entries: TranscriptLine[] }[];
   terminal: string[];
 }
@@ -242,26 +168,6 @@ export interface GateProof {
   order: number;
   rule: string;
   text: string;
-}
-
-export interface CardFilesPort {
-  // Raw card log, ANSI sequences kept; `null` if absent.
-  cardLog(cardId: string): string[] | null;
-  // Claude Code transcripts launched from a card's workspace during a window (epoch ms).
-  claudeTranscripts(workspacePath: string, fromMs: number, toMs: number): LaneTranscript[];
-  // `evidence/` files left by the agent; `null` = no readable evidence folder.
-  evidence(cardId: string): EvidenceFile[] | null;
-  // Evidence folder fingerprint: changes when a file is added or removed there.
-  evidenceStamp(cardId: string): string;
-  // The gate's proofs of a head (`evidence/gate/<sha7>/NN-<rule>.txt`), texts cut at 64 KB.
-  gateProofs(cardId: string, sha7: string): GateProof[];
-}
-
-// --- Journal d'Hermès ----------------------------------------------------------------------------
-
-export interface AgentLogPort {
-  // Catalogued log lines of an agent between two instants (epoch seconds); `null` = unreadable.
-  facts(profile: string, from: number, to: number): LogFact[] | null;
 }
 
 // --- GitHub --------------------------------------------------------------------------------------
@@ -411,14 +317,11 @@ export interface ActivityFilter {
 }
 
 export interface HistoryPort {
-  mirror(delta: KanbanDelta): void;
-  board(): Board & { comments: Comment[] };
   appendActivity(events: readonly ActivityEvent[]): void;
   recentActivity(limit: number): ActivityEvent[];
   activityOfCards(cardIds: readonly string[], filter?: ActivityFilter): ActivityEvent[];
   // Most recent lines of these kinds, across all cards (guard refusals).
   activityOfKinds(kinds: readonly string[], limit: number): ActivityEvent[];
-  addUsage(delta: UsageDelta): void;
   /**
    * Usage rows as workflow-core serves them (#66): each one sets its day, model, provider and agent, so a
    * day served again is not counted twice, and a day the core no longer serves stays.
@@ -451,12 +354,6 @@ export interface HistoryPort {
     complete: boolean,
   ): void;
   historyItems(workflow: string): HistoryItem[];
-  /** Pours these items into the history once per workflow (the mirror, at the first start on the core's side). */
-  seedHistory(
-    workflow: string,
-    items: readonly { id: string; state: unknown }[],
-    at: number,
-  ): boolean;
 }
 
 /** One item of factory-live's history (#63): its last state as the core served it; times in ms epoch. */
@@ -554,9 +451,9 @@ export interface CoreActivityFact {
 
 export interface WorkflowView {
   name: string;
-  /** The sheet the workflow serves; `null` until read, or while it is invalid (`sheetError`). */
+  /** The sheet the workflow serves; `null` until read, or while it is invalid (`sheetRefusal`). */
   sheet: WorkflowSheet | null;
-  sheetError: string | null;
+  sheetRefusal: string | null;
   items: StudioItem[];
   /** When the workflow last answered; `null` before it ever did. */
   readAt: number | null;
@@ -565,6 +462,13 @@ export interface WorkflowView {
   error: string | null;
 }
 
-/** Where the code line's sheet comes from (#31): the factory's published one, or the web's copy. */
-export type PublishedSheet =
-  { source: 'published'; sheet: WorkflowSheet } | { source: 'embedded'; reason: string };
+/**
+ * The code line's sheet as the core serves it (#31): the core judged it, the web draws it as it is. When the core
+ * refuses its sheet, `refusal` says why, as the core says it, and the last sheet it served stays (`null` when it
+ * never served one).
+ */
+export interface PublishedSheet {
+  source: 'published';
+  sheet: WorkflowSheet | null;
+  refusal?: string;
+}

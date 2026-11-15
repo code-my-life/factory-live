@@ -1,3 +1,5 @@
+import type { FactoryRuntime } from '@factory-live/contracts';
+import { FACTORY_RUNTIME } from '@factory-live/contracts';
 import {
   CommentIcon,
   HubotIcon,
@@ -10,12 +12,12 @@ import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { Badge } from './Badge.tsx';
 import { hueOf } from './hues.ts';
 
-/** The sources of a fact: the kanban, Hermes, GitHub, a comment, factory-live. */
-export type SourceKind = 'kanban' | 'hermes' | 'github' | 'comment' | 'factory-live';
+/** The sources of a fact: the kanban, the factory's runtime, GitHub, a comment, factory-live. */
+export type SourceKind = 'kanban' | FactoryRuntime | 'github' | 'comment' | 'factory-live';
 
 const SOURCE_ICON: Record<SourceKind, Icon> = {
   kanban: ProjectIcon,
-  hermes: HubotIcon,
+  [FACTORY_RUNTIME]: HubotIcon,
   github: MarkGithubIcon,
   comment: CommentIcon,
   'factory-live': PulseIcon,

@@ -27,7 +27,6 @@ import {
   runRoleOf,
 } from '@factory-live/domain';
 import type {
-  ActivityLine,
   Board,
   Comment,
   DeliveryFacts,
@@ -462,27 +461,6 @@ export function coreActivityEvent(
     status: fact.status,
     durationMs: null,
     model: null,
-  };
-}
-
-/** Ligne du domaine vers l'événement du fil : identifiant de séquence, issue retrouvée par la carte. */
-export function toActivityEvent(
-  line: ActivityLine,
-  seq: number,
-  issueOfCard: ReadonlyMap<string, string>,
-): ActivityEvent {
-  return {
-    id: `a${seq}`,
-    at: iso(line.at),
-    kind: line.kind,
-    profile: line.profile,
-    issueKey: line.cardId ? (issueOfCard.get(line.cardId) ?? null) : null,
-    cardId: line.cardId,
-    label: line.label,
-    detail: line.detail,
-    status: line.status,
-    durationMs: line.durationMs === null ? null : Math.max(0, Math.round(line.durationMs)),
-    model: line.model,
   };
 }
 
