@@ -358,6 +358,41 @@ describe('LiveSource : lien et dernier état connu', () => {
   });
 });
 
+describe('LiveSource : état gardé avant #109', () => {
+  it('s’ouvre sur un état gardé avec l’ancien groupe des tuiles du runtime, montré comme runtime', () => {
+    // Saved before code-my-life/factory-live#109: the runtime's tiles under the runtime's former name.
+    const former = ['her', 'mes'].join('');
+    const tile = (id: string, group: string) => ({
+      id,
+      label: id,
+      group,
+      status: 'ok',
+      detail: '',
+      checkedAt: null,
+      metrics: [],
+    });
+    const storage = {
+      getItem: () =>
+        JSON.stringify({
+          receivedAt: 1_000_000,
+          snapshot: {
+            ...SNAPSHOT,
+            health: [tile('gateway', former), tile('pause', 'renamed'), tile('llm', 'models')],
+          },
+        }),
+      setItem: () => undefined,
+    };
+    const { health } = setup({}, { storage, now: () => 2_000_000 }).source.getSnapshot();
+    expect(health.map((service) => [service.id, service.group])).toEqual([
+      ['gateway', 'runtime'],
+      ['pause', 'runtime'],
+      ['llm', 'models'],
+    ]);
+    // Only the group changes: the tile keeps what the server sent.
+    expect(health[0]).toEqual(tile('gateway', 'runtime'));
+  });
+});
+
 describe('LiveSource : accès GitHub', () => {
   const ACCESS = {
     mode: 'app',

@@ -1,6 +1,7 @@
 # ADR 0021 : l'ancienne lecture d'Hermès est retirée
 
-Date : 2026-11-15. Statut : accepté. Amende les ADR 0010, 0014, 0015 et 0019. Fondée sur les ADR 0001 et 0006 de
+Date : 2026-11-15. Statut : accepté, amendée par l'ADR 0022 (issue #109 : les valeurs `hermes` deviennent
+`runtime`, la liste déclarée part). Amende les ADR 0010, 0014, 0015 et 0019. Fondée sur les ADR 0001 et 0006 de
 workflow-core. Epic code-my-life/factory-live#71, issue #72.
 
 ## Contexte

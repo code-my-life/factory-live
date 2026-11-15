@@ -40,7 +40,7 @@ function age(now: number, at: number): { seconds: number } {
   return { seconds: Math.max(0, Math.round((now - at) / 1000)) };
 }
 
-/** The group of the factory's own tiles on the Health page, a value factory-live writes itself (`runtime.ts`). */
+/** The group of the agent runtime's tiles on the Health page, a value factory-live writes itself (`runtime.ts`). */
 const FACTORY: ServiceHealth['group'] = FACTORY_RUNTIME;
 
 const GROUPS: Readonly<Record<string, ServiceHealth['group']>> = {

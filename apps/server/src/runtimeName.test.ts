@@ -1,6 +1,7 @@
 // CI rule (code-my-life/factory-live#72, AD-1): factory-live reads the core, and only the core's adapter knows
 // the agent runtime that runs the factory. No tracked file of `apps/`, `packages/`, `docker/`, `e2e/` and
-// `scripts/` names it, but the exceptions below. Model: `scripts/check-text.mjs`.
+// `scripts/` names it, but the exempt folders below and the factory's repository name: no declared file, no
+// allowed value (code-my-life/factory-live#109). Model: `scripts/check-text.mjs`.
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,26 +28,11 @@ const EXEMPT_DIRECTORIES = [
   'apps/web/src/demo/',
 ];
 
-const QUOTED_VALUE = /(['"])hermes\1/gu;
-
 /**
- * The declared list, and nowhere else: each file, its reason, and what it alone may write. The value `'hermes'`
- * that factory-live writes itself (provisional exemption, removed by story 4 of the epic, which renames it) is
- * allowed there between quotes only.
+ * The value the files of the old declared list wrote, between quotes (code-my-life/factory-live#109); built here
+ * so that no line of the repository writes it, not even this test.
  */
-const DECLARED: readonly { file: string; reason: string; allowed: readonly RegExp[] }[] = [
-  {
-    file: 'packages/contracts/src/runtime.ts',
-    reason:
-      'la valeur que factory-live écrit lui-même (groupe de tuiles de sa page Santé, source de la session d’un agent), valeur du contrat entre son serveur et son app web, écrite là seule ; exemption provisoire, retirée par la story 4 de l’epic',
-    allowed: [QUOTED_VALUE],
-  },
-  {
-    file: 'apps/server/src/http/app.test.ts',
-    reason: "le test « les routes d'ingestion d'Hermès n'existent plus » nomme la route retirée",
-    allowed: [/les routes d'ingestion d'Hermès n'existent plus/gu, /'\/api\/ingest\/hermes'/gu],
-  },
-];
+const QUOTED = `'${['her', 'mes'].join('')}'`;
 
 interface Mention {
   file: string;
@@ -57,13 +43,10 @@ interface Mention {
 function mentionsIn(file: string, content: string): Mention[] {
   if (EXEMPT_DIRECTORIES.some((directory) => file.startsWith(directory)) || file === THIS_TEST)
     return [];
-  const declared = DECLARED.find((entry) => entry.file === file);
   const found: Mention[] = [];
   if (NAME.test(file.replace(REPOSITORY, ''))) found.push({ file, line: 0 });
   content.split('\n').forEach((text, index) => {
-    let line = text.replace(REPOSITORY, '');
-    for (const allowed of declared?.allowed ?? []) line = line.replace(allowed, '');
-    if (NAME.test(line)) found.push({ file, line: index + 1 });
+    if (NAME.test(text.replace(REPOSITORY, ''))) found.push({ file, line: index + 1 });
   });
   return found;
 }
@@ -133,25 +116,21 @@ describe('la règle du nom de la factory', () => {
     ]);
   });
 
-  it("la valeur 'hermes' n'est admise que dans les fichiers de la liste, chacun avec sa raison", () => {
-    const value = "export const FACTORY_RUNTIME = 'hermes' as const;";
-    // A listed file, which gives its reason: the value passes.
-    const listed = DECLARED.find((entry) => entry.file === 'packages/contracts/src/runtime.ts');
-    expect(listed?.reason).toBeTruthy();
-    expect(report(mentionsIn('packages/contracts/src/runtime.ts', value))).toEqual([]);
-    // The same string in a file out of the list: refused, the file named.
-    expect(report(mentionsIn('apps/server/src/application/health.ts', value))).toEqual([
-      'apps/server/src/application/health.ts:1',
-    ]);
-    // Only the value between quotes passes in a listed file: the name alone does not.
-    expect(report(mentionsIn('packages/contracts/src/runtime.ts', '// Hermes'))).toEqual([
+  it(`la chaîne ${QUOTED} est refusée dans un fichier de l'ancienne liste`, () => {
+    tree = mkdtempSync(join(tmpdir(), 'factory-live-name-'));
+    write(tree, 'apps/server/src/application/health.ts', `// lu\nconst group = ${QUOTED};\n`);
+    write(tree, 'packages/contracts/src/runtime.ts', `export const FACTORY_RUNTIME = ${QUOTED};\n`);
+
+    expect(report(mentionsOf(tree, filesUnder(tree))).sort()).toEqual([
+      'apps/server/src/application/health.ts:2',
       'packages/contracts/src/runtime.ts:1',
     ]);
+    // Only the repository's name stays allowed there, as everywhere.
     expect(
-      report(mentionsIn('apps/server/src/http/app.test.ts', "post('/api/ingest/hermes', {})")),
+      report(mentionsIn('apps/server/src/application/health.ts', "'hermes-software-factory'")),
     ).toEqual([]);
-    expect(report(mentionsIn('apps/server/src/http/app.test.ts', 'HERMES_HOME'))).toEqual([
-      'apps/server/src/http/app.test.ts:1',
+    expect(report(mentionsIn('packages/contracts/src/runtime.ts', '// Hermes'))).toEqual([
+      'packages/contracts/src/runtime.ts:1',
     ]);
   });
 
@@ -159,9 +138,5 @@ describe('la règle du nom de la factory', () => {
     expect(report(mentionsIn('packages/domain/src/hermes.ts', ''))).toEqual([
       'packages/domain/src/hermes.ts (nom du fichier)',
     ]);
-  });
-
-  it('chaque entrée déclarée a sa raison', () => {
-    for (const entry of DECLARED) expect(entry.reason).not.toBe('');
   });
 });

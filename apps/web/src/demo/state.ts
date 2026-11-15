@@ -215,8 +215,8 @@ export function appendTranscript(
   if (!view) return;
   view.entries.push({ id: nextId('tr'), ...entry });
   if (terminalLine !== undefined) {
-    const hermes = views?.find((candidate) => candidate.source === 'hermes');
-    hermes?.terminal.push(terminalLine);
+    const session = views?.find((candidate) => candidate.source === 'runtime');
+    session?.terminal.push(terminalLine);
   }
 }
 

@@ -953,7 +953,7 @@ export const fr = {
     },
     source: {
       kanban: 'Kanban',
-      hermes: 'Hermès',
+      runtime: 'Hermès',
       github: 'GitHub',
       comment: 'Commentaire',
       'factory-live': 'factory-live',
@@ -1265,7 +1265,7 @@ export const fr = {
       system: 'Session',
     },
     source: {
-      hermes: 'Session Hermès',
+      runtime: 'Session Hermès',
       'claude-code': 'Claude Code',
       opencode: 'OpenCode',
       terminal: 'Terminal',
@@ -1512,7 +1512,7 @@ export const fr = {
       'La sonde du gateway passe toutes les 30 s ; le reste vient de ce que les agents observent en travaillant.',
     checked: 'Vérifié',
     groups: {
-      hermes: { label: 'Hermès', hint: 'Gateway, dispatcher, pause, dashboard' },
+      runtime: { label: 'Hermès', hint: 'Gateway, dispatcher, pause, dashboard' },
       models: { label: 'Modèles', hint: 'Fournisseurs appelés par les agents' },
       tools: { label: 'Outils', hint: 'MCP et API utilisés par les agents' },
       intake: { label: 'Intake', hint: 'Ce qui fait entrer les issues dans la factory' },

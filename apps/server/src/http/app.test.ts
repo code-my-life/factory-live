@@ -8,12 +8,11 @@ import {
   StreamEvent,
   msg,
 } from '@factory-live/contracts';
-import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { trackUnblockReactions } from '../application/unblock.ts';
 import type { GesturesPort } from '../application/ports.ts';
-import { NOW, NOW_S, ORIGINS, SECRET, harness } from '../test/harness.ts';
+import { NOW, NOW_S, ORIGINS, harness } from '../test/harness.ts';
 import type { Harness } from '../test/harness.ts';
 import { insertEvent, insertRun, updateTask } from '../test/board-fixtures.ts';
 import { TwinBench } from '../adapters/twins/bench.ts';
@@ -187,27 +186,6 @@ describe('santé du socle dans /healthz', () => {
     const response = await healthz();
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, version: 'test' });
-  });
-});
-
-describe('ingestion retirée (#72)', () => {
-  it("les routes d'ingestion d'Hermès n'existent plus", async () => {
-    // A body signed with the old secret's scheme: no route reads it any more.
-    const body = JSON.stringify({ event: 'pre_tool_call', delivery_id: 'd-1' });
-    const signature = `sha256=${createHmac('sha256', SECRET).update(body).digest('hex')}`;
-    for (const path of ['/api/ingest/hermes', '/api/ingest/health']) {
-      const response = await h.app.request(path, {
-        method: 'POST',
-        body,
-        headers: {
-          host: '127.0.0.1:8446',
-          'content-type': 'application/json',
-          'x-factory-live-signature-256': signature,
-        },
-      });
-      expect(response.status, path).toBe(404);
-    }
-    expect((await snapshot()).activity).toEqual([]);
   });
 });
 

@@ -375,6 +375,26 @@ describe('TranscriptPanel', () => {
     expect(elements.length).toBeGreaterThan(0);
   });
 
+  it('une source inconnue, d’un serveur d’une autre version, garde l’onglet de la session de l’agent', () => {
+    mockTranscripts = [
+      {
+        runId: 1,
+        source: 'renamed' as TranscriptView['source'],
+        title: { code: 'transcript.agent', params: { profile: 'coder', session: null } },
+        name: null,
+        startedAt: null,
+        endedAt: null,
+        costUsd: null,
+        entries: [],
+        terminal: [],
+      },
+    ];
+    render(<TranscriptPanel runId={1} />);
+    expect(
+      screen.getAllByText(i18nOf('fr').t.transcript.source[FACTORY_RUNTIME]).length,
+    ).toBeGreaterThan(0);
+  });
+
   it('deux sources ne partagent jamais une clé', () => {
     // Three unnamed Claude Code lanes - should have unique React keys
     mockTranscripts = [

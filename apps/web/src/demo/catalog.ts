@@ -486,7 +486,7 @@ export function buildHealth(now: number): ServiceHealth[] {
     {
       id: 'gateway',
       label: msg('health.gateway'),
-      group: 'hermes',
+      group: 'runtime',
       status: 'ok',
       detail: msg('health.gateway.running', { seconds: 9 }),
       checkedAt: ago(9),
@@ -498,7 +498,7 @@ export function buildHealth(now: number): ServiceHealth[] {
     {
       id: 'dispatcher',
       label: msg('health.dispatcher'),
-      group: 'hermes',
+      group: 'runtime',
       status: 'ok',
       detail: msg('health.dispatcher.lastTick', { seconds: 12 }),
       checkedAt: ago(12),
@@ -513,7 +513,7 @@ export function buildHealth(now: number): ServiceHealth[] {
     {
       id: 'pause',
       label: 'Pause (ESTOP)',
-      group: 'hermes',
+      group: 'runtime',
       status: 'ok',
       detail: 'Factory active, aucune pause posée',
       checkedAt: ago(8),
@@ -522,7 +522,7 @@ export function buildHealth(now: number): ServiceHealth[] {
     {
       id: 'dashboard',
       label: 'Dashboard Hermès',
-      group: 'hermes',
+      group: 'runtime',
       status: 'ok',
       detail: 'Répond, joignable depuis le tailnet',
       checkedAt: ago(8),
@@ -576,7 +576,7 @@ export function buildHealth(now: number): ServiceHealth[] {
     {
       id: 'guards',
       label: msg('health.guards'),
-      group: 'hermes',
+      group: 'runtime',
       status: 'degraded',
       detail: msg('health.guards.risk', { count: 2 }),
       checkedAt: ago(15),

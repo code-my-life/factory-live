@@ -137,15 +137,16 @@ function choices(
   const result: { label: string; choice: ViewChoice; startedAt: number | null }[] = [];
   const labelCounts = new Map<string, number>();
   for (const view of sorted) {
-    if (view.source === FACTORY_RUNTIME) {
+    if (view.source === 'claude-code' || view.source === 'opencode') {
+      const label = labelForView(view, t, labelCounts);
+      result.push({ label, choice: { kind: 'entries', view }, startedAt: view.startedAt });
+    } else {
+      // The runtime's session, or a source this version does not know (a server of another version, #109).
       result.push({
         label: t.transcript.source[FACTORY_RUNTIME],
         choice: { kind: 'entries', view },
         startedAt: view.startedAt,
       });
-    } else if (view.source === 'claude-code' || view.source === 'opencode') {
-      const label = labelForView(view, t, labelCounts);
-      result.push({ label, choice: { kind: 'entries', view }, startedAt: view.startedAt });
     }
   }
   const terminal = views.find((view) => view.terminal.length > 0);

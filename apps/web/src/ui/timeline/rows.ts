@@ -103,16 +103,17 @@ const TONE: Record<TimelineEntry['tone'], RowTone> = {
 };
 
 export function fromTimelineEntry(entry: TimelineEntry, { t, text }: I18n): TimelineRow {
-  const sourceIcon = SOURCE_ICON[entry.source];
-  const sourceLabel = t.activity.source[entry.source];
+  // A source this version does not know (a server of another version, before or after #109) is the runtime's.
+  const source = Object.hasOwn(SOURCE_ICON, entry.source) ? entry.source : FACTORY_RUNTIME;
+  const sourceIcon = SOURCE_ICON[source];
+  const sourceLabel = t.activity.source[source];
   return {
     id: entry.id,
     at: entry.at,
     tone: TONE[entry.tone],
     icon: entry.tone === 'done' ? CheckIcon : entry.tone === 'danger' ? BlockedIcon : sourceIcon,
     iconLabel: sourceLabel,
-    condensed:
-      entry.source === 'comment' || (entry.source === FACTORY_RUNTIME && entry.tone === 'neutral'),
+    condensed: source === 'comment' || (source === FACTORY_RUNTIME && entry.tone === 'neutral'),
     agent: entry.profile,
     title: `${text(entry.label)}${entry.repeats ? t.activity.repeats(entry.repeats) : ''}`,
     detail: entry.detail === null ? null : text(entry.detail),

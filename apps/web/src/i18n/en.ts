@@ -889,7 +889,7 @@ export const en: Messages = {
     },
     source: {
       kanban: 'Kanban',
-      hermes: 'Hermès',
+      runtime: 'Hermès',
       github: 'GitHub',
       comment: 'Comment',
       'factory-live': 'factory-live',
@@ -1160,7 +1160,7 @@ export const en: Messages = {
       system: 'Session',
     },
     source: {
-      hermes: 'Hermès session',
+      runtime: 'Hermès session',
       'claude-code': 'Claude Code',
       opencode: 'OpenCode',
       terminal: 'Terminal',
@@ -1399,7 +1399,7 @@ export const en: Messages = {
       'The gateway probe reports every 30 s; the rest comes from what the agents observe while they work.',
     checked: 'Checked',
     groups: {
-      hermes: { label: 'Hermès', hint: 'Gateway, dispatcher, pause, dashboard' },
+      runtime: { label: 'Hermès', hint: 'Gateway, dispatcher, pause, dashboard' },
       models: { label: 'Models', hint: 'Providers the agents call' },
       tools: { label: 'Tools', hint: 'MCPs and APIs the agents use' },
       intake: { label: 'Intake', hint: 'What brings issues into the factory' },

@@ -183,7 +183,7 @@ function gateContactStep(state: DemoState, now: number, step: ToolStep): void {
   appendTranscript(
     state,
     RUNS.contactGate,
-    'hermes',
+    'runtime',
     {
       at: iso(now),
       role: 'tool_call',
@@ -539,7 +539,7 @@ export function buildScript(): ScenarioStep[] {
         appendTranscript(
           state,
           RUNS.teamImpl,
-          'hermes',
+          'runtime',
           {
             at: iso(now),
             role: 'tool_result',

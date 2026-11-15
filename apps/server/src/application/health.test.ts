@@ -209,6 +209,28 @@ function coreHub(): Hub {
 }
 
 describe('buildHealth, côté socle', () => {
+  it('les tuiles du runtime sont du groupe runtime', () => {
+    const runtime = (id: string) => check({ id, label: id, group: 'runtime' });
+    const health = buildHealth(
+      signals({
+        now: CORE_NOW,
+        guards: { checkedAt: CORE_NOW, risks: [] },
+        core: {
+          unreachableSince: null,
+          error: null,
+          machine: null,
+          checks: ['gateway', 'pause', 'dashboard', 'disk'].map(runtime),
+        },
+      }),
+    );
+    const ids = ['gateway', 'dispatcher', 'guards', 'pause', 'dashboard', 'disk'];
+
+    expect(ids.map((id) => [id, service(health, id)?.group])).toEqual(
+      ids.map((id) => [id, 'runtime']),
+    );
+    expect(health.health.map((item) => item.group)).not.toContain(['her', 'mes'].join(''));
+  });
+
   it('côté socle, un socle arrêté donne la tuile socle injoignable et une intervention', () => {
     const hub = coreHub();
     hub.applyCoreMachine(MACHINE);

@@ -103,7 +103,7 @@ describe('DemoSource', () => {
 
     for (const issue of snapshot.issues) {
       for (const entry of source.getIssueDetail(issue.key)?.timeline ?? [])
-        if (entry.source !== 'hermes') expectCoded(`timeline ${issue.key}`, entry.label);
+        if (entry.source !== 'runtime') expectCoded(`timeline ${issue.key}`, entry.label);
       for (const card of source.getIssueDetail(issue.key)?.cards ?? [])
         for (const run of card.runs)
           for (const view of source.getTranscripts(run.id) ?? [])
